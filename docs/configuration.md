@@ -432,6 +432,30 @@ This applies only to agents Firstmate launches; the captain's own primary Firstm
 
 Every claude launch's inline `--settings` JSON also carries `"attribution":{"commit":"","pr":"","sessionUrl":false}`, so a spawned worker never writes a Co-Authored-By trailer, Claude-Session link, or generated-with line into a commit or PR body regardless of which settings scopes end up loaded.
 
+## Launch environment values (config/launch-env)
+
+The optional local, gitignored `config/launch-env` lists environment values every agent Firstmate launches starts with: crewmates, scouts, and secondmates, on every harness and backend, on a fresh spawn and on a relaunch alike, including raw launch commands and remote secondmates.
+It exists for a setting that must hold for every worker regardless of how its pane was created, such as a context-compaction threshold, because the pane shell, its rc files, and the terminal daemon's environment do not reliably reach a launched agent.
+Firstmate delivers the values itself, the same way it delivers the compact-adviser kill switch described above, so they never depend on shell initialization.
+Only agents Firstmate launches receive them; the captain's own primary Firstmate session never does.
+Changes apply to subsequent launches; existing processes keep their environment.
+The file is inherited into secondmate homes through the [primary-authoritative configuration contract](../.agents/skills/secondmate-provisioning/SKILL.md), so a secondmate's own workers start with the same values.
+
+Write one `NAME=value` per line; blank lines and lines beginning with `#` are ignored.
+The name follows the same POSIX environment-name rule as `config/launch-env-allowlist`.
+The value is everything after the first `=`, taken verbatim: no variable expansion, no quote processing, no trimming, and it may be empty.
+A line without `=`, an invalid or repeated name, an unreadable or nonregular file, or a path inspection error stops the launch before anything is created, naming the line.
+Names Firstmate itself establishes at launch are refused for the same reason, so this file can never override the launch contract: every `FM_*` name, `COMPACT_ADVISER_DISABLE`, `FM_TASK_ID`, `TRACEPARENT`, `GOTMPDIR`, `CLAUDE_CONFIG_DIR`, and the harness markers a launch sets or clears.
+For example, to have every worker compact at 40 percent of its context window on Claude Code:
+
+```text
+# Claude Code reads this from its environment and can only lower the threshold
+CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=40
+```
+
+Under an enabled `config/launch-env-allowlist`, these values are assigned after Firstmate's operational floor, so they win over any forwarded pane value.
+[`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the exact parsing and delivery mechanics, with regression coverage that executes emitted launch commands with synthetic values in [`tests/fm-spawn-launch-env.test.sh`](../tests/fm-spawn-launch-env.test.sh).
+
 ## Crew dispatch profiles (config/crew-dispatch.json)
 
 `config/crew-dispatch.json` is an optional local, gitignored file containing natural-language rules that firstmate reads before dispatching a crewmate or scout.
