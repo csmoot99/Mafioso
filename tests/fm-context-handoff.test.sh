@@ -62,12 +62,13 @@ posttooluse_payload() {  # <transcript>
   printf '{"session_id":"s1","transcript_path":"%s","cwd":"/tmp","hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"true"},"tool_response":{"stdout":""}}\n' "$1"
 }
 
-run_precompact() {  # <case-record> <id> <trigger> [gen-override]
-  local rec=$1 id=$2 trigger=$3 gen
+run_precompact() {  # <case-record> <id> <trigger> [gen-override] [ceiling-pct]
+  local rec=$1 id=$2 trigger=$3 gen ceiling=()
   read_hook_case "$rec"
   gen=${4:-$GEN}
+  [ -z "${5:-}" ] || ceiling=(--ceiling-pct "$5")
   precompact_payload "$TRANSCRIPT" "$trigger" \
-    | "$HANDOFF" precompact "$STATE_DIR" "$id" --gen "$gen" --data-dir "$DATA_DIR" --fm-root "$ROOT" 2>"$STATE_DIR/precompact.err"
+    | "$HANDOFF" precompact "$STATE_DIR" "$id" --gen "$gen" --data-dir "$DATA_DIR" --fm-root "$ROOT" "${ceiling[@]}" 2>"$STATE_DIR/precompact.err"
 }
 
 run_posttooluse() {  # <case-record> <id> [gen-override]
@@ -165,6 +166,46 @@ test_high_override_is_treated_as_no_safe_threshold() {
   expect_code 0 "$rc" "an override at or above the ceiling percentage leaves no room for a handoff and must proceed"
   [ "$(marker_field "$STATE_DIR" "$id" state)" = no-override ] || fail "an unusable override must be recorded like a missing one"
   pass "an override too close to the window limit is treated as no safe handoff threshold"
+}
+
+test_ceiling_argument_scales_the_fallback_and_the_override_bound() {
+  local id=hk-ceiling-arg rec rc
+  rec=$(new_hook_case "$id"); read_hook_case "$rec"
+  write_transcript "$TRANSCRIPT" 70000
+  CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=35 run_precompact "$rec" "$id" auto "" 50; rc=$?
+  expect_code 2 "$rc" "the first auto PreCompact under an explicit ceiling must still block"
+  [ "$(marker_field "$STATE_DIR" "$id" ceiling)" = 100000 ] \
+    || fail "with --ceiling-pct 50 the ceiling must be usage times 50 over 35 (100000), got '$(marker_field "$STATE_DIR" "$id" ceiling)'"
+  [ "$(marker_field "$STATE_DIR" "$id" ceiling_pct)" = 50 ] || fail "the marker must record the ceiling percentage the worker was launched with"
+  write_transcript "$TRANSCRIPT" 100000
+  CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=35 run_precompact "$rec" "$id" auto "" 50; rc=$?
+  expect_code 0 "$rc" "reaching the explicit ceiling must let compaction through"
+  [ "$(marker_field "$STATE_DIR" "$id" state)" = fallback ] || fail "reaching the explicit ceiling must record the fallback"
+  id=hk-ceiling-arg-bound
+  rec=$(new_hook_case "$id"); read_hook_case "$rec"
+  write_transcript "$TRANSCRIPT" 70000
+  CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=50 run_precompact "$rec" "$id" auto "" 50; rc=$?
+  expect_code 0 "$rc" "an override at the explicit ceiling is no safe threshold and must proceed"
+  [ "$(marker_field "$STATE_DIR" "$id" state)" = no-override ] || fail "an override at the ceiling must record no-override"
+  assert_grep "1 to 49" "$STATE_DIR/$id.status" "the skipped note must state the override bound as 1 to N-1 for the explicit ceiling"
+  id=hk-ceiling-arg-ok
+  rec=$(new_hook_case "$id"); read_hook_case "$rec"
+  write_transcript "$TRANSCRIPT" 70000
+  CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=49 run_precompact "$rec" "$id" auto "" 50; rc=$?
+  expect_code 2 "$rc" "an override one below the explicit ceiling is a usable threshold and must block"
+  pass "an explicit --ceiling-pct scales the fallback ceiling and bounds the usable override at N-1"
+}
+
+test_no_ceiling_argument_keeps_the_80_percent_default() {
+  local id=hk-ceiling-default rec rc
+  rec=$(new_hook_case "$id"); read_hook_case "$rec"
+  write_transcript "$TRANSCRIPT" 70000
+  CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=35 run_precompact "$rec" "$id" auto; rc=$?
+  expect_code 2 "$rc" "a hook command with no ceiling argument must still block the first auto compaction"
+  [ "$(marker_field "$STATE_DIR" "$id" ceiling)" = 160000 ] \
+    || fail "without a ceiling argument the ceiling must stay 80 percent of the window (160000), got '$(marker_field "$STATE_DIR" "$id" ceiling)'"
+  [ "$(marker_field "$STATE_DIR" "$id" ceiling_pct)" = 80 ] || fail "the marker must record the default ceiling percentage, got '$(marker_field "$STATE_DIR" "$id" ceiling_pct)'"
+  pass "a hook command written without a ceiling argument keeps meaning 80 percent"
 }
 
 test_manual_compaction_is_never_blocked() {
@@ -342,6 +383,82 @@ test_flag_on_adds_nothing_for_another_harness() {
   out=$(grep -rl "fm-context-handoff.sh precompact" "$WT_DIR" "$HOME_DIR/state" 2>/dev/null || true)
   [ -z "$out" ] || fail "the handoff hooks must never be wired for a non-claude harness: $out"
   pass "with the flag on a codex worker gets no handoff wiring"
+}
+
+# run_flag_precompact <settings.json> <transcript> <override> <tokens>: drive the
+# generated PreCompact command exactly as Claude would, returning its exit code.
+run_flag_precompact() {
+  local cmd
+  cmd=$(jq -r ".hooks.PreCompact[0].hooks[0].command" "$1")
+  write_transcript "$2" "$4"
+  precompact_payload "$2" auto | CLAUDE_AUTOCOMPACT_PCT_OVERRIDE="$3" sh -c "$cmd" 2>/dev/null
+}
+
+test_flag_file_fallback_pct_is_baked_into_the_precompact_command() {
+  local rec id=sp-fallback out settings rc
+  rec=$(make_spawn_case fallback claude "$id" on); read_spawn_case "$rec"
+  printf "# the handoff point is set in launch-env\\n\\nfallback-pct=50\\n" > "$HOME_DIR/config/worker-context-handoff"
+  printf "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=35\\n" > "$HOME_DIR/config/launch-env"
+  out=$(fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --mode no-mistakes --yolo off)
+  expect_code 0 $? "claude ship spawn with fallback-pct=50 should succeed: $out"
+  settings="$WT_DIR/.claude/settings.local.json"
+  run_flag_precompact "$settings" "$CASE_DIR/transcript.jsonl" 35 70000; rc=$?
+  expect_code 2 "$rc" "the generated PreCompact command must block the first auto compaction"
+  [ "$(marker_field "$HOME_DIR/state" "$id" ceiling)" = 100000 ] \
+    || fail "fallback-pct=50 with a 35 override must put the ceiling at usage times 50 over 35 (100000), got '$(marker_field "$HOME_DIR/state" "$id" ceiling)'"
+  [ "$(marker_field "$HOME_DIR/state" "$id" ceiling_pct)" = 50 ] || fail "the marker must record the baked ceiling percentage"
+  pass "fallback-pct in the flag file is baked into the PreCompact command and scales the ceiling"
+}
+
+test_comment_only_flag_file_keeps_the_default_ceiling() {
+  local rec id=sp-comment out settings rc
+  rec=$(make_spawn_case comment claude "$id" on); read_spawn_case "$rec"
+  printf "# turned on for every claude worker\\n\\n" > "$HOME_DIR/config/worker-context-handoff"
+  out=$(fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --mode no-mistakes --yolo off)
+  expect_code 0 $? "claude ship spawn with a comment-only flag file should succeed: $out"
+  settings="$WT_DIR/.claude/settings.local.json"
+  [ "$(hook_names "$settings")" = "PostToolUse PreCompact SessionEnd Stop StopFailure UserPromptSubmit" ] \
+    || fail "a comment-only flag file must still wire the hooks, got '$(hook_names "$settings")'"
+  run_flag_precompact "$settings" "$CASE_DIR/transcript.jsonl" 40 80000; rc=$?
+  expect_code 2 "$rc" "the generated PreCompact command must block the first auto compaction"
+  [ "$(marker_field "$HOME_DIR/state" "$id" ceiling)" = 160000 ] \
+    || fail "a comment-only flag file must keep the 80 percent ceiling (160000), got '$(marker_field "$HOME_DIR/state" "$id" ceiling)'"
+  pass "a flag file holding only comments and blank lines keeps the 80 percent ceiling"
+}
+
+# assert_flag_refused <status> <out> <bad-value> <id> <label>
+assert_flag_refused() {
+  local status=$1 out=$2 value=$3 id=$4 label=$5
+  [ "$status" -ne 0 ] || fail "$label: the spawn should have refused: $out"
+  assert_contains "$out" "config/worker-context-handoff" "$label: the refusal must name the flag file"
+  assert_contains "$out" "$value" "$label: the refusal must name the bad value"
+  [ ! -e "$HOME_DIR/state/$id.meta" ] || fail "$label: a task record was created despite the refusal"
+  assert_absent "$WT_DIR/.claude/settings.local.json" "$label: no hooks may be written despite the refusal"
+}
+
+test_bad_fallback_pct_refuses_the_spawn() {
+  local rec id=sp-refuse out status
+  rec=$(make_spawn_case refuse claude "$id" on); read_spawn_case "$rec"
+  printf "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=35\\n" > "$HOME_DIR/config/launch-env"
+  printf "fallback-pct=fifty\\n" > "$HOME_DIR/config/worker-context-handoff"
+  out=$(fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --mode no-mistakes --yolo off); status=$?
+  assert_flag_refused "$status" "$out" fifty "$id" "non-numeric value"
+  printf "fallback-pct=81\\n" > "$HOME_DIR/config/worker-context-handoff"
+  out=$(fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --mode no-mistakes --yolo off); status=$?
+  assert_flag_refused "$status" "$out" 81 "$id" "value above 80"
+  printf "fallback-pct=50\\nfallback-pct=60\\n" > "$HOME_DIR/config/worker-context-handoff"
+  out=$(fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --mode no-mistakes --yolo off); status=$?
+  assert_flag_refused "$status" "$out" "fallback-pct=60" "$id" "duplicate line"
+  printf "handoff-pct=50\\n" > "$HOME_DIR/config/worker-context-handoff"
+  out=$(fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --mode no-mistakes --yolo off); status=$?
+  assert_flag_refused "$status" "$out" "handoff-pct=50" "$id" "unknown key"
+  printf "fallback-pct=35\\n" > "$HOME_DIR/config/worker-context-handoff"
+  out=$(fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --mode no-mistakes --yolo off); status=$?
+  assert_flag_refused "$status" "$out" 35 "$id" "value at the threshold"
+  printf "fallback-pct=30\\n" > "$HOME_DIR/config/worker-context-handoff"
+  out=$(fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --mode no-mistakes --yolo off); status=$?
+  assert_flag_refused "$status" "$out" 30 "$id" "value below the threshold"
+  pass "an invalid, too-high, duplicate, unknown-key, or at-or-below-threshold fallback-pct refuses the spawn and names the value"
 }
 
 # make_relaunch_stub <case-dir>: the pane-lifecycle tmux stub
@@ -548,6 +665,8 @@ test_repeat_fires_keep_blocking_silently
 test_ceiling_lets_compaction_through_and_records_the_fallback
 test_missing_override_lets_compaction_through_with_a_reason
 test_high_override_is_treated_as_no_safe_threshold
+test_ceiling_argument_scales_the_fallback_and_the_override_bound
+test_no_ceiling_argument_keeps_the_80_percent_default
 test_manual_compaction_is_never_blocked
 test_stale_incarnation_and_bad_input_let_compaction_through
 test_second_handoff_gets_the_next_number
@@ -557,6 +676,9 @@ test_flag_off_leaves_the_claude_settings_exactly_as_today
 test_flag_on_adds_the_hooks_for_a_claude_ship
 test_flag_on_adds_the_hooks_for_a_claude_scout
 test_flag_on_adds_nothing_for_another_harness
+test_flag_file_fallback_pct_is_baked_into_the_precompact_command
+test_comment_only_flag_file_keeps_the_default_ceiling
+test_bad_fallback_pct_refuses_the_spawn
 test_relaunch_starts_with_fresh_handoff_state
 test_replace_refuses_a_missing_empty_or_stale_handoff
 test_replace_hands_a_valid_handoff_to_fm_control

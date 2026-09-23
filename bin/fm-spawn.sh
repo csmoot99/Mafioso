@@ -338,6 +338,14 @@
 # Verified per-harness turn-end hooks are installed automatically where enabled; some live outside the worktree.
 # Under config/worker-context-handoff a claude ship or scout also gets the PreCompact and
 # PostToolUse hook commands owned by bin/fm-context-handoff.sh in the same settings file.
+# That flag file may hold one optional `fallback-pct=<N>` line (blank lines and `#`
+# comments ignored): the percentage of the window at which the hook lets compaction
+# through if the handoff never arrives, baked into the PreCompact command as
+# `--ceiling-pct N` so a running worker keeps its launch value and a relaunch reads the
+# file again. Absent, the hook's own default of 80 applies. N must be a whole number, at
+# most 80, and greater than the CLAUDE_AUTOCOMPACT_PCT_OVERRIDE config/launch-env sets,
+# when it sets one; anything else, an unknown key, or a repeated line refuses before
+# launch naming the file and the value.
 # Kimi uses one surgically installed Firstmate region in $HOME/.kimi-code/config.toml,
 # a firstmate-owned global hook and registry, and a gitignored per-task pointer.
 # Kimi 2.0.0 also gates a fresh worktree on an interactive folder-trust dialog.
@@ -870,9 +878,65 @@ esac
 # config/worker-context-handoff (docs/configuration.md "Worker context
 # handoff"): a presence flag read at every launch and relaunch. Present, a
 # claude ship or scout also gets the PreCompact and PostToolUse hook commands
-# owned by bin/fm-context-handoff.sh; absent, nothing changes.
+# owned by bin/fm-context-handoff.sh; absent, nothing changes. Its optional
+# `fallback-pct=<N>` line (header above) is validated here, before anything
+# mutates, against the CLAUDE_AUTOCOMPACT_PCT_OVERRIDE config/launch-env
+# gives the worker, so a ceiling the hook could never honor refuses the launch
+# instead of silently falling back to a default.
 if ! CONTEXT_HANDOFF_PRESENT=$(fm_config_source_present "$CONFIG/worker-context-handoff"); then
   exit 1
+fi
+CONTEXT_HANDOFF_CEILING_PCT=
+spawn_context_handoff_load() { # <file>
+  local file=$1 line lineno=0 value threshold='' i=0
+  if [ ! -f "$file" ] || [ ! -r "$file" ]; then
+    echo "error: config/worker-context-handoff must be a readable regular file" >&2
+    return 1
+  fi
+  while [ "$i" -lt "${#LAUNCH_ENV_SET_NAMES[@]}" ]; do
+    [ "${LAUNCH_ENV_SET_NAMES[$i]}" != CLAUDE_AUTOCOMPACT_PCT_OVERRIDE ] || threshold=${LAUNCH_ENV_SET_VALUES[$i]}
+    i=$((i + 1))
+  done
+  while IFS= read -r line || [ -n "$line" ]; do
+    lineno=$((lineno + 1))
+    case "$line" in
+    '' | '#'*) continue ;;
+    fallback-pct=*) ;;
+    *)
+      echo "error: config/worker-context-handoff line $lineno is not 'fallback-pct=<N>', a blank line, or a # comment: '$line'" >&2
+      return 1
+      ;;
+    esac
+    if [ -n "$CONTEXT_HANDOFF_CEILING_PCT" ]; then
+      echo "error: config/worker-context-handoff sets fallback-pct twice (line $lineno: '$line'); keep one line" >&2
+      return 1
+    fi
+    value=${line#fallback-pct=}
+    case "$value" in
+    '' | *[!0-9]*)
+      echo "error: config/worker-context-handoff fallback-pct must be a whole number from 1 to 80, got '$value' (line $lineno)" >&2
+      return 1
+      ;;
+    esac
+    if [ "$value" -lt 1 ] || [ "$value" -gt 80 ]; then
+      echo "error: config/worker-context-handoff fallback-pct must be a whole number from 1 to 80 (Claude keeps its own threshold near 83), got '$value' (line $lineno)" >&2
+      return 1
+    fi
+    case "$threshold" in
+    '' | *[!0-9]*) ;;
+    *)
+      if [ "$value" -le "$threshold" ]; then
+        echo "error: config/worker-context-handoff fallback-pct must be greater than the CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=$threshold handoff threshold in config/launch-env, got '$value' (line $lineno)" >&2
+        return 1
+      fi
+      ;;
+    esac
+    CONTEXT_HANDOFF_CEILING_PCT=$value
+  done <"$file"
+  return 0
+}
+if [ "$CONTEXT_HANDOFF_PRESENT" = 1 ]; then
+  spawn_context_handoff_load "$CONFIG/worker-context-handoff" || exit 1
 fi
 SUB_HOME_MARKER=".fm-secondmate-home"
 if [ -e "$STATE" ] || [ -L "$STATE" ]; then
@@ -4207,7 +4271,9 @@ if [ "$KIND" != secondmate ]; then
       DATA_REAL=$(cd "$DATA" && pwd -P)
       handoff_cmd_prefix="$(shell_quote "$FM_ROOT/bin/fm-context-handoff.sh")"
       handoff_suffix="$(shell_quote "$STATE_REAL") $(shell_quote "$ID") --gen $(shell_quote "$BUSY_GEN") --data-dir $(shell_quote "$DATA_REAL") --fm-root $(shell_quote "$FM_ROOT")"
-      j_precompact=$(json_escape "$handoff_cmd_prefix precompact $handoff_suffix")
+      handoff_ceiling=
+      [ -z "$CONTEXT_HANDOFF_CEILING_PCT" ] || handoff_ceiling=" --ceiling-pct $(shell_quote "$CONTEXT_HANDOFF_CEILING_PCT")"
+      j_precompact=$(json_escape "$handoff_cmd_prefix precompact $handoff_suffix$handoff_ceiling")
       j_posttool=$(json_escape "$handoff_cmd_prefix posttooluse $handoff_suffix 2>/dev/null || true")
       handoff_hooks=",\"PreCompact\":[{\"matcher\":\"auto\",\"hooks\":[{\"type\":\"command\",\"command\":\"$j_precompact\",\"timeout\":30}]}],\"PostToolUse\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_posttool\",\"timeout\":30}]}]"
     fi

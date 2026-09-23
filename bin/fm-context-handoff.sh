@@ -7,13 +7,15 @@
 # The whole feature is off unless the home holds the presence flag
 # config/worker-context-handoff (docs/configuration.md "Worker context
 # handoff"). bin/fm-spawn.sh reads the flag at every claude ship or scout
-# launch and relaunch, and only then wires the two hook commands below into the
-# worker's .claude/settings.local.json beside the busy-state hooks; a
-# secondmate, the primary, and every other harness never get them.
+# launch and relaunch, validates its one optional `fallback-pct=<N>` line
+# (blank and `#` lines ignored; see fm-spawn's header for the exact rule),
+# and only then wires the two hook commands below into the worker's
+# .claude/settings.local.json beside the busy-state hooks; a secondmate, the
+# primary, and every other harness never get them.
 #
 # Subcommands:
 #
-#   precompact <state-dir> <id> --gen G --data-dir D --fm-root R
+#   precompact <state-dir> <id> --gen G --data-dir D --fm-root R [--ceiling-pct N]
 #       Claude PreCompact hook (matcher `auto`; a manual /compact is never
 #       blocked). Reads the hook payload on stdin. The threshold is Claude's
 #       own: the hook fires exactly when auto-compaction would, which
@@ -33,16 +35,23 @@
 #       Without a usable override the hook only ever fires near the full
 #       window, too late for a safe handoff, so it writes a `no-override`
 #       marker, appends one `note:` saying why, and proceeds. A usable
-#       override is an integer from 1 to 79: at 80 and above the ceiling
-#       below would already be behind the first fire.
+#       override is an integer from 1 to N-1, N being the fallback ceiling
+#       percentage below: at N and above the ceiling would already be behind
+#       the first fire.
 #       Fallback ceiling: at the first block the transcript's latest
 #       assistant `message.usage` (input_tokens + cache_read_input_tokens +
 #       cache_creation_input_tokens, which is what Claude counts as context)
 #       sits at the configured percentage P of the window, so the window is
-#       usage * 100 / P and the ceiling is 80 percent of that (usage * 80 /
-#       P). Claude clamps its own threshold near 83 percent because it
-#       reserves a response buffer, so 80 keeps the fallback compaction
-#       inside the space Claude itself treats as safe. The estimate is
+#       usage * 100 / P and the ceiling is N percent of that (usage * N /
+#       P). N is the --ceiling-pct argument fm-spawn bakes into the hook
+#       command from the flag file's optional `fallback-pct=<N>` line (fm-spawn
+#       validates it; the hook only refuses a value it could never have
+#       baked), and a hook command written without the argument means 80, so
+#       a worker launched before the setting existed keeps its ceiling.
+#       Claude clamps its own threshold near 83 percent because it reserves a
+#       response buffer, so 80 is the highest N and keeps the fallback
+#       compaction inside the space Claude itself treats as safe. The marker
+#       records both the derived token ceiling and N. The estimate is
 #       conservative: if Claude measures its percentage against a window
 #       smaller than the model's full one, the derived ceiling is lower, never
 #       higher.
@@ -107,7 +116,7 @@ set -u
 usage() {
   cat >&2 <<'EOF'
 usage:
-  fm-context-handoff.sh precompact <state-dir> <id> --gen G --data-dir D --fm-root R   (PreCompact payload on stdin)
+  fm-context-handoff.sh precompact <state-dir> <id> --gen G --data-dir D --fm-root R [--ceiling-pct N]   (PreCompact payload on stdin)
   fm-context-handoff.sh posttooluse <state-dir> <id> --gen G --data-dir D --fm-root R  (PostToolUse payload on stdin)
   fm-context-handoff.sh replace <id>                                                (FM_HOME-resolved)
 See the header comment for the full contract.
@@ -131,9 +140,8 @@ esac
 # shellcheck source=bin/fm-busy-lib.sh
 . "$SCRIPT_DIR/fm-busy-lib.sh"
 
-MARKER_MAX_PCT=79
 NOTICE_EVERY=6
-CEILING_PCT=80
+CEILING_PCT_DEFAULT=80
 
 id_ok() { case "${1:-}" in ''|*[!A-Za-z0-9._-]*) return 1 ;; *) return 0 ;; esac; }
 
@@ -215,16 +223,22 @@ hook_args() {
   STATE=${1:-}; ID=${2:-}
   [ -n "$STATE" ] && [ -n "$ID" ] || usage
   shift 2
-  GEN=; DATA_DIR=; SKILL_ROOT=
+  GEN=; DATA_DIR=; SKILL_ROOT=; CEILING_PCT=$CEILING_PCT_DEFAULT
   while [ $# -gt 0 ]; do
     case "$1" in
       --gen) GEN=${2:-}; shift 2 || usage ;;
       --data-dir) DATA_DIR=${2:-}; shift 2 || usage ;;
       --fm-root) SKILL_ROOT=${2:-}; shift 2 || usage ;;
+      --ceiling-pct) CEILING_PCT=${2:-}; shift 2 || usage ;;
       *) usage ;;
     esac
   done
   [ -n "$GEN" ] && [ -n "$DATA_DIR" ] && [ -n "$SKILL_ROOT" ] || usage
+  # fm-spawn validates the ceiling against the flag file before baking it in;
+  # a hook command carrying anything else is a wiring error, not a decision.
+  case "$CEILING_PCT" in ''|*[!0-9]*) usage ;; esac
+  [ "$CEILING_PCT" -ge 1 ] && [ "$CEILING_PCT" -le "$CEILING_PCT_DEFAULT" ] || usage
+  MARKER_MAX_PCT=$((CEILING_PCT - 1))
   id_ok "$ID" || usage
   STATUS="$STATE/$ID.status"
   MARKER=$(marker_path "$STATE" "$ID")
@@ -295,7 +309,7 @@ do_precompact() {
   n=$(next_handoff_number "$DATA_DIR" "$ID")
   handoff="$DATA_DIR/$ID/handoff-$n.md"
   key="context-handoff-$n"
-  marker_write "$MARKER" "v1 gen=$GEN state=due seq=$n handoff=$handoff key=$key usage=$usage pct=$pct window=$window ceiling=$ceiling notices=0 calls=0 at=$epoch" || exit 0
+  marker_write "$MARKER" "v1 gen=$GEN state=due seq=$n handoff=$handoff key=$key usage=$usage pct=$pct window=$window ceiling=$ceiling ceiling_pct=$CEILING_PCT notices=0 calls=0 at=$epoch" || exit 0
   status_note "$STATUS" "note: context handoff due: usage $usage of about $window tokens at $pct percent; the worker was told to write $handoff and report it with key $key" || true
   echo "firstmate: auto-compaction blocked; write the context handoff to $handoff first (fallback compaction at $ceiling tokens)" >&2
   exit 2
