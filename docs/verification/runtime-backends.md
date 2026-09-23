@@ -508,6 +508,27 @@ The lab home was deleted and the test entry was removed from the store and verif
 That automated spawn case runs against a fake claude, so it asserts the store entry and the launch command and nothing more; the live arms above are what establish that the entry actually suppresses the dialog.
 The composer-classification record below observes the same gate from the other side, where an untrusted worktree left Claude, Grok, and Muse unverified because the guard reads a first-launch trust dialog as an unreadable composer.
 
+## Claude worker context handoff
+
+Verified 2026-09-23 on Claude Code 2.1.280 with the opt-in live guard, which is the command that refreshes this record after every Claude upgrade.
+The guard forces an auto compaction in a scratch `claude -p` session with `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=1`, first with a PreCompact hook that allows it (the positive control) and then with the real `bin/fm-context-handoff.sh` PreCompact and PostToolUse commands wired exactly as `bin/fm-spawn.sh` writes them.
+
+```sh
+FM_CONTEXT_HANDOFF_LIVE_E2E=1 bin/fm-test-run.sh tests/fm-context-handoff-live-e2e.test.sh
+```
+
+```text
+ok - Claude 2.1.280 (Claude Code) live E2E: a forced auto compaction was observed with an allowing PreCompact hook (4 events), the exit-2 hook skipped it and the session continued, and the PostToolUse notice reached the model
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=33711
+```
+
+What the run established on this version:
+
+- An auto compaction is observable as one `system` event with subtype `compact_boundary` in `--output-format stream-json` and as an `isCompactSummary` record in the session transcript; the control run saw both, so the blocking assertion is not vacuous.
+- A PreCompact hook registered with matcher `auto` in the project's `.claude/settings.local.json` receives a payload whose `trigger` is `auto` and whose `transcript_path` names the live transcript, and its exit 2 makes Claude skip that proactive compaction: the blocking run recorded the handoff-due marker and status note, produced zero compaction events, and went on to run its next tool call.
+- A PostToolUse hook's `hookSpecificOutput.additionalContext` reaches the model: the blocking run ended with the reply the prompt reserved for having seen the notice, without running the command the notice told it not to start.
+- The compaction fired after the first assistant response, so with a lowering override the hook runs before the model's next call rather than at the full window.
+
 ## Codex hook trust
 
 Verified 2026-09-16 on codex-cli 0.151.0, macOS arm64, in a fresh linked worktree of this repository.

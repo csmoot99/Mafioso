@@ -361,6 +361,7 @@ family_for_basename() {
     fm-quota-array-dispatch-live-e2e.test.sh|fm-send-secondmate-marker-herdr-e2e.test.sh|\
     fm-send-inbox-doorbell-live-e2e.test.sh|\
     fm-calm-claude-mod-plugin.test.sh|fm-calm-claude-mod-live-e2e.test.sh|\
+    fm-context-handoff-live-e2e.test.sh|\
     fm-herdr-submit-confirm-live-e2e.test.sh)
       printf '%s\n' live-harness-optin
       ;;
@@ -373,7 +374,7 @@ family_for_basename() {
     fm-trace-context-spawn.test.sh|fm-spawn-worktree-settle.test.sh|\
     fm-spawn-compact-adviser-disable.test.sh|\
     fm-spawn-compact-adviser-disable-remote.test.sh|\
-    fm-spawn-launch-env.test.sh|\
+    fm-spawn-launch-env.test.sh|fm-context-handoff.test.sh|\
     fm-teardown-endpoint-safety.test.sh)
       printf '%s\n' backend-dispatch
       ;;
@@ -1536,6 +1537,12 @@ families_for_changed_path() {
       # pre-teardown run abort (pr-forge).
       printf '%s\n' pure-contract-unit
       printf '%s\n' pr-forge
+      ;;
+    bin/fm-context-handoff.sh|.agents/skills/context-handoff/SKILL.md)
+      # The PreCompact block and PostToolUse notice are Claude's own
+      # behaviors, so the live guard is selected beside the portable suite.
+      printf '%s\n' __script__:fm-context-handoff.test.sh
+      printf '%s\n' live-harness-optin
       ;;
     bin/fm-control-lib.sh)
       printf '%s\n' backend-dispatch

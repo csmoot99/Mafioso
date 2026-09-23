@@ -336,6 +336,8 @@
 #     __ROVOBIN__   resolved, rovo-verified executable for a rovo launch
 #     __AGYBIN__    resolved, agy-verified executable for an agy launch
 # Verified per-harness turn-end hooks are installed automatically where enabled; some live outside the worktree.
+# Under config/worker-context-handoff a claude ship or scout also gets the PreCompact and
+# PostToolUse hook commands owned by bin/fm-context-handoff.sh in the same settings file.
 # Kimi uses one surgically installed Firstmate region in $HOME/.kimi-code/config.toml,
 # a firstmate-owned global hook and registry, and a gitignored per-task pointer.
 # Kimi 2.0.0 also gates a fresh worktree on an interactive folder-trust dialog.
@@ -865,6 +867,13 @@ case "$CLAUDE_PERMISSION_MODE" in
 auto) CLAUDE_PERM_FLAG='--permission-mode auto' ;;
 *) CLAUDE_PERM_FLAG='--dangerously-skip-permissions' ;;
 esac
+# config/worker-context-handoff (docs/configuration.md "Worker context
+# handoff"): a presence flag read at every launch and relaunch. Present, a
+# claude ship or scout also gets the PreCompact and PostToolUse hook commands
+# owned by bin/fm-context-handoff.sh; absent, nothing changes.
+if ! CONTEXT_HANDOFF_PRESENT=$(fm_config_source_present "$CONFIG/worker-context-handoff"); then
+  exit 1
+fi
 SUB_HOME_MARKER=".fm-secondmate-home"
 if [ -e "$STATE" ] || [ -L "$STATE" ]; then
   fm_backlog_directory_present "$STATE" "state directory" || {
@@ -4129,6 +4138,9 @@ if [ "$KIND" != secondmate ]; then
   # armed: its BeforeAgent / AfterAgent / SessionEnd hooks are a verified
   # open-close pair.
   BUSY_GEN=
+  # A context-handoff marker (bin/fm-context-handoff.sh) is bound to one
+  # incarnation; whatever harness the replacement runs on, it starts fresh.
+  rm -f "$STATE_REAL/$ID.context-handoff"
   case "$HARNESS" in
   codex*)
     if fm_busy_codex_semantic_source; then
@@ -4183,8 +4195,24 @@ if [ "$KIND" != secondmate ]; then
     j_stop=$(json_escape "touch $(shell_quote "$TURNEND"); $busy_cmd_prefix idle $busy_suffix --event stop 2>/dev/null || true")
     j_stopfail=$(json_escape "$busy_cmd_prefix idle $busy_suffix --event stop-failure 2>/dev/null || true")
     j_sessionend=$(json_escape "$busy_cmd_prefix idle $busy_suffix --event session-end 2>/dev/null || true")
+    # Opt-in context handoff (bin/fm-context-handoff.sh): a PreCompact hook
+    # on auto compaction only, whose exit 2 holds the compaction while the
+    # worker writes its handoff, and a PostToolUse hook that delivers the
+    # in-band notice. Both carry the same gen as the busy hooks, so a hook
+    # outliving its incarnation can never speak for the replacement. The
+    # previous incarnation's marker is cleared above for every non-secondmate
+    # launch, so a replacement always starts with fresh handoff state.
+    handoff_hooks=
+    if [ "$CONTEXT_HANDOFF_PRESENT" = 1 ]; then
+      DATA_REAL=$(cd "$DATA" && pwd -P)
+      handoff_cmd_prefix="$(shell_quote "$FM_ROOT/bin/fm-context-handoff.sh")"
+      handoff_suffix="$(shell_quote "$STATE_REAL") $(shell_quote "$ID") --gen $(shell_quote "$BUSY_GEN") --data-dir $(shell_quote "$DATA_REAL") --fm-root $(shell_quote "$FM_ROOT")"
+      j_precompact=$(json_escape "$handoff_cmd_prefix precompact $handoff_suffix")
+      j_posttool=$(json_escape "$handoff_cmd_prefix posttooluse $handoff_suffix 2>/dev/null || true")
+      handoff_hooks=",\"PreCompact\":[{\"matcher\":\"auto\",\"hooks\":[{\"type\":\"command\",\"command\":\"$j_precompact\",\"timeout\":30}]}],\"PostToolUse\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_posttool\",\"timeout\":30}]}]"
+    fi
     cat >"$WT/.claude/settings.local.json" <<EOF
-{"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"$j_submit"}]}],"Stop":[{"hooks":[{"type":"command","command":"$j_stop"}]}],"StopFailure":[{"hooks":[{"type":"command","command":"$j_stopfail"}]}],"SessionEnd":[{"hooks":[{"type":"command","command":"$j_sessionend"}]}]}}
+{"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"$j_submit"}]}],"Stop":[{"hooks":[{"type":"command","command":"$j_stop"}]}],"StopFailure":[{"hooks":[{"type":"command","command":"$j_stopfail"}]}],"SessionEnd":[{"hooks":[{"type":"command","command":"$j_sessionend"}]}]$handoff_hooks}}
 EOF
     exclude_path '.claude/settings.local.json'
     ;;

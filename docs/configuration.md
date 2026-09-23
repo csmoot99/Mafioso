@@ -456,6 +456,16 @@ CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=40
 Under an enabled `config/launch-env-allowlist`, these values are assigned after Firstmate's operational floor, so they win over any forwarded pane value.
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the exact parsing and delivery mechanics, with regression coverage that executes emitted launch commands with synthetic values in [`tests/fm-spawn-launch-env.test.sh`](../tests/fm-spawn-launch-env.test.sh).
 
+## Worker context handoff (config/worker-context-handoff)
+
+The optional local, gitignored presence flag `config/worker-context-handoff` changes what a Claude ship or scout worker does when its context reaches the auto-compaction threshold: instead of compacting and continuing in the same session, it writes a handoff document and Firstmate replaces it with a fresh worker that continues the same task from that document, automatically and without asking.
+Absent, nothing changes: workers compact exactly as they do today.
+The threshold itself stays wherever `config/launch-env` places it through `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`; there is no second threshold setting, and a worker whose environment carries no lowering override compacts as before and says so in its status log, because a handoff at the full window would be too late to be safe.
+The flag is read at every launch and relaunch and applies only to Claude ship and scout workers; a secondmate, the primary Firstmate session, and every other harness are untouched.
+[`bin/fm-context-handoff.sh --help`](../bin/fm-context-handoff.sh) owns the hook mechanics, the fallback ceiling, the durable records, and the replacement command, and the `context-handoff` skill owns what the handoff document carries.
+The file is inherited into secondmate homes through the [primary-authoritative configuration contract](../.agents/skills/secondmate-provisioning/SKILL.md), so a secondmate's own Claude workers hand off the same way.
+Regression coverage runs the real hook commands, spawn wiring, and replacement command in [`tests/fm-context-handoff.test.sh`](../tests/fm-context-handoff.test.sh); the blocking and in-band-notice behaviors are Claude's own and are proven on the installed Claude Code by the opt-in live guard recorded in [`docs/verification/runtime-backends.md`](verification/runtime-backends.md).
+
 ## Crew dispatch profiles (config/crew-dispatch.json)
 
 `config/crew-dispatch.json` is an optional local, gitignored file containing natural-language rules that firstmate reads before dispatching a crewmate or scout.
