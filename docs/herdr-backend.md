@@ -221,7 +221,8 @@ Workspace and tab ids support verification and cleanup but are not inferred from
 The adapter starts and polls a named server before workspace, tab, pane, or agent calls.
 Every Herdr invocation goes through `fm_backend_herdr_cli`, which sets the environment and passes an explicit trailing `--session <name>`.
 An environment variable alone is not reliable when another Herdr server is running.
-When the selected named server is not running, the adapter launches it without inherited Firstmate home and directory overrides, harness identity markers, or the supervision-model override.
+When the selected named server is not running, the adapter launches it without inherited Firstmate home and directory overrides, harness identity markers, Claude Code session identity, or the supervision-model override.
+Claude Code session identity matters because a server started from inside a Claude session would otherwise mark every later Claude pane, the primary firstmate included, as a transcript-off child session; `fm_backend_herdr_server_ensure` in `bin/backends/herdr.sh` owns the exact scrubbed set.
 Herdr passes its server startup environment to every later pane, so retaining those values could misroute panes for another Firstmate home or harness.
 An already-running server is reused without restart or environment changes.
 Explicit named-session routing and unrelated launch environment remain intact.

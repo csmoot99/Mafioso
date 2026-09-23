@@ -1651,7 +1651,24 @@ fm_backend_herdr_projection_order_best_effort() {  # <session> <created-workspac
 # NOT auto-start the server, so this must run before any workspace/tab/pane
 # call. The server outlives its launcher and passes its startup environment to
 # every later pane, so remove home, harness identity, and supervision selection
-# inherited from whichever agent happened to start it. Bounded poll for the
+# inherited from whichever agent happened to start it.
+#
+# Claude Code session identity gets the same treatment. Claude Code injects a
+# per-session set into every process it runs (verified on 2.1.280 by diffing
+# the session's own /proc/<pid>/environ against its Bash tool environment:
+# CLAUDECODE, CLAUDE_CODE_CHILD_SESSION, CLAUDE_CODE_SESSION_ID,
+# CLAUDE_CODE_SESSION_ATTENDED, CLAUDE_CODE_ENTRYPOINT, CLAUDE_CODE_EXECPATH,
+# CLAUDE_CODE_MESSAGING_SOCKET, CLAUDE_CODE_MESSAGING_TOKEN,
+# CLAUDE_CODE_BRIDGE_SESSION_ID, CLAUDE_PID, CLAUDE_EFFORT) plus
+# CLAUDE_PROJECT_DIR and CLAUDE_ENV_FILE for hook processes. A server started
+# from inside a Claude session (a spawn, or fm-crew-state.sh during recovery)
+# would otherwise hand CLAUDE_CODE_CHILD_SESSION=1 to every later pane, and
+# every Claude started in it afterwards - the primary firstmate included -
+# reports "Transcript saving is off - inherited CLAUDE_CODE_CHILD_SESSION
+# marker" and runs as a child session. The list is explicit on purpose:
+# settings a person configures (CLAUDE_CONFIG_DIR,
+# CLAUDE_AUTOCOMPACT_PCT_OVERRIDE, CLAUDE_CODE_USE_*, ...) must still reach
+# the panes, so no blanket CLAUDE_* pattern is used. Bounded poll for the
 # server to report running.
 fm_backend_herdr_server_ensure() {  # <session>
   local session=$1 running out i
@@ -1659,7 +1676,10 @@ fm_backend_herdr_server_ensure() {  # <session>
   [ "$running" = "true" ] && return 0
   (
     unset FM_HOME FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE \
-      CURSOR_AGENT CURSOR_INVOKED_AS CLAUDECODE PI_CODING_AGENT FM_PI_HARNESS GROK_AGENT FM_SUPERVISION_MODEL
+      CURSOR_AGENT CURSOR_INVOKED_AS CLAUDECODE PI_CODING_AGENT FM_PI_HARNESS GROK_AGENT FM_SUPERVISION_MODEL \
+      CLAUDE_CODE_CHILD_SESSION CLAUDE_CODE_SESSION_ID CLAUDE_CODE_SESSION_ATTENDED CLAUDE_CODE_ENTRYPOINT \
+      CLAUDE_CODE_EXECPATH CLAUDE_CODE_MESSAGING_SOCKET CLAUDE_CODE_MESSAGING_TOKEN CLAUDE_CODE_BRIDGE_SESSION_ID \
+      CLAUDE_PID CLAUDE_EFFORT CLAUDE_PROJECT_DIR CLAUDE_ENV_FILE
     fm_backend_herdr_cli "$session" server >/dev/null 2>&1 &
   ) || return 1
   for i in $(seq 1 20); do
