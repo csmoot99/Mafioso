@@ -1668,8 +1668,25 @@ fm_backend_herdr_projection_order_best_effort() {  # <session> <created-workspac
 # marker" and runs as a child session. The list is explicit on purpose:
 # settings a person configures (CLAUDE_CONFIG_DIR,
 # CLAUDE_AUTOCOMPACT_PCT_OVERRIDE, CLAUDE_CODE_USE_*, ...) must still reach
-# the panes, so no blanket CLAUDE_* pattern is used. Bounded poll for the
-# server to report running.
+# the panes, so no blanket CLAUDE_* pattern is used.
+#
+# Firstmate's own per-invocation internals get the same treatment, for the same
+# reason. The server is normally started by whatever read first needs a pane
+# after a reboot, and on a fresh machine that is the session-start fleet
+# snapshot: fm-fleet-snapshot.sh's crew_state_json exports
+# FM_CREW_STATE_META_OVERRIDE and FM_CREW_STATE_STATUS_OVERRIDE for one
+# fm-crew-state.sh call, whose no-run pane_readable probe captures the pane
+# through fm_backend_herdr_target_ready and lands here. A server carrying those
+# two values hands every later pane a META override pointing at a snapshot temp
+# file that no longer exists, so every fm-crew-state.sh in the fleet, the
+# primary firstmate's included, reads "no metadata" for every task (observed
+# after the 2026-10-07 reboot). The session-start stage file and the home
+# summary refresh's worker/parent values are the other per-run internals on that
+# same launch path. The list stays explicit for the same reason as the Claude
+# one: watcher tuning an operator sets on purpose (FM_POLL, FM_HEARTBEAT,
+# FM_PAUSE_RESURFACE_SECS, ...; docs/configuration.md) must still reach the
+# panes, so no blanket FM_* pattern is used either. Bounded poll for the server
+# to report running.
 fm_backend_herdr_server_ensure() {  # <session>
   local session=$1 running out i
   running=$(fm_backend_herdr_cli "$session" status --json 2>/dev/null | jq -r '.server.running // false' 2>/dev/null)
@@ -1679,7 +1696,9 @@ fm_backend_herdr_server_ensure() {  # <session>
       CURSOR_AGENT CURSOR_INVOKED_AS CLAUDECODE PI_CODING_AGENT FM_PI_HARNESS GROK_AGENT FM_SUPERVISION_MODEL \
       CLAUDE_CODE_CHILD_SESSION CLAUDE_CODE_SESSION_ID CLAUDE_CODE_SESSION_ATTENDED CLAUDE_CODE_ENTRYPOINT \
       CLAUDE_CODE_EXECPATH CLAUDE_CODE_MESSAGING_SOCKET CLAUDE_CODE_MESSAGING_TOKEN CLAUDE_CODE_BRIDGE_SESSION_ID \
-      CLAUDE_PID CLAUDE_EFFORT CLAUDE_PROJECT_DIR CLAUDE_ENV_FILE
+      CLAUDE_PID CLAUDE_EFFORT CLAUDE_PROJECT_DIR CLAUDE_ENV_FILE \
+      FM_CREW_STATE_META_OVERRIDE FM_CREW_STATE_STATUS_OVERRIDE FM_SESSION_START_STAGE_FILE \
+      FM_HOME_SUMMARY_IF_IDLE FM_HOME_SUMMARY_WORKER_BEST_EFFORT FM_HOME_SUMMARY_PARENT_ERROR FM_HOME_SUMMARY_PARENT_STAMP
     fm_backend_herdr_cli "$session" server >/dev/null 2>&1 &
   ) || return 1
   for i in $(seq 1 20); do

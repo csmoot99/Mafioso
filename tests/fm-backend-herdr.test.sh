@@ -99,6 +99,9 @@ case "${1:-}" in
       for name in FM_HOME FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE CURSOR_AGENT CURSOR_INVOKED_AS CLAUDECODE PI_CODING_AGENT FM_PI_HARNESS GROK_AGENT FM_SUPERVISION_MODEL \
         CLAUDE_CODE_CHILD_SESSION CLAUDE_CODE_SESSION_ID CLAUDE_CODE_SESSION_ATTENDED CLAUDE_CODE_ENTRYPOINT CLAUDE_CODE_EXECPATH \
         CLAUDE_CODE_MESSAGING_SOCKET CLAUDE_CODE_MESSAGING_TOKEN CLAUDE_CODE_BRIDGE_SESSION_ID CLAUDE_PID CLAUDE_EFFORT CLAUDE_PROJECT_DIR CLAUDE_ENV_FILE \
+        FM_CREW_STATE_META_OVERRIDE FM_CREW_STATE_STATUS_OVERRIDE FM_SESSION_START_STAGE_FILE \
+        FM_HOME_SUMMARY_IF_IDLE FM_HOME_SUMMARY_WORKER_BEST_EFFORT FM_HOME_SUMMARY_PARENT_ERROR FM_HOME_SUMMARY_PARENT_STAMP \
+        FM_POLL FM_HEARTBEAT FM_PAUSE_RESURFACE_SECS \
         CLAUDE_CONFIG_DIR CLAUDE_AUTOCOMPACT_PCT_OVERRIDE CLAUDE_CODE_USE_BEDROCK FM_HERDR_SENTINEL HERDR_SESSION; do
         eval 'value=${'"$name"'-<unset>}'
         printf '%s=%s\n' "$name" "$value"
@@ -1097,6 +1100,10 @@ test_server_ensure_scrubs_home_and_harness_identity() {
     CLAUDE_CODE_CHILD_SESSION=1 CLAUDE_CODE_SESSION_ID=sess-1 CLAUDE_CODE_SESSION_ATTENDED=1 CLAUDE_CODE_ENTRYPOINT=cli CLAUDE_CODE_EXECPATH=/tmp/claude \
     CLAUDE_CODE_MESSAGING_SOCKET=/tmp/msg.sock CLAUDE_CODE_MESSAGING_TOKEN=tok CLAUDE_CODE_BRIDGE_SESSION_ID=bridge-1 CLAUDE_PID=4242 CLAUDE_EFFORT=high \
     CLAUDE_PROJECT_DIR=/tmp/proj CLAUDE_ENV_FILE=/tmp/env-file \
+    FM_CREW_STATE_META_OVERRIDE=/tmp/fm-fleet-tasks.gone/task.meta FM_CREW_STATE_STATUS_OVERRIDE=/tmp/fm-fleet-tasks.gone/task.status \
+    FM_SESSION_START_STAGE_FILE=/tmp/fm-session-start-stage.gone \
+    FM_HOME_SUMMARY_IF_IDLE=0 FM_HOME_SUMMARY_WORKER_BEST_EFFORT=1 FM_HOME_SUMMARY_PARENT_ERROR=err FM_HOME_SUMMARY_PARENT_STAMP=stamp \
+    FM_POLL=30 FM_HEARTBEAT=1800 FM_PAUSE_RESURFACE_SECS=3600 \
     CLAUDE_CONFIG_DIR=/tmp/claude-config CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=70 CLAUDE_CODE_USE_BEDROCK=1 \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_server_ensure fmtest' "$ROOT"
   expect_code 0 $? "server_ensure should start under a polluted launcher environment"
@@ -1111,6 +1118,18 @@ test_server_ensure_scrubs_home_and_harness_identity() {
     CLAUDE_CODE_MESSAGING_SOCKET CLAUDE_CODE_MESSAGING_TOKEN CLAUDE_CODE_BRIDGE_SESSION_ID CLAUDE_PID CLAUDE_EFFORT CLAUDE_PROJECT_DIR CLAUDE_ENV_FILE; do
     assert_contains "$output" "$name=<unset>" "server_ensure leaked Claude Code session identity $name into the long-lived Herdr server"
   done
+  # Firstmate's own per-invocation internals: the fleet snapshot's crew-state
+  # overrides, the session-start stage file, and the home summary refresh's
+  # worker values. A server carrying the META override makes every later
+  # fm-crew-state.sh read "no metadata" for every task.
+  for name in FM_CREW_STATE_META_OVERRIDE FM_CREW_STATE_STATUS_OVERRIDE FM_SESSION_START_STAGE_FILE \
+    FM_HOME_SUMMARY_IF_IDLE FM_HOME_SUMMARY_WORKER_BEST_EFFORT FM_HOME_SUMMARY_PARENT_ERROR FM_HOME_SUMMARY_PARENT_STAMP; do
+    assert_contains "$output" "$name=<unset>" "server_ensure leaked firstmate per-invocation internal $name into the long-lived Herdr server"
+  done
+  # Watcher tuning an operator sets on purpose must still reach the panes.
+  assert_contains "$output" "FM_POLL=30" "server_ensure removed the operator-configured FM_POLL"
+  assert_contains "$output" "FM_HEARTBEAT=1800" "server_ensure removed the operator-configured FM_HEARTBEAT"
+  assert_contains "$output" "FM_PAUSE_RESURFACE_SECS=3600" "server_ensure removed the operator-configured FM_PAUSE_RESURFACE_SECS"
   # Settings a person configures on purpose must still reach the panes.
   assert_contains "$output" "CLAUDE_CONFIG_DIR=/tmp/claude-config" "server_ensure removed the user-configured CLAUDE_CONFIG_DIR"
   assert_contains "$output" "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=70" "server_ensure removed the user-configured CLAUDE_AUTOCOMPACT_PCT_OVERRIDE"
@@ -1118,7 +1137,7 @@ test_server_ensure_scrubs_home_and_harness_identity() {
   assert_contains "$output" "FM_HERDR_SENTINEL=kept" "server_ensure removed an unrelated environment variable"
   assert_contains "$output" "HERDR_SESSION=fmtest" "server_ensure lost explicit Herdr session routing"
   assert_contains "$output" "args=server --session fmtest" "server_ensure lost the trailing Herdr session flag"
-  pass "fm_backend_herdr_server_ensure: scrubs home, harness, and Claude Code session identity without disturbing user settings, unrelated environment, or session routing"
+  pass "fm_backend_herdr_server_ensure: scrubs home, harness, Claude Code session identity, and firstmate per-invocation internals without disturbing operator settings, unrelated environment, or session routing"
 }
 
 test_container_ensure_reuses_existing_workspace() {
