@@ -494,7 +494,7 @@ case "${1:-}" in
       printf '%s\n' "$payload" >> "$D/literal"
       case "$payload" in
         /exit|/quit) printf 'zsh' > "$D/command" ;;
-        *'encode launch-brief'*) printf 'claude' > "$D/command" ;;
+        *'encode launch-brief'* | *'Firstmate operational input waiting: read'*) printf 'claude' > "$D/command" ;;
       esac
     else
       printf '%s\n' "$payload" >> "$D/keys"

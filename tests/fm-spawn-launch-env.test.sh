@@ -187,6 +187,8 @@ test_secondmate_inherits_and_launches_with_values() {
   printf '# Firstmate\n' > "$sm/AGENTS.md"
   printf 'sm-values\n' > "$sm/.fm-secondmate-home"
   printf 'charter for sm-values\n' > "$sm/data/charter.md"
+  printf '%s\n' 'projects/' 'state/' 'data/' 'config/' '.no-mistakes/' > "$sm/.gitignore"
+  git -C "$sm" init -q -b main
   out=$(run_case_spawn sm-values "$sm" --secondmate)
   status=$?
   expect_code 0 "$status" "secondmate spawn should succeed: $out"
@@ -311,7 +313,7 @@ case "${1:-}" in
       printf '%s\n' "$payload" >> "$D/literal"
       case "$payload" in
         /exit|/quit) printf 'zsh' > "$D/command" ;;
-        *'encode launch-brief'*) printf 'codex' > "$D/command" ;;
+        *'encode launch-brief'* | *'Firstmate operational input waiting: read'*) printf 'codex' > "$D/command" ;;
       esac
     else
       printf '%s\n' "$payload" >> "$D/keys"
