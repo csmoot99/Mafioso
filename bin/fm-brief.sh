@@ -108,8 +108,8 @@
 # process state/<id>.inbox/*.msg in order and acknowledge each by moving it to
 # handled/ (record, doorbell, and ladder owned by bin/fm-task-inbox-lib.sh).
 # Ship tasks carry a coding-discipline section rendered by bin/fm-dod-lib.sh's
-# fm_ship_coding_discipline_block (the vendored ponytail prompt at level full,
-# with its three Firstmate adaptations); scouts and secondmate charters do not.
+# fm_ship_coding_discipline_block, which loads the crewmate-adapted ponytail
+# prompt in .agents/skills/ponytail; scouts and secondmate charters do not.
 # Ship tasks include a project-memory section bounding crewmate edits to a
 # project's AGENTS.md/CLAUDE.md: only corrections of factually wrong
 # information, including wrong information the task itself introduced - never

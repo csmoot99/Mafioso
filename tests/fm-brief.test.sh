@@ -511,9 +511,9 @@ test_ship_project_memory_wording() {
   pass "fm-brief.sh: ship project-memory wording bounds edits to corrections of wrong information"
 }
 
-# Every ship worker, in every delivery mode, is pointed at the vendored
+# Every ship worker, in every delivery mode, is pointed at the crewmate-adapted
 # ponytail prompt by the absolute path under the code root (the Claude launch
-# grants .agents/skills), at level full, with the three Firstmate adaptations.
+# grants .agents/skills); the prompt file itself owns the rules.
 # A scout delivers a report and a secondmate charter is not a coding task, so
 # neither carries it. The assertions read the rendered briefs, never the
 # scripts, and the referenced skill file must exist where the brief points.
@@ -525,6 +525,15 @@ test_ship_briefs_load_the_coding_discipline_prompt() {
   [ -f "$skill" ] || fail "the vendored ponytail prompt is missing at $skill"
   [ -f "$ROOT/.agents/skills/ponytail/LICENSE" ] \
     || fail "the vendored ponytail prompt ships without its MIT LICENSE file"
+  assert_grep "plus its \`## Firstmate spec\` plus any spec, report, plan, or PR the \`# Task\` names" "$skill" \
+    "the ponytail prompt lost the what-was-asked definition"
+  assert_grep "in the PR description where the mode opens one, and in the \`done:\` line in every mode" "$skill" \
+    "the ponytail prompt lost the skipped-or-not-checked placement"
+  assert_grep "only where it names none, use a code comment of the form \`shortcut: <the limit>, <when to upgrade>\`" "$skill" \
+    "the ponytail prompt lost the project deferred-work marker precedence"
+  assert_grep "Tests go in alongside every change" "$skill" \
+    "the ponytail prompt lost the captain's tests-alongside rule"
+  assert_no_grep "/ponytail lite" "$skill" "the ponytail prompt still describes a slash command no worker has"
   for id_mode in "brief-discipline-nm:no-mistakes" "brief-discipline-dp:direct-PR" "brief-discipline-lo:local-only"; do
     id=${id_mode%%:*}
     mode=${id_mode##*:}
@@ -532,14 +541,8 @@ test_ship_briefs_load_the_coding_discipline_prompt() {
       || fail "$id: fm-brief.sh --mode $mode exited non-zero"
     brief="$home/data/$id/brief.md"
     assert_grep "# Coding discipline" "$brief" "$id: ship brief lost the coding-discipline section"
-    assert_grep "Before editing, read and follow \`$skill\` at level \`full\`." "$brief" \
-      "$id: ship brief does not load the ponytail prompt by its resolved path at level full"
-    assert_grep "\"Anything the user asked for\" means the \`## Captain's intent\` above plus any spec, report, plan, or PR the Task names" "$brief" \
-      "$id: ship brief lost the what-was-asked adaptation"
-    assert_grep "goes in the PR description where the mode opens one and in the \`done:\` line in every mode, not in a chat reply" "$brief" \
-      "$id: ship brief lost the skipped-or-not-checked placement adaptation"
-    assert_grep "use that marker instead of \`shortcut:\`" "$brief" \
-      "$id: ship brief lost the project deferred-work marker adaptation"
+    assert_grep "Before editing, read and follow \`$skill\`" "$brief" \
+      "$id: ship brief does not load the ponytail prompt by its resolved path"
     # The section sits between the rules and the project-memory contract.
     awk '/^# Coding discipline$/ { cd = NR } /^# Project memory$/ { pm = NR } END { exit !(cd && pm && cd < pm) }' "$brief" \
       || fail "$id: the coding-discipline section is not placed before # Project memory"
@@ -558,7 +561,7 @@ test_ship_briefs_load_the_coding_discipline_prompt() {
     "secondmate charter carries the ship-only coding-discipline prompt"
   assert_no_grep "# Coding discipline" "$home/data/brief-discipline-sm/brief.md" \
     "secondmate charter carries the ship-only coding-discipline section"
-  pass "fm-brief.sh: ship briefs load the vendored ponytail prompt at level full; scouts and charters do not"
+  pass "fm-brief.sh: ship briefs load the ponytail prompt; scouts and charters do not"
 }
 
 test_herdr_lab_contract_is_explicit_and_complete() {

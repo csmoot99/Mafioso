@@ -108,12 +108,10 @@
 # fm_ship_coding_discipline_block owns the `# Coding discipline` section every
 # ship worker receives, from an ordinary ship brief (bin/fm-brief.sh) and from
 # the ship instructions and relaunch brief a promoted scout gets
-# (bin/fm-promote.sh). It loads the vendored ponytail prompt at
+# (bin/fm-promote.sh). It loads the crewmate-adapted ponytail prompt at
 # .agents/skills/ponytail/SKILL.md by the absolute path under the code root,
-# which the Claude launch grants, at level `full`, and carries the three
-# Firstmate adaptations: what "asked for" means, where the skipped-or-not-checked
-# line goes, and a project's own deferred-work marker. A scout brief and a
-# secondmate charter never carry it.
+# which the Claude launch grants; that file owns the rules themselves. A scout
+# brief and a secondmate charter never carry it.
 
 # shellcheck source=bin/fm-pr-lib.sh
 . "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-pr-lib.sh"
@@ -227,12 +225,7 @@ fm_ship_rule_one() {  # <no-mistakes|direct-PR|local-only> <task-id> [branch] [<
 fm_ship_coding_discipline_block() {  # <code-root>
   local root=$1
   printf '# Coding discipline\n'
-  printf "Before editing, read and follow \`%s/.agents/skills/ponytail/SKILL.md\` at level \`full\`.\n" "$root"
-  cat <<'EOF'
-"Anything the user asked for" means the `## Captain's intent` above plus any spec, report, plan, or PR the Task names; behaviour those documents require is asked for, never a feature nobody asked for.
-The one-or-two-line "what was skipped or not checked" statement goes in the PR description where the mode opens one and in the `done:` line in every mode, not in a chat reply.
-Where the project's `AGENTS.md` or `CLAUDE.md` names its own marker for deferred work (for example `TODO(phase-N)`), use that marker instead of `shortcut:`.
-EOF
+  printf "Before editing, read and follow \`%s/.agents/skills/ponytail/SKILL.md\`; it owns the smallest-complete-change rules, what \"asked for\" means, and where the skipped-or-not-checked line goes.\n" "$root"
 }
 
 # Return 0 when a Task subsection still consists only of its scaffold
