@@ -525,7 +525,7 @@ test_ship_briefs_load_the_coding_discipline_prompt() {
   [ -f "$skill" ] || fail "the vendored ponytail prompt is missing at $skill"
   [ -f "$ROOT/.agents/skills/ponytail/LICENSE" ] \
     || fail "the vendored ponytail prompt ships without its MIT LICENSE file"
-  assert_grep "its Firstmate spec, and any spec, report, plan, or PR the Task names; build that and nothing more" "$skill" \
+  assert_grep "any spec, report, plan, or PR the Task names, and the project's own AGENTS.md or CLAUDE.md rules; build that and nothing more" "$skill" \
     "the ponytail prompt lost the what-was-asked definition"
   assert_grep "in the PR description and the \`done:\` line" "$skill" \
     "the ponytail prompt lost the skipped-or-not-checked placement"
