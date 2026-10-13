@@ -10,7 +10,7 @@ Verified as a CREWMATE and SCOUT adapter only; `../../../../../bin/fm-spawn.sh` 
 |---|---|
 | Busy state | Semantic `qwen-hook`, Claude-style event names: `UserPromptSubmit` opens a turn, `Stop` and `SessionEnd` close it. `UserPromptSubmit` fires TWICE per submitted prompt; the repeated busy event is idempotent. `Stop` does NOT fire on a manual Escape, so `../../../../../bin/fm-control.sh` invalidates the record to `unknown fm-interrupt` after an interrupt, as it does for Devin. |
 | Rendered tail | Not a state source, but the running turn's status row is the one ASCII busy token: `(<n>s · esc to cancel)`, carrying `↓ <n> tokens` once output streams, absent when idle. The phase text beside it is model-generated and the spinner is a dot animation; neither is ever a signal. It is registered as qwen's delivery-only footer in `../../../../../bin/fm-composer-lib.sh`, which is what lets a submit be confirmed by the idle-to-busy transition. |
-| Turn end | `Stop` fires once per turn after the final response. A post-turn memory update (`Updated 1 memory`) can follow and briefly re-open busy, so a pane is settled only when the record, the footer, and the composer all agree. |
+| Turn end | `Stop` fires once per turn after the final response. With managed auto-memory on, a post-turn memory update (`Updated 1 memory`) can follow and briefly re-open busy; the per-task settings file turns it off, and a pane is still settled only when the record, the footer, and the composer all agree. |
 | Exit | `/quit` (alias `/exit`), one Enter, exit status 0; prints `To continue this session, run` / `qwen --resume <session-id>`. `SessionEnd` fires once. |
 | Interrupt | Single `Escape`, then `Ctrl+U`. On a turn with streamed output Escape prints `●︎ Request cancelled.`, leaves the agent running, and RESTORES the cancelled prompt into the composer as `* <prompt>`, where the next typed line would concatenate onto it; `Ctrl+U` clears it and is harmless on an empty composer. An Escape that lands before any output streams withdraws the prompt from the transcript with no cancel notice. Escape on an idle composer does nothing. |
 | Composer | A separated shape: one row between two `─` rules opening with a literal ASCII `*`, then the `Type your message or @path/to/file` placeholder as dark truecolor text. It classifies `empty` only through the tmux identity probe plus the ghost-stripped glyph row, and a typed draft is `pending`; `*` is never an agent glyph on its own. |
@@ -72,16 +72,17 @@ The same rule backs pane liveness in `bin/backends/tmux.sh` and the composer ide
 ## Worker busy state and the per-task settings file
 
 `../../../../../bin/fm-spawn.sh` writes a firstmate-owned per-task settings file at `state/<id>.qwen-settings.json` and the launch reaches it through `QWEN_CODE_SYSTEM_SETTINGS_PATH`.
-It carries the three busy hooks bound to the minted busy generation, `"$version": 4`, `security.folderTrust.enabled=false`, `ui.enableFollowupSuggestions=false`, and `ui.enableUserFeedback=false`.
+It carries the three busy hooks bound to the minted busy generation, `"$version": 4`, `security.folderTrust.enabled=false`, `ui.enableFollowupSuggestions=false`, `ui.enableUserFeedback=false`, and `memory.enableManagedAutoMemory=false`.
 Hook arrays merge across qwen's settings layers, so a project's own hooks still run alongside firstmate's.
 This wiring belongs only to the canonical exact `qwen` adapter template; a raw qwen-shaped launch receives no busy-state wiring and has no trusted busy state.
 It is deliberately NOT the worktree's `.qwen/settings.json`, which is the project's own file.
 `../../../../../bin/fm-teardown.sh` removes the file.
 
-Three settings exist because of observed hazards.
+Four settings exist because of observed hazards.
 qwen rewrites any settings file that lacks `"$version"` into pretty-printed form at startup, including the system settings file, which is why the per-task file declares it (a project with no `.qwen/` directory is left untouched).
 After a turn qwen can render a model-generated follow-up row (`* commit this`) in the composer position, where a composer read takes it for a draft.
 After a turn with enough tool calls it can also open a session survey (`How is Qwen doing this session? (optional)`, `1: Good 2: Bad 3: Fine 0: Dismiss`) over the composer, where the next typed line is swallowed.
+`memory.enableManagedAutoMemory` (default true on 0.25.1) gates both the post-turn extraction that writes `~/.qwen/memories` and the pre-turn recall that reads it, so pinning it false keeps every worker out of the captain's global memory in both directions; the captain chose off per task after the session audit found the extractor spending as many tokens as the main loop and a poisoned memory file steering later sessions.
 
 ## Context window on a local Ollama model
 

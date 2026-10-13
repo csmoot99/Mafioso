@@ -113,7 +113,11 @@ git -C "$WT" log -1 --format=%B -- answer.txt > "$LAB/commit.txt" 2>/dev/null
   || fail "worker commit carries qwen attribution: $(cat "$LAB/commit.txt")"
 [ ! -e "$WT/.qwen" ] || fail 'the launch created a .qwen directory inside the project worktree'
 [ "$(cksum < "$SETTINGS")" = "$settings_before" ] || fail 'qwen rewrote the firstmate-owned settings file at startup'
-pass "$VERSION: no project settings written, no settings rewrite, and the worker commit carries no attribution"
+# Managed auto-memory is off per task: the turn must leave no memory store
+# under the worker's user home and no post-turn `Updated N memory` line.
+[ ! -e "$H/user-home/.qwen/memories" ] || fail 'the worker wrote managed auto-memory under ~/.qwen/memories'
+! screen_text | grep -qE 'Updated [0-9]+ memor' || fail "a post-turn memory update ran with managed auto-memory off: $(screen_text | tail -8)"
+pass "$VERSION: no project settings written, no settings rewrite, no memory store, and the worker commit carries no attribution"
 # The real styled screen must classify empty through the tmux path (the
 # separated `*` glyph row proven by the foreground-process identity probe),
 # because fm-control's exit refuses anything short of a proven-empty composer.
