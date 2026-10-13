@@ -1,0 +1,20 @@
+Scenario: relaunch of a PR-ready ship task keeps its armed merge poll authenticating
+Driver: bash tests/fm-control-relaunch.test.sh :: test_relaunch_keeps_an_armed_pr_poll_authenticating
+(drives bin/fm-control.sh relaunch end-to-end through the real fm-spawn.sh --relaunch
+ writer, with a real poll armed via fm_pr_poll_prepare/fm_pr_poll_publish_prepared and
+ validated via fm_pr_lib.sh fm_pr_poll_artifacts_valid before and after the relaunch.)
+
+=== WITH FIX (target commit d43778b: control_relaunch_tx written before preserved pr= block) ===
+ok - fm-control relaunch: an armed PR poll keeps authenticating after the relaunch
+EXIT=0
+
+=== WITHOUT FIX (bin/fm-spawn.sh reverted to base 9abc2e2: control_relaunch_tx after pr= block) ===
+not ok - the relaunched record no longer authenticates its armed PR poll
+EXIT=1
+
+The unfixed symptom matches the filed firstmate bug: after relaunch a non-pr key
+(control_relaunch_tx=) lands after pr=/pr_head=, fm_pr_metadata_identity_parse's
+post_pr_invalid rule rejects it, and the armed merge poll stops authenticating.
+The fix makes fm-spawn.sh echo control_relaunch_tx= before preserve_relaunch_meta
+so the preserved pr= block stays terminal; the parser is unchanged (single owner
+of the ordering rule).
