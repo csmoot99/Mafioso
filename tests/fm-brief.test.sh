@@ -511,6 +511,56 @@ test_ship_project_memory_wording() {
   pass "fm-brief.sh: ship project-memory wording bounds edits to corrections of wrong information"
 }
 
+# Every ship worker, in every delivery mode, is pointed at the vendored
+# ponytail prompt by the absolute path under the code root (the Claude launch
+# grants .agents/skills), at level full, with the three Firstmate adaptations.
+# A scout delivers a report and a secondmate charter is not a coding task, so
+# neither carries it. The assertions read the rendered briefs, never the
+# scripts, and the referenced skill file must exist where the brief points.
+test_ship_briefs_load_the_coding_discipline_prompt() {
+  local home id mode brief skill
+  home="$TMP_ROOT/coding-discipline-home"
+  mkdir -p "$home/data"
+  skill="$ROOT/.agents/skills/ponytail/SKILL.md"
+  [ -f "$skill" ] || fail "the vendored ponytail prompt is missing at $skill"
+  [ -f "$ROOT/.agents/skills/ponytail/LICENSE" ] \
+    || fail "the vendored ponytail prompt ships without its MIT LICENSE file"
+  for id_mode in "brief-discipline-nm:no-mistakes" "brief-discipline-dp:direct-PR" "brief-discipline-lo:local-only"; do
+    id=${id_mode%%:*}
+    mode=${id_mode##*:}
+    FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" some-proj --mode "$mode" >/dev/null 2>&1 \
+      || fail "$id: fm-brief.sh --mode $mode exited non-zero"
+    brief="$home/data/$id/brief.md"
+    assert_grep "# Coding discipline" "$brief" "$id: ship brief lost the coding-discipline section"
+    assert_grep "Before editing, read and follow \`$skill\` at level \`full\`." "$brief" \
+      "$id: ship brief does not load the ponytail prompt by its resolved path at level full"
+    assert_grep "\"Anything the user asked for\" means the \`## Captain's intent\` above plus any spec, report, plan, or PR the Task names" "$brief" \
+      "$id: ship brief lost the what-was-asked adaptation"
+    assert_grep "goes in the PR description where the mode opens one and in the \`done:\` line in every mode, not in a chat reply" "$brief" \
+      "$id: ship brief lost the skipped-or-not-checked placement adaptation"
+    assert_grep "use that marker instead of \`shortcut:\`" "$brief" \
+      "$id: ship brief lost the project deferred-work marker adaptation"
+    # The section sits between the rules and the project-memory contract.
+    awk '/^# Coding discipline$/ { cd = NR } /^# Project memory$/ { pm = NR } END { exit !(cd && pm && cd < pm) }' "$brief" \
+      || fail "$id: the coding-discipline section is not placed before # Project memory"
+  done
+
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-discipline-scout some-proj --scout >/dev/null 2>&1 \
+    || fail "fm-brief.sh scout scaffold exited non-zero"
+  assert_no_grep "ponytail" "$home/data/brief-discipline-scout/brief.md" \
+    "scout brief carries the ship-only coding-discipline prompt"
+  assert_no_grep "# Coding discipline" "$home/data/brief-discipline-scout/brief.md" \
+    "scout brief carries the ship-only coding-discipline section"
+  FM_SECONDMATE_CHARTER='Supervise the alpha domain.' \
+    FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-discipline-sm --secondmate --no-projects >/dev/null 2>&1 \
+    || fail "fm-brief.sh secondmate scaffold exited non-zero"
+  assert_no_grep "ponytail" "$home/data/brief-discipline-sm/brief.md" \
+    "secondmate charter carries the ship-only coding-discipline prompt"
+  assert_no_grep "# Coding discipline" "$home/data/brief-discipline-sm/brief.md" \
+    "secondmate charter carries the ship-only coding-discipline section"
+  pass "fm-brief.sh: ship briefs load the vendored ponytail prompt at level full; scouts and charters do not"
+}
+
 test_herdr_lab_contract_is_explicit_and_complete() {
   local home id brief
   home="$TMP_ROOT/herdr-lab-home"
@@ -1478,6 +1528,7 @@ test_no_mistakes_dod_green_detection
 test_pr_based_dod_requires_non_draft
 test_ask_user_escalation_format
 test_ship_project_memory_wording
+test_ship_briefs_load_the_coding_discipline_prompt
 test_herdr_lab_contract_is_explicit_and_complete
 test_herdr_lab_contract_quotes_foreign_firstmate_path
 test_herdr_lab_omission_is_loud_for_ship_and_scout

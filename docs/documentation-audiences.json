@@ -565,6 +565,10 @@
       "audience": "agent-runtime"
     },
     {
+      "path": ".agents/skills/ponytail/SKILL.md",
+      "audience": "agent-runtime"
+    },
+    {
       "path": ".agents/skills/scout-completion/SKILL.md",
       "audience": "agent-runtime"
     },

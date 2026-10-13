@@ -107,6 +107,9 @@
 # Every scaffold also carries the steering-inbox receive-and-ack section:
 # process state/<id>.inbox/*.msg in order and acknowledge each by moving it to
 # handled/ (record, doorbell, and ladder owned by bin/fm-task-inbox-lib.sh).
+# Ship tasks carry a coding-discipline section rendered by bin/fm-dod-lib.sh's
+# fm_ship_coding_discipline_block (the vendored ponytail prompt at level full,
+# with its three Firstmate adaptations); scouts and secondmate charters do not.
 # Ship tasks include a project-memory section bounding crewmate edits to a
 # project's AGENTS.md/CLAUDE.md: only corrections of factually wrong
 # information, including wrong information the task itself introduced - never
@@ -669,6 +672,7 @@ case "$MODE" in
 esac
 RULE1=$(fm_ship_rule_one "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH") || exit 1
 DOD=$(fm_dod_block "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH") || exit 1
+CODING_DISCIPLINE=$(fm_ship_coding_discipline_block "$FM_ROOT")
 
 cat > "$BRIEF" <<EOF
 You are a crewmate: an autonomous worker agent managed by firstmate. Work on your own; do not wait for a human.
@@ -715,6 +719,8 @@ $ASK_USER_BLOCK
 $SHARED_INFRA_RULE
 
 $WAIT_BLOCK$INBOX_SECTION
+
+$CODING_DISCIPLINE
 
 # Project memory
 A project's \`AGENTS.md\` or \`CLAUDE.md\` is loaded into every agent session in that project, so edit it only to correct information that is factually wrong - including information your own change made wrong - and never to add knowledge because it is missing.

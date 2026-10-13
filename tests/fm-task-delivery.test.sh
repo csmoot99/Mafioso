@@ -366,6 +366,14 @@ STUB
         "$mode: $contract omitted the ship outside-worktree write boundary"
       assert_grep "Leave the worktree clean before reporting done." "$contract" \
         "$mode: $contract omitted the clean-before-done rule"
+      # The promoted worker is pointed at the same vendored coding-discipline
+      # prompt an ordinary ship brief loads, by the resolved code-root path.
+      assert_grep "# Coding discipline" "$contract" \
+        "$mode: $contract omitted the coding-discipline section"
+      assert_grep "Before editing, read and follow \`$ROOT/.agents/skills/ponytail/SKILL.md\` at level \`full\`." "$contract" \
+        "$mode: $contract does not load the ponytail prompt by its resolved path at level full"
+      assert_grep "use that marker instead of \`shortcut:\`" "$contract" \
+        "$mode: $contract lost the project deferred-work marker adaptation"
     done
 
     # Compare the public outputs of both real generation paths. The promoted
