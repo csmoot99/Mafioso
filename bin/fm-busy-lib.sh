@@ -36,13 +36,17 @@
 #                    cancellation emits no Stop, so control invalidates to unknown.
 #   gemini-hook      Gemini agent hooks (BeforeAgent opens; AfterAgent and
 #                    SessionEnd close)
+#   qwen-hook        Qwen Code hooks (UserPromptSubmit opens; Stop and
+#                    SessionEnd close); a manual Escape emits no Stop, so
+#                    control invalidates to unknown as it does for Devin.
 #   codex-hook, codex-appserver  reserved: Codex, gated by
 #                    fm_busy_codex_semantic_source
 #   kimi-wire, kimi-hook  reserved: standalone Kimi, gated by fm_busy_kimi_verified
 # Firstmate-owned sources accepted for every converted adapter:
 #   fm-spawn         the launch-brief turn seeded at spawn
 #   fm-interrupt     the legacy Claude fm-send --key Escape idle event, and the
-#                    unknown invalidation fm-control writes after a Devin interrupt
+#                    unknown invalidation fm-control writes after a Devin or
+#                    Qwen interrupt
 #   fm-recovery      a documented recovery reset after relaunch
 # Classifier-only sources (never written into a record):
 #   endpoint-gone, herdr-native, grok-regex, rovo-regex, agy-regex, muse-session-log,
@@ -77,7 +81,7 @@
 # launch whose busy record never advanced past the fm-spawn seed is
 # indistinguishable, from the record alone, between "still reading its
 # brief" and "parked on an interactive prompt the harness never gets past
-# without a human" - a Claude/Gemini/Pi workspace-trust dialog, a sign-in or
+# without a human" - a Claude/Gemini/Qwen/Pi workspace-trust dialog, a sign-in or
 # auth-method picker, or a first-run setup menu. Left alone this reads as
 # ordinary busy for the full BUSY_TURN_MAX_SECS (one hour) before the
 # separate wedge-suspect bound even looks at it. The signature table matches
@@ -88,7 +92,8 @@
 # dialog. This is a best-effort backstop, not prevention: it never suppresses
 # a real busy verdict once any hook has posted, and it defers to whatever
 # harness-specific trust pre-registration already exists (fm-claude-trust.sh,
-# GEMINI_CLI_TRUST_WORKSPACE) to stop the dialog from appearing at all.
+# GEMINI_CLI_TRUST_WORKSPACE, qwen's per-task folder-trust setting) to stop
+# the dialog from appearing at all.
 # Apart from the launch-prompt backstop above, Grok, Rovo, and AGY are the ONLY
 # rendered-text busy fallbacks that survive the redesign, because none of their
 # structured lifecycles was credited-live-verified
@@ -231,6 +236,7 @@ fm_busy_sources_for_harness() {  # <harness>
       ;;
     opencode*) adapter=opencode-plugin ;;
     gemini*) adapter=gemini-hook ;;
+    qwen*) adapter=qwen-hook ;;
     devin) adapter=devin-hook ;;
     pi|pi-signed) adapter=pi-ext ;;
     omp) adapter=omp-ext ;;
@@ -992,10 +998,26 @@ fm_busy_gemini_launch_prompt_tail() {
   printf '%s' "$buf" | grep -qiE "${FM_BUSY_GEMINI_APIKEY_PROMPT_REGEX:-Enter Gemini API Key}"
 }
 
+# fm_busy_qwen_launch_prompt_tail: Qwen Code's folder-trust dialog ("Do you
+# trust this folder?" with `Trust folder (<name>)`, `Trust parent folder
+# (<parent>)`, and `Don't trust (esc)`), live-verified on qwen 0.25.1 with
+# security.folderTrust.enabled forced on (docs/verification/runtime-backends.md
+# "Qwen Code"). fm-spawn.sh's per-task system settings disable folder trust,
+# so the dialog is reached only when that wiring is missing, which is exactly
+# the raw-launch case this backstop exists for. The question is paired with
+# one of its own option lines for the same self-referential-prose reason as
+# Claude's and Gemini's pairings above.
+fm_busy_qwen_launch_prompt_tail() {
+  local buf
+  buf=$(cat)
+  printf '%s' "$buf" | grep -qiE "${FM_BUSY_QWEN_TRUST_PROMPT_REGEX:-Do you trust this folder\\?}" \
+    && printf '%s' "$buf" | grep -qiE "Trust folder|Don't trust"
+}
+
 # fm_busy_launch_prompt_parked: dispatch to the signature above for <harness>,
 # or fail when this harness has none. Consumes the tail on stdin. Scoped to
 # exactly the harnesses fm-spawn.sh arms with the fm-spawn busy source
-# (claude*, opencode*, pi, pi-signed, omp, gemini) since only those can ever
+# (claude*, opencode*, pi, pi-signed, omp, gemini, qwen) since only those can ever
 # read a pinned "busy fm-spawn" record; codex and standalone Kimi already
 # classify unknown before a record is ever consulted, and opencode ships no
 # trust dialog at all.
@@ -1004,6 +1026,7 @@ fm_busy_launch_prompt_parked() {  # <harness>
     claude*) fm_busy_claude_launch_prompt_tail ;;
     pi | pi-signed | omp) fm_busy_pi_launch_prompt_tail ;;
     gemini) fm_busy_gemini_launch_prompt_tail ;;
+    qwen) fm_busy_qwen_launch_prompt_tail ;;
     *) return 1 ;;
   esac
 }

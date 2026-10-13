@@ -49,6 +49,8 @@ _FM_TMUX_LIB_DIR=${BASH_SOURCE[0]%/*}
 . "${_FM_TMUX_LIB_DIR:-/}/fm-composer-lib.sh"
 # shellcheck source=bin/fm-cursor-lib.sh
 . "${_FM_TMUX_LIB_DIR:-/}/fm-cursor-lib.sh"
+# shellcheck source=bin/fm-qwen-lib.sh
+. "${_FM_TMUX_LIB_DIR:-/}/fm-qwen-lib.sh"
 unset _FM_TMUX_LIB_DIR
 
 
@@ -90,47 +92,56 @@ fm_tmux_composer_caps() {
 }
 
 # fm_tmux_composer_identity: the tmux agent-identity probe backing the
-# separated (pi) composer shape, tmux's analogue of herdr's native
-# `agent get`. It answers only for pi, from two live signals:
+# separated composer shapes (pi's blank row, qwen's `*` glyph row), tmux's
+# analogue of herdr's native `agent get`. It answers only for pi and qwen,
+# from two live signals:
 #   - identity: the pane tty's FOREGROUND process group (pgid = tpgid, the
 #     same scoping as fm_backend_tmux_foreground_comms) contains a pi-family
 #     process (pi, pi-signed, pi-launcher - docs/verification/
 #     runtime-backends.md "Agent liveness name sources"), falling back to
-#     tmux's own foreground-derived #{pane_current_command}. A pane whose
-#     agent died to a shell has no pi foreground process and gets NO identity,
-#     which is exactly what keeps the strict blank-row rule honest: a blank
-#     row between two stale rules stays unknown.
-#   - status: pi's verified busy footer via fm_pane_is_busy, mapped onto the
-#     idle/working vocabulary herdr's probe reports natively.
-# Prints "pi<TAB>idle" or "pi<TAB>working"; exits 1 when the pane is not a
-# live pi.
+#     tmux's own foreground-derived #{pane_current_command}; or a qwen
+#     process, whose comm is the node interpreter's (`MainThread` on Linux)
+#     so its identity is read from argv through bin/fm-qwen-lib.sh, with no
+#     command-name fallback. A pane whose agent died to a shell has no such
+#     foreground process and gets NO identity, which is exactly what keeps
+#     the strict blank-row rule honest: a blank row between two stale rules
+#     stays unknown.
+#   - status: that harness's verified busy footer via fm_pane_busy_state,
+#     mapped onto the idle/working vocabulary herdr's probe reports natively.
+# Prints "<pi|qwen><TAB>idle" or "<pi|qwen><TAB>working"; exits 1 when the
+# pane is not a live pi or qwen.
 fm_tmux_composer_identity() {  # <target>
-  local target=$1 tty pgid tpgid comm found=0 status
+  local target=$1 tty pid pgid tpgid comm args found='' status
   tty=$(tmux display-message -p -t "$target" '#{pane_tty}' 2>/dev/null) || tty=
   case "$tty" in
     /dev/*)
-      while read -r _ pgid tpgid comm; do
+      while read -r pid pgid tpgid comm; do
         [ -n "$comm" ] || continue
         [ "$pgid" = "$tpgid" ] || continue
         case "${comm##*/}" in
-          pi|pi-signed|pi-launcher|Pi) found=1 ;;
+          pi|pi-signed|pi-launcher|Pi) found=pi ;;
+          *)
+            [ -z "$found" ] || continue
+            args=$(LC_ALL=C ps -p "$pid" -o args= 2>/dev/null) || args=
+            ! fm_qwen_args_are_qwen "$args" || found=qwen
+            ;;
         esac
       done <<EOF
 $(LC_ALL=C ps -t "${tty#/dev/}" -o pid=,pgid=,tpgid=,comm= 2>/dev/null)
 EOF
       ;;
   esac
-  if [ "$found" -ne 1 ]; then
+  if [ -z "$found" ]; then
     comm=$(tmux display-message -p -t "$target" '#{pane_current_command}' 2>/dev/null) || comm=
     case "${comm##*/}" in
-      pi|pi-signed|pi-launcher) found=1 ;;
+      pi|pi-signed|pi-launcher) found=pi ;;
     esac
   fi
-  [ "$found" -eq 1 ] || return 1
-  status=$(fm_pane_busy_state "$target" pi)
+  [ -n "$found" ] || return 1
+  status=$(fm_pane_busy_state "$target" "$found")
   case "$status" in
-    busy) printf 'pi\tworking' ;;
-    idle) printf 'pi\tidle' ;;
+    busy) printf '%s\tworking' "$found" ;;
+    idle) printf '%s\tidle' "$found" ;;
     *) return 1 ;;
   esac
 }

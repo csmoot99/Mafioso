@@ -619,6 +619,35 @@ test_matrix_pi_separated_needs_identity() {
   pass "matrix: pi's separated composer needs identity + structure; the blank row alone never proves it"
 }
 
+test_matrix_qwen_separated_glyph_row_needs_identity() {
+  # Real idle qwen 0.25.1 on tmux (captured live 2026-10-13): one row between
+  # two solid rules opening with a literal ASCII `*`, then the placeholder in
+  # a dark truecolor foreground the ghost strip removes. `*` is never an agent
+  # glyph (it is a bullet everywhere else), so the row proves a composer only
+  # with a live idle qwen identity, exactly as pi's blank row does.
+  local screen typed wrapped bullet qwen_idle qwen_working none
+  screen=$'transcript\n────────────────────────\n* \033[38;2;108;112;134m  Type your message or @path/to/file\033[39m\n────────────────────────\n  YOLO mode (shift + tab to cycle)'
+  qwen_idle=$(printf 'qwen\tidle'); qwen_working=$(printf 'qwen\tworking'); none=$(printf 'zsh\t')
+  assert_screen "qwen idle on tmux with identity" empty "$CAPS_TMUX" "$screen" 2 "$qwen_idle"
+  assert_screen "qwen idle on herdr with identity" empty "$CAPS_STYLED" "$screen" '' "$qwen_idle"
+  [ "$(fm_composer_classify_screen "$CAPS_TMUX" "$screen" 2)" = need-identity ] \
+    || fail "an identity-capable profile should request the lazy identity probe for qwen's row"
+  assert_screen "working qwen defers" unknown "$CAPS_TMUX" "$screen" 2 "$qwen_working"
+  assert_screen "absent identity cannot prove qwen's glyph row" unknown "$CAPS_TMUX" "$screen" 2 probe-absent
+  assert_screen "a non-qwen identity cannot prove qwen's glyph row" unknown "$CAPS_TMUX" "$screen" 2 "$none"
+  assert_screen "qwen's row without identity capability" unknown "$CAPS_STYLED_NOID" "$screen"
+  # A plain capture cannot tell the placeholder from typed text.
+  assert_screen "qwen's row on plain backends" unknown "$CAPS_PLAIN" "$screen"
+  typed=$'────────────────────────\n* \033[39mhello draft\033[4m \xe2\x80\x8b\033[0m\n────────────────────────'
+  assert_screen "qwen typed draft" pending "$CAPS_TMUX" "$typed" 1 "$qwen_idle"
+  wrapped=$'────────────────────────\n* \033[39ma long draft that\033[0m\n\033[39mwraps onto a second row\033[0m\n────────────────────────'
+  assert_screen "qwen wrapped draft" pending "$CAPS_TMUX" "$wrapped" 2 "$qwen_idle"
+  # Bright text after the glyph is a draft even when it looks like a bullet.
+  bullet=$'────────────────────────\n* a bullet point\n────────────────────────'
+  assert_screen "qwen bullet-shaped row" pending "$CAPS_TMUX" "$bullet" 1 "$qwen_idle"
+  pass "matrix: qwen's * glyph row needs identity + structure; the glyph alone never proves it"
+}
+
 test_matrix_pi_dollar_status_footer_is_empty() {
   # Pi's status row `$0.000 (sub) 5.4%/272k (auto)` at column 0 used to read
   # as a dead-shell prompt, so an idle separated composer classified unknown.
@@ -1032,6 +1061,7 @@ test_matrix_herdr_halfblock_rule_bounds_bare_wrap
 test_matrix_omp_status_row_bounds_bare_composer
 test_matrix_codex_idle_starfield_furniture
 test_matrix_pi_separated_needs_identity
+test_matrix_qwen_separated_glyph_row_needs_identity
 test_matrix_pi_dollar_status_footer_is_empty
 test_matrix_opencode_leftbar_signals
 test_matrix_grok_titled_bottom_border

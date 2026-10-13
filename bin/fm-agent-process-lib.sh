@@ -19,6 +19,8 @@ _FM_AGENT_PROCESS_LIB_DIR=${BASH_SOURCE[0]%/*}
 . "${_FM_AGENT_PROCESS_LIB_DIR:-/}/fm-session-lock-lib.sh"
 # shellcheck source=bin/fm-gemini-lib.sh
 . "${_FM_AGENT_PROCESS_LIB_DIR:-/}/fm-gemini-lib.sh"
+# shellcheck source=bin/fm-qwen-lib.sh
+. "${_FM_AGENT_PROCESS_LIB_DIR:-/}/fm-qwen-lib.sh"
 unset _FM_AGENT_PROCESS_LIB_DIR
 
 # fm_agent_process_classify_name: the single owner of the process-name
@@ -49,8 +51,11 @@ fm_agent_process_classify_name() {  # <path> [argv0] -> agent|shell|other
     # single binary, comm=agy with argv[0]=agy), and a glob would claim
     # unrelated commands containing that fragment. devin is anchored the same
     # way (verified, devin 3000.11.1: comm=devin), so a `*devin*` glob never
-    # claims an unrelated command.
-    agy|devin) printf 'agent' ;;
+    # claims an unrelated command. qwen is anchored too: the installed bundle
+    # never presents this name (its comm is the node interpreter's, owned by
+    # bin/fm-qwen-lib.sh), so only a natively-named qwen command reaches it,
+    # and a glob would claim the qwen3-coder model name in unrelated panes.
+    agy|devin|qwen) printf 'agent' ;;
     zsh|bash|sh|dash|ash|ksh|mksh|tcsh|csh|fish) printf 'shell' ;;
     *)
       if fm_harness_path_name "$path" >/dev/null || fm_harness_path_name "$argv0" >/dev/null; then
@@ -85,8 +90,9 @@ fm_agent_process_classify_name() {  # <path> [argv0] -> agent|shell|other
 #   <argv0>  argv[0] as the process reports it - a bare name or an install
 #            path, whichever the launcher used (empty when unknown).
 #   <args>   the flattened command line, read only for the node-bundle
-#            harnesses whose identity sits in argv[1] (bin/fm-gemini-lib.sh).
-#   [pid]    when given, lets the Gemini rule read argv boundaries from the
+#            harnesses whose identity sits in argv[1] (bin/fm-gemini-lib.sh,
+#            bin/fm-qwen-lib.sh).
+#   [pid]    when given, lets the Gemini and Qwen rules read argv boundaries from the
 #            live process instead of the flattened line.
 fm_agent_process_classify() {  # <name> <argv0> <args> [pid] -> agent|shell|other
   local name=${1:-} argv0=${2:-} args=${3:-} pid=${4:-} by_name by_argv0
@@ -100,11 +106,11 @@ fm_agent_process_classify() {  # <name> <argv0> <args> [pid] -> agent|shell|othe
   else
     by_argv0=$by_name
   fi
-  if [ -n "$pid" ] && fm_gemini_pid_is_gemini "$pid"; then
+  if [ -n "$pid" ] && { fm_gemini_pid_is_gemini "$pid" || fm_qwen_pid_is_qwen "$pid"; }; then
     printf 'agent'
     return 0
   fi
-  if [ -n "$args" ] && fm_gemini_args_are_gemini "$args"; then
+  if [ -n "$args" ] && { fm_gemini_args_are_gemini "$args" || fm_qwen_args_are_qwen "$args"; }; then
     printf 'agent'
     return 0
   fi

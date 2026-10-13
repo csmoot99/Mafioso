@@ -370,6 +370,43 @@ test_pi_identity_requires_readable_busy_state() (
   pass "fm_tmux_composer_identity: unknown busy state cannot become idle identity"
 )
 
+test_qwen_identity_reads_argv_of_the_foreground_node_bundle() (
+  local out
+  # qwen's comm is the node interpreter's (MainThread on Linux), so only argv
+  # identifies it; the mocks reproduce the live ps shape (verified 0.25.1).
+  # shellcheck disable=SC2329 # Mock invoked indirectly by the sourced adapter.
+  tmux() {
+    local arg
+    for arg in "$@"; do
+      case "$arg" in
+        *pane_tty*) printf '/dev/pts/9\n'; return 0 ;;
+        *pane_current_command*) printf 'node\n'; return 0 ;;
+      esac
+    done
+    return 1
+  }
+  # shellcheck disable=SC2329 # Mock invoked indirectly by the sourced adapter.
+  ps() {
+    case "$*" in
+      *'-t '*) printf '4242 4242 4242 MainThread\n' ;;
+      *'-p 4242 '*) printf '%s\n' "${FM_FAKE_ARGS:-node /home/u/.local/bin/qwen -y -i brief}" ;;
+    esac
+  }
+  # shellcheck disable=SC2329 # Mock invoked indirectly by the sourced adapter.
+  fm_pane_busy_state() { printf '%s' "${FM_FAKE_BUSY:-idle}"; }
+  out=$(fm_tmux_composer_identity fakepane) || fail "a live idle qwen must produce identity"
+  [ "$out" = "$(printf 'qwen\tidle')" ] || fail "expected qwen idle identity, got '$out'"
+  out=$(FM_FAKE_BUSY=busy fm_tmux_composer_identity fakepane) || fail "a live busy qwen must produce identity"
+  [ "$out" = "$(printf 'qwen\tworking')" ] || fail "expected qwen working identity, got '$out'"
+  if out=$(FM_FAKE_BUSY=unknown fm_tmux_composer_identity fakepane); then
+    fail "a qwen with unreadable busy state must not produce identity, got '$out'"
+  fi
+  if out=$(FM_FAKE_ARGS='node /home/u/project/server.js' fm_tmux_composer_identity fakepane); then
+    fail "an unrelated node process must not produce identity, got '$out'"
+  fi
+  pass "fm_tmux_composer_identity: qwen is read from argv, never from the node comm or a bare interpreter"
+)
+
 test_bordered_busy_signatures_are_pending() {
   local dir fb capture out signature
   dir="$TMP_ROOT/bordered-busy-signatures"; mkdir -p "$dir"
@@ -697,6 +734,7 @@ test_two_row_composer_reads_text_above_empty_cursor_row
 test_wrapped_composer_reads_all_content_rows
 test_proven_box_bottom_border_cursor_classifies_content
 test_pi_identity_requires_readable_busy_state
+test_qwen_identity_reads_argv_of_the_foreground_node_bundle
 test_bordered_busy_signatures_are_pending
 test_non_bordered_busy_footer_is_unknown_strict
 test_clipped_bordered_box_is_unknown

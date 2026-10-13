@@ -376,6 +376,27 @@ test_launch_prompt_gemini_dialogs() {
   pass "a Gemini launch parked on its trust, auth-picker, or API-key dialog classifies unknown launch-prompt"
 }
 
+test_launch_prompt_qwen_dialog() {
+  local state out
+  state=$(new_state_dir launch-prompt-qwen-trust)
+  "$EV" arm "$state" t1 >/dev/null
+  # The rows qwen 0.25.1 renders with security.folderTrust.enabled forced on.
+  out=$(fm_busy_classify tmux w1 qwen t1 "$state" 'Do you trust this folder?
+Trusting a folder allows Qwen Code to execute commands it suggests.
+› 1. Trust folder (wt)
+  2. Trust parent folder (lab)
+  3. Don'"'"'t trust (esc)')
+  [ "$out" = "unknown launch-prompt" ] \
+    || fail "a qwen launch parked on its folder-trust dialog must classify unknown launch-prompt, got '$out'"
+  # The question alone is prose a worker could render; the option row is required.
+  state=$(new_state_dir launch-prompt-qwen-prose)
+  "$EV" arm "$state" t1 >/dev/null
+  out=$(fm_busy_classify tmux w1 qwen t1 "$state" 'Do you trust this folder? I asked the captain.')
+  [ "$out" = "busy fm-spawn" ] \
+    || fail "qwen prose quoting the trust question must stay busy fm-spawn, got '$out'"
+  pass "a qwen launch parked on its folder-trust dialog classifies unknown launch-prompt"
+}
+
 test_launch_prompt_never_shortens_a_working_launch() {
   local state out
   state=$(new_state_dir launch-prompt-working)
@@ -613,6 +634,7 @@ test_launch_prompt_claude_trust_dialog
 test_launch_prompt_pi_trust_dialog
 test_launch_prompt_pi_requires_both_markers
 test_launch_prompt_gemini_dialogs
+test_launch_prompt_qwen_dialog
 test_launch_prompt_never_shortens_a_working_launch
 test_launch_prompt_scoped_to_armed_harnesses
 test_launch_prompt_never_reclassifies_an_advanced_record

@@ -248,7 +248,7 @@ test_non_cursor_launch_clears_inherited_cursor_markers() {
   status=$?
   expect_code 0 "$status" "claude spawn under Cursor markers should succeed"
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI" \
+  assert_contains "$launch" "env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI -u QWEN_CODE_CLI" \
     "non-cursor launch must clear both inherited Cursor identity markers"
   pass "non-cursor launches clear inherited Cursor identity markers"
 }
@@ -707,6 +707,66 @@ test_cursor_threads_model_workspace_and_omits_effort_axis() {
   assert_grep 'harness=cursor' "$HOME_DIR/state/$id.meta" "cursor harness was not recorded in meta"
   assert_grep 'model=cursor-grok-4.5-high' "$HOME_DIR/state/$id.meta" "cursor model was recorded as default"
   pass "cursor receives its model-qualified reasoning class and exact task workspace"
+}
+
+test_qwen_threads_model_interactive_brief_and_omits_effort_axis() {
+  local rec id out status launch
+  id=profile-qwen-k1
+  rec=$(make_spawn_case profile-qwen qwen "$id")
+  read_case_record "$rec"
+  fm_fake_exit0 "$FAKEBIN_DIR" qwen
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" \
+    --model qwen3-coder:30b --effort high)
+  status=$?
+  expect_code 0 "$status" "qwen spawn with a model and an effort should succeed"
+  assert_meta_profile "$HOME_DIR/state/$id.meta" qwen qwen3-coder:30b high
+  launch=$(cat "$LAUNCH_LOG")
+  # The brief MUST ride -i: a bare positional is a one-shot headless run on qwen.
+  assert_contains "$launch" "qwen -y --model 'qwen3-coder:30b' -i \"\$(" \
+    "qwen launch did not carry yolo, the model, and the interactive brief flag in order"
+  assert_contains "$launch" "encode launch-brief" "qwen launch did not deliver the brief"
+  assert_contains "$launch" "QWEN_CODE_SYSTEM_SETTINGS_PATH='$HOME_DIR/state/$id.qwen-settings.json'" \
+    "qwen launch did not point at its firstmate-owned settings file"
+  assert_contains "$launch" "env -u CLAUDECODE" "qwen launch must clear foreign primary markers"
+  assert_contains "$launch" "-u GEMINI_CLI -u QWEN_CODE_CLI" "qwen launch must clear a stale node-bundle marker"
+  assert_not_contains "$launch" "--effort" "qwen launch must not invent an effort flag"
+  assert_not_contains "$launch" "--approval-mode" "an absent config/qwen-approval-mode must launch with -y"
+  assert_not_contains "$launch" "QWEN_CODE_TRUSTED_FOLDERS_PATH" "qwen launch must not route trust through a folder record"
+  assert_not_contains "$launch" "openai" "qwen launch must never carry a credential or endpoint"
+  pass "qwen receives its model and interactive brief and omits the effort axis"
+}
+
+test_qwen_approval_mode_auto_replaces_yolo() {
+  local rec id out status launch
+  id=profile-qwen-k2
+  rec=$(make_spawn_case profile-qwen-auto qwen "$id")
+  read_case_record "$rec"
+  fm_fake_exit0 "$FAKEBIN_DIR" qwen
+  printf ' auto\n' > "$HOME_DIR/config/qwen-approval-mode"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  status=$?
+  expect_code 0 "$status" "qwen spawn under config/qwen-approval-mode auto should succeed: $out"
+  launch=$(cat "$LAUNCH_LOG")
+  assert_contains "$launch" "qwen --approval-mode auto -i" "auto must launch with --approval-mode auto"
+  assert_not_contains "$launch" " -y " "auto must not also pass -y"
+  pass "config/qwen-approval-mode auto selects qwen's classifier-reviewed mode"
+}
+
+test_qwen_approval_mode_refuses_unknown_value_before_launch() {
+  local rec id out status
+  id=profile-qwen-k3
+  rec=$(make_spawn_case profile-qwen-bad qwen "$id")
+  read_case_record "$rec"
+  fm_fake_exit0 "$FAKEBIN_DIR" qwen
+  printf 'plan\n' > "$HOME_DIR/config/qwen-approval-mode"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  status=$?
+  [ "$status" -ne 0 ] || fail "an unknown qwen approval mode must refuse the spawn"
+  assert_contains "$out" "config/qwen-approval-mode holds 'plan'; accepted values are: yolo" \
+    "the refusal must name the file, the value, and the accepted set: $out"
+  assert_absent "$HOME_DIR/state/$id.meta" "a refused qwen spawn must leave no task record"
+  [ ! -s "$LAUNCH_LOG" ] || fail "a refused qwen spawn must launch nothing"
+  pass "config/qwen-approval-mode refuses an unknown value before any launch"
 }
 
 test_cursor_refuses_model_absent_from_live_catalog() {
@@ -1447,7 +1507,7 @@ test_claude_forwards_firstmate_config_dir_when_set() {
   status=$?
   expect_code 0 "$status" "claude spawn with CLAUDE_CONFIG_DIR set should succeed"
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "CLAUDE_CONFIG_DIR='$CASE_DIR/claude-work' env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude --dangerously-skip-permissions $(claude_worker_add_dirs "$HOME_DIR" "$id")--settings '{\"feedbackDrafts\":\"off\",\"attribution\":{\"commit\":\"\",\"pr\":\"\",\"sessionUrl\":false}}'" \
+  assert_contains "$launch" "CLAUDE_CONFIG_DIR='$CASE_DIR/claude-work' env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI -u QWEN_CODE_CLI CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude --dangerously-skip-permissions $(claude_worker_add_dirs "$HOME_DIR" "$id")--settings '{\"feedbackDrafts\":\"off\",\"attribution\":{\"commit\":\"\",\"pr\":\"\",\"sessionUrl\":false}}'" \
     "claude launch did not forward firstmate's CLAUDE_CONFIG_DIR to the crewmate pane"
   pass "claude forwards firstmate's CLAUDE_CONFIG_DIR so the crewmate uses the same credential store"
 }
@@ -2058,7 +2118,7 @@ claude_expected_launch() {  # <launch> <home> <id> <permission-flag>
   [ "$(printf '%s' "$doorbell" | "$ROOT/bin/fm-operational-input.sh" doorbell-kind)" = launch-brief ] \
     || doorbell="not a launch-brief doorbell"
   quoted="'$(printf '%s' "$doorbell" | sed "s/'/'\\\\''/g")'"
-  printf '%s' "export COMPACT_ADVISER_DISABLE=1; $(task_inbox_export "$2" "$3")$(ai_trailer_hooks_prefix "$2" "$3")env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude $4 $(claude_worker_add_dirs "$2" "$3")--settings '{\"feedbackDrafts\":\"off\",\"attribution\":{\"commit\":\"\",\"pr\":\"\",\"sessionUrl\":false}}' $CLAUDE_CONTROL_CHANNEL_FLAG $quoted"
+  printf '%s' "export COMPACT_ADVISER_DISABLE=1; $(task_inbox_export "$2" "$3")$(ai_trailer_hooks_prefix "$2" "$3")env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI -u QWEN_CODE_CLI CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude $4 $(claude_worker_add_dirs "$2" "$3")--settings '{\"feedbackDrafts\":\"off\",\"attribution\":{\"commit\":\"\",\"pr\":\"\",\"sessionUrl\":false}}' $CLAUDE_CONTROL_CHANNEL_FLAG $quoted"
 }
 
 test_claude_permission_mode_bypass_matches_absent_launch() {
@@ -2212,6 +2272,9 @@ test_grok_omits_invalid_max_reasoning_effort
 test_grok_omits_invalid_xhigh_reasoning_effort
 test_cursor_threads_model_workspace_and_omits_effort_axis
 test_cursor_refuses_model_absent_from_live_catalog
+test_qwen_threads_model_interactive_brief_and_omits_effort_axis
+test_qwen_approval_mode_auto_replaces_yolo
+test_qwen_approval_mode_refuses_unknown_value_before_launch
 test_cursor_failed_catalog_probe_does_not_block_spawn
 test_opencode_threads_model_and_effort_variant
 test_opencode_without_effort_keeps_launch_config_unchanged

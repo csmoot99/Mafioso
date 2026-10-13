@@ -77,6 +77,12 @@
 #                different, self-proving thing: real claude 2.x draws exactly
 #                that (`─` rule, `❯`+NBSP, `─` rule), so the glyph inside the
 #                pair carries the shape and no identity is needed.
+#                qwen (Qwen Code 0.25.1) draws a third variant: one row
+#                between the rules opening with a literal ASCII `*`, then its
+#                ghost placeholder or the typed text. `*` is ordinary text
+#                everywhere else (a bullet), so it is NEVER an agent glyph;
+#                the row proves a composer only together with a live
+#                idle qwen identity, exactly as pi's blank row does.
 #
 # THE COMPOSER FOOTER ZONE (task firstmate-doorbell-vals-pending-p1): a
 # harness draws its own furniture BELOW the composer - a user statusLine, a
@@ -352,6 +358,7 @@ fm_composer_strip_ghost() {
 # asking what a worker is doing, and the two must not be conflated.
 # Delivery-only rendered busy footers per harness. claude/codex: "esc to
 # interrupt"; opencode: "esc interrupt"; pi: "Working..."; omp: "Working…"; grok: "Ctrl+c:cancel"; agy: "esc to cancel";
+# qwen: the `(<n>s · esc to cancel)` status row (verified live, qwen 0.25.1);
 # devin: "esc twice to interrupt" and its "❭ Guide Devin while it works" working composer.
 # Claude's current spinner has a rotating glyph and word, but every active-turn
 # line has an ellipsis followed by a parenthesized elapsed duration. Keep this
@@ -419,6 +426,7 @@ FM_DELIVERY_CURSOR_BUSY_REGEX_DEFAULT='ctrl\+c to stop'
 # acknowledgement. Delivery guard only; recorded worker state comes from the
 # agy-regex fold in bin/fm-busy-lib.sh.
 FM_DELIVERY_AGY_BUSY_REGEX_DEFAULT='esc[[:space:]]+to[[:space:]]+cancel'
+FM_DELIVERY_QWEN_BUSY_REGEX_DEFAULT='esc[[:space:]]+to[[:space:]]+cancel'
 FM_DELIVERY_KIMI_BUSY_REGEX_DEFAULT='^[[:space:]]*(🌑|🌒|🌓|🌔|🌕|🌖|🌗|🌘)[[:space:]]+·[[:space:]]+'
 
 fm_busy_lines_match() {  # [harness]
@@ -436,6 +444,7 @@ fm_busy_lines_match() {  # [harness]
       omp) regex=$FM_DELIVERY_OMP_BUSY_REGEX_DEFAULT ;;
       grok) regex=$FM_DELIVERY_GROK_BUSY_REGEX_DEFAULT ;;
       agy) regex=$FM_DELIVERY_AGY_BUSY_REGEX_DEFAULT ;;
+      qwen) regex=$FM_DELIVERY_QWEN_BUSY_REGEX_DEFAULT ;;
       kimi) regex=$FM_DELIVERY_KIMI_BUSY_REGEX_DEFAULT ;;
       cursor) regex=$FM_DELIVERY_CURSOR_BUSY_REGEX_DEFAULT ;;
       '') regex=$FM_DELIVERY_BUSY_REGEX_DEFAULT ;;
@@ -1964,17 +1973,49 @@ _fm_composer_pi_verdict() {  # <screen> <styled> <has_identity> <identity>
   fi
   agent=${identity%%$'\t'*}
   agent_status=${identity#*$'\t'}
-  if [ "$agent" != pi ] || [ "$FM_COMPOSER_SCAN_PI_PAIR_VALID" != 1 ]; then
-    printf 'unknown'
-    return 0
-  fi
-  state=$(_fm_composer_classify_pi_rows "$screen" "$styled")
-  if [ "$state" = pending ]; then
-    printf 'pending'
-    return 0
-  fi
+  [ "$FM_COMPOSER_SCAN_PI_PAIR_VALID" = 1 ] || { printf 'unknown'; return 0; }
+  case "$agent" in
+    pi) state=$(_fm_composer_classify_pi_rows "$screen" "$styled") ;;
+    qwen) state=$(_fm_composer_classify_qwen_rows "$screen" "$styled") ;;
+    *) printf 'unknown'; return 0 ;;
+  esac
+  case "$state" in
+    pending|unknown) printf '%s' "$state"; return 0 ;;
+  esac
   case "$agent_status" in
     idle|done) printf 'empty' ;;
     *) printf 'unknown' ;;
   esac
+}
+
+# qwen's rows between the separator pair (verified live, qwen 0.25.1 through
+# tmux): the first row opens with a literal `*` glyph, followed by the
+# `Type your message or @path/to/file` placeholder in a dark truecolor
+# foreground that the ghost strip removes, leaving the bare `*`, or by the
+# typed text as bright bytes (`* hello draft` plus a trailing U+200B cursor
+# cell). A plain capture cannot tell that placeholder from typed text, so it
+# stays unknown; a wrapped draft continues on the rows below the glyph row.
+_fm_composer_classify_qwen_rows() {  # <screen> <styled>
+  local screen=$1 styled=$2 row raw content first=1
+  [ "$styled" = 1 ] || { printf 'unknown'; return 0; }
+  row=$((FM_COMPOSER_SCAN_PI_OPEN + 1))
+  while [ "$row" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; do
+    raw=$(_fm_composer_screen_row "$row" "$screen")
+    content=$(_fm_composer_row_content "$raw" "$styled")
+    fm_composer_normalize_trim_var content
+    if [ "$first" = 1 ]; then
+      first=0
+      case "$content" in
+        '*') ;;
+        '* '*) printf 'pending'; return 0 ;;
+        *) printf 'unknown'; return 0 ;;
+      esac
+    elif [ -n "$content" ]; then
+      printf 'pending'
+      return 0
+    fi
+    row=$((row + 1))
+  done
+  [ "$first" = 0 ] || { printf 'unknown'; return 0; }
+  printf 'empty'
 }

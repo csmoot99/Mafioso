@@ -199,6 +199,32 @@ else
   note "gemini not installed - launch-prompt signature not checked"
 fi
 
+QWEN_BIN=$(command -v qwen 2>/dev/null || true)
+if [ -x "${QWEN_BIN:-}" ]; then
+  VERSION_OUT=$("$QWEN_BIN" --version 2>&1) || fail "qwen --version failed: $VERSION_OUT"
+  note "live qwen version: $VERSION_OUT"
+  # qwen's folder-trust gate is OFF by default, so the dialog is reached only
+  # when a settings layer turns it on: a lab-owned system settings file does
+  # that here, and a lab-owned empty trust record keeps the operator's real
+  # ~/.qwen/trustedFolders.json out of the run. The explicit unreachable
+  # openai endpoint keeps the auth picker from rendering first; no request is
+  # ever made because the dialog parks the launch. -i is required: a bare
+  # positional is a one-shot headless run that never renders the TUI.
+  QWEN_LAB=$(mktemp -d "${TMPDIR:-/tmp}/fm-launch-prompt-qwen-lab.XXXXXX") || fail "qwen: could not create the lab"
+  LABS+=("$QWEN_LAB")
+  printf '{"%s":4,"security":{"folderTrust":{"enabled":true}}}\n' "\$version" > "$QWEN_LAB/system-settings.json"
+  printf '{}\n' > "$QWEN_LAB/trusted-folders.json"
+  check_harness qwen fm-lp-qwen-$$ '' '' \
+    'Do you trust this folder' '' \
+    env QWEN_CODE_SYSTEM_SETTINGS_PATH="$QWEN_LAB/system-settings.json" \
+      QWEN_CODE_TRUSTED_FOLDERS_PATH="$QWEN_LAB/trusted-folders.json" \
+      "$QWEN_BIN" -y --auth-type openai --openai-api-key placeholder \
+      --openai-base-url http://127.0.0.1:9/v1 -i hello
+  pass "qwen: a real launch parked on its own rendered trust dialog surfaces through the watcher gate"
+else
+  note "qwen not installed - launch-prompt signature not checked"
+fi
+
 [ "$CHECKED" -gt 0 ] || fail "no installed harness could be checked; this run verified nothing"
 note "checked $CHECKED launch-prompt signature(s) against real installed binaries"
 cleanup_all

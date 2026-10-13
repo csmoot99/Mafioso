@@ -29,7 +29,7 @@ CONTRACT="$ROOT/bin/fm-afk-contract.sh"
 # fm_afk_launch_primary_harness): the suite calls the entrypoints directly, so a
 # real harness ancestor - a no-mistakes gate agent run under Pi - would outrank
 # the CLAUDECODE=1 marker below and refuse the daemon paths under test.
-unset PI_CODING_AGENT FM_PI_HARNESS CURSOR_AGENT CURSOR_INVOKED_AS GEMINI_CLI ATLASSIAN_AGENT_TYPE ROVODEV_CLI
+unset PI_CODING_AGENT FM_PI_HARNESS CURSOR_AGENT CURSOR_INVOKED_AS GEMINI_CLI QWEN_CODE_CLI ATLASSIAN_AGENT_TYPE ROVODEV_CLI
 export CLAUDECODE=1 FM_TEST_HARNESS=claude FM_TEST_SEAM=1
 # A Claude home runs the supervision host unless config/supervision-host-off
 # opts it out (docs/configuration.md "Supervision host"), and the host is that home's

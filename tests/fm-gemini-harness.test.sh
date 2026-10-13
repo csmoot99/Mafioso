@@ -43,7 +43,7 @@ test_gemini_marker_outranks_inherited_claudecode() {
   # each marker alone must still produce its own verdict.
   out=$(env -u CLAUDECODE PATH="$fakebin:$base_path" GEMINI_CLI=1 "$HARNESS")
   [ "$out" = gemini ] || fail "GEMINI_CLI alone must detect gemini, got '$out'"
-  out=$(env -u GEMINI_CLI PATH="$fakebin:$base_path" CLAUDECODE=1 "$HARNESS")
+  out=$(env -u GEMINI_CLI -u QWEN_CODE_CLI PATH="$fakebin:$base_path" CLAUDECODE=1 "$HARNESS")
   [ "$out" = claude ] || fail "CLAUDECODE alone must still detect claude, got '$out'"
   # Cursor's marker still outranks gemini's, preserving the documented order.
   out=$(PATH="$fakebin:$base_path" CURSOR_AGENT=1 GEMINI_CLI=1 "$HARNESS")
@@ -56,12 +56,12 @@ test_gemini_does_not_claim_inherited_ai_agent() {
   # AI_AGENT was observed carrying the CLAUDE primary's value inside a gemini
   # tool process, so it proves nothing about which harness is running. A session
   # with AI_AGENT but no GEMINI_CLI must not be read as gemini.
-  out=$(env -u GEMINI_CLI -u CLAUDECODE -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
+  out=$(env -u GEMINI_CLI -u QWEN_CODE_CLI -u CLAUDECODE -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
         -u PI_CODING_AGENT -u GROK_AGENT AI_AGENT=gemini-cli_0-58-0_agent "$HARNESS")
   [ "$out" != gemini ] \
     || fail "AI_AGENT must never claim the gemini identity, got '$out'"
   # A non-1 GEMINI_CLI is not the verified marker value either.
-  out=$(env -u CLAUDECODE -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI \
+  out=$(env -u CLAUDECODE -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI -u QWEN_CODE_CLI \
         -u PI_CODING_AGENT -u GROK_AGENT GEMINI_CLI=0 "$HARNESS")
   [ "$out" != gemini ] \
     || fail "GEMINI_CLI=0 must not claim the gemini identity, got '$out'"
@@ -83,7 +83,7 @@ esac
 exit 1
 SH
   chmod +x "$fakebin/ps"
-  out=$(env -u GEMINI_CLI -u CLAUDECODE -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
+  out=$(env -u GEMINI_CLI -u QWEN_CODE_CLI -u CLAUDECODE -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
         -u PI_CODING_AGENT -u GROK_AGENT PATH="$fakebin:$PATH" "$HARNESS")
   [ "$out" = gemini ] \
     || fail "a natively-named gemini command must be detected by ancestry, got '$out'"
@@ -103,13 +103,13 @@ exit 1
 SH
   chmod +x "$fakebin/ps"
 
-  out=$(env -u GEMINI_CLI -u CLAUDECODE -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
+  out=$(env -u GEMINI_CLI -u QWEN_CODE_CLI -u CLAUDECODE -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
         -u PI_CODING_AGENT -u GROK_AGENT FAKE_PS_COMM=gemini-helper \
         FAKE_PS_ARGS='gemini-helper --serve' PATH="$fakebin:$PATH" "$HARNESS")
   [ "$out" != gemini ] \
     || fail "an unrelated gemini-helper command must not detect gemini, got '$out'"
 
-  out=$(env -u GEMINI_CLI -u CLAUDECODE -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
+  out=$(env -u GEMINI_CLI -u QWEN_CODE_CLI -u CLAUDECODE -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
         -u PI_CODING_AGENT -u GROK_AGENT FAKE_PS_COMM=node \
         FAKE_PS_ARGS='node server.js --model gemini' PATH="$fakebin:$PATH" "$HARNESS")
   [ "$out" != gemini ] \
@@ -160,8 +160,15 @@ JS
   out=$(FM_HARNESS_BIN="$HARNESS" node "$dir/gemini" 2>/dev/null | tr -d '\n')
   [ "$out" != gemini ] \
     || fail "node reports comm=$comm here, so ancestry must not be claiming gemini; got '$out'"
-  # And the marker closes exactly that gap on the same process shape.
-  out=$(FM_HARNESS_BIN="$HARNESS" GEMINI_CLI=1 node -e '
+  # And the marker closes exactly that gap on the same process shape; the
+  # ancestry is blinded so a claude primary running this suite cannot outrank
+  # the marker structurally (node passes PATH down to fm-harness.sh's ps).
+  local fakebin node_bin
+  node_bin=$(command -v node)
+  fakebin=$(fm_fakebin "$TMP_ROOT/bundle-marker")
+  fm_fake_blind_ancestry "$fakebin"
+  out=$(PATH="$fakebin:${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" \
+    FM_HARNESS_BIN="$HARNESS" GEMINI_CLI=1 "$node_bin" -e '
 const { spawnSync } = require("child_process");
 const r = spawnSync(process.env.FM_HARNESS_BIN, { encoding: "utf8" });
 process.stdout.write(r.stdout || "");' 2>/dev/null | tr -d '\n')

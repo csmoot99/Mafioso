@@ -636,6 +636,20 @@ The real pane renders this inside a bordered box, omitted here for readability; 
 That capture demonstrated why each signature function matches the FULL captured tail rather than the Grok/Rovo/AGY busy-footer convention of the last 12 non-blank lines: a bordered dialog box renders many short lines of pure border and padding (`│  ...  │`) that are NOT whitespace-only, so the 12-line reduction pushed this exact heading text out of the window and silently defeated the match on the first attempt.
 None of these three runs ever answered its dialog (Escape only, never Enter), so no credential store was written to and no model tokens were spent.
 
+Refreshed 2026-10-13 on Claude Code 2.1.296 and qwen 0.25.1, with pi and gemini not installed on that box:
+
+```
+# live claude version: 2.1.296 (Claude Code)
+ok - claude: a real launch parked on its own rendered trust dialog surfaces through the watcher gate
+# pi not installed - launch-prompt signature not checked
+# gemini not installed - launch-prompt signature not checked
+# live qwen version: 0.25.1
+ok - qwen: a real launch parked on its own rendered trust dialog surfaces through the watcher gate
+# checked 2 launch-prompt signature(s) against real installed binaries
+```
+
+Qwen Code's folder-trust gate is off by default, so the guard reaches its dialog by turning the gate on through a system settings file, with `QWEN_CODE_TRUSTED_FOLDERS_PATH` pointed at an unreachable path so the operator's own trusted-folders record stays out of the run; the dialog text it matches is recorded under [Qwen Code](#qwen-code) below.
+
 ## Worker account pin sign-in check
 
 `bin/fm-worker-account-lib.sh` decides whether a pinned account is signed in from vendor output: the exit status of `claude auth status`, the JSON of `pi auth check`, and the provider column of `pi --list-models`.
@@ -1127,6 +1141,188 @@ teardown gm2 complete; state/gm2.gemini-settings.json removed
 
 Gemini as a PRIMARY or SECONDMATE runtime is unverified and is refused by `bin/fm-spawn.sh`: no wake protocol exists under `docs/supervision-protocols/` and no turn-end guard adapter was built or exercised.
 No reasoning-effort axis was found; `gemini --help` on 0.58.0 exposes no effort, reasoning, or thinking flag, so the record-and-omit contract applies.
+
+## Qwen Code
+
+The Qwen Code crewmate and scout adapter was verified on 2026-10-13 with qwen 0.25.1 (`@qwen-code/qwen-code`, a Gemini CLI fork) on Linux, Node v24.21.0, tmux 3.6, against a local Ollama 0.40.3 server on 127.0.0.1:11434 serving `qwen3-coder:30b`.
+Every check below ran in throwaway scratch worktrees under isolated user homes against the real CLI; the operator's own `~/.qwen` was never written, no task worktree was used, and no agent was left running.
+Probe launches passed the endpoint explicitly (`--auth-type openai --openai-base-url http://127.0.0.1:11434/v1 --openai-api-key ollama -m qwen3-coder:30b`); the key is a placeholder a local Ollama ignores, and no real credential appears in this record.
+
+```sh
+FM_QWEN_SIGNALS_LIVE=1 bash tests/fm-qwen-signals-live-e2e.test.sh
+```
+
+```text
+ok - qwen 0.25.1: spawn brief, model, autonomy, trust, identity and native Stop
+ok - qwen 0.25.1: no project settings written, no settings rewrite, and the worker commit carries no attribution
+ok - qwen 0.25.1: real fm-send doorbell read and acknowledged
+ok - qwen 0.25.1: single Escape cancels, Ctrl+U clears the restored prompt, and busy state is invalidated
+ok - qwen 0.25.1: /quit and native -r session resume
+```
+
+That guard is the command that refreshes this record after a qwen upgrade.
+It runs the real `bin/fm-spawn.sh` launch, `bin/fm-send.sh`, and `bin/fm-control.sh` against a real qwen pane in a private tmux server, under a user home holding only the three-line `~/.qwen/.env` the adapter reference documents, so a pass also proves that precondition reaches the model with no auth or onboarding dialog.
+It skips when `$FM_QWEN_BASE_URL/models` is unreachable.
+
+### Credential precondition and the headless probe
+
+With no auth configured anywhere, a headless run returns a structured error rather than parking, and its exit status is 0:
+
+```sh
+env -u OPENAI_API_KEY -u OPENAI_BASE_URL -u OPENAI_MODEL -u QWEN_OAUTH HOME=<empty dir> qwen -o json 'say OK' | jq -c '.[] | select(.type == "result") | {subtype, message: .error.message}'
+```
+
+```text
+{"subtype":"error_during_execution","message":"No auth type is selected. Please configure an auth type (e.g. via settings or `--auth-type`) before running in non-interactive mode."}
+```
+
+The same command with the explicit endpoint flags above printed `{"subtype":"success"}`, and its `system/init` event carried `model: qwen3-coder:30b` with `permission_mode: auto` without `-y` and `yolo` with it.
+Auth resolves in the bundle as `--auth-type`, else `security.auth.selectedType` from settings, else the environment, where `OPENAI_API_KEY` together with `OPENAI_MODEL` (or `QWEN_MODEL`) and `OPENAI_BASE_URL` selects `openai`; qwen loads `<cwd>/.qwen/.env` or `<cwd>/.env` walking up to `$HOME`, then `~/.qwen/.env`, then `~/.env` itself at startup.
+A user home holding exactly `.qwen/.env` with those three lines plus a `{"$version":4}` system settings file ran an interactive `-i` session with no auth or onboarding dialog (`API Key | qwen3-coder:30b` in the header), and wrote only runtime directories under `.qwen/`, never a `settings.json`.
+
+### Trust gate and the dialog
+
+qwen's folder-trust gate is OFF by default (`folderTrustEnabled = system ?? user ?? defaults ?? false` in the bundle, and the system layer wins outright).
+With `{"$version":4,"security":{"folderTrust":{"enabled":true}}}` in the system settings file, an interactive launch into a fresh folder parks on:
+
+```text
+   │ Do you trust this folder?
+   │ Trusting a folder allows Qwen Code to execute commands it suggests. This is a security feature
+   │ to prevent accidental execution in untrusted directories.
+   │
+   │ › 1. Trust folder (proj)
+   │   2. Trust parent folder (run-1791926385)
+   │   3. Don't trust (esc)
+```
+
+The trusting choice is the default, and a headless launch into the same folder downgrades silently instead:
+
+```text
+Approval mode overridden to "default" because the current folder is not trusted.
+```
+
+A headless A/B on one worktree carrying a workspace skill (`.agents/skills/labskill/`, listed in the init event's `slash_commands` when loaded), same prompt, changing only the trust mechanism:
+
+```text
+A  system settings folderTrust.enabled=false                              skill listed  permission_mode=yolo
+B  folderTrust.enabled=true + QWEN_CODE_TRUSTED_FOLDERS_PATH naming the worktree  skill listed  permission_mode=yolo
+C  folderTrust.enabled=true + an empty trusted-folders record             skill listed  permission_mode=default (stderr above)
+```
+
+Both A and B load the project's own skills, so `bin/fm-spawn.sh` pins `security.folderTrust.enabled=false` in the per-task settings file: it needs no path registration and leaves no record of disposable worktree paths.
+`~/.qwen/trustedFolders.json` never appeared in any run and the user settings file was `UNCHANGED` after every launch.
+
+### Hook lifecycle
+
+`UserPromptSubmit`, `Stop`, and `SessionEnd` were registered in a system settings file on a probe that appends its event name, beside a project `.qwen/settings.json` `Stop` hook, and driven through the brief turn, an Escape, and `/quit`:
+
+```text
+--- after brief turn ---   SessionStart, UserPromptSubmit, UserPromptSubmit, PROJECT-Stop, Stop
+--- after Escape ---       (one more turn)  UserPromptSubmit, PROJECT-Stop, Stop
+--- after /quit ---        ..., SessionEnd
+```
+
+Three facts the adapter depends on come from that run: `UserPromptSubmit` fires TWICE per submitted prompt, so the repeated busy event must be idempotent; hook arrays MERGE across layers, so the project's own `Stop` hook ran beside firstmate's; and `SessionEnd` fired once per `/quit`.
+A second probe that cancelled a streaming turn with Escape logged no `Stop` for it (`events after esc B: UserPromptSubmit PreToolUse PostToolUse`), which is why `bin/fm-control.sh` invalidates the busy record to `unknown fm-interrupt` after a qwen interrupt rather than relying on a self-closing event as it does for gemini.
+Hook commands that print nothing were accepted with no visible error.
+
+### Autonomous end-to-end worker
+
+One throwaway worker was launched as the spawn launches one, `-y`, `-i "<brief>"`, system settings through `QWEN_CODE_SYSTEM_SETTINGS_PATH`, and observed to idle:
+
+```text
+busy row:  .  Engaging the improbability drive... (7s · ↓ 155 tokens · esc to cancel)
+footer:    YOLO mode (shift + tab to cycle)
+auto-output: GATECHECK
+events after brief turn: UserPromptSubmit UserPromptSubmit Stop
+```
+
+The brief submitted itself with no extra Enter (a bare positional is one-shot headless on qwen, which is why `-i` is load-bearing), the file write and a `git add -A && git commit` shell call landed with no approval gate, and the worker's commit carried `Co-authored-by: Qwen-Coder <qwen-coder@alibabacloud.com>`, which the per-task hooks path from `bin/fm-git-strip-ai-trailers.sh` strips at the commit object (the live guard's second line asserts the spawned worker's commit carries no trailer).
+`(<n>s · esc to cancel)` is the one stable rendered busy token; the phrase beside it is model-generated and the spinner is a dot animation, so the adapter's state source is the hooks above and the token is registered for delivery confirmation only.
+qwen's own tool policy blocks a standalone `sleep` shell call (`Blocked: standalone sleep 60. Run blocking commands in the background with is_background: true`), so a long turn for a probe must be generation.
+
+### Interrupt and composer
+
+Escape on a turn with streamed output printed `●︎ Request cancelled.`, left the agent running, and RESTORED the cancelled prompt into the composer:
+
+```text
+  ●︎ Request cancelled.
+* Count from 1 to 300, one number per line with a short sentence about each. Do not use tools. <U+200B>
+```
+
+A `/quit` typed onto that row was submitted as chat (`> Count from 1 to 300, ... Do not use tools./quit`), which is why `fm_control_interrupt_clear_key` returns `C-u` for qwen; `Ctrl+U` on a typed draft restored the placeholder, and `Ctrl+U` and Escape on an empty composer left it unchanged.
+An Escape that landed before any output streamed withdrew the prompt with no cancel notice and an empty composer.
+The idle composer row, read with `capture-pane -e` and ghost-stripped, is a literal ASCII `*` followed by the dark-truecolor placeholder:
+
+```text
+0000000   *               T   y   p   e       y   o   u   r       m   e
+0000020   s   s   a   g   e       o   r       @   p   a   t   h   /   t
+0000040   o   /   f   i   l   e  \n
+```
+
+Before the composer change `fm_backend_composer_state tmux` on that pane read `unknown | identity: none`, and `bin/fm-control.sh` exit refuses any composer not proven `empty`; the tmux identity probe now reads the foreground node bundle's argv through `bin/fm-qwen-lib.sh`, and the guard asserts `empty` through the real backend path.
+`*` is never an agent glyph on its own, because it is a bullet everywhere else.
+
+`/quit` printed `To continue this session, run` / `qwen --resume <session-id>` and `QWEN-EXIT-RC=0`; resuming by that id with `-r <session-id> -i '<prompt>'` restored the transcript and ran the prompt, which the guard's last line asserts.
+
+### Identity markers
+
+Env var NAMES were read from a real qwen tool process launched under `CLAUDECODE=1 AI_AGENT=lab-launcher`; the messaging token's value was never recorded.
+
+```text
+AI_AGENT=lab-launcher                  (inherited unchanged)
+CLAUDECODE=1                           (inherited unchanged; qwen does NOT clear it)
+QWEN_CODE_CLI=/home/<user>/.local/lib/nodejs/lib/node_modules/@qwen-code/qwen-code/cli-entry.js
+QWEN_CODE_SESSION_ID, QWEN_CODE_PROJECT_DIR, QWEN_CODE_MODEL=qwen3-coder:30b, QWEN_CODE_STARTUP_VERSION=0.25.1
+QWEN_CODE_MESSAGING_SOCKET, QWEN_CODE_MESSAGING_TOKEN, QWEN_CODE_PROMPT_ID, QWEN_CODE_MODEL_IDENTITY, QWEN_CODE_AGENT_ID
+(no GEMINI_CLI)
+```
+
+`QWEN_CODE_CLI` is unset in the launching environment, so it is qwen's own, and `bin/fm-harness.sh` tests it before `CLAUDECODE`; the spawn additionally clears the foreign markers at the launch boundary.
+The foreground group of a live pane read:
+
+```text
+1383246 1383246 1383246 MainThread      node /home/work/.local/bin/qwen -y --auth-type openai ... -m qwen3-coder:30b
+```
+
+The shipped CLI is a node bundle, so neither ancestry arm matches it and `bin/fm-qwen-lib.sh` identifies one from argv[1] instead; `tests/fm-qwen-harness.test.sh` pins the marker precedence, the marker's required shape, and the ancestry boundary with real processes and no harness.
+
+### Settings placement and the startup rewrite
+
+Firstmate's hooks go to a firstmate-owned `state/<id>.qwen-settings.json` reached through `QWEN_CODE_SYSTEM_SETTINGS_PATH`, never the worktree's `.qwen/settings.json`, which is the project's own file.
+Three startup runs over one-line settings files showed why the per-task file declares `"$version":4`:
+
+```text
+project .qwen/settings.json without "$version"   ->  rewritten pretty-printed with "$version": 4   (git: M .qwen/settings.json)
+project with no .qwen/ directory                  ->  untouched, no directory created
+file already carrying "$version":4                ->  untouched
+```
+
+The system settings file is rewritten the same way when it lacks the key.
+Two more rows the per-task file carries come from observed hazards: after a turn qwen rendered a model-generated follow-up row (`* commit this`) in the composer position, which a composer read takes for a draft, so `ui.enableFollowupSuggestions=false`; and after a turn with several tool calls it opened `●︎ How is Qwen doing this session? (optional)` / `1: Good 2: Bad 3: Fine 0: Dismiss` over the composer and swallowed the next typed line, so `ui.enableUserFeedback=false` (bundle gate `settings.merged.ui?.enableUserFeedback===false`).
+The guard asserts the file's checksum is unchanged after the session and that the worktree gained no `.qwen/`.
+
+### Context window on the local model
+
+```sh
+ollama ps
+```
+
+```text
+NAME               ID              SIZE     PROCESSOR    CONTEXT    RUNNER      UNTIL
+qwen3-coder:30b    06c1097efce0    21 GB    100% GPU     32768      llamacpp    2 minutes from now
+```
+
+`ollama show qwen3-coder:30b` reports `parameters 30.5B`, `context length 262144`, `quantization Q4_K_M`, and `systemctl show ollama -p Environment` printed an empty `Environment=`, so the running service sets no `OLLAMA_CONTEXT_LENGTH` and grants the default 32768 while qwen's footer claims `262.1k Context`.
+qwen will therefore not compact before the server truncates; raising the limit is the operator's call and the adapter changes neither the service nor the models.
+
+### Not verified
+
+Qwen Code as a PRIMARY or SECONDMATE runtime is unverified and refused by `bin/fm-spawn.sh`: no wake protocol exists under `docs/supervision-protocols/` and no turn-end guard adapter was built or exercised.
+No reasoning-effort axis was found; `qwen --help` on 0.25.1 exposes no effort, reasoning, or thinking flag, so the record-and-omit contract applies.
+`--approval-mode auto` was verified only as the flag shape `config/qwen-approval-mode` selects, not for which actions it blocks.
+The `/<skill>` submit shape, the Herdr backend (its identity probe reports native agent names and was never exercised with qwen), `--exclude-tools`, and whether `ui.enableFollowupSuggestions=false` is what removed the follow-up row (none appeared in any guard run with it set, with no A/B) remain unverified.
+`tests/fm-composer-matrix-live-e2e.test.sh` was not extended with qwen because it launches each harness bare, which needs the operator credential; the qwen guard asserts the same composer verdict through the real tmux path instead.
 
 ## Herdr
 
