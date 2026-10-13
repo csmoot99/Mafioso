@@ -225,7 +225,7 @@ fm_ship_rule_one() {  # <no-mistakes|direct-PR|local-only> <task-id> [branch] [<
 fm_ship_coding_discipline_block() {  # <code-root>
   local root=$1
   printf '# Coding discipline\n'
-  printf "Before editing, read and follow \`%s/.agents/skills/ponytail/SKILL.md\`; it owns the smallest-complete-change rules, what \"asked for\" means, and where the skipped-or-not-checked line goes.\n" "$root"
+  printf "Before editing, read and follow \`%s/.agents/skills/ponytail/SKILL.md\`.\n" "$root"
 }
 
 # Return 0 when a Task subsection still consists only of its scaffold

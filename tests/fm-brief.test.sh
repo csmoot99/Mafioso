@@ -525,11 +525,11 @@ test_ship_briefs_load_the_coding_discipline_prompt() {
   [ -f "$skill" ] || fail "the vendored ponytail prompt is missing at $skill"
   [ -f "$ROOT/.agents/skills/ponytail/LICENSE" ] \
     || fail "the vendored ponytail prompt ships without its MIT LICENSE file"
-  assert_grep "plus its \`## Firstmate spec\` plus any spec, report, plan, or PR the \`# Task\` names" "$skill" \
+  assert_grep "its Firstmate spec, and any spec, report, plan, or PR the Task names; build that and nothing more" "$skill" \
     "the ponytail prompt lost the what-was-asked definition"
-  assert_grep "in the PR description where the mode opens one, and in the \`done:\` line in every mode" "$skill" \
+  assert_grep "in the PR description and the \`done:\` line" "$skill" \
     "the ponytail prompt lost the skipped-or-not-checked placement"
-  assert_grep "only where it names none, use a code comment of the form \`shortcut: <the limit>, <when to upgrade>\`" "$skill" \
+  assert_grep "\`shortcut: <limit>, <when to upgrade>\` only where it names none" "$skill" \
     "the ponytail prompt lost the project deferred-work marker precedence"
   assert_grep "Tests go in alongside every change" "$skill" \
     "the ponytail prompt lost the captain's tests-alongside rule"
