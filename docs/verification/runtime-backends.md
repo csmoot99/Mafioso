@@ -1300,7 +1300,7 @@ file already carrying "$version":4                ->  untouched
 ```
 
 The system settings file is rewritten the same way when it lacks the key.
-Two more rows the per-task file carries come from observed hazards: after a turn qwen rendered a model-generated follow-up row (`* commit this`) in the composer position, which a composer read takes for a draft, so `ui.enableFollowupSuggestions=false`; and after a turn with several tool calls it opened `●︎ How is Qwen doing this session? (optional)` / `1: Good 2: Bad 3: Fine 0: Dismiss` over the composer and swallowed the next typed line, so `ui.enableUserFeedback=false` (bundle gate `settings.merged.ui?.enableUserFeedback===false`).
+Three more rows the per-task file carries come from observed hazards: after a turn qwen rendered a model-generated follow-up row (`* commit this`) in the composer position, which a composer read takes for a draft, so `ui.enableFollowupSuggestions=false`; after a turn with several tool calls it opened `●︎ How is Qwen doing this session? (optional)` / `1: Good 2: Bad 3: Fine 0: Dismiss` over the composer and swallowed the next typed line, so `ui.enableUserFeedback=false` (bundle gate `settings.merged.ui?.enableUserFeedback===false`); and managed auto-memory ran a post-turn extractor that spent as many tokens as the main loop and left a poisoned `~/.qwen/memories` file steering later sessions, so `memory.enableManagedAutoMemory=false` (the no-memory-store guard above).
 The guard asserts the file's checksum is unchanged after the session and that the worktree gained no `.qwen/`.
 
 ### Context window on the local model
