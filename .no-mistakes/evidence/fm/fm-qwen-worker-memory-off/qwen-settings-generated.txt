@@ -1,0 +1,51 @@
+=== Generated per-task settings file: state/qwen-mem.qwen-settings.json ===
+{
+  "$version": 4,
+  "security": {
+    "folderTrust": {
+      "enabled": false
+    }
+  },
+  "ui": {
+    "enableFollowupSuggestions": false,
+    "enableUserFeedback": false
+  },
+  "memory": {
+    "enableManagedAutoMemory": false
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/home/work/.no-mistakes/worktrees/5f69104d19ce/01M4VT36Y6V9FRMMN4N9TEGHH0/bin/fm-busy-event.sh' apply '/tmp/qwen-settings-evidence.hGH3Vm/home/state' 'qwen-mem' busy --gen 'g1791935070.2985354.18602' --source qwen-hook --event user-prompt-submit >/dev/null 2>&1 || true"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "touch '/tmp/qwen-settings-evidence.hGH3Vm/home/state/qwen-mem.turn-ended'; '/home/work/.no-mistakes/worktrees/5f69104d19ce/01M4VT36Y6V9FRMMN4N9TEGHH0/bin/fm-busy-event.sh' apply '/tmp/qwen-settings-evidence.hGH3Vm/home/state' 'qwen-mem' idle --gen 'g1791935070.2985354.18602' --source qwen-hook --event stop >/dev/null 2>&1 || true"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/home/work/.no-mistakes/worktrees/5f69104d19ce/01M4VT36Y6V9FRMMN4N9TEGHH0/bin/fm-busy-event.sh' apply '/tmp/qwen-settings-evidence.hGH3Vm/home/state' 'qwen-mem' idle --gen 'g1791935070.2985354.18602' --source qwen-hook --event session-end >/dev/null 2>&1 || true"
+          }
+        ]
+      }
+    ]
+  }
+}
+
+=== memory.enableManagedAutoMemory getter value ===
+false

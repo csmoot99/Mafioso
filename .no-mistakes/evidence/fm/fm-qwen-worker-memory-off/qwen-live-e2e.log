@@ -1,0 +1,6 @@
+ok - qwen 0.25.1: spawn brief, model, autonomy, trust, identity and native Stop
+ok - qwen 0.25.1: no project settings written, no settings rewrite, no memory store, and the worker commit carries no attribution
+ok - qwen 0.25.1: real fm-send doorbell read and acknowledged
+ok - qwen 0.25.1: single Escape cancels, Ctrl+U clears the restored prompt, and busy state is invalidated
+ok - qwen 0.25.1: /quit and native -r session resume
+LIVE_EXIT=0
