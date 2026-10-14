@@ -41,11 +41,12 @@ A sandbox writable root must be a directory: naming a file makes every sandboxed
 Codex ignores a misspelled or renamed `-c` key without an error, which is why that guard asserts the rendered result rather than the flags.
 
 The launch also gives the worker what a Claude crewmate gets: the task-worker trust statement as `developer_instructions`, a project's instructions in full (Codex otherwise truncates `AGENTS.md` at 32 KiB), `CLAUDE.md` where a project has no `AGENTS.md`, and no startup update check.
+It also compacts at the share of the window a Claude worker stops growing at: `model_auto_compact_token_limit` is an absolute token count, so the launch applies the `config/launch-env` threshold percentage to the selected model's effective window from the catalog cache, with the scope pinned to the full active context.
 
 Parity gaps that remain with the hook layer off, because Codex treats every hook - a `-c` session-flag hook included - as untrusted until the operator trusts it, and ignores trust state passed with `-c`:
 
 - No semantic busy state (no `userPromptSubmit`/`stop` hooks); the turn-end notify still fires.
-- No context handoff: Codex compacts at its own threshold, and its auto-compaction knob, `model_auto_compact_token_limit`, is an absolute token count rather than a percentage.
+- No context handoff: the worker compacts in place at the threshold instead of handing off to a fresh worker, because the handoff needs a `preCompact` hook to hold compaction.
 - The operator's `~/.codex/hooks.json` and a project's `.codex/hooks.json` do not run, while a Claude crewmate runs the operator's and project's Claude hooks.
 - A project's `.mcp.json` servers are Claude-only; Codex reads MCP servers only from its own config.
 

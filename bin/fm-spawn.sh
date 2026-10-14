@@ -421,6 +421,10 @@
 #                  flag naming exactly this task's steering inbox and data
 #                  directory (codex_writable_roots_flag below; supplies its
 #                  own trailing space)
+#     __CODEXCOMPACT__ optional -c model_auto_compact_token_limit and its
+#                  scope, the launch-env threshold share of the selected
+#                  model's window (codex_compact_limit_flag below; supplies its
+#                  own trailing space, empty when it does not apply)
 #     __PIBIN__    quoted concrete Pi-family executable path resolved from PATH
 #     __PITUIMODE__ optional --tui-mode regular when that executable advertises it
 #     __PIAPPROVE__ optional --approve on a seeded Pi/pi-signed secondmate when
@@ -735,7 +739,9 @@ launch_template() {
   # (codex_writable_roots_flag below) adds exactly the task's steering inbox and
   # data directory; the status file, the shared git common dir, the network, and
   # the no-mistakes daemon socket stay outside the sandbox, so those steps run as
-  # reviewed escalations. developer_instructions carries the same task-worker
+  # reviewed escalations. __CODEXCOMPACT__ (codex_compact_limit_flag below)
+  # compacts the worker in place at the share of the window a claude worker
+  # stops growing at. developer_instructions carries the same task-worker
   # trust statement claude gets through --append-system-prompt.
   # project_doc_max_bytes lifts codex's 32 KiB AGENTS.md cap so a worker reads a
   # project's instructions in full, as claude reads CLAUDE.md, and
@@ -746,7 +752,7 @@ launch_template() {
     if [ "$kind" = secondmate ]; then
       printf '%s' 'codex __MODELFLAG____EFFORTFLAG__--dangerously-bypass-approvals-and-sandbox "$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
     else
-      printf '%s' 'codex __MODELFLAG____EFFORTFLAG__-c '\''sandbox_mode="workspace-write"'\'' -c '\''approval_policy="on-request"'\'' -c '\''approvals_reviewer="auto_review"'\'' -c '\''sandbox_workspace_write.network_access=false'\'' __CODEXWRITABLEROOTS__'
+      printf '%s' 'codex __MODELFLAG____EFFORTFLAG__-c '\''sandbox_mode="workspace-write"'\'' -c '\''approval_policy="on-request"'\'' -c '\''approvals_reviewer="auto_review"'\'' -c '\''sandbox_workspace_write.network_access=false'\'' __CODEXWRITABLEROOTS____CODEXCOMPACT__'
       printf '%s' "-c 'developer_instructions=\"$TASK_WORKER_TRUST_STATEMENT\"' "
       printf '%s' '-c '\''project_doc_max_bytes=1048576'\'' -c '\''project_doc_fallback_filenames=["CLAUDE.md"]'\'' -c '\''check_for_update_on_startup=false'\'' '
       printf '%s' '--disable hooks -c "notify=[\"bash\",\"-c\",\"touch __TURNEND__\"]" "$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
@@ -3240,6 +3246,33 @@ codex_writable_roots_flag() {  # <state-dir> <data-dir> <task-id>
   printf -- '-c %s ' "$(shell_quote "sandbox_workspace_write.writable_roots=[\"$(json_escape "$state_real/$3.inbox")\",\"$(json_escape "$data_real/$3")\"]")"
 }
 
+# A codex ship or scout's auto-compaction point: the same share of the window
+# a claude worker stops growing at, which is the CLAUDE_AUTOCOMPACT_PCT_OVERRIDE
+# value config/launch-env sets (the home's one threshold setting, header above).
+# Codex's knob is an absolute token count, so the share is applied to the
+# selected model's effective window (context_window times
+# effective_context_window_percent) from codex's model catalog cache, counting
+# the full active context as claude's percentage does. This is a compaction in
+# place, not claude's handoff to a fresh worker. No override, a value outside
+# 1-99, no selected model, or a model the catalog does not list omits the flags
+# and leaves codex's own compaction point.
+codex_compact_limit_flag() {  # <model>
+  local model=$1 pct='' limit i=0
+  while [ "$i" -lt "${#LAUNCH_ENV_SET_NAMES[@]}" ]; do
+    [ "${LAUNCH_ENV_SET_NAMES[$i]}" != CLAUDE_AUTOCOMPACT_PCT_OVERRIDE ] || pct=${LAUNCH_ENV_SET_VALUES[$i]}
+    i=$((i + 1))
+  done
+  case "$pct" in '' | *[!0-9]*) return 0 ;; esac
+  pct=$((10#$pct))
+  [ "$pct" -ge 1 ] && [ "$pct" -le 99 ] || return 0
+  [ -n "$model" ] && [ "$model" != default ] && command -v jq >/dev/null 2>&1 || return 0
+  limit=$(jq -r --arg m "$model" --argjson p "$pct" \
+    'first(.models[]? | select(.slug == $m) | select((.context_window | type) == "number")) | (.context_window * (.effective_context_window_percent // 100) * $p / 10000 | floor)' \
+    "${CODEX_HOME:-$HOME/.codex}/models_cache.json" 2>/dev/null) || return 0
+  case "$limit" in '' | 0 | *[!0-9]*) return 0 ;; esac
+  printf -- '-c %s -c %s ' "$(shell_quote "model_auto_compact_token_limit=$limit")" "$(shell_quote 'model_auto_compact_token_limit_scope="total"')"
+}
+
 resolved_existing_dir() {
   local path=$1
   [ -d "$path" ] || {
@@ -5629,6 +5662,9 @@ MODELFLAG=$(model_flag_for_harness "$HARNESS" "$MODEL")
 EFFORTFLAG=$(effort_flag_for_harness "$HARNESS" "$EFFORT" "$MODEL") || exit 1
 LAUNCH=${LAUNCH//__MODELFLAG__/$MODELFLAG}
 LAUNCH=${LAUNCH//__EFFORTFLAG__/$EFFORTFLAG}
+case "$LAUNCH" in
+*__CODEXCOMPACT__*) LAUNCH=${LAUNCH//__CODEXCOMPACT__/$(codex_compact_limit_flag "$MODEL")} ;;
+esac
 # Relaunch session continuity. Computed here, where the adopted endpoint (T) is
 # known, and substituted only into the Pi-family template's `__PIRESUME__`
 # placeholder; an empty value leaves every other launch byte-identical.

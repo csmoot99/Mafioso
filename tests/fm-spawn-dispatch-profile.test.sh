@@ -603,6 +603,49 @@ test_codex_omits_max_effort_for_unsupported_model() {
   pass "codex omits max when the catalog is capped, missing the model, or absent"
 }
 
+# A codex worker compacts at the share of the window a claude worker stops
+# growing at: config/launch-env's CLAUDE_AUTOCOMPACT_PCT_OVERRIDE applied to
+# the selected model's effective window from codex's catalog, since codex's
+# knob is an absolute token count. Without the override, without a selected
+# model, or with a model the catalog does not list, codex keeps its own point.
+test_codex_compacts_at_the_launch_env_share_of_the_selected_window() {
+  local rec id out status launch case_name model env_line expect
+  for case_name in sol-40 sol61-40 sol-35 no-override no-model unlisted; do
+    id=profile-codex-compact-$case_name-z4f
+    rec=$(make_spawn_case "profile-codex-compact-$case_name" codex "$id")
+    read_case_record "$rec"
+    mkdir -p "$HOME_DIR/codex-home"
+    printf '%s\n' '{"models":[{"slug":"gpt-6-sol","context_window":272000,"effective_context_window_percent":95},{"slug":"gpt-6.1-sol","context_window":500000,"effective_context_window_percent":95}]}' \
+      > "$HOME_DIR/codex-home/models_cache.json"
+    model=gpt-6-sol env_line='CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=40' expect=103360
+    case "$case_name" in
+    sol61-40) model=gpt-6.1-sol expect=190000 ;;
+    sol-35) env_line='CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=35' expect=90440 ;;
+    no-override) env_line='' expect='' ;;
+    no-model) model='' expect='' ;;
+    unlisted) model=gpt-6-luna expect='' ;;
+    esac
+    [ -z "$env_line" ] || printf '%s\n' "$env_line" > "$HOME_DIR/config/launch-env"
+
+    if [ -n "$model" ]; then
+      out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --model "$model")
+    else
+      out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+    fi
+    status=$?
+    expect_code 0 "$status" "codex spawn ($case_name) should succeed"$'\n'"$out"
+    launch=$(cat "$LAUNCH_LOG")
+    if [ -n "$expect" ]; then
+      assert_contains "$launch" "-c 'model_auto_compact_token_limit=$expect' -c 'model_auto_compact_token_limit_scope=\"total\"'" \
+        "codex launch ($case_name) did not compact at the launch-env share of the selected model's effective window"
+    else
+      assert_not_contains "$launch" "model_auto_compact_token_limit" \
+        "codex launch ($case_name) set a compaction limit it had no window or share for"
+    fi
+  done
+  pass "codex compacts at the launch-env share of the selected model's effective window, and only when both are known"
+}
+
 # A codex crewmate runs under codex's own sandbox and automatic approval
 # reviewer instead of the no-sandbox bypass, with writes beyond its worktree
 # limited to exactly its steering inbox and data directory, both created
@@ -2323,6 +2366,7 @@ test_codex_threads_model_and_effort
 test_codex_threads_model_and_max_effort
 test_codex_omits_max_effort_for_unsupported_model
 test_codex_crewmate_launch_runs_sandboxed_under_auto_review
+test_codex_compacts_at_the_launch_env_share_of_the_selected_window
 test_codex_crewmate_launch_disables_the_hook_layer
 test_codex_secondmate_launch_keeps_the_hook_layer
 test_grok_threads_model_and_reasoning_effort

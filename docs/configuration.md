@@ -1135,6 +1135,9 @@ For example, to have every worker compact at 40 percent of its context window on
 CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=40
 ```
 
+A Codex crewmate or scout follows the same value: Codex's compaction knob is an absolute token count, so Firstmate applies that percentage to the selected model's effective window from Codex's own model catalog and launches the worker with that limit.
+It is a compaction in place, not the [worker context handoff](#worker-context-handoff-configworker-context-handoff), which stays Claude-only; a Codex launch with no selected model, or a model the catalog does not list, keeps Codex's own compaction point.
+
 Under an enabled `config/launch-env-allowlist`, these values are assigned after Firstmate's operational floor, so they win over any forwarded pane value.
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the exact parsing and delivery mechanics, with regression coverage that executes emitted launch commands with synthetic values in [`tests/fm-spawn-launch-env.test.sh`](../tests/fm-spawn-launch-env.test.sh).
 

@@ -766,6 +766,10 @@ bwrap: Can't mkdir parents for .../state/probe-t1.status/.git: Not a directory
 
 The same `command/exec` run kept `GIT_CONFIG_KEY_0` and a `*_TOKEN` name in the command environment, so Codex's environment policy leaves Firstmate's per-task hooksPath trio intact.
 
+The app-server `config/read` request reports the effective configuration for a set of `-c` flags.
+With `-c model_auto_compact_token_limit=103360 -c 'model_auto_compact_token_limit_scope="total"'` it returned both values with origin `sessionFlags`; without the scope flag the scope was unset (`None`), which is why the crewmate launch pins it.
+`codex debug models` reported `context_window` 272000 for `gpt-6-sol`, `gpt-6-astra`, and `gpt-6-luna`, 500000 for `gpt-6.1-sol`, and `effective_context_window_percent` 95 for all of them, so 40 percent of the effective window is 103360 and 190000 tokens.
+
 `tests/fm-codex-hook-layer-live-e2e.test.sh` is the command that refreshes this record: it replays the captured crewmate launch through `codex debug prompt-input` and fails naming the version if the sandbox, reviewer, writable roots, or trust statement stop rendering.
 
 ## Composer classification matrix
