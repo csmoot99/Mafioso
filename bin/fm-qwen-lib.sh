@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Qwen Code process identity.
-# Sourced by bin/backends/tmux.sh, bin/fm-agent-process-lib.sh, and
-# bin/fm-harness.sh. This file is sourced by scripts and has no side effects
-# on source.
+# Sourced by bin/fm-tmux-lib.sh (so every copy of that adapter, including the
+# remote transport's staged bin tree, needs this file beside it),
+# bin/fm-agent-process-lib.sh, and bin/fm-harness.sh. This file is sourced by
+# scripts and has no side effects on source.
 #
 # Why one owner: Qwen Code ships as a node bundle (a Gemini CLI fork), so a
 # live qwen pane presents as an interpreter and nothing about its command NAME

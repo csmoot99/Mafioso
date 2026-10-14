@@ -1200,6 +1200,7 @@ export default function (pi: ExtensionAPI) {
   }
 
   pi.on?.("before_agent_start", (event) => {
+    if (!("prompt" in event)) return; // a custom-message run carries no prompt
     consumeWake(generation, event.prompt);
   });
   pi.on?.("message_start", (event) => {
