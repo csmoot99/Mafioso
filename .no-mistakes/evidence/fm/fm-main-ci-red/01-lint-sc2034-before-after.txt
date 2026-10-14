@@ -1,0 +1,25 @@
+Scenario: Lint partition no longer flags SC2034 in tests/fm-context-handoff.test.sh
+Tool: CI's pinned ShellCheck 0.11.0 (bin/fm-lint.sh --required-version), run on the single file.
+
+=== BASE 9abc2e2 (file content via git show) ===
+$ shellcheck -x --source-path="$PWD" tests/fm-context-handoff.test.sh
+In tests/fm-context-handoff.test.sh line 280:
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+  ^-^ SC2034 (warning): i appears unused. Verify use (or export if used externally).
+exit=1
+
+=== TARGET 0528b86 ===
+$ shellcheck -x --source-path="$PWD" tests/fm-context-handoff.test.sh
+exit=0
+
+CI cross-check (main push run 38485554990, job "Lint 1"; PR #2 run 38486673717, job "Lint 2"):
+  ^-^ SC2034 (warning): i appears unused. Verify use (or export if used externally).
+
+Behavior check of the renamed loop variable (target):
+$ bash tests/fm-context-handoff.test.sh
+ok - a relaunch clears the old handoff marker and re-wires the hooks for the new incarnation
+ok - replace refuses a missing, empty, whitespace-only, stale, or unrecorded handoff and never reaches fm-control
+ok - replace hands a valid handoff to fm-control relaunch with a read-it-first note and closes the record
+ok - a refused relaunch is relayed and leaves the handoff record open
+all fm-context-handoff tests passed
+exit=0

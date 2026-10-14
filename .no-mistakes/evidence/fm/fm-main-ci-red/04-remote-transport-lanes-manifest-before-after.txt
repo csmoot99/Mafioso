@@ -1,0 +1,28 @@
+Scenario: tests/fm-remote-transport-lanes.test.sh (portable-serial-8of9) copies bin/fm-qwen-lib.sh so the
+remote worker's bin/fm-tmux-lib.sh can source it.
+
+=== BASE 9abc2e2 test manifest (base test file run as a temporary copy in tests/, then deleted) ===
+not ok - the control-state call did not complete through the worker: /tmp/fm-remote-transport-lanes.RrJcSL/remote-root/bin/fm-tmux-lib.sh: line 53: /tmp/fm-remote-transport-lanes.RrJcSL/remote-root/bin/fm-qwen-lib.sh: No such file or directory
+exit=1
+
+CI cross-check (PR #2 run 38486673717, job "Behavior portable serial 8"):
+not ok - the control-state call did not complete through the worker: /tmp/fm-remote-transport-lanes.GlsHlp/remote-root/bin/fm-tmux-lib.sh: line 53: /tmp/fm-remote-transport-lanes.GlsHlp/remote-root/bin/fm-qwen-lib.sh: No such file or directory
+
+=== TARGET 0528b86 (full run) ===
+ok - same-home jobs staged in the same second execute in staging-sequence order
+ok - same-home sequence order follows completed staging publication
+ok - a caller killed mid-wait cancels its queued job before execution
+ok - a caller killed mid-wait stops its running job's process group
+ok - a signal-less caller disconnect cancels the abandoned job through the parent probe
+ok - bounded reads after a cancellation meet their own budget with no convoy
+ok - an open caller stdin no longer wedges a non-payload remote command
+ok - a live explicit-stdin stage survives the staging-litter age bound
+ok - --stdin still delivers a payload caller's bytes
+ok - abandoned stage litter is reaped by age while live staging survives
+ALL TESTS PASSED
+exit=0
+
+Note: on this WSL2 host some repeat runs (both base and target) stopped earlier at
+"not ok - concurrent sequence claims were not unique and monotonic" before reaching the manifest-dependent
+assertion. See 05-host-uutils-mkdir-flake.txt: that is a host coreutils defect, not this change, and CI's
+ubuntu-latest runner passed that step in every run cited above.

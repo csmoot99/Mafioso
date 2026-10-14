@@ -1,0 +1,14 @@
+Environment note (not caused by this change): this test host is Ubuntu with coreutils-from-uutils
+(mkdir (uutils coreutils) 0.8.0; /usr/bin/mkdir -> ../lib/cargo/bin/coreutils/mkdir). Under that mkdir, two
+concurrent `mkdir <same-path>` invocations can BOTH exit 0, which breaks the mkdir-based atomic claim in
+fm_remote_job_next_seq (bin/fm-remote-job-lib.sh) and makes the "concurrent sequence claims" step of
+tests/fm-remote-transport-lanes.test.sh flaky locally.
+
+Probe: 20 racers each `mkdir "$d/x"` and append their id on success; rounds with >1 winner:
+  shell mkdir, /tmp (tmpfs):      5/30 rounds had multiple winners   (1/30 with the tool sandbox off)
+  shell mkdir, /dev/shm (tmpfs):  4/30
+  shell mkdir, /var/tmp (ext4):  27/30                                (25/30 with the tool sandbox off)
+  python os.mkdir (raw syscall), /tmp and /var/tmp: 0/30 and 0/30  -> the kernel is atomic; the uutils binary is not.
+No LD_PRELOAD and no /etc/ld.so.preload present.
+
+CI's ubuntu-latest runner uses GNU coreutils and passed this step in runs 38485554990 and 38486673717.

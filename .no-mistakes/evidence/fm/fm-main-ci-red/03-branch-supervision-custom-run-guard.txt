@@ -1,0 +1,29 @@
+Scenario (adversarial): a custom-message run (pi.sendMessage(..., {triggerTurn:true}) while idle) fires
+before_agent_start with NO prompt. The extension must not crash, and a real captain prompt must still be
+staged and mirrored into the branch before the next wake.
+
+Driver: the stubbed-Pi fixture and driver prelude from tests/fm-pi-branch-extension.test.sh (lock-owning
+session, real bin scripts), extended with a temporary probe that fires both event shapes through the real
+handler chain. Probe file was created in tests/, run, and deleted (not committed).
+
+=== BASE 9abc2e2 .pi/extensions/fm-branch-supervision.ts ===
+custom-run before_agent_start: THREW TypeError: Cannot read properties of undefined (reading 'trim')
+branch mirror before the wake: ["[captain] captain asks: hold task-9 until I say"]
+Error: custom-run before_agent_start threw
+[base] exit=1
+
+=== TARGET 0528b86 ===
+custom-run before_agent_start: returned cleanly
+branch mirror before the wake: ["[captain] captain asks: hold task-9 until I say"]
+[target] exit=0
+
+(The custom-run body "custom body" never appeared in the mirror in either variant.)
+
+Companion probe for .pi/extensions/fm-primary-pi-watch.ts (same two event shapes through the registered
+before_agent_start handler, fake pi capturing handlers): base and target both return cleanly for custom and
+user runs; the watch guard is a type-contract fix with no runtime crash at base.
+  [base] exit=0   [target] exit=0
+
+Existing behavior suites at target (Pi package available):
+  tests/fm-pi-watch-extension.test.sh   -> 60 ok lines, exit=0
+  tests/fm-pi-branch-extension.test.sh  -> 51 ok lines, exit=0
