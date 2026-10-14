@@ -1414,27 +1414,43 @@ test_post_publication_launch_failure_keeps_the_new_record() {
 # fixture is seeded the way fm-pr-check.sh really writes it: pr= and pr_head=
 # as the LAST lines of the record, then the poll artifacts published through
 # the same prepare/publish pair, because fm_pr_metadata_identity_parse rejects
-# any other key after pr= and the relaunch transaction adds its own key.
-test_relaunch_keeps_an_armed_pr_poll_authenticating() {
-  local dir out rc state
-  dir=$(new_case pr-poll rl45)
-  add_ship_task "$dir" rl45 claude
+# any other key after pr= and the relaunch adds its own keys: the transaction
+# key always, and the trace carrier when trace context is on.
+assert_relaunch_keeps_an_armed_pr_poll_authenticating() {  # <id> <trace off|on>
+  local id=$1 trace=$2 dir out rc state
+  dir=$(new_case "pr-poll-$trace" "$id")
+  add_ship_task "$dir" "$id" claude
   state="$dir/home/state"
   printf 'pr=%s\npr_head=%s\n' https://github.com/example/repo/pull/1 \
-    0123456789abcdef0123456789abcdef01234567 >> "$state/rl45.meta"
-  fm_pr_poll_prepare "$state" rl45 github https://github.com/example/repo/pull/1 \
+    0123456789abcdef0123456789abcdef01234567 >> "$state/$id.meta"
+  printf '%s\n' "$$" > "$state/.lock"
+  printf '%s %s\n' "$$" "$trace" > "$state/.trace-context-effective"
+  fm_pr_poll_prepare "$state" "$id" github https://github.com/example/repo/pull/1 \
     github.com example/repo 1 "$ROOT/bin/fm-pr-poll.sh" \
     || fail "could not prepare the PR poll fixture"
   fm_pr_poll_publish_prepared || fail "could not publish the PR poll fixture"
-  fm_pr_poll_artifacts_valid "$state" rl45 "$ROOT/bin/fm-pr-poll.sh" \
+  fm_pr_poll_artifacts_valid "$state" "$id" "$ROOT/bin/fm-pr-poll.sh" \
     || fail "the PR poll fixture did not authenticate before the relaunch"
-  out=$(run_control "$dir" rl45 relaunch --note "keep polling the PR"); rc=$?
+  out=$(run_control "$dir" "$id" relaunch --note "keep polling the PR"); rc=$?
   expect_code 0 "$rc" "a relaunch of a PR-ready task should succeed"$'\n'"$out"
-  [ -n "$(meta_field "$dir" rl45 control_relaunch_tx)" ] \
+  [ -n "$(meta_field "$dir" "$id" control_relaunch_tx)" ] \
     || fail "the relaunched record should identify its relaunch transaction"
-  fm_pr_poll_artifacts_valid "$state" rl45 "$ROOT/bin/fm-pr-poll.sh" \
-    || fail "the relaunched record no longer authenticates its armed PR poll"
+  if [ "$trace" = on ]; then
+    fm_trace_context_valid "$(meta_field "$dir" "$id" traceparent)" \
+      || fail "a trace-context relaunch should record its trace carrier"
+  fi
+  fm_pr_poll_artifacts_valid "$state" "$id" "$ROOT/bin/fm-pr-poll.sh" \
+    || fail "the relaunched record no longer authenticates its armed PR poll (trace context $trace)"
+}
+
+test_relaunch_keeps_an_armed_pr_poll_authenticating() {
+  assert_relaunch_keeps_an_armed_pr_poll_authenticating rl45 off
   pass "fm-control relaunch: an armed PR poll keeps authenticating after the relaunch"
+}
+
+test_trace_context_relaunch_keeps_an_armed_pr_poll_authenticating() {
+  assert_relaunch_keeps_an_armed_pr_poll_authenticating rl46 on
+  pass "fm-control relaunch: an armed PR poll keeps authenticating after a trace-context relaunch"
 }
 
 test_stop_transport_failure_reconciles_a_dead_agent() {
@@ -2560,6 +2576,7 @@ test_launch_failure_keeps_the_prior_record_and_reports_it
 test_prepublication_failure_keeps_concurrent_durable_metadata
 test_post_publication_launch_failure_keeps_the_new_record
 test_relaunch_keeps_an_armed_pr_poll_authenticating
+test_trace_context_relaunch_keeps_an_armed_pr_poll_authenticating
 test_stop_transport_failure_reconciles_a_dead_agent
 test_complete_journal_failure_rolls_back_from_durable_phase
 test_prepublication_abort_retires_replacement_wiring_and_busy_state
