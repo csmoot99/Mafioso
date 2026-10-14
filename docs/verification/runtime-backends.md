@@ -730,6 +730,44 @@ It captures the launch `bin/fm-spawn.sh` actually builds, replays those exact fl
 It spends no model tokens, so it runs by default wherever Codex is installed.
 The portable half, `tests/fm-spawn-dispatch-profile.test.sh`, pins the split the launch template makes: a crewmate launches hook-free while a secondmate, which runs a primary session on this repository's own project hooks, keeps them.
 
+## Codex crewmate safety posture
+
+Verified 2026-10-14 on codex-cli 0.162.1, Linux x86_64 (WSL2), with no prompt submitted to any model.
+
+`codex debug prompt-input` renders what the model would be shown for a given set of `-c` flags.
+For the crewmate launch's sandbox keys it rendered:
+
+```text
+`sandbox_mode` is `workspace-write`: The sandbox permits reading files, and editing files in `cwd` and `writable_roots`. Editing files in other directories requires approval. Network access is restricted.
+`approvals_reviewer` is `auto_review`: Sandbox escalations with require_escalated will be reviewed for compliance with the policy.
+```
+
+The same command run in this repository without `project_doc_max_bytes` cut `AGENTS.md` (48504 bytes) off mid-sentence at 32 KiB, and with `project_doc_max_bytes=1048576` rendered it in full.
+In a repository with only `CLAUDE.md`, `project_doc_fallback_filenames=["CLAUDE.md"]` rendered that file as the project instructions.
+A misspelled key (`approvals_reviewr`) was ignored without an error and the reviewer line disappeared, which is why the live guard asserts the rendered text.
+
+The app-server `command/exec` request runs a command in the configured sandbox without a model.
+With the crewmate's keys and writable roots of the task inbox and data directory:
+
+```text
+STATUS_DENIED   append to state/<id>.status
+INBOX_OK        mv inside state/<id>.inbox
+DATA_OK         write in data/<id>
+COMMIT_DENIED   git commit (writes the shared git common dir)
+TMP_OK          write in /tmp
+```
+
+`codex sandbox -P :workspace` additionally showed writes to `$HOME` denied, `git ls-remote` against a GitHub remote denied, and the no-mistakes daemon socket refused with `connect: operation not permitted`.
+Listing a file instead of a directory as a writable root made every command fail:
+
+```text
+bwrap: Can't mkdir parents for .../state/probe-t1.status/.git: Not a directory
+```
+
+The same `command/exec` run kept `GIT_CONFIG_KEY_0` and a `*_TOKEN` name in the command environment, so Codex's environment policy leaves Firstmate's per-task hooksPath trio intact.
+
+`tests/fm-codex-hook-layer-live-e2e.test.sh` is the command that refreshes this record: it replays the captured crewmate launch through `codex debug prompt-input` and fails naming the version if the sandbox, reviewer, writable roots, or trust statement stop rendering.
+
 ## Composer classification matrix
 
 The shared composer classifier (`bin/fm-composer-lib.sh`, `fm_composer_classify_screen`) owns every composer shape fleet-wide; each backend contributes only a capture and a capability descriptor.

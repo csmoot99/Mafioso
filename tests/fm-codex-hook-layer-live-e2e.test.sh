@@ -16,8 +16,18 @@
 # guard fails naming the harness and version instead of letting the modal
 # silently come back.
 #
-# It spends no model tokens (`codex features list` resolves configuration only),
-# so it runs by default wherever codex is installed.
+# The same captured flags carry the crewmate's safety posture: codex's
+# workspace-write sandbox with network off, its automatic approval reviewer
+# instead of a pane prompt, writable roots limited to the task's steering inbox
+# and data directory, and the task-worker trust statement. The guard replays the
+# flags through `codex debug prompt-input`, which renders exactly what the model
+# would be told, and fails naming the version if any of that stops rendering -
+# for example a release that renames a config key, which would otherwise be
+# ignored as an unknown key and quietly restore pane prompts.
+#
+# It spends no model tokens (`codex features list` and `codex debug
+# prompt-input` resolve configuration only), so it runs by default wherever
+# codex is installed.
 set -u
 
 # shellcheck source=tests/fixtures.sh
@@ -91,7 +101,36 @@ test_installed_codex_still_reports_the_hook_feature() {
   printf 'ok - codex %s still publishes the hook feature flag firstmate disables\n' "$CODEX_VERSION"
 }
 
+test_installed_codex_renders_the_captured_crewmate_safety_posture() {
+  local launch flags case_dir inbox data rendered expect
+  launch=$(capture_codex_launch safety --mode no-mistakes --yolo off)
+  flags=$(codex_global_flags "$launch")
+  case_dir="$TMP_ROOT/safety"
+  inbox="$(cd "$case_dir/home/state" && pwd -P)/codex-hook-layer-safety.inbox"
+  data="$(cd "$case_dir/home/data" && pwd -P)/codex-hook-layer-safety"
+
+  rendered=$(cd "$case_dir/wt" && eval "codex $flags debug prompt-input fm-probe" 2>&1) ||
+    fail "codex $CODEX_VERSION could not render a prompt for firstmate's crewmate launch flags: $rendered"
+  # The backticks are literal text in codex's rendered permissions block.
+  # shellcheck disable=SC2016
+  for expect in \
+    '`sandbox_mode` is `workspace-write`' \
+    'Network access is restricted.' \
+    '`approvals_reviewer` is `auto_review`' \
+    "\`$inbox\`" \
+    "\`$data\`" \
+    'You are a task worker launched by Firstmate'; do
+    case "$rendered" in
+    *"$expect"*) ;;
+    *) fail "codex $CODEX_VERSION does not show firstmate's crewmate launch the expected safety posture: missing $expect" ;;
+    esac
+  done
+
+  printf 'ok - codex %s renders the crewmate launch sandboxed under auto-review with only its task channels writable\n' "$CODEX_VERSION"
+}
+
 test_installed_codex_still_reports_the_hook_feature
 test_installed_codex_disables_hooks_for_the_captured_crewmate_launch
+test_installed_codex_renders_the_captured_crewmate_safety_posture
 
 echo "# all fm-codex-hook-layer-live-e2e tests passed"

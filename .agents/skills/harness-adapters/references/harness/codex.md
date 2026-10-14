@@ -12,7 +12,7 @@ Verified on 2026-06-11 with codex-cli 0.139.0 unless a fact gives a newer versio
 | Skill invocation | `$<skill>`, for example `$no-mistakes`; `/<skill>` is Claude-only and Codex rejects it as "Unrecognized command". |
 | Resume | `codex resume <session-id>`, using the id printed on quit. |
 | Model flag | `--model <model>`. |
-| Effort flag | `-c 'model_reasoning_effort="<low\|medium\|high\|xhigh\|max>"'`, verified on codex-cli 0.142.1 whose installed schema contains `model_reasoning_effort`, active config uses it, and bundled catalog advertised only the first four values while omitting `max`; current codex-cli 0.153.4 catalog data at `${CODEX_HOME:-~/.codex}/models_cache.json` advertises `max` for `gpt-5.6-luna`, which Firstmate passes for that model. |
+| Effort flag | `-c 'model_reasoning_effort="<low\|medium\|high\|xhigh\|max>"'`, verified on codex-cli 0.142.1 whose installed schema contains `model_reasoning_effort`. `max` is passed only when the selected model's entry in the catalog cache at `${CODEX_HOME:-~/.codex}/models_cache.json` advertises it, which every GPT-6 model does on codex-cli 0.162.1. |
 | Model discovery | Open the current interactive session's `/model` picker. |
 | Marker | None; identity comes from ancestry, and `../../../bin/fm-harness.sh` is what keeps a retained foreign `CLAUDECODE` from renaming it. Verified on 2026-09-01 with codex-cli 0.152.0: the pane process is the `node` npm shim and the native `codex` binary runs as its foreground child, so a tool subprocess reaches the native name directly while the shim itself is identified from its script path. |
 
@@ -28,6 +28,26 @@ Writing Codex's own trust store to pre-accept it would manufacture an operator c
 So crewmate and scout launches disable Codex's hook layer outright (`bin/fm-spawn.sh`'s launch template owns the flag), which is the opposite of `--dangerously-bypass-hook-trust` - that flag RUNS the untrusted hooks.
 A crewmate loses nothing: its turn-end signal is the `-c notify=` program on the same launch, and the Firstmate hooks in a project's `.codex/hooks.json` are primary-session infrastructure that stands down in a child worktree.
 A secondmate is a primary in its own home and keeps its hooks, so an unanswerable modal there is still possible and is the operator's own hook review to settle.
+
+## Crewmate safety posture
+
+Verified on 2026-10-14 with codex-cli 0.162.1.
+A crewmate or scout runs under Codex's own safety layer, the counterpart of Claude's auto mode, never under `--dangerously-bypass-approvals-and-sandbox`; `../../../../../bin/fm-spawn.sh`'s launch template owns the exact keys.
+Model shell commands run in the `workspace-write` sandbox: the worktree, `/tmp`, the task's steering inbox, and its data directory are writable, reads are unrestricted, and the network and unix sockets are blocked.
+Anything else - a status-file append, `git commit` or `checkout -b` (they write the shared git common dir), a push, `gh`, `no-mistakes` (its daemon socket), a package install - needs a sandbox escalation, which goes to Codex's automatic approval reviewer (`approvals_reviewer="auto_review"`) instead of a pane prompt.
+A denial comes back to the worker as a tool result, so no human ever answers a prompt in the pane.
+A sandbox writable root must be a directory: naming a file makes every sandboxed command fail with a bwrap mount error, so the status file can never be granted directly.
+`codex debug prompt-input` with the launch's `-c` flags renders exactly what the model is told, including the permissions block, at no token cost; `../../../../../tests/fm-codex-hook-layer-live-e2e.test.sh` replays the captured launch through it.
+Codex ignores a misspelled or renamed `-c` key without an error, which is why that guard asserts the rendered result rather than the flags.
+
+The launch also gives the worker what a Claude crewmate gets: the task-worker trust statement as `developer_instructions`, a project's instructions in full (Codex otherwise truncates `AGENTS.md` at 32 KiB), `CLAUDE.md` where a project has no `AGENTS.md`, and no startup update check.
+
+Parity gaps that remain with the hook layer off, because Codex treats every hook - a `-c` session-flag hook included - as untrusted until the operator trusts it, and ignores trust state passed with `-c`:
+
+- No semantic busy state (no `userPromptSubmit`/`stop` hooks); the turn-end notify still fires.
+- No context handoff: Codex compacts at its own threshold, and its auto-compaction knob, `model_auto_compact_token_limit`, is an absolute token count rather than a percentage.
+- The operator's `~/.codex/hooks.json` and a project's `.codex/hooks.json` do not run, while a Claude crewmate runs the operator's and project's Claude hooks.
+- A project's `.mcp.json` servers are Claude-only; Codex reads MCP servers only from its own config.
 
 ## Skill popup
 
