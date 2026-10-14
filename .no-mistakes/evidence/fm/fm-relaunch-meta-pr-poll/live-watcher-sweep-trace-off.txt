@@ -1,0 +1,9 @@
+### watcher check sweep after the trace-off relaunch (13:48:43)
+.last-check forced stale at 13:48:33; sweep completed at 13:48:40
+2830827 bash /tmp/fmlab.ID5UwL/home/bin/fm-watch.sh
+2836020 /usr/bin/zsh -c source /home/work/.claude/shell-snapshots/snapshot-zsh-1791999417989-xstj3w.sh 2>/dev/null || true && setopt NO_EXTENDED_GLOB NO_BARE_GLOB_QUAL 2>/dev/null || true && { \builtin unalias -- 'unsetenv'; \builtin unset -f -- 'unsetenv'; } >/dev/null 2>&1 || true && eval 'L=/tmp/fmlab.ID5UwL; S=$L/home/state; E=/home/work/.no-mistakes/evidence/01M4XQRQQ9QQNYGHF138ZEV1N9; touch -d '"'"'-10 minutes'"'"' $S/.last-check; t0=$(date +%s); until [ $(stat -c %Y $S/.last-check) -ge $t0 ] || [ $(( $(date +%s) - t0 )) -ge 180 ]; do sleep 3; done; { echo "### watcher check sweep after the trace-off relaunch ($(date +%T))"; echo ".last-check forced stale at $(date -d @$t0 +%T); sweep completed at $(date -d @$(stat -c %Y $S/.last-check) +%T)"; pgrep -af '"'"'fmlab.ID5UwL/home/bin/fm-watch.sh'"'"' | head -2; echo "'"'"'rejected unauthenticated state checks'"'"' lines anywhere in lab state: $(grep -rh '"'"'rejected unauthenticated'"'"' $S 2>/dev/null | wc -l)"; echo "--- wake queue tail:"; tail -3 $S/.wake-queue 2>/dev/null; echo "--- watcher deliveries tail:"; tail -2 $S/.watch-deliveries.log | cut -f1,3-; } | tee $E/live-watcher-sweep-trace-off.txt' < /dev/null && pwd -P >| /tmp/claude-ecb0-cwd
+'rejected unauthenticated state checks' lines anywhere in lab state: 0
+--- wake queue tail:
+--- watcher deliveries tail:
+2661153	signal: /tmp/fmlab.ID5UwL/home/state/lab1e6cb3970790-worker.turn-ended
+2814450	stale: firstmate:fm-lab1e6cb3970790-worker

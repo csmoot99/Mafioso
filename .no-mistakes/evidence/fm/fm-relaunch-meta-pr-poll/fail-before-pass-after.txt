@@ -1,0 +1,8 @@
+=== bin/fm-spawn.sh from 5d5ee1d (fix: clear the three CI failures already red on main (#3)) ===
+not ok - the relaunched record no longer authenticates its armed PR poll (trace context off)
+=== bin/fm-spawn.sh from e89b8c2 (fix(spawn): keep a relaunched record's pr= block terminal) ===
+ok - fm-control relaunch: an armed PR poll keeps authenticating after the relaunch
+not ok - the relaunched record no longer authenticates its armed PR poll (trace context on)
+=== bin/fm-spawn.sh from 9090429 (fix(spawn): record a relaunch's trace carrier ahead of its pr= block) ===
+ok - fm-control relaunch: an armed PR poll keeps authenticating after the relaunch
+ok - fm-control relaunch: an armed PR poll keeps authenticating after a trace-context relaunch

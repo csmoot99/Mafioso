@@ -1,0 +1,17 @@
+### control A: pre-fix record shape (traceparent after pr_head, as the OLD spawn_record_traceparent wrote it)
+last three keys: pr,pr_head,traceparent
+fm_pr_poll_artifacts_valid -> FAIL
+watcher sweep at 13:50:13: 'rejected unauthenticated state checks' lines 3 -> 5
+1792000210	12	check	unauthenticated-state-checks	check: rejected unauthenticated state checks: /tmp/fmlab.ID5UwL/home/state/lab1e6cb3970790-worker.check.sh
+
+### control B: the order the FIXED writer produced live (traceparent ahead of pr=)
+last two keys: pr,pr_head
+fm_pr_poll_artifacts_valid -> PASS
+watcher sweep at 13:53:14: 'rejected unauthenticated state checks' lines 5 -> 5
+
+NOTE on control B: the watcher had exited on control A's actionable rejection wake and
+re-arming via bin/fm-watch-arm.sh resurfaced that pending wake ("check: rearm-resurface"),
+so no check sweep ran during control B (.last-check never advanced; the until-loop timed
+out). Control B's "5 -> 5" is therefore NOT a sweep result; its evidence is the
+fm_pr_poll_artifacts_valid PASS. The live sweeps against the fixed writer's real relaunch
+output are in live-watcher-sweep-trace-off.txt and live-watcher-sweep-trace-on.txt.

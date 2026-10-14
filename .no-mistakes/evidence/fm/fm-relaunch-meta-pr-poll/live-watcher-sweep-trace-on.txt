@@ -1,0 +1,4 @@
+### watcher check sweep after the trace-on relaunch (13:49:13)
+.last-check forced stale at 13:49:07; sweep completed at 13:49:12
+live watcher: 2830827
+'rejected unauthenticated state checks' lines anywhere in lab state: 0

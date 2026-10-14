@@ -1,0 +1,44 @@
+### trace context: off   FM_HOME=/tmp/fmlab.ID5UwL/home   tree=9090429
+armed PR poll: published
+--- record BEFORE relaunch (/tmp/fmlab.ID5UwL/home/state/lab1e6cb3970790-worker.meta) ---
+window=firstmate:fm-lab1e6cb3970790-worker
+endpoint_task_id=lab1e6cb3970790-worker
+worktree=/tmp/fmlab.ID5UwL/treehouse/.treehouse/notes-0a9ed0/1/notes
+project=/tmp/fmlab.ID5UwL/home/projects/notes
+harness=claude
+kind=ship
+mode=local-only
+yolo=on
+branch=fm/lab1e6cb3970790-worker
+tasktmp=/tmp/fm-lab1e6cb3970790-worker
+model=sonnet
+effort=low
+busy_gen=g1791999614.2622710.18741
+spawn_gen=s1791999615.2620829.7039
+pr=https://github.com/csmoot99/Mafioso/pull/2
+pr_head=909042903566b951c551183215b3be338fc64aff
+BEFORE: fm_pr_poll_artifacts_valid -> PASS
+--- $ bin/fm-control.sh lab1e6cb3970790-worker relaunch --note ... ---
+relaunched lab1e6cb3970790-worker harness=claude from=claude model=sonnet effort=low backend=tmux endpoint=firstmate:fm-lab1e6cb3970790-worker worktree=/tmp/fmlab.ID5UwL/treehouse/.treehouse/notes-0a9ed0/1/notes
+fm-control rc=0
+--- record AFTER relaunch ---
+window=firstmate:fm-lab1e6cb3970790-worker
+endpoint_task_id=lab1e6cb3970790-worker
+worktree=/tmp/fmlab.ID5UwL/treehouse/.treehouse/notes-0a9ed0/1/notes
+project=/tmp/fmlab.ID5UwL/home/projects/notes
+harness=claude
+kind=ship
+mode=local-only
+yolo=on
+branch=fm/lab1e6cb3970790-worker
+tasktmp=/tmp/fm-lab1e6cb3970790-worker
+model=sonnet
+effort=low
+busy_gen=g1792000015.2788032.21369
+spawn_gen=s1792000015.2786653.14918
+control_relaunch_tx=2785032.20261014T174653Z.20916
+pr=https://github.com/csmoot99/Mafioso/pull/2
+pr_head=909042903566b951c551183215b3be338fc64aff
+--- last two keys of the record: pr,pr_head
+AFTER: fm_pr_poll_artifacts_valid -> PASS
+DONE
