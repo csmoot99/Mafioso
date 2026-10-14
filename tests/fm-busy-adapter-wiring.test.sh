@@ -440,6 +440,8 @@ test_qwen_hooks_semantic_lifecycle() {
     || fail "qwen settings must disable follow-up suggestions in the composer"
   [ "$(jq -r '.ui.enableUserFeedback' "$settings")" = false ] \
     || fail "qwen settings must disable the session survey that swallows typed input"
+  [ "$(jq -r '.memory.enableManagedAutoMemory' "$settings")" = false ] \
+    || fail "qwen settings must keep managed auto-memory off so a worker never reads or writes ~/.qwen/memories"
   # The worktree's own .qwen/settings.json is the PROJECT's file; firstmate
   # must never write it.
   assert_absent "$WT_DIR/.qwen/settings.json" \

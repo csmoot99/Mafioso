@@ -5027,6 +5027,12 @@ EOF
       # ui.enableUserFeedback=false keeps qwen's session survey (`How is Qwen
       # doing this session?`, digit shortcuts) from opening over the composer
       # after a turn, where it swallows the next typed line (observed live).
+      # memory.enableManagedAutoMemory=false (default true on qwen 0.25.1)
+      # keeps the worker out of the captain's global ~/.qwen/memories: the
+      # same getter gates the post-turn extraction that wrote `Updated 1
+      # memory` and the pre-turn recall, so a worker neither reads nor
+      # writes it (the captain's call; the extractor spent as many tokens as
+      # the main loop and a poisoned memory steered later sessions).
       # Hook commands print nothing: qwen's hook contract accepts an empty
       # stdout (verified), and every command tolerates a refused event so a
       # stale-gen writer can never break qwen's own lifecycle.
@@ -5036,7 +5042,7 @@ EOF
       q_stop=$(json_escape "touch $(shell_quote "$TURNEND"); $busy_cmd_prefix idle $busy_suffix --event stop >/dev/null 2>&1 || true")
       q_sessionend=$(json_escape "$busy_cmd_prefix idle $busy_suffix --event session-end >/dev/null 2>&1 || true")
       cat >"$STATE_REAL/$ID.qwen-settings.json" <<EOF
-{"\$version":4,"security":{"folderTrust":{"enabled":false}},"ui":{"enableFollowupSuggestions":false,"enableUserFeedback":false},"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"$q_submit"}]}],"Stop":[{"hooks":[{"type":"command","command":"$q_stop"}]}],"SessionEnd":[{"hooks":[{"type":"command","command":"$q_sessionend"}]}]}}
+{"\$version":4,"security":{"folderTrust":{"enabled":false}},"ui":{"enableFollowupSuggestions":false,"enableUserFeedback":false},"memory":{"enableManagedAutoMemory":false},"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"$q_submit"}]}],"Stop":[{"hooks":[{"type":"command","command":"$q_stop"}]}],"SessionEnd":[{"hooks":[{"type":"command","command":"$q_sessionend"}]}]}}
 EOF
     fi
     ;;

@@ -69,7 +69,7 @@ state/               runtime records and signals; gitignored
   <id>.grok-turnend-token   firstmate-owned grok hook registry token for the task; removed by teardown
   <id>.kimi-turnend-token   firstmate-owned Kimi hook registry token for the task; removed by teardown
   <id>.gemini-settings.json  firstmate-owned per-task Gemini settings carrying the busy-state and turn-end hooks, reached through GEMINI_CLI_SYSTEM_SETTINGS_PATH so nothing is written into the project's own .gemini/; removed by teardown
-  <id>.qwen-settings.json  firstmate-owned per-task Qwen Code settings carrying the busy-state and turn-end hooks, folder trust off, and the survey and follow-up rows off, reached through QWEN_CODE_SYSTEM_SETTINGS_PATH so nothing is written into the project's own .qwen/; removed by teardown
+  <id>.qwen-settings.json  firstmate-owned per-task Qwen Code settings carrying the busy-state and turn-end hooks, folder trust off, the survey and follow-up rows off, and managed auto-memory off, reached through QWEN_CODE_SYSTEM_SETTINGS_PATH so nothing is written into the project's own .qwen/; removed by teardown
   <id>.devin-config.json  firstmate-owned per-task Devin config (mode 600 snapshot of the user config plus the busy-state and turn-end hooks) passed through --config so no user or project config is edited; bin/fm-devin-config.sh owns it; removed by teardown
   <id>.context-handoff  one-line record of a Claude worker's pending, missed, or skipped context handoff, bound to its incarnation gen; bin/fm-context-handoff.sh is its only writer, spawn and relaunch clear it, and teardown removes it
   <id>.muse-session  muse busy-source binding (sessions root plus task worktree) written by fm-spawn; removed by teardown
