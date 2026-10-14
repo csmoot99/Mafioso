@@ -261,7 +261,7 @@ test_posttooluse_is_silent_without_a_marker() {
 }
 
 test_posttooluse_delivers_the_notice_sparingly_until_the_handoff_exists() {
-  local id=hk-pt-due rec out rc i delivered=0 handoff
+  local id=hk-pt-due rec out rc delivered=0 handoff
   rec=$(new_hook_case "$id"); read_hook_case "$rec"
   write_transcript "$TRANSCRIPT" 80000
   CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=40 run_precompact "$rec" "$id" auto
@@ -277,7 +277,7 @@ test_posttooluse_delivers_the_notice_sparingly_until_the_handoff_exists() {
   assert_contains "$ctx" "context-handoff-1" "the notice must name the decision key the report must carry"
   assert_contains "$ctx" "$STATE_DIR/$id.status" "the notice must name the status file to report through"
   assert_contains "$ctx" "start nothing new" "the notice must tell the worker to finish the step in hand and start nothing new"
-  for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
     out=$(run_posttooluse "$rec" "$id")
     [ -z "$out" ] || delivered=$((delivered + 1))
   done
