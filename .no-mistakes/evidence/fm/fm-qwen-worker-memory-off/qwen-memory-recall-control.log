@@ -1,0 +1,11 @@
+--- spawn-generated qwen-mem.qwen-settings.json (crewmate ship launch), hooks elided:
+{"$version":4,"security":{"folderTrust":{"enabled":false}},"ui":{"enableFollowupSuggestions":false,"enableUserFeedback":false},"memory":{"enableManagedAutoMemory":false}}
+--- qwen reply (control, memory key removed):
+Warning: running headless with --yolo / approval-mode=yolo and no sandbox. All tool calls (shell, write, edit) auto-execute at this process's privilege level. Configure tools.executionSandbox on Linux or a supported legacy sandbox via --sandbox / QWEN_SANDBOX, or set QWEN_CODE_SUPPRESS_YOLO_WARNING=1 to silence this notice.
+ready
+--- canary occurrences across 3 logged model requests:
+     13 OSPREY-9032-PROJTIER
+     13 PELICAN-4471-USERTIER
+ok - qwen 0.25.1 [control]: without memory.enableManagedAutoMemory=false the seeded ~/.qwen/memories canary reaches the model request (recall is live)
+ok - qwen 0.25.1 [control]: without the key the project-tier canary reaches the model request too
+exit=0

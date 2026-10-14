@@ -1,0 +1,24 @@
+--- spawn-generated qwen-mem.qwen-settings.json (crewmate ship launch), hooks elided:
+{"$version":4,"security":{"folderTrust":{"enabled":false}},"ui":{"enableFollowupSuggestions":false,"enableUserFeedback":false},"memory":{"enableManagedAutoMemory":false}}
+ok - qwen 0.25.1 [product]: crewmate spawn: 3 logged model requests carry no seeded canary, both memory tiers byte-identical, no 'Updated N memory' after a settled turn, despite a user layer setting managed auto-memory ON
+--- bin/fm-control.sh qwen-mem relaunch:
+warning: /tmp/qm.XcFh30/home/data/qwen-mem/launch-brief.md records no ship branch; defaulting to legacy branch fm/qwen-mem
+warning: /tmp/qm.XcFh30/home/data/qwen-mem/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunched qwen-mem harness=qwen from=qwen model=qwen3-coder:30b effort=default backend=tmux endpoint=firstmate:fm-qwen-mem worktree=/tmp/qm.XcFh30/wt
+--- relaunch-regenerated qwen-mem.qwen-settings.json, hooks elided:
+{"$version":4,"security":{"folderTrust":{"enabled":false}},"ui":{"enableFollowupSuggestions":false,"enableUserFeedback":false},"memory":{"enableManagedAutoMemory":false}}
+ok - qwen 0.25.1 [product]: control-plane relaunch regenerated the per-task settings for the new busy generation with memory.enableManagedAutoMemory=false
+ok - qwen 0.25.1 [product]: relaunched qwen: 7 more model requests carry no canary, memory tiers byte-identical, no 'Updated N memory' after a settled turn
+--- final pane tail:
+To continue this session, run
+qwen --resume b5aa6a9d-7d6d-4e67-844b-c0f7cdd97d38
+bash-5.3$ cd -- '/tmp/qm.XcFh30/wt'
+bash-5.3$ export GOTMPDIR=/tmp/fm-qwen-mem/gotmp
+bash-5.3$ export COMPACT_ADVISER_DISABLE=1
+bash-5.3$ export FM_TASK_ID=qwen-mem
+bash-5.3$ . '/tmp/fm-qwen-mem+fbde7929bae976ba8c0d678f25175e64232d2561f4a22409ad2dff9c236ad596/launch.s1792000147.285551
+5.32753.sh'
+To continue this session, run
+qwen --resume 4eb2c854-68f9-46db-be43-491737a547ae
+bash-5.3$
+exit=0

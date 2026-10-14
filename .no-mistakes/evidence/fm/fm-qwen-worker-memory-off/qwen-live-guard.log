@@ -1,0 +1,8 @@
+ok - qwen 0.25.1: spawn brief, model, autonomy, trust, identity and native Stop
+ok - qwen 0.25.1: no project settings written, no settings rewrite, and the worker commit carries no attribution
+ok - qwen 0.25.1: real fm-send doorbell read and acknowledged
+ok - qwen 0.25.1: two settled turns left no memory store and no post-turn memory update
+ok - qwen 0.25.1: single Escape cancels, Ctrl+U clears the restored prompt, and busy state is invalidated
+ok - qwen 0.25.1: /quit and native -r session resume
+FM_QWEN_SIGNALS_LIVE=1 bash tests/fm-qwen-signals-live-e2e.test.sh  3.49s user 3.84s system 10% cpu 1:06.88 total
+exit=0
