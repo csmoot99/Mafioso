@@ -1154,8 +1154,9 @@ FM_QWEN_SIGNALS_LIVE=1 bash tests/fm-qwen-signals-live-e2e.test.sh
 
 ```text
 ok - qwen 0.25.1: spawn brief, model, autonomy, trust, identity and native Stop
-ok - qwen 0.25.1: no project settings written, no settings rewrite, no memory store, and the worker commit carries no attribution
+ok - qwen 0.25.1: no project settings written, no settings rewrite, and the worker commit carries no attribution
 ok - qwen 0.25.1: real fm-send doorbell read and acknowledged
+ok - qwen 0.25.1: two settled turns left no memory store and no post-turn memory update
 ok - qwen 0.25.1: single Escape cancels, Ctrl+U clears the restored prompt, and busy state is invalidated
 ok - qwen 0.25.1: /quit and native -r session resume
 ```
@@ -1163,7 +1164,9 @@ ok - qwen 0.25.1: /quit and native -r session resume
 That guard is the command that refreshes this record after a qwen upgrade.
 It runs the real `bin/fm-spawn.sh` launch, `bin/fm-send.sh`, and `bin/fm-control.sh` against a real qwen pane in a private tmux server, under a user home holding only the three-line `~/.qwen/.env` the adapter reference documents, so a pass also proves that precondition reaches the model with no auth or onboarding dialog.
 It skips when `$FM_QWEN_BASE_URL/models` is unreachable.
-The no-memory-store check, added 2026-10-13 on the same qwen 0.25.1, proves the per-task `memory.enableManagedAutoMemory=false` setting: the worker's user home holds no `.qwen/memories` after its turns and the pane shows no `Updated N memory` line.
+The no-memory-store check, added 2026-10-13 on the same qwen 0.25.1, proves the per-task `memory.enableManagedAutoMemory=false` setting: the worker's user home holds no `.qwen/memories` and the pane shows no `Updated N memory` line.
+Because extraction would only start after Stop, the check runs once two turns have ended and the pane has stayed idle.
+The guard was re-run with that placement on 2026-10-14 on the same qwen 0.25.1.
 
 ### Credential precondition and the headless probe
 
