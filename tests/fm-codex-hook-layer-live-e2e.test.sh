@@ -98,7 +98,7 @@ test_installed_codex_enables_hooks_for_the_captured_crewmate_launch() {
 # reports for the captured launch's `-c hooks.*` session flags, from the case's
 # worktree.
 codex_session_flag_hooks() {
-  local case_dir=$1 wt line prev a hookargs=()
+  local case_dir=$1 wt line prev a as_pid hookargs=()
   wt="$case_dir/wt"
   fm_test_codex_launch_argv "$case_dir/launch.log" "$case_dir/argv" ||
     fail "codex $CODEX_VERSION: the captured launch did not run against an argument recorder"
@@ -110,17 +110,24 @@ codex_session_flag_hooks() {
     prev=$a
   done < "$case_dir/argv/args"
   [ "${#hookargs[@]}" -gt 0 ] || fail "codex $CODEX_VERSION: the captured launch carries no session-flag hooks"
-  coproc CODEX_AS { cd "$wt" && exec timeout 60 codex app-server --listen stdio:// -c features.hooks=true "${hookargs[@]}" 2>/dev/null; }
+  # A FIFO pair rather than coproc, which stock macOS Bash 3.2 cannot parse.
+  rm -f "$case_dir/as.in" "$case_dir/as.out"
+  mkfifo "$case_dir/as.in" "$case_dir/as.out"
+  (cd "$wt" && exec timeout 60 codex app-server --listen stdio:// -c features.hooks=true "${hookargs[@]}" \
+    < "$case_dir/as.in" > "$case_dir/as.out" 2>/dev/null) &
+  as_pid=$!
+  exec 7> "$case_dir/as.in" 8< "$case_dir/as.out"
   printf '%s\n' \
     '{"id":1,"method":"initialize","params":{"clientInfo":{"name":"fm-codex-hook-layer-live","version":"0"}}}' \
     '{"method":"initialized"}' \
-    "{\"id\":2,\"method\":\"hooks/list\",\"params\":{\"cwds\":[\"$wt\"]}}" >&"${CODEX_AS[1]}"
-  while IFS= read -r -t 30 line <&"${CODEX_AS[0]}"; do
+    "{\"id\":2,\"method\":\"hooks/list\",\"params\":{\"cwds\":[\"$wt\"]}}" >&7
+  while IFS= read -r -t 30 line <&8; do
     case "$line" in *'"id":2'*) break ;; esac
     line=
   done
-  kill "$CODEX_AS_PID" 2>/dev/null
-  wait "$CODEX_AS_PID" 2>/dev/null
+  exec 7>&- 8<&-
+  kill "$as_pid" 2>/dev/null
+  wait "$as_pid" 2>/dev/null
   [ -n "${line:-}" ] || fail "codex $CODEX_VERSION app-server did not answer hooks/list"
   printf '%s' "$line"
 }
