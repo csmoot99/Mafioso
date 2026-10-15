@@ -650,6 +650,31 @@ ok - qwen: a real launch parked on its own rendered trust dialog surfaces throug
 
 Qwen Code's folder-trust gate is off by default, so the guard reaches its dialog by turning the gate on through a system settings file, with `QWEN_CODE_TRUSTED_FOLDERS_PATH` pointed at an unreachable path so the operator's own trusted-folders record stays out of the run; the dialog text it matches is recorded under [Qwen Code](#qwen-code) below.
 
+Codex was added on 2026-10-14 with codex-cli 0.162.1, Claude Code 2.1.300, and qwen 0.25.1 on Linux x86_64 (WSL2); pi and gemini were not installed:
+
+```
+# live codex version: codex-cli 0.162.1
+ok - codex: a real launch parked on its own rendered trust dialog surfaces through the watcher gate
+# checked 3 launch-prompt signature(s) against real installed binaries
+```
+
+Codex, launched into a fresh repository root under the operator's own `~/.codex`, which the run left unchanged:
+
+```
+  Folder access
+  /tmp/fm-launch-prompt-codex.XXXXXX/wt
+
+  Trust this folder? Codex can read, edit, and run files here, subject to your permission settings. Folder settings can run code automatically, even without a model request. Continue only if you
+  trust these files. Your trust decision will be saved.
+
+› 1. Trust and continue
+  2. Quit
+
+  enter continue · esc quit
+```
+
+From a linked worktree the same dialog adds a note that trust applies to the repository root; the signature pairs the question with its "Trust and continue" option, so it matches both.
+
 ## Worker account pin sign-in check
 
 `bin/fm-worker-account-lib.sh` decides whether a pinned account is signed in from vendor output: the exit status of `claude auth status`, the JSON of `pi auth check`, and the provider column of `pi --list-models`.
@@ -694,41 +719,101 @@ The selection starts on "Review hooks", which is neither trusting nor declining,
 That count covers every hook Codex had no persisted trust for, drawn from both the machine's own `~/.codex/hooks.json` and this repository's tracked `.codex/hooks.json`.
 Writing Codex's own trust store to pre-accept the modal would record an operator consent that was never given, so it is not an option either.
 
-`codex --help` documents `--dangerously-bypass-hook-trust` as "Run enabled hooks without requiring persisted hook trust for this invocation", which RUNS the untrusted hooks.
-That is the opposite of what an unattended worker needs, so the control used is the hook feature flag:
+Verified 2026-10-14 on codex-cli 0.162.1, Linux x86_64 (WSL2).
+`codex --help` documents `--dangerously-bypass-hook-trust` as "Run enabled hooks without requiring persisted hook trust for this invocation", so a crewmate launch passes it with `--enable hooks`, runs the operator's and the project's hooks the way a Claude worker runs its own, and writes no trust store:
 
 ```sh
-codex features list | grep '^hooks'
-codex --disable hooks features list | grep '^hooks'
-codex --disable no_such_feature features list
+codex --enable hooks --dangerously-bypass-hook-trust features list | grep '^hooks'
 ```
 
 ```text
 hooks                                    stable             true
-hooks                                    stable             false
-Error: Unknown feature flag: no_such_feature
 ```
 
-The last arm is what makes the control safe to depend on: an unknown feature name is a hard error, so a release that renames or drops the flag fails the launch loudly instead of silently restoring the modal.
+An interactive pane launched that way, with probe hooks passed as `-c hooks.<Event>=...` session flags, reached the composer with no modal; `UserPromptSubmit`, `Stop`, and `SessionEnd` each fired once, and the operator's three `SessionStart` hooks ran once each.
+The app-server `hooks/list` request reports such a hook as `"source":"sessionFlags"`, `"enabled":true`, `"trustStatus":"untrusted"`, and clamps a `SessionEnd` timeout to 3 seconds.
 
-The same launch with the hook layer disabled reached the composer with no modal, answered the prompt, and fired the turn-end program that rides the launch rather than any hook:
-
-```sh
-codex --dangerously-bypass-approvals-and-sandbox --disable hooks \
-  -c "notify=[\"bash\",\"-c\",\"touch $TURNEND\"]" "Say ACK and stop."
-```
+The turn-end notification rides the `Stop` hook, not Codex's `notify` program: in the same release `notify` also fired seconds into a turn, for the TUI's side request that names the conversation, with the same `type` as the real turn end:
 
 ```text
-> Say ACK and stop.
-- ACK, captain.
-$ ls "$TURNEND"
-<turn-end file present>
+agent-turn-complete {"type":"agent-turn-complete","thread-id":"01a13cf9-0b94-...","client":"codex-tui","input-messages":["Generate a concise, single-line task title ..."],"last-assistant-message":"{\"title\":\"Run sandbox verification steps\"}"}
 ```
 
 `tests/fm-codex-hook-layer-live-e2e.test.sh` is the command that refreshes this record.
-It captures the launch `bin/fm-spawn.sh` actually builds, replays those exact flags against the installed Codex, and fails naming the harness and version if the hook layer comes back on.
+It captures the launch `bin/fm-spawn.sh` actually builds, replays those exact flags against the installed Codex, and fails naming the harness and version if the hook layer is off or any Firstmate hook stops loading from the launch with its exact command.
 It spends no model tokens, so it runs by default wherever Codex is installed.
-The portable half, `tests/fm-spawn-dispatch-profile.test.sh`, pins the split the launch template makes: a crewmate launches hook-free while a secondmate, which runs a primary session on this repository's own project hooks, keeps them.
+The portable half, `tests/fm-spawn-dispatch-profile.test.sh`, pins the split the launch template makes: a crewmate runs its hooks past the trust modal while a secondmate, which runs a primary session on this repository's own project hooks, keeps them without the bypass or the worker hooks.
+
+## Codex crewmate safety posture
+
+Verified 2026-10-14 on codex-cli 0.162.1, Linux x86_64 (WSL2), with no prompt submitted to any model.
+
+`codex debug prompt-input` renders what the model would be shown for a given set of `-c` flags.
+For the crewmate launch's sandbox keys it rendered:
+
+```text
+`sandbox_mode` is `workspace-write`: The sandbox permits reading files, and editing files in `cwd` and `writable_roots`. Editing files in other directories requires approval. Network access is restricted.
+`approvals_reviewer` is `auto_review`: Sandbox escalations with require_escalated will be reviewed for compliance with the policy.
+```
+
+The same command run in this repository without `project_doc_max_bytes` cut `AGENTS.md` (48504 bytes) off mid-sentence at 32 KiB, and with `project_doc_max_bytes=1048576` rendered it in full.
+In a repository with only `CLAUDE.md`, `project_doc_fallback_filenames=["CLAUDE.md"]` rendered that file as the project instructions.
+A misspelled key (`approvals_reviewr`) was ignored without an error and the reviewer line disappeared, which is why the live guard asserts the rendered text.
+
+The app-server `command/exec` request runs a command in the configured sandbox without a model.
+With the crewmate's keys and writable roots of the task inbox and data directory:
+
+```text
+STATUS_DENIED   append to state/<id>.status
+INBOX_OK        mv inside state/<id>.inbox
+DATA_OK         write in data/<id>
+COMMIT_DENIED   git commit (writes the shared git common dir)
+TMP_OK          write in /tmp
+```
+
+`codex sandbox -P :workspace` additionally showed writes to `$HOME` denied, `git ls-remote` against a GitHub remote denied, and the no-mistakes daemon socket refused with `connect: operation not permitted`.
+Listing a file instead of a directory as a writable root made every command fail:
+
+```text
+bwrap: Can't mkdir parents for .../state/probe-t1.status/.git: Not a directory
+```
+
+The same `command/exec` run kept `GIT_CONFIG_KEY_0` and a `*_TOKEN` name in the command environment, so Codex's environment policy leaves Firstmate's per-task hooksPath trio intact.
+
+The app-server `config/read` request reports the effective configuration for a set of `-c` flags.
+With `-c model_auto_compact_token_limit=103360 -c 'model_auto_compact_token_limit_scope="total"'` it returned both values with origin `sessionFlags`; without the scope flag the scope was unset (`None`), which is why the crewmate launch pins it.
+`codex debug models` reported `context_window` 272000 for `gpt-6-sol`, `gpt-6-astra`, and `gpt-6-luna`, 500000 for `gpt-6.1-sol`, and `effective_context_window_percent` 95 for all of them, so 40 percent of the effective window is 103360 and 190000 tokens.
+
+`tests/fm-codex-hook-layer-live-e2e.test.sh` is the command that refreshes this record: it replays the captured crewmate launch through `codex debug prompt-input` and fails naming the version if the sandbox, reviewer, writable roots, or trust statement stop rendering.
+
+The push guard rules file (`.agents/skills/harness-adapters/references/harness/codex-push-guard.rules`, installed as `~/.codex/rules/firstmate-push-guard.rules` per `codex.md` "Push guard rules") was checked the same day with Codex's own policy evaluator:
+
+```sh
+codex execpolicy check --rules ~/.codex/rules/firstmate-push-guard.rules git push --force origin fm/x
+codex execpolicy check --rules ~/.codex/rules/firstmate-push-guard.rules git push origin fm/x
+```
+
+```text
+{"matchedRules":[{"prefixRuleMatch":{"matchedPrefix":["git","push","--force"],"decision":"forbidden","justification":"Firstmate push guard: force pushes are forbidden; push a new branch instead."}}],"decision":"forbidden"}
+{"matchedRules":[]}
+```
+
+All 23 force and `main` or `master` forms tried were `forbidden`, and the 7 ordinary commands tried, including `git push -u origin fm/<branch>` and `git push origin --delete fm/<branch>`, matched no rule.
+An app-server `thread/start` under `RUST_LOG=codex_core::exec_policy=trace` logged that a session loads the file:
+
+```text
+DEBUG codex_core::exec_policy: loaded 1 .rules files in /home/work/.codex/rules
+DEBUG codex_core::exec_policy: loaded rules from 1 files
+```
+
+A model command refused by a rule inside a live worker was not observed.
+`tests/fm-codex-push-guard-live-e2e.test.sh` is the command that refreshes the evaluator half of this record against the tracked file, at no token cost.
+
+A live run on the same day and release showed the context handoff's notice path in a crewmate pane running session-flag probe hooks.
+Each `PostToolUse` payload named the rollout log in `transcript_path`, and that log carried `token_count` records with `last_token_usage` and `model_context_window`.
+The hook fired once for each of the worker's five shell calls.
+The first call's `additionalContext` appeared in the log as a developer message tagged `hooks.additional_context`, and the worker's next call created the file it asked for.
+`tests/captures/codex-cli-0.162.1/` holds the captured payload and log excerpt that `tests/fm-context-handoff.test.sh` replays through the hook.
 
 ## Composer classification matrix
 

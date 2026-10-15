@@ -288,21 +288,75 @@ test_claude_hooks_stale_incarnation_harmless() {
   pass "claude hook events from a superseded incarnation are rejected without breaking the hook"
 }
 
-test_codex_unverified_until_a_semantic_source_exists() {
+# codex's hooks ride its launch command as -c session flags, so these drive
+# the command codex would run for each event, parsed from the launch the spawn
+# typed (fm_test_codex_hook_command).
+run_codex_hook() {  # <hook-event>
+  local cmd
+  cmd=$(fm_test_codex_hook_command "$CASE_DIR/launch.log" "$1" "$CASE_DIR/codex-args") \
+    || fail "no $1 hook command on the codex launch"
+  sh -c "$cmd"
+}
+
+test_codex_hooks_semantic_lifecycle() {
   local rec id=busy-cx-1 out state
-  rec=$(make_spawn_case codex-unverified codex "$id")
+  rec=$(make_spawn_case codex-lifecycle codex "$id")
   read_case_record "$rec"
-  out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR")
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR")
   expect_code 0 $? "codex spawn should succeed: $out"
   state="$HOME_DIR/state"
-  assert_absent "$state/$id.busy-gen" "codex must not arm a busy contract with no verified semantic source"
-  assert_absent "$WT_DIR/.codex/hooks.json" "codex must not install unverified busy hooks"
-  assert_contains "$out" 'spawned '"$id"' harness=codex' "codex spawn did not complete normally"
+  assert_present "$state/$id.busy-gen" "codex spawn did not arm the busy contract"
+  # The hooks ride the launch; the project's own .codex/hooks.json is untouched.
+  assert_absent "$WT_DIR/.codex/hooks.json" "codex spawn must not write the project's .codex/hooks.json"
   out=$(classify codex "$id" "$state")
-  [ "$out" = "unknown codex-unverified" ] || fail "codex must classify 'unknown codex-unverified', got '$out'"
+  [ "$out" = "busy fm-spawn" ] || fail "seed after spawn must be 'busy fm-spawn', got '$out'"
   out=$(fm_busy_classify tmux fake:w codex "$id" "$state" '• Working (6s • esc to interrupt)')
-  [ "$out" = "unknown codex-unverified" ] || fail "codex must not fall back to footer text, got '$out'"
-  pass "codex classifies unknown until a semantic source is verified, never idle or footer-matched"
+  [ "$out" = "busy fm-spawn" ] || fail "codex must not classify from footer text, got '$out'"
+
+  rm -f "${state:?}/${id:?}.turn-ended"
+  out=$(run_codex_hook Stop) || fail "Stop hook command failed"
+  [ -z "$out" ] || fail "codex hook commands must print nothing, got '$out'"
+  [ -f "$state/$id.turn-ended" ] || fail "Stop does not touch the turn-end notification marker"
+  out=$(classify codex "$id" "$state")
+  [ "$out" = "idle codex-hook" ] || fail "Stop must classify 'idle codex-hook', got '$out'"
+
+  run_codex_hook UserPromptSubmit >/dev/null || fail "UserPromptSubmit hook command failed"
+  out=$(classify codex "$id" "$state")
+  [ "$out" = "busy codex-hook" ] || fail "UserPromptSubmit must classify 'busy codex-hook', got '$out'"
+
+  run_codex_hook SessionEnd >/dev/null || fail "SessionEnd hook command failed"
+  out=$(classify codex "$id" "$state")
+  [ "$out" = "idle codex-hook" ] || fail "SessionEnd must classify idle, got '$out'"
+  pass "codex hooks open on UserPromptSubmit and close on Stop and SessionEnd"
+}
+
+test_codex_hooks_stale_incarnation_harmless() {
+  local rec id=busy-cx-2 out state
+  rec=$(make_spawn_case codex-stale codex "$id")
+  read_case_record "$rec"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR")
+  expect_code 0 $? "codex spawn should succeed: $out"
+  state="$HOME_DIR/state"
+  "$ROOT/bin/fm-busy-event.sh" arm "$state" "$id" >/dev/null
+  run_codex_hook UserPromptSubmit >/dev/null \
+    || fail "a stale-gen hook must still exit 0 so codex's lifecycle is never broken"
+  out=$(classify codex "$id" "$state")
+  [ "$out" = "busy fm-spawn" ] || fail "a stale-gen hook event must not change state, got '$out'"
+  pass "codex hook events from a superseded incarnation are rejected without breaking the hook"
+}
+
+test_raw_codex_launch_has_no_semantic_wiring() {
+  local rec id=busy-cx-raw out state
+  rec=$(make_spawn_case codex-raw codex "$id")
+  read_case_record "$rec"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" 'codex --search')
+  expect_code 0 $? "raw codex spawn should succeed: $out"
+  state="$HOME_DIR/state"
+  assert_absent "$state/$id.busy-gen" "raw codex launch must not arm a busy generation"
+  assert_not_contains "$(cat "$CASE_DIR/launch.log")" "hooks.Stop" "raw codex launch must not carry session-flag hooks"
+  out=$(classify codex "$id" "$state")
+  [ "$out" = "unknown missing" ] || fail "raw codex launch must classify unknown, got '$out'"
+  pass "raw codex launch remains unwired and classifies unknown"
 }
 
 # Gemini's hooks are PROJECT hooks in the worktree's own .gemini/settings.json,
@@ -542,6 +596,8 @@ test_qwen_hooks_semantic_lifecycle
 test_qwen_hooks_stale_incarnation_harmless
 test_raw_qwen_launch_has_no_semantic_wiring
 test_qwen_is_refused_as_a_secondmate
-test_codex_unverified_until_a_semantic_source_exists
+test_codex_hooks_semantic_lifecycle
+test_codex_hooks_stale_incarnation_harmless
+test_raw_codex_launch_has_no_semantic_wiring
 
 echo "all fm-busy-adapter-wiring tests passed"

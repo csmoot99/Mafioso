@@ -39,8 +39,11 @@
 #   qwen-hook        Qwen Code hooks (UserPromptSubmit opens; Stop and
 #                    SessionEnd close); a manual Escape emits no Stop, so
 #                    control invalidates to unknown as it does for Devin.
-#   codex-hook, codex-appserver  reserved: Codex, gated by
-#                    fm_busy_codex_semantic_source
+#   codex-hook       Codex session-flag hooks (UserPromptSubmit opens; Stop and
+#                    SessionEnd close); cancellation is unverified, so control
+#                    invalidates to unknown as it does for Qwen.
+#   codex-appserver  reserved: Codex's app-server turn lifecycle, gated by
+#                    fm_busy_codex_appserver_observable
 #   kimi-wire, kimi-hook  reserved: standalone Kimi, gated by fm_busy_kimi_verified
 # Firstmate-owned sources accepted for every converted adapter:
 #   fm-spawn         the launch-brief turn seeded at spawn
@@ -81,7 +84,7 @@
 # launch whose busy record never advanced past the fm-spawn seed is
 # indistinguishable, from the record alone, between "still reading its
 # brief" and "parked on an interactive prompt the harness never gets past
-# without a human" - a Claude/Gemini/Qwen/Pi workspace-trust dialog, a sign-in or
+# without a human" - a Claude/Gemini/Qwen/Pi/Codex workspace-trust dialog, a sign-in or
 # auth-method picker, or a first-run setup menu. Left alone this reads as
 # ordinary busy for the full BUSY_TURN_MAX_SECS (one hour) before the
 # separate wedge-suspect bound even looks at it. The signature table matches
@@ -123,9 +126,9 @@
 # Codex negotiation (fm_busy_codex_appserver_observable,
 # fm_busy_codex_hooks_verified): the approved contract prefers Codex's
 # app-server turn lifecycle with capability negotiation, and sanctions its
-# stable lifecycle hooks as the intermediate. Neither is usable on the
-# installed binary, so Codex classifies unknown codex-unverified rather than
-# falling back to idle, and fm-spawn installs no Codex busy wiring.
+# stable lifecycle hooks as the intermediate. The hooks are verified, so
+# fm-spawn wires them and their codex-hook records classify; were both gates
+# closed, Codex would classify unknown codex-unverified rather than idle.
 # docs/verification/supervision.md owns the evidence for both probes.
 #
 # Sourcing: set -u and set -e safe; no subshell-unfriendly globals.
@@ -171,16 +174,17 @@ fm_busy_codex_appserver_observable() {
 
 # fm_busy_codex_hooks_verified: the sanctioned intermediate - Codex's stable
 # hooks engine (UserPromptSubmit to open a turn, Stop and SessionEnd to close
-# it). Returns 0 only once those hooks are live-verified to fire for a
-# firstmate-launched worker. codex-cli 0.145.0 verdict (live, 2026-07-28):
-# NOT verified. Firstmate-written project hooks under <worktree>/.codex/
-# never fired in an interactive pane whose directory trust was granted, nor
-# under `codex exec`, in either case with --dangerously-bypass-hook-trust,
-# while global hooks fired in the same runs. Codex additionally exposes no
-# StopFailure hook, so an API-error turn end would need separate coverage
-# even after the discovery problem is solved.
+# it). Returns 0 once those hooks are live-verified to fire for a
+# firstmate-launched worker. codex-cli 0.162.1 verdict (live, 2026-10-14):
+# verified. Session-flag hooks (`-c hooks.<Event>=...`) under
+# --enable hooks --dangerously-bypass-hook-trust fired in an interactive pane
+# exactly once each - UserPromptSubmit at the launch prompt, Stop at the true
+# turn end, SessionEnd on /quit - with no hook-trust modal. (0.145.0 never
+# fired Firstmate-written project hooks under <worktree>/.codex/; fm-spawn
+# does not use that path.) Codex exposes no StopFailure hook, so an
+# API-error turn end is not closed by a hook.
 fm_busy_codex_hooks_verified() {
-  return 1
+  return 0
 }
 
 # fm_busy_codex_semantic_source: 0 when ANY verified Codex semantic source
@@ -1014,12 +1018,27 @@ fm_busy_qwen_launch_prompt_tail() {
     && printf '%s' "$buf" | grep -qiE "Trust folder|Don't trust"
 }
 
+# fm_busy_codex_launch_prompt_tail: Codex's directory-trust dialog, shown on
+# the first run per repository root ("Folder access", then "Trust this
+# folder? Codex can read, edit, and run files here, ..." above a preselected
+# "1. Trust and continue" and "2. Quit"), live-verified on codex-cli 0.162.1
+# (docs/verification/runtime-backends.md "Launch-prompt backstop
+# signatures"). Firstmate answers it with one Enter after spawn; this is the
+# backstop while it waits. The question is paired with its own option line
+# for the same self-referential-prose reason as the pairings above.
+fm_busy_codex_launch_prompt_tail() {
+  local buf
+  buf=$(cat)
+  printf '%s' "$buf" | grep -qiE "${FM_BUSY_CODEX_TRUST_PROMPT_REGEX:-Trust this folder\\? Codex can read}" \
+    && printf '%s' "$buf" | grep -qiE 'Trust and continue'
+}
+
 # fm_busy_launch_prompt_parked: dispatch to the signature above for <harness>,
 # or fail when this harness has none. Consumes the tail on stdin. Scoped to
 # exactly the harnesses fm-spawn.sh arms with the fm-spawn busy source
-# (claude*, opencode*, pi, pi-signed, omp, gemini, qwen) since only those can ever
-# read a pinned "busy fm-spawn" record; codex and standalone Kimi already
-# classify unknown before a record is ever consulted, and opencode ships no
+# (claude*, opencode*, pi, pi-signed, omp, gemini, qwen, codex*) since only
+# those can ever read a pinned "busy fm-spawn" record; standalone Kimi already
+# classifies unknown before a record is ever consulted, and opencode ships no
 # trust dialog at all.
 fm_busy_launch_prompt_parked() {  # <harness>
   case "${1:-}" in
@@ -1027,6 +1046,7 @@ fm_busy_launch_prompt_parked() {  # <harness>
     pi | pi-signed | omp) fm_busy_pi_launch_prompt_tail ;;
     gemini) fm_busy_gemini_launch_prompt_tail ;;
     qwen) fm_busy_qwen_launch_prompt_tail ;;
+    codex*) fm_busy_codex_launch_prompt_tail ;;
     *) return 1 ;;
   esac
 }

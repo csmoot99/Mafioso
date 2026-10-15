@@ -114,8 +114,24 @@ run_spawn() {
     FM_FAKE_PI_VERSION="${FM_TEST_PI_VERSION:-0.84.0}" \
     FM_FAKE_CURSOR_MODELS="${FM_TEST_CURSOR_MODELS:-}" \
     FM_FAKE_CURSOR_LIST_STATUS="${FM_TEST_CURSOR_LIST_STATUS:-0}" \
-    GROK_HOME="$home/grok-home" \
+    GROK_HOME="$home/grok-home" CODEX_HOME="$home/codex-home" \
     fm_test_run_spawn "$home" "$wt" "$fakebin" "$@"
+}
+
+# write_codex_catalog <home> <slug:effort,effort,...>...: a codex model catalog
+# cache in the case's own CODEX_HOME, shaped like the installed
+# ~/.codex/models_cache.json, so effort mapping never reads the developer's.
+write_codex_catalog() {
+  local home=$1 entry slug efforts models='' sep=''
+  shift
+  mkdir -p "$home/codex-home"
+  for entry in "$@"; do
+    slug=${entry%%:*}
+    efforts=$(printf '%s' "${entry#*:}" | tr ',' '\n' | sed 's/.*/{"effort":"&"}/' | paste -sd, -)
+    models="$models$sep{\"slug\":\"$slug\",\"context_window\":272000,\"supported_reasoning_levels\":[$efforts]}"
+    sep=,
+  done
+  printf '{"models":[%s]}\n' "$models" > "$home/codex-home/models_cache.json"
 }
 
 # Ship spawns carry an explicit delivery contract (AGENTS.md section 7); these
@@ -446,7 +462,7 @@ test_active_dispatch_profile_allows_explicit_harness() {
   assert_contains "$out" "spawned $id harness=codex" "spawn did not report explicit codex harness"
   assert_meta_profile "$HOME_DIR/state/$id.meta" codex gpt-5 high
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "codex --model 'gpt-5' -c 'model_reasoning_effort=\"high\"' --dangerously-bypass-approvals-and-sandbox" \
+  assert_contains "$launch" "codex --model 'gpt-5' -c 'model_reasoning_effort=\"high\"' -c 'sandbox_mode=\"workspace-write\"'" \
     "explicit harness launch did not thread model and effort"
   pass "active crew-dispatch profile allows an explicit resolved harness"
 }
@@ -539,7 +555,7 @@ test_codex_threads_model_and_effort() {
   expect_code 0 "$status" "codex spawn with profile flags should succeed"
   assert_meta_profile "$HOME_DIR/state/$id.meta" codex gpt-5 high
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "codex --model 'gpt-5' -c 'model_reasoning_effort=\"high\"' --dangerously-bypass-approvals-and-sandbox" \
+  assert_contains "$launch" "codex --model 'gpt-5' -c 'model_reasoning_effort=\"high\"' -c 'sandbox_mode=\"workspace-write\"'" \
     "codex launch did not thread model and reasoning effort config"
   pass "codex receives --model and model_reasoning_effort profile flags"
 }
@@ -549,39 +565,138 @@ test_codex_threads_model_and_max_effort() {
   id=profile-codex-max-z4
   rec=$(make_spawn_case profile-codex-max codex "$id")
   read_case_record "$rec"
+  write_codex_catalog "$HOME_DIR" gpt-6-sol:low,medium,high,xhigh,max,ultra
 
-  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --model gpt-5.6-luna --effort max)
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --model gpt-6-sol --effort max)
   status=$?
-  expect_code 0 "$status" "codex Luna spawn with max effort should succeed"
-  assert_meta_profile "$HOME_DIR/state/$id.meta" codex gpt-5.6-luna max
+  expect_code 0 "$status" "codex GPT-6 spawn with max effort should succeed"
+  assert_meta_profile "$HOME_DIR/state/$id.meta" codex gpt-6-sol max
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "codex --model 'gpt-5.6-luna' -c 'model_reasoning_effort=\"max\"' --dangerously-bypass-approvals-and-sandbox" \
-    "codex launch did not thread Luna's max reasoning effort config"
-  pass "codex Luna receives --model and model_reasoning_effort max profile flags"
+  assert_contains "$launch" "codex --model 'gpt-6-sol' -c 'model_reasoning_effort=\"max\"' -c 'sandbox_mode=\"workspace-write\"'" \
+    "codex launch did not thread max reasoning effort for a model whose catalog entry advertises it"
+  pass "codex receives max reasoning effort when the selected model's catalog entry advertises it"
 }
 
+# max follows the selected model's own catalog entry: a model whose entry
+# stops at xhigh, a model the catalog does not list, and a home with no
+# catalog at all each keep the model flag and omit the effort.
 test_codex_omits_max_effort_for_unsupported_model() {
-  local rec id out status launch
-  id=profile-codex-max-unsupported-z4b
-  rec=$(make_spawn_case profile-codex-max-unsupported codex "$id")
+  local rec id out status launch catalog
+  for catalog in capped unlisted absent; do
+    id=profile-codex-max-$catalog-z4b
+    rec=$(make_spawn_case "profile-codex-max-$catalog" codex "$id")
+    read_case_record "$rec"
+    case "$catalog" in
+    capped) write_codex_catalog "$HOME_DIR" gpt-6-luna:low,medium,high,xhigh ;;
+    unlisted) write_codex_catalog "$HOME_DIR" gpt-6-sol:low,medium,high,xhigh,max ;;
+    esac
+
+    out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --model gpt-6-luna --effort max)
+    status=$?
+    expect_code 0 "$status" "codex spawn with an unsupported max effort ($catalog catalog) should omit the effort flag"
+    assert_meta_profile "$HOME_DIR/state/$id.meta" codex gpt-6-luna max
+    launch=$(cat "$LAUNCH_LOG")
+    assert_contains "$launch" "codex --model 'gpt-6-luna' -c 'sandbox_mode=\"workspace-write\"'" \
+      "codex launch did not preserve the model flag when max effort was omitted ($catalog catalog)"
+    assert_not_contains "$launch" "model_reasoning_effort" "codex launch must omit max reasoning effort ($catalog catalog)"
+  done
+  pass "codex omits max when the catalog is capped, missing the model, or absent"
+}
+
+# A codex worker compacts at the share of the window a claude worker stops
+# growing at: config/launch-env's CLAUDE_AUTOCOMPACT_PCT_OVERRIDE applied to
+# the selected model's effective window from codex's catalog, since codex's
+# knob is an absolute token count. Without the override, without a selected
+# model, or with a model the catalog does not list, codex keeps its own point.
+# Under config/worker-context-handoff the worker hands off at that share
+# instead, through the handoff hooks, and codex compacts only at the fallback
+# ceiling; an override the handoff cannot honor leaves the in-place compaction.
+test_codex_compacts_at_the_launch_env_share_of_the_selected_window() {
+  local rec id out status launch case_name model env_line expect handoff hooks
+  for case_name in sol-40 sol61-40 sol-35 no-override no-model unlisted handoff-40 handoff-fallback-50 handoff-override-85; do
+    id=profile-codex-compact-$case_name-z4f
+    rec=$(make_spawn_case "profile-codex-compact-$case_name" codex "$id")
+    read_case_record "$rec"
+    mkdir -p "$HOME_DIR/codex-home"
+    printf '%s\n' '{"models":[{"slug":"gpt-6-sol","context_window":272000,"effective_context_window_percent":95},{"slug":"gpt-6.1-sol","context_window":500000,"effective_context_window_percent":95}]}' \
+      > "$HOME_DIR/codex-home/models_cache.json"
+    model=gpt-6-sol env_line='CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=40' expect=103360 handoff=absent hooks=''
+    case "$case_name" in
+    sol61-40) model=gpt-6.1-sol expect=190000 ;;
+    sol-35) env_line='CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=35' expect=90440 ;;
+    no-override) env_line='' expect='' ;;
+    no-model) model='' expect='' ;;
+    unlisted) model=gpt-6-luna expect='' ;;
+    handoff-40) handoff='' expect=206720 hooks='--ceiling-pct 80 --codex-threshold-pct 40' ;;
+    handoff-fallback-50) handoff='fallback-pct=50' expect=129200 hooks='--ceiling-pct 50 --codex-threshold-pct 40' ;;
+    handoff-override-85) handoff='' env_line='CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=85' expect=219640 ;;
+    esac
+    [ -z "$env_line" ] || printf '%s\n' "$env_line" > "$HOME_DIR/config/launch-env"
+    [ "$handoff" = absent ] || printf '%s\n' "$handoff" > "$HOME_DIR/config/worker-context-handoff"
+
+    if [ -n "$model" ]; then
+      out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --model "$model")
+    else
+      out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+    fi
+    status=$?
+    expect_code 0 "$status" "codex spawn ($case_name) should succeed"$'\n'"$out"
+    launch=$(cat "$LAUNCH_LOG")
+    if [ -n "$expect" ]; then
+      assert_contains "$launch" "-c 'model_auto_compact_token_limit=$expect' -c 'model_auto_compact_token_limit_scope=\"total\"'" \
+        "codex launch ($case_name) did not compact at the launch-env share of the selected model's effective window"
+    else
+      assert_not_contains "$launch" "model_auto_compact_token_limit" \
+        "codex launch ($case_name) set a compaction limit it had no window or share for"
+    fi
+    if [ -n "$hooks" ]; then
+      assert_contains "$launch" "-c 'hooks.PreCompact=" "codex launch ($case_name) lacks the handoff PreCompact hook"
+      assert_contains "$launch" "-c 'hooks.PostToolUse=" "codex launch ($case_name) lacks the handoff PostToolUse hook"
+      assert_contains "$launch" "$hooks" "codex launch ($case_name) did not bake the handoff threshold and ceiling into its hooks"
+    else
+      assert_not_contains "$launch" "fm-context-handoff.sh" "codex launch ($case_name) wired a handoff it cannot honor"
+    fi
+  done
+  pass "codex compacts at the launch-env share of the selected window, or at the handoff ceiling when it hands off there"
+}
+
+# A codex crewmate runs under codex's own sandbox and automatic approval
+# reviewer instead of the no-sandbox bypass, with writes beyond its worktree
+# limited to exactly its steering inbox and data directory, both created
+# before launch so the worker can acknowledge a steer and write its report.
+test_codex_crewmate_launch_runs_sandboxed_under_auto_review() {
+  local rec id out status launch state_real data_real
+  id=profile-codex-safety-z4e
+  rec=$(make_spawn_case profile-codex-safety codex "$id")
   read_case_record "$rec"
 
-  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --model gpt-5 --effort max)
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
   status=$?
-  expect_code 0 "$status" "codex spawn with an unsupported model max effort should omit the effort flag"
-  assert_meta_profile "$HOME_DIR/state/$id.meta" codex gpt-5 max
+  expect_code 0 "$status" "codex crewmate spawn should succeed"$'\n'"$out"
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "codex --model 'gpt-5' --dangerously-bypass-approvals-and-sandbox" \
-    "codex launch did not preserve the model flag when max effort was omitted"
-  assert_not_contains "$launch" "model_reasoning_effort" "codex launch must omit unsupported model max reasoning effort"
-  pass "codex omits max for models without the catalog capability"
+  state_real=$(cd "$HOME_DIR/state" && pwd -P)
+  data_real=$(cd "$HOME_DIR/data" && pwd -P)
+  assert_not_contains "$launch" "--dangerously-bypass-approvals-and-sandbox" \
+    "codex crewmate launch still bypasses the sandbox and approvals"
+  assert_contains "$launch" "-c 'sandbox_mode=\"workspace-write\"' -c 'approval_policy=\"on-request\"' -c 'approvals_reviewer=\"auto_review\"' -c 'sandbox_workspace_write.network_access=false'" \
+    "codex crewmate launch did not pin the sandbox, approval policy, reviewer, and network posture"
+  assert_contains "$launch" "-c 'sandbox_workspace_write.writable_roots=[\"$state_real/$id.inbox\",\"$data_real/$id\"]'" \
+    "codex crewmate writable roots are not exactly the task inbox and data directory"
+  [ -d "$state_real/$id.inbox/handled" ] || fail "codex spawn did not create the steering inbox before launch"
+  [ -d "$data_real/$id" ] || fail "codex spawn did not create the task data directory before launch"
+  assert_contains "$launch" "-c 'developer_instructions=\"You are a task worker launched by Firstmate," \
+    "codex crewmate launch lacks the task-worker trust statement"
+  assert_contains "$launch" "-c 'project_doc_max_bytes=1048576' -c 'project_doc_fallback_filenames=[\"CLAUDE.md\"]' -c 'check_for_update_on_startup=false'" \
+    "codex crewmate launch does not load full project instructions or keep the update check off"
+  pass "a codex crewmate runs sandboxed under auto-review with only its task channels writable"
 }
 
-# Codex parks a crewmate launch forever on its unanswerable hook-trust modal
-# unless the launch turns the hook layer off. These two cases pin the split:
-# a crewmate runs hook-free, a secondmate keeps the project hooks that carry its
-# own primary-session turn-end guard and session-start digest.
-test_codex_crewmate_launch_disables_the_hook_layer() {
+# A crewmate runs codex's hook layer the way a claude worker runs its hooks,
+# past the hook-trust modal it could never answer, with busy state and the
+# turn-end signal as session-flag hooks on the launch itself. A secondmate
+# keeps the project hooks that carry its own primary-session turn-end guard
+# and session-start digest, and gets none of the worker hooks.
+test_codex_crewmate_launch_runs_hooks_past_the_trust_modal() {
   local rec id out status launch
   id=profile-codex-hooks-z4c
   rec=$(make_spawn_case profile-codex-hooks codex "$id")
@@ -591,17 +706,19 @@ test_codex_crewmate_launch_disables_the_hook_layer() {
   status=$?
   expect_code 0 "$status" "codex crewmate spawn should succeed"$'\n'"$out"
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "--disable hooks" \
-    "codex crewmate launch did not disable the hook layer that blocks it on a trust modal"
-  # The opposite posture: this flag RUNS the untrusted hooks instead of
-  # disabling them, so a launch must never reach for it.
-  assert_not_contains "$launch" "--dangerously-bypass-hook-trust" \
-    "codex crewmate launch ran the operator's untrusted hooks instead of disabling them"
-  # Firstmate goes blind without the turn-end signal, which rides this same
-  # launch rather than any hook.
-  assert_contains "$launch" "notify=" \
-    "codex crewmate launch lost the turn-end notify program"
-  pass "a codex crewmate launches with no hook layer and keeps its turn-end signal"
+  assert_contains "$launch" "--enable hooks --dangerously-bypass-hook-trust -c 'hooks.UserPromptSubmit=" \
+    "codex crewmate launch did not run its hooks past the trust modal"
+  assert_contains "$launch" "-c 'hooks.Stop=" "codex crewmate launch lacks the Stop turn-end hook"
+  assert_contains "$launch" "-c 'hooks.SessionEnd=" "codex crewmate launch lacks the SessionEnd hook"
+  # Each hook silences itself; a mangled redirection would print into codex.
+  assert_contains "$launch" ">/dev/null 2>&1 || true" \
+    "codex crewmate hook commands lost their output redirection"
+  assert_not_contains "$launch" "--disable hooks" "codex crewmate launch still disables the hook layer"
+  # The notify program also fires for the title side request mid-turn.
+  assert_not_contains "$launch" "notify=" "codex crewmate launch still carries the notify program"
+  assert_not_contains "$launch" "hooks.PostToolUse" \
+    "codex crewmate launch wired the context handoff with config/worker-context-handoff absent"
+  pass "a codex crewmate runs its hooks past the trust modal with Stop as its turn-end signal"
 }
 
 test_codex_secondmate_launch_keeps_the_hook_layer() {
@@ -618,6 +735,7 @@ test_codex_secondmate_launch_keeps_the_hook_layer() {
   launch=$(cat "$LAUNCH_LOG")
   assert_not_contains "$launch" "--disable hooks" \
     "codex secondmate launch disabled the project hooks its own primary supervision depends on"
+  assert_not_contains "$launch" "hooks.Stop" "codex secondmate launch got a worker's session-flag hooks"
   pass "a codex secondmate keeps the project hook layer its primary session runs on"
 }
 
@@ -2265,7 +2383,9 @@ test_claude_threads_model_and_effort
 test_codex_threads_model_and_effort
 test_codex_threads_model_and_max_effort
 test_codex_omits_max_effort_for_unsupported_model
-test_codex_crewmate_launch_disables_the_hook_layer
+test_codex_crewmate_launch_runs_sandboxed_under_auto_review
+test_codex_compacts_at_the_launch_env_share_of_the_selected_window
+test_codex_crewmate_launch_runs_hooks_past_the_trust_modal
 test_codex_secondmate_launch_keeps_the_hook_layer
 test_grok_threads_model_and_reasoning_effort
 test_grok_omits_invalid_max_reasoning_effort

@@ -11,8 +11,9 @@
 # caught it.
 #
 # For each of claude, pi (covering pi-signed and omp, which share Pi's engine
-# and trust gate), and gemini that is actually installed, this drives the REAL
-# binary in an isolated tmux server into its genuine interactive launch prompt
+# and trust gate), gemini, qwen, and codex that is actually installed, this
+# drives the REAL binary in an isolated tmux server into its genuine
+# interactive launch prompt
 # (a fresh untrusted worktree carrying a project-local trust-requiring
 # resource for claude and pi, a fresh credential-less environment for gemini),
 # captures the pane with the exact production shape (bin/fm-backend.sh's
@@ -35,7 +36,7 @@
 #
 # Run explicitly with FM_LAUNCH_PROMPT_SIGNALS_LIVE=1. Refresh
 # docs/verification/runtime-backends.md ("Launch-prompt backstop signatures")
-# from this guard's output after any of claude/pi/gemini upgrades.
+# from this guard's output after any of claude/pi/gemini/qwen/codex upgrades.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -223,6 +224,22 @@ if [ -x "${QWEN_BIN:-}" ]; then
   pass "qwen: a real launch parked on its own rendered trust dialog surfaces through the watcher gate"
 else
   note "qwen not installed - launch-prompt signature not checked"
+fi
+
+CODEX_BIN=$(command -v codex 2>/dev/null || true)
+if [ -x "${CODEX_BIN:-}" ]; then
+  VERSION_OUT=$("$CODEX_BIN" --version 2>&1) || fail "codex --version failed: $VERSION_OUT"
+  note "live codex version: $VERSION_OUT"
+  # A fresh repository root has no saved directory trust, so codex parks on
+  # its trust dialog before the positional prompt is ever submitted; Escape
+  # quits it. Codex's TUI may still record its own display bookkeeping in
+  # ~/.codex/config.toml on an interactive start.
+  check_harness codex fm-lp-codex-$$ '' '' \
+    'Trust this folder' '' \
+    "$CODEX_BIN" -c check_for_update_on_startup=false hello
+  pass "codex: a real launch parked on its own rendered trust dialog surfaces through the watcher gate"
+else
+  note "codex not installed - launch-prompt signature not checked"
 fi
 
 [ "$CHECKED" -gt 0 ] || fail "no installed harness could be checked; this run verified nothing"
