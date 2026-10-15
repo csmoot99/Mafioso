@@ -613,8 +613,8 @@ test_bootstrap_nudge_retry_refuses_changed_home() {
 # backend targets (default:w9:pY) that liveness respawn immediately replaced
 # (default:wA:p2), so fm-send with the printed target fell back to tmux and failed
 # while fm-<id> resolved through current meta.
-make_nudge_herdr_fake() {
-  local dir=$1 stale=$2 fresh=$3 fakebin
+make_nudge_herdr_fake() {  # <dir> <stale> <fresh> <stale-shell-pid>
+  local dir=$1 stale=$2 fresh=$3 shell_pid=$4 fakebin
   fakebin=$(fm_fakebin "$dir")
   cat > "$fakebin/herdr" <<SH
 #!/usr/bin/env bash
@@ -643,6 +643,12 @@ case "\$cmd \$sub" in
       printf '{"error":{"code":"agent_not_found","message":"gone"}}\n' >&2
     fi
     ;;
+  "pane process-info")
+    # The stale pane holds only its bare shell.
+    if [ "\$4" = "${stale#*:}" ]; then
+      printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"${stale#*:}","shell_pid":$shell_pid,"foreground_process_group_id":$shell_pid,"foreground_processes":[{"pid":$shell_pid,"name":"zsh","argv0":"zsh","argv":["-zsh"],"cmdline":"-zsh"}]}}}\n'
+    fi
+    ;;
   "pane send-text"|"pane run"|"pane send-keys")
     if [ "\$arg" = "${stale#*:}" ]; then
       exit 1
@@ -657,7 +663,7 @@ SH
 }
 
 test_nudge_retry_uses_fresh_herdr_endpoint_after_respawn() {
-  local w c1 stale fresh fakebin herdrfb toolchain out meta window resolved stale_send fresh_send spawn_stub marker
+  local w c1 stale fresh fakebin herdrfb toolchain out meta window resolved stale_send fresh_send spawn_stub marker shell_pid
   stale=default:w9:pY
   fresh=default:wA:p2
   w=$(new_world nudge-herdr-rotate)
@@ -689,7 +695,10 @@ SH
   chmod +x "$spawn_stub"
   cp "$spawn_stub" "$w/main/bin/fm-spawn.sh"
 
-  herdrfb=$(make_nudge_herdr_fake "$w/herdr" "$stale" "$fresh")
+  # A real, childless process stands in for the stale pane's bare shell.
+  sleep 300 &
+  shell_pid=$!
+  herdrfb=$(make_nudge_herdr_fake "$w/herdr" "$stale" "$fresh" "$shell_pid")
   toolchain=$(make_fake_toolchain "$w")
   if ! add_real_jq "$toolchain"; then
     pass "T8b nudge selector herdr respawn skipped without jq"
@@ -699,6 +708,7 @@ SH
     FM_SEND_SETTLE=0 \
     FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
     "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null)
+  kill "$shell_pid" 2>/dev/null || true
 
   # The nudge now rides the durable inbox: a stale endpoint can only swallow
   # the best-effort doorbell, never the steer itself, so the nudge is SENT

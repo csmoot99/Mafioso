@@ -2088,8 +2088,9 @@ case "${1:-} ${2:-}" in
     exit 0 ;;
   'pane process-info')
     # A retained registration with a shell-only pane models an exited agent
-    # whose Herdr status authority still belongs to its previous session.
-    if [ -f "$D/herdr-agent-registration" ]; then
+    # whose Herdr status authority still belongs to its previous session, and
+    # a pane holding no agent is that same plain shell.
+    if [ -f "$D/herdr-agent-registration" ] || [ ! -f "$D/herdr-agent-live" ]; then
       printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":4242,"foreground_processes":[]}}}\n' \
         "$(cat "$D/herdr-pane")"
     else
@@ -2139,17 +2140,15 @@ esac
 exit 0
 SH
   chmod +x "$fb/herdr"
+  # The herdr pane classifier's process-table reads see the pane's childless
+  # shell; every other ps call reads the real table.
   cat > "$fb/ps" <<'SH'
 #!/usr/bin/env bash
-if [ -f "$FM_FAKE_DIR/herdr-agent-registration" ]; then
-  case "$*" in
-    '-axo pid=,ppid=,comm=') printf '4242 1 bash\n' ;;
-    '-p 4242 -o args=') printf 'bash\n' ;;
-    *) exec /bin/ps "$@" ;;
-  esac
-else
-  exec /bin/ps "$@"
-fi
+case "$*" in
+  '-axo pid=,ppid=,comm=') printf '4242 1 bash\n' ;;
+  '-p 4242 -o args=') printf 'bash\n' ;;
+  *) exec /bin/ps "$@" ;;
+esac
 SH
   chmod +x "$fb/ps"
 }
