@@ -474,6 +474,11 @@ case "${1:-} ${2:-}" in
       exit 1
     fi
     ;;
+  "pane process-info")
+    # The husk pane holds only its bare shell.
+    [ "${4:-}" = p-old ] && [ ! -e "$killed" ] || exit 1
+    printf '%s\n' '{"result":{"type":"pane_process_info","process_info":{"pane_id":"p-old","shell_pid":4242,"foreground_process_group_id":4242,"foreground_processes":[{"pid":4242,"name":"zsh","argv0":"zsh","argv":["-zsh"],"cmdline":"-zsh"}]}}}'
+    ;;
   "pane close")
     [ "${3:-}" = p-old ] && : > "$killed"
     ;;
@@ -486,6 +491,17 @@ esac
 exit 0
 SH
   chmod +x "$fakebin/herdr"
+  # The herdr pane classifier's process-table reads see the husk's childless
+  # shell; any other read fails closed, so no shell pid is ever signaled.
+  cat > "$fakebin/herdr-ps" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  '-axo pid=,ppid=,comm=') printf '1 0 init\n4242 1 zsh\n' ;;
+  '-p 4242 -o args=') printf -- '-zsh\n' ;;
+  *) exit 1 ;;
+esac
+SH
+  chmod +x "$fakebin/herdr-ps"
 }
 
 # make_fake_herdr <fakebin> <live-pane> [odd-status-pane]: `herdr pane get
@@ -683,7 +699,7 @@ run_session_start_herdr_secondmate() {
   local root=$1 home=$2 fakebin=$3 mate=$4 log=$5 state=$6
   FM_BACKEND=herdr FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_STATE="$state" \
     FM_FAKE_SECOND_MATE_ID="$SESSION_START_HERDR_SECOND_MATE_ID" \
-    FM_FAKE_HARNESS_PID=$$ \
+    FM_FAKE_HARNESS_PID=$$ FM_HERDR_PS_BIN="$fakebin/herdr-ps" \
     run_session_start "$home" "$root" "$fakebin:$BASE_PATH"
 }
 

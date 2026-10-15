@@ -36,6 +36,7 @@ STATE='$state'
 LOG='$log'
 SEND_FAIL='$send_fail'
 SOCKET='$socket'
+SHELL_PID='$$'
 SH
   cat >> "$script" <<'SH'
 printf '%s\n' "$*" >> "$LOG"
@@ -100,13 +101,14 @@ case "${1:-} ${2:-}" in
   "pane read") printf '\n' ;;
   "pane process-info")
     # The agent a launch typed in is codex in the foreground; a pane holding
-    # no agent is its bare shell.
+    # no agent is its bare shell. The installing test process stands in for
+    # that shell, so the classifier's process-table read finds it alive.
     if [ "$(jq_state -r --arg p "$pane" '.typed[$p] // false')" = true ]; then
       printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":%s,"foreground_process_group_id":%s,"foreground_processes":[{"pid":%s,"name":"codex","argv0":"codex","argv":["codex"],"cmdline":"codex"}]}}}\n' \
-        "$pane" "$$" "$$" "$$"
+        "$pane" "$SHELL_PID" "$SHELL_PID" "$SHELL_PID"
     else
       printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":%s,"foreground_process_group_id":%s,"foreground_processes":[{"pid":%s,"name":"zsh","argv0":"zsh","argv":["-zsh"],"cmdline":"-zsh"}]}}}\n' \
-        "$pane" "$$" "$$" "$$"
+        "$pane" "$SHELL_PID" "$SHELL_PID" "$SHELL_PID"
     fi ;;
   "agent get")
     pane=${3:-}
