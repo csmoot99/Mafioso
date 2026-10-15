@@ -809,7 +809,7 @@ DEBUG codex_core::exec_policy: loaded rules from 1 files
 A model command refused by a rule inside a live worker was not observed.
 `tests/fm-codex-push-guard-live-e2e.test.sh` is the command that refreshes the evaluator half of this record against the tracked file, at no token cost.
 
-Live run-1792018316 on the same day and release showed the context handoff's notice path in a crewmate pane running session-flag probe hooks.
+A live run on the same day and release showed the context handoff's notice path in a crewmate pane running session-flag probe hooks.
 Each `PostToolUse` payload named the rollout log in `transcript_path`, and that log carried `token_count` records with `last_token_usage` and `model_context_window`.
 The hook fired once for each of the worker's five shell calls.
 The first call's `additionalContext` appeared in the log as a developer message tagged `hooks.additional_context`, and the worker's next call created the file it asked for.
