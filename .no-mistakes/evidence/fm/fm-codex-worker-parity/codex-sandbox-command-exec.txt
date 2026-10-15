@@ -1,0 +1,10 @@
+== codex app-server command/exec under the captured crewmate sandbox (gpt-6-sol launch), cwd=worktree
+WORKTREE_WRITE               exit=0 ['WT_OK']
+STATUS_APPEND                exit=0 ['STATUS_WRITTEN']
+INBOX_MV                     exit=0 ['INBOX_OK']
+DATA_WRITE                   exit=0 ['DATA_OK']
+HOME_WRITE                   exit=1 ['bash: line 1: /home/work/fm-parity-sandbox-probe: Read-only file system']
+GIT_COMMIT                   exit=128 ["fatal: Unable to create '/tmp/fm-parity.33O9vP/sol40/project/.git/worktrees/wt/index.lock': Read-only file system"]
+NETWORK                      exit=6 ['curl: (6) Could not resolve host: github.com']
+TMP_WRITE                    exit=0 ['TMP_OK']
+-- after: status file bytes=5; inbox handled: m1; home probe exists: no

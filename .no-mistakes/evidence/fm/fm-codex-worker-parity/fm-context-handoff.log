@@ -1,0 +1,31 @@
+ok - the first auto PreCompact blocks, binds a due marker to the incarnation, and notes the handoff once
+ok - repeat auto PreCompact fires keep blocking without new status events while the handoff is pending
+ok - the fallback ceiling lets compaction through once the window nears its limit and records the miss once
+ok - a worker environment without the lowering override compacts as before and says why once
+ok - an override too close to the window limit is treated as no safe handoff threshold
+ok - an explicit --ceiling-pct scales the fallback ceiling and bounds the usable override at N-1
+ok - a hook command written without a ceiling argument keeps meaning 80 percent
+ok - manual compaction is never blocked and leaves no record
+ok - stale incarnations, unreadable payloads, and missing transcripts all let compaction through
+ok - each handoff in a task gets the next durable path and key, never overwriting an earlier one
+ok - the no-marker PostToolUse path is a silent exit 0
+ok - PostToolUse delivers the handoff notice once, re-delivers it sparingly, and stops once the handoff exists
+ok - a Codex worker below its handoff threshold gets no marker, note, or notice
+ok - a Codex worker at its threshold gets the same due marker, note, and notice a held Claude worker gets
+ok - a recorded live Codex PostToolUse payload and session log fire the handoff notice at the threshold
+ok - a Codex PreCompact never blocks and records a handoff the fallback compaction overtook
+ok - a Codex compaction that overtakes the threshold between tool calls is recorded as the fallback
+ok - manual and superseded-incarnation Codex compactions leave no handoff record
+ok - with config/worker-context-handoff absent a claude worker's settings are exactly the busy-state hooks
+ok - with the flag on a claude ship gets working PreCompact and PostToolUse hooks bound to its incarnation
+ok - with the flag on a claude scout gets the handoff hooks
+ok - with the flag on a qwen worker gets no handoff wiring
+ok - with the flag on a codex ship gets working handoff hooks bound to its incarnation
+ok - fallback-pct in the flag file is baked into the PreCompact command and scales the ceiling
+ok - a flag file holding only comments and blank lines keeps the 80 percent ceiling
+ok - an invalid, too-high, duplicate, unknown-key, or at-or-below-threshold fallback-pct refuses the spawn and names the value
+ok - a relaunch clears the old handoff marker and re-wires the hooks for the new incarnation
+ok - replace refuses a missing, empty, whitespace-only, stale, or unrecorded handoff and never reaches fm-control
+ok - replace hands a valid handoff to fm-control relaunch with a read-it-first note and closes the record
+ok - a refused relaunch is relayed and leaves the handoff record open
+all fm-context-handoff tests passed

@@ -1,0 +1,35 @@
+-- after fm-spawn armed the record
+   parity-sol40ho.busy-gen: g1792032116.1226272.16258 
+   parity-sol40ho.busy-state: v1 gen=g1792032116.1226272.16258 seq=1 state=busy source=fm-spawn event=launch-brief ts=1792032116 
+== UserPromptSubmit (exact launch command)
+-- after UserPromptSubmit
+   parity-sol40ho.busy-gen: g1792032116.1226272.16258 
+   parity-sol40ho.busy-state: v1 gen=g1792032116.1226272.16258 seq=2 state=busy source=codex-hook event=user-prompt-submit ts=1792032662 
+== PostToolUse at recorded usage 18183/258400 (7%)
+   hook stdout: <empty>
+-- after PostToolUse below threshold
+   parity-sol40ho.busy-gen: g1792032116.1226272.16258 
+   parity-sol40ho.busy-state: v1 gen=g1792032116.1226272.16258 seq=2 state=busy source=codex-hook event=user-prompt-submit ts=1792032662 
+== PostToolUse at 103360/258400 (40%)
+   hook stdout: {"hookSpecificOutput":{"additionalContext":"FIRSTMATE CONTEXT HANDOFF for task parity-sol40ho: this worker's context reached the handoff threshold, and auto-compaction is being held off so you can hand over instead. Do these four things, in order.\n1. Finish only the step already in hand and start nothing new. Never hand off in the middle of a running validation call: reach the next point where no pipeline call is in flight first.\n2. Read and follow the handoff skill at /home/work/.no-mistakes/worktrees/5f69104d19ce/01M4YP1TBNRG3QK5JS6QGY8AJY/.agents/skills/context-handoff/SKILL.md.\n3. Write the handoff to exactly /tmp/fm-parity.33O9vP/sol40ho/home/data/parity-sol40ho/hando
+-- after PostToolUse at threshold
+   parity-sol40ho.busy-gen: g1792032116.1226272.16258 
+   parity-sol40ho.busy-state: v1 gen=g1792032116.1226272.16258 seq=2 state=busy source=codex-hook event=user-prompt-submit ts=1792032662 
+   parity-sol40ho.context-handoff: v1 gen=g1792032116.1226272.16258 state=due seq=1 handoff=/tmp/fm-parity.33O9vP/sol40ho/home/data/parity-sol40ho/handoff-1.md key=context-handoff-1 usage=103360 pct=40 window=258400 ceiling=206720 ceiling_pct=80 notices=1
+   status| note [at=1792032662]: context handoff due: usage 103360 of about 258400 tokens at 40 percent; the worker was told to write /tmp/fm-parity.33O9vP/sol40ho/home/data/parity-sol40ho/handoff-1.md and report it with key context-handoff-1
+== PostToolUse again at 40% (must not repeat the notice)
+   hook stdout: <empty>
+== Stop (exact launch command)
+-- after Stop
+   parity-sol40ho.busy-gen: g1792032116.1226272.16258 
+   parity-sol40ho.busy-state: v1 gen=g1792032116.1226272.16258 seq=3 state=idle source=codex-hook event=stop ts=1792032662 
+   parity-sol40ho.turn-ended: 
+   parity-sol40ho.context-handoff: v1 gen=g1792032116.1226272.16258 state=due seq=1 handoff=/tmp/fm-parity.33O9vP/sol40ho/home/data/parity-sol40ho/handoff-1.md key=context-handoff-1 usage=103360 pct=40 window=258400 ceiling=206720 ceiling_pct=80 notices=1
+   status| note [at=1792032662]: context handoff due: usage 103360 of about 258400 tokens at 40 percent; the worker was told to write /tmp/fm-parity.33O9vP/sol40ho/home/data/parity-sol40ho/handoff-1.md and report it with key context-handoff-1
+== SessionEnd (exact launch command)
+-- after SessionEnd
+   parity-sol40ho.busy-gen: g1792032116.1226272.16258 
+   parity-sol40ho.busy-state: v1 gen=g1792032116.1226272.16258 seq=4 state=idle source=codex-hook event=session-end ts=1792032662 
+   parity-sol40ho.turn-ended: 
+   parity-sol40ho.context-handoff: v1 gen=g1792032116.1226272.16258 state=due seq=1 handoff=/tmp/fm-parity.33O9vP/sol40ho/home/data/parity-sol40ho/handoff-1.md key=context-handoff-1 usage=103360 pct=40 window=258400 ceiling=206720 ceiling_pct=80 notices=1
+   status| note [at=1792032662]: context handoff due: usage 103360 of about 258400 tokens at 40 percent; the worker was told to write /tmp/fm-parity.33O9vP/sol40ho/home/data/parity-sol40ho/handoff-1.md and report it with key context-handoff-1

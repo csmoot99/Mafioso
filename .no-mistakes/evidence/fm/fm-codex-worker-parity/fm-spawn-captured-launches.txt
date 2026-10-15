@@ -1,0 +1,74 @@
+# fm-spawn captured launches (fake pane), CODEX_HOME=~/.codex catalog, launch-env CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=40
+== sol40: 
+gpt-6-sol
+sandbox_mode="workspace-write"
+approval_policy="on-request"
+approvals_reviewer="auto_review"
+sandbox_workspace_write.network_access=false
+sandbox_workspace_write.writable_roots=["/tmp/fm-parity.33O9vP/sol40/home/state/parity-sol40.inbox","/tmp/fm-parity.33O9vP/sol40/home/data/parity-sol40"]
+model_auto_compact_token_limit=103360
+model_auto_compact_token_limit_scope="total"
+developer_instructions="You are a task worker launched by Firstmate, your supervising orchestrator for the same human operator. The launch-brief record named by
+hooks.UserPromptSubmit=[{hooks=[{type="command",command="'/home/work/.no-mistakes/worktrees/5f69104d19ce/01M4YP1TBNRG3QK5JS6QGY8AJY/bin/fm-busy-event.sh' apply 
+hooks.Stop=[{hooks=[{type="command",command="touch '/tmp/fm-parity.33O9vP/sol40/home/state/parity-sol40.turn-ended'; '/home/work/.no-mistakes/worktrees/5f69104d
+hooks.SessionEnd=[{hooks=[{type="command",command="'/home/work/.no-mistakes/worktrees/5f69104d19ce/01M4YP1TBNRG3QK5JS6QGY8AJY/bin/fm-busy-event.sh' apply '/tmp/
+== sol40ho: 
+gpt-6-sol
+sandbox_mode="workspace-write"
+approval_policy="on-request"
+approvals_reviewer="auto_review"
+sandbox_workspace_write.network_access=false
+sandbox_workspace_write.writable_roots=["/tmp/fm-parity.33O9vP/sol40ho/home/state/parity-sol40ho.inbox","/tmp/fm-parity.33O9vP/sol40ho/home/data/parity-sol40ho"
+model_auto_compact_token_limit=206720
+model_auto_compact_token_limit_scope="total"
+developer_instructions="You are a task worker launched by Firstmate, your supervising orchestrator for the same human operator. The launch-brief record named by
+hooks.UserPromptSubmit=[{hooks=[{type="command",command="'/home/work/.no-mistakes/worktrees/5f69104d19ce/01M4YP1TBNRG3QK5JS6QGY8AJY/bin/fm-busy-event.sh' apply 
+hooks.Stop=[{hooks=[{type="command",command="touch '/tmp/fm-parity.33O9vP/sol40ho/home/state/parity-sol40ho.turn-ended'; '/home/work/.no-mistakes/worktrees/5f69
+hooks.SessionEnd=[{hooks=[{type="command",command="'/home/work/.no-mistakes/worktrees/5f69104d19ce/01M4YP1TBNRG3QK5JS6QGY8AJY/bin/fm-busy-event.sh' apply '/tmp/
+hooks.PreCompact=[{hooks=[{type="command",command="'/home/work/.no-mistakes/worktrees/5f69104d19ce/01M4YP1TBNRG3QK5JS6QGY8AJY/bin/fm-context-handoff.sh' precomp
+hooks.PostToolUse=[{hooks=[{type="command",command="'/home/work/.no-mistakes/worktrees/5f69104d19ce/01M4YP1TBNRG3QK5JS6QGY8AJY/bin/fm-context-handoff.sh' postto
+== sol40ho70: 
+gpt-6-sol
+sandbox_mode="workspace-write"
+approval_policy="on-request"
+approvals_reviewer="auto_review"
+sandbox_workspace_write.network_access=false
+sandbox_workspace_write.writable_roots=["/tmp/fm-parity.33O9vP/sol40ho70/home/state/parity-sol40ho70.inbox","/tmp/fm-parity.33O9vP/sol40ho70/home/data/parity-so
+model_auto_compact_token_limit=180880
+model_auto_compact_token_limit_scope="total"
+developer_instructions="You are a task worker launched by Firstmate, your supervising orchestrator for the same human operator. The launch-brief record named by
+hooks.UserPromptSubmit=[{hooks=[{type="command",command="'/home/work/.no-mistakes/worktrees/5f69104d19ce/01M4YP1TBNRG3QK5JS6QGY8AJY/bin/fm-busy-event.sh' apply 
+hooks.Stop=[{hooks=[{type="command",command="touch '/tmp/fm-parity.33O9vP/sol40ho70/home/state/parity-sol40ho70.turn-ended'; '/home/work/.no-mistakes/worktrees/
+hooks.SessionEnd=[{hooks=[{type="command",command="'/home/work/.no-mistakes/worktrees/5f69104d19ce/01M4YP1TBNRG3QK5JS6QGY8AJY/bin/fm-busy-event.sh' apply '/tmp/
+hooks.PreCompact=[{hooks=[{type="command",command="'/home/work/.no-mistakes/worktrees/5f69104d19ce/01M4YP1TBNRG3QK5JS6QGY8AJY/bin/fm-context-handoff.sh' precomp
+hooks.PostToolUse=[{hooks=[{type="command",command="'/home/work/.no-mistakes/worktrees/5f69104d19ce/01M4YP1TBNRG3QK5JS6QGY8AJY/bin/fm-context-handoff.sh' postto
+== s61: 
+gpt-6.1-sol
+model_reasoning_effort="max"
+sandbox_mode="workspace-write"
+approval_policy="on-request"
+approvals_reviewer="auto_review"
+sandbox_workspace_write.network_access=false
+sandbox_workspace_write.writable_roots=["/tmp/fm-parity.33O9vP/s61/home/state/parity-s61.inbox","/tmp/fm-parity.33O9vP/s61/home/data/parity-s61"]
+model_auto_compact_token_limit=190000
+model_auto_compact_token_limit_scope="total"
+developer_instructions="You are a task worker launched by Firstmate, your supervising orchestrator for the same human operator. The launch-brief record named by
+hooks.UserPromptSubmit=[{hooks=[{type="command",command="'/home/work/.no-mistakes/worktrees/5f69104d19ce/01M4YP1TBNRG3QK5JS6QGY8AJY/bin/fm-busy-event.sh' apply 
+hooks.Stop=[{hooks=[{type="command",command="touch '/tmp/fm-parity.33O9vP/s61/home/state/parity-s61.turn-ended'; '/home/work/.no-mistakes/worktrees/5f69104d19ce
+hooks.SessionEnd=[{hooks=[{type="command",command="'/home/work/.no-mistakes/worktrees/5f69104d19ce/01M4YP1TBNRG3QK5JS6QGY8AJY/bin/fm-busy-event.sh' apply '/tmp/
+== luna: 
+gpt-6-luna
+model_reasoning_effort="max"
+sandbox_mode="workspace-write"
+approval_policy="on-request"
+approvals_reviewer="auto_review"
+sandbox_workspace_write.network_access=false
+sandbox_workspace_write.writable_roots=["/tmp/fm-parity.33O9vP/luna/home/state/parity-luna.inbox","/tmp/fm-parity.33O9vP/luna/home/data/parity-luna"]
+model_auto_compact_token_limit=103360
+model_auto_compact_token_limit_scope="total"
+developer_instructions="You are a task worker launched by Firstmate, your supervising orchestrator for the same human operator. The launch-brief record named by
+hooks.UserPromptSubmit=[{hooks=[{type="command",command="'/home/work/.no-mistakes/worktrees/5f69104d19ce/01M4YP1TBNRG3QK5JS6QGY8AJY/bin/fm-busy-event.sh' apply 
+hooks.Stop=[{hooks=[{type="command",command="touch '/tmp/fm-parity.33O9vP/luna/home/state/parity-luna.turn-ended'; '/home/work/.no-mistakes/worktrees/5f69104d19
+hooks.SessionEnd=[{hooks=[{type="command",command="'/home/work/.no-mistakes/worktrees/5f69104d19ce/01M4YP1TBNRG3QK5JS6QGY8AJY/bin/fm-busy-event.sh' apply '/tmp/
+== claude launch (same home settings)
+export CLAUDE_AUTOCOMPACT_PCT_OVERRIDE='40'; export COMPACT_ADVISER_DISABLE=1; export FM_TASK_INBOX='/tmp/fm-parity.33O9vP/claude/home/state/parity-claude.inbox'; export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0='/tmp/fm-parity.33O9vP/claude/home/state/parity-claude.git-hooks'; env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI -u QWEN_CODE_CLI CLAUDE_CODE_ENABLE_PR

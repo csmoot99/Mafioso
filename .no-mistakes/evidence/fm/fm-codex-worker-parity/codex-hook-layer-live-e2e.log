@@ -1,0 +1,6 @@
+ok - codex codex-cli 0.162.1 still publishes the hook feature flag firstmate enables
+ok - codex codex-cli 0.162.1 accepts a firstmate crewmate launch with its hook layer enabled
+ok - codex codex-cli 0.162.1 loads every firstmate session-flag hook from the crewmate launch with its exact command
+ok - codex codex-cli 0.162.1 renders the crewmate launch sandboxed under auto-review with only its task channels writable
+# all fm-codex-hook-layer-live-e2e tests passed
+exit=0

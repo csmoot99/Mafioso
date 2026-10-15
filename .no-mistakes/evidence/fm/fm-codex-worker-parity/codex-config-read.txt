@@ -1,0 +1,88 @@
+== codex app-server config/read for captured fm-spawn launch: sol40
+{
+ "model": "gpt-6-sol",
+ "model_auto_compact_token_limit": 103360,
+ "model_auto_compact_token_limit_scope": "total",
+ "model_reasoning_effort": null,
+ "sandbox_mode": "workspace-write",
+ "approval_policy": "on-request",
+ "approvals_reviewer": "auto_review",
+ "sandbox_workspace_write": {
+  "writable_roots": [
+   "/tmp/fm-parity.33O9vP/sol40/home/state/parity-sol40.inbox",
+   "/tmp/fm-parity.33O9vP/sol40/home/data/parity-sol40"
+  ],
+  "network_access": false,
+  "exclude_tmpdir_env_var": false,
+  "exclude_slash_tmp": false
+ },
+ "project_doc_max_bytes": 1048576,
+ "project_doc_fallback_filenames": [
+  "CLAUDE.md"
+ ],
+ "check_for_update_on_startup": false,
+ "_origins": {
+  "model_auto_compact_token_limit": {
+   "name": {
+    "type": "sessionFlags"
+   },
+   "version": "sha256:84b1878c41308a635f73bf87371d86dce07fd8943bae83a65e2920f2e624524d"
+  },
+  "model_auto_compact_token_limit_scope": {
+   "name": {
+    "type": "sessionFlags"
+   },
+   "version": "sha256:84b1878c41308a635f73bf87371d86dce07fd8943bae83a65e2920f2e624524d"
+  },
+  "approvals_reviewer": {
+   "name": {
+    "type": "sessionFlags"
+   },
+   "version": "sha256:84b1878c41308a635f73bf87371d86dce07fd8943bae83a65e2920f2e624524d"
+  }
+ }
+}
+== codex app-server config/read for captured fm-spawn launch: sol40ho70
+{
+ "model": "gpt-6-sol",
+ "model_auto_compact_token_limit": 180880,
+ "model_auto_compact_token_limit_scope": "total",
+ "model_reasoning_effort": null,
+ "sandbox_mode": "workspace-write",
+ "approval_policy": "on-request",
+ "approvals_reviewer": "auto_review",
+ "sandbox_workspace_write": {
+  "writable_roots": [
+   "/tmp/fm-parity.33O9vP/sol40ho70/home/state/parity-sol40ho70.inbox",
+   "/tmp/fm-parity.33O9vP/sol40ho70/home/data/parity-sol40ho70"
+  ],
+  "network_access": false,
+  "exclude_tmpdir_env_var": false,
+  "exclude_slash_tmp": false
+ },
+ "project_doc_max_bytes": 1048576,
+ "project_doc_fallback_filenames": [
+  "CLAUDE.md"
+ ],
+ "check_for_update_on_startup": false,
+ "_origins": {
+  "model_auto_compact_token_limit": {
+   "name": {
+    "type": "sessionFlags"
+   },
+   "version": "sha256:2e409d00b3ae2ab781e2532a6ed684d30eea0b4a83c13e786eb6ba4fc11d9f1e"
+  },
+  "model_auto_compact_token_limit_scope": {
+   "name": {
+    "type": "sessionFlags"
+   },
+   "version": "sha256:2e409d00b3ae2ab781e2532a6ed684d30eea0b4a83c13e786eb6ba4fc11d9f1e"
+  },
+  "approvals_reviewer": {
+   "name": {
+    "type": "sessionFlags"
+   },
+   "version": "sha256:2e409d00b3ae2ab781e2532a6ed684d30eea0b4a83c13e786eb6ba4fc11d9f1e"
+  }
+ }
+}
