@@ -16,9 +16,9 @@ Verified on 2026-06-11 with codex-cli 0.139.0 unless a fact gives a newer versio
 | Model discovery | Open the current interactive session's `/model` picker. |
 | Marker | None; identity comes from ancestry, and `../../../bin/fm-harness.sh` is what keeps a retained foreign `CLAUDECODE` from renaming it. Verified on 2026-09-01 with codex-cli 0.152.0: the pane process is the `node` npm shim and the native `codex` binary runs as its foreground child, so a tool subprocess reaches the native name directly while the shim itself is identified from its script path. |
 
-A directory trust dialog appears on the first run for a repository root: "Do you trust the contents of this directory?"
+A directory trust dialog appears on the first run for a repository root; on codex-cli 0.162.1 (verified 2026-10-14) it reads "Folder access ... Trust this folder?" with "1. Trust and continue" preselected, and from a worktree it notes that trust applies to the repository root.
 Accept it with Enter and verify the instructions begin processing.
-The decision persists for the repository, so later worktrees of the same project skip it.
+The decision persists for the repository root as a `[projects."<root>"]` `trust_level = "trusted"` entry in `~/.codex/config.toml`, so later worktrees of the same project skip it; a session-only `-c projects."<root>".trust_level="trusted"` override does not suppress the dialog.
 
 ## Hook trust
 
