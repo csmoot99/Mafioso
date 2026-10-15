@@ -1,0 +1,99 @@
+# herdr herdr 0.8.0, qwen 0.25.1, lab session fm-lab-qwenlive-2139716-24815
+# workspace=w1 tab=w1:t1 pane=w1:p1
+
+## Scenario A: real qwen running in the pane, never registered by Herdr
+$ herdr agent get w1:p1   (registration as Herdr sees it)
+{"error":{"code":"agent_not_found","message":"agent target w1:p1 not found"},"id":"cli:agent:get"}
+$ herdr pane process-info --pane w1:p1  (foreground)
+[{"pid":2139957,"name":"MainThread","argv0":null,"argv":["node","/home/work/.local/bin/qwen"]}]
+lab qwen pid=2139957: 2139957 node /home/work/.local/bin/qwen
+base   process_state=agent pane_agent_state=no-agent backend_agent_state=dead
+fixed  process_state=agent pane_agent_state=live backend_agent_state=alive
+$ herdr pane read (qwen TUI, last lines)
+  ┌───────────────────────────────────────────────┐
+  │ >_ Qwen Code (v0.25.1)                        │
+  │                                               │
+  │ API Key | qwen3-coder:30b (/model to change)  │
+  │ /tmp/fm-qwen-lab.dXcwlN/wt                    │
+  └───────────────────────────────────────────────┘
+  Tips: You can switch permission mode quickly with
+   Shift+Tab or /approval-mode.
+─────────────────────────────────────────────────────
+>   Type your message or @path/to/file
+─────────────────────────────────────────────────────
+  ➜ wt · git:(task-qwenlab) · qwen3-coder:30b
+  Auto mode (shift + tab to cycle)
+
+## Scenario B: fm-control.sh interrupt on the live qwen worker
+$ [base]  fm-control.sh qwenlab interrupt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.XsV6um
+error: no agent is running at task qwenlab's recorded endpoint (state: dead); there is nothing to interrupt
+(exit 1)
+$ [fixed] fm-control.sh qwenlab interrupt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.XsV6um
+interrupt-delivered qwenlab harness=qwen backend=herdr verified=agent-alive cancel=unconfirmed
+(exit 0)
+qwen still alive after interrupt: agent
+
+## Scenario C: adversarial - unreadable process view on an unregistered pane
+bare shell pane w2:p1, readable ps:   pane_agent_state=no-agent backend_agent_state=dead
+bare shell pane w2:p1, failing ps:    pane_agent_state=unknown backend_agent_state=unreadable
+tab_is_husk on bare shell (readable): rc=0  (failing ps): rc=1
+
+## Scenario D: fm-control.sh exit on the live qwen
+screen before exit:
+>   Type your message or @path/to/file
+─────────────────────────────────────────────────────
+  ➜ wt · git:(task-qwenlab) · qwen3-coder:30b
+  Auto mode (shift + tab to cycle)
+$ [base]  fm-control.sh qwenlab exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.XsV6um
+already-stopped qwenlab harness=qwen backend=herdr endpoint=fm-lab-qwenlive-2139716-24815:w1:p1 worktree=/tmp/fm-qwen-lab.dXcwlN/wt
+(exit 0)
+$ [fixed] fm-control.sh qwenlab exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.XsV6um
+error: task qwenlab's composer state is 'unknown', not proven empty; refusing to type the /quit exit command because it could concatenate onto existing text. Clear the composer, then retry 'exit'
+(exit 1)
+lab qwen pid 2139957 still running (nothing was typed into it)
+
+## Scenario E: qwen quits to the shell - the agent-free pane still reads dead and interrupt refuses
+lab qwen pid 2139957 has exited
+base   process_state=shell pane_agent_state=no-agent backend_agent_state=dead
+fixed  process_state=shell pane_agent_state=no-agent backend_agent_state=dead
+$ [fixed] fm-control.sh qwenlab interrupt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.XsV6um
+error: no agent is running at task qwenlab's recorded endpoint (state: dead); there is nothing to interrupt
+(exit 1)
+tab_is_husk on the quit-qwen pane (fixed): rc=0
+
+## Scenario F: fm-control.sh relaunch from the dead pane (fixed) - replacement qwen reads alive
+$ [fixed] FM_CONTROL_LAUNCH_WAIT=60 fm-control.sh qwenlab relaunch --note 'lab relaunch'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.XsV6um
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.XsV6um
+warning: /tmp/fm-lab.XsV6um/data/qwenlab/launch-brief.md records no ship branch; defaulting to legacy branch fm/qwenlab
+warning: /tmp/fm-lab.XsV6um/data/qwenlab/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunched qwenlab harness=qwen from=qwen model=default effort=default backend=herdr endpoint=fm-lab-qwenlive-2139716-24815:w1:p1 worktree=/tmp/fm-qwen-lab.dXcwlN/wt
+(exit 0)
+replacement qwen pid=2146760: node /home/work/.local/bin/qwen -y -i ⁣FIRSTMATE_OP: v1 la
+{"error":{"code":"agent_not_found","message":"agent target w1:p1 not found"},"id":"cli:agent:get"}
+base   process_state=agent pane_agent_state=no-agent backend_agent_state=dead
+fixed  process_state=agent pane_agent_state=live backend_agent_state=alive
+$ [fixed] fm-control.sh qwenlab interrupt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.XsV6um
+interrupt-delivered qwenlab harness=qwen backend=herdr verified=agent-alive cancel=unconfirmed
+(exit 0)
+replacement stopped; pane process state: shell
+
+## Scenario G: the same relaunch with the BASE code - reproduces the reported failure
+$ [base]  FM_CONTROL_LAUNCH_WAIT=20 fm-control.sh qwenlab relaunch --note 'lab relaunch base'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.XsV6um
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.XsV6um
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: /tmp/fm-lab.XsV6um/data/qwenlab/launch-brief.md records no ship branch; defaulting to legacy branch fm/qwenlab
+warning: /tmp/fm-lab.XsV6um/data/qwenlab/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+error: the replacement agent for qwenlab did not come up within 20s (endpoint reads 'dead')
+error: qwenlab was relaunched on qwen but no running agent could be confirmed; its work is preserved at /tmp/fm-qwen-lab.dXcwlN/wt
+(exit 1)
+qwen launched by base relaunch: pid=2150434 node /home/work/.local/bin/qwen -y -i ⁣FIRSTMATE_OP: v1 la
+base   process_state=agent pane_agent_state=no-agent backend_agent_state=dead
+# teardown of fm-lab-qwenlive-2139716-24815 ok

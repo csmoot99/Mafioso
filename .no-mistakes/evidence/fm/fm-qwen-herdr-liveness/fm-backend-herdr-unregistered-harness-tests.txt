@@ -1,0 +1,4 @@
+ok - herdr unregistered harness: a qwen or gemini node bundle in the foreground reads alive without a Herdr registration
+ok - herdr unregistered harness: a qwen process under the pane shell reads alive while a bare shell stays a husk
+ok - herdr unregistered harness: a stranger's node process is never claimed as an agent
+ok - herdr unregistered harness: an unreadable process view neither proves a husk nor closes the tab
