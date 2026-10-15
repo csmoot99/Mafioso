@@ -293,6 +293,112 @@ test_posttooluse_delivers_the_notice_sparingly_until_the_handoff_exists() {
   pass "PostToolUse delivers the handoff notice once, re-delivers it sparingly, and stops once the handoff exists"
 }
 
+# --- Codex mode -----------------------------------------------------------------
+
+# write_codex_log <path> <tokens> <window>: a Codex session log whose latest
+# token_count event reports <tokens> of last-response context in a <window>
+# effective window, after an older token_count a reader must not take and noise
+# a reader must skip (a session record, a token_count with no info yet, and the
+# cumulative total, which is not context).
+write_codex_log() {
+  {
+    printf '{"type":"session_meta","payload":{"id":"s1"}}\n'
+    printf '{"type":"event_msg","payload":{"type":"token_count","info":null}}\n'
+    printf '{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"total_tokens":999999},"last_token_usage":{"total_tokens":1},"model_context_window":%s}}}\n' "$3"
+    printf '{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"total_tokens":999999},"last_token_usage":{"total_tokens":%s},"model_context_window":%s}}}\n' "$2" "$3"
+    printf '{"type":"response_item","payload":{"type":"message"}}\n'
+  } > "$1"
+}
+
+# run_codex_hook <case-record> <id> precompact|posttooluse [trigger] [gen-override]:
+# one Codex-mode hook call at a 40 percent threshold and a 50 percent ceiling.
+run_codex_hook() {
+  local rec=$1 id=$2 sub=$3 trigger=${4:-auto} gen
+  read_hook_case "$rec"
+  gen=${5:-$GEN}
+  if [ "$sub" = precompact ]; then precompact_payload "$TRANSCRIPT" "$trigger"; else posttooluse_payload "$TRANSCRIPT"; fi \
+    | "$HANDOFF" "$sub" "$STATE_DIR" "$id" --gen "$gen" --data-dir "$DATA_DIR" --fm-root "$ROOT" --ceiling-pct 50 --codex-threshold-pct 40 2>"$STATE_DIR/$sub.err"
+}
+
+test_codex_posttooluse_is_silent_below_the_threshold() {
+  local id=cx-below rec out rc
+  rec=$(new_hook_case "$id"); read_hook_case "$rec"
+  write_codex_log "$TRANSCRIPT" 103359 258400
+  out=$(run_codex_hook "$rec" "$id" posttooluse); rc=$?
+  expect_code 0 "$rc" "a Codex PostToolUse below the threshold must exit 0"
+  [ -z "$out" ] || fail "a Codex PostToolUse below the threshold must print nothing, got '$out'"
+  assert_absent "$STATE_DIR/$id.context-handoff" "no marker may be written below the threshold"
+  assert_absent "$STATE_DIR/$id.status" "no status event may be appended below the threshold"
+  pass "a Codex worker below its handoff threshold gets no marker, note, or notice"
+}
+
+test_codex_posttooluse_marks_the_handoff_due_at_the_threshold() {
+  local id=cx-due rec out rc ctx
+  rec=$(new_hook_case "$id"); read_hook_case "$rec"
+  write_codex_log "$TRANSCRIPT" 103360 258400
+  out=$(run_codex_hook "$rec" "$id" posttooluse); rc=$?
+  expect_code 0 "$rc" "a Codex PostToolUse at the threshold must exit 0"
+  [ "$(marker_field "$STATE_DIR" "$id" state)" = due ] || fail "the threshold must record a due marker, got '$(cat "$STATE_DIR/$id.context-handoff" 2>/dev/null)'"
+  [ "$(marker_field "$STATE_DIR" "$id" gen)" = "$GEN" ] || fail "the marker must be bound to the armed incarnation gen"
+  [ "$(marker_field "$STATE_DIR" "$id" window)" = 258400 ] || fail "the window must come from the session log, got '$(marker_field "$STATE_DIR" "$id" window)'"
+  [ "$(marker_field "$STATE_DIR" "$id" ceiling)" = 129200 ] || fail "the ceiling must be 50 percent of the window (129200), got '$(marker_field "$STATE_DIR" "$id" ceiling)'"
+  [ "$(status_count "$STATE_DIR" "$id" 'context handoff due')" = 1 ] || fail "the threshold must append exactly one handoff-due note"
+  ctx=$(printf '%s' "$out" | jq -r '.hookSpecificOutput.additionalContext')
+  assert_contains "$ctx" "$DATA_DIR/$id/handoff-1.md" "the notice must be delivered on the call that crossed the threshold"
+  assert_contains "$ctx" "context-handoff-1" "the notice must name the decision key"
+  write_codex_log "$TRANSCRIPT" 110000 258400
+  run_codex_hook "$rec" "$id" posttooluse >/dev/null
+  [ "$(status_count "$STATE_DIR" "$id" 'context handoff due')" = 1 ] || fail "a later call must not note the handoff again"
+  [ "$(marker_field "$STATE_DIR" "$id" handoff)" = "$DATA_DIR/$id/handoff-1.md" ] || fail "a later call must keep the same handoff"
+  pass "a Codex worker at its threshold gets the same due marker, note, and notice a held Claude worker gets"
+}
+
+test_codex_precompact_never_blocks_and_records_a_missed_handoff() {
+  local id=cx-fallback rec rc before
+  rec=$(new_hook_case "$id"); read_hook_case "$rec"
+  write_codex_log "$TRANSCRIPT" 103360 258400
+  run_codex_hook "$rec" "$id" posttooluse >/dev/null
+  write_codex_log "$TRANSCRIPT" 129200 258400
+  run_codex_hook "$rec" "$id" precompact; rc=$?
+  expect_code 0 "$rc" "a Codex PreCompact must never exit nonzero"
+  [ "$(marker_field "$STATE_DIR" "$id" state)" = fallback ] || fail "a compaction before the handoff must move the marker to fallback"
+  [ "$(status_count "$STATE_DIR" "$id" 'context handoff missed')" = 1 ] || fail "a missed handoff must be noted once"
+  before=$(wc -c < "$STATE_DIR/$id.status")
+  run_codex_hook "$rec" "$id" precompact; rc=$?
+  expect_code 0 "$rc" "a later Codex PreCompact must exit 0"
+  [ -z "$(run_codex_hook "$rec" "$id" posttooluse)" ] || fail "no notice may follow a missed handoff"
+  [ "$(wc -c < "$STATE_DIR/$id.status")" = "$before" ] || fail "later calls must append nothing after the fallback"
+  pass "a Codex PreCompact never blocks and records a handoff the fallback compaction overtook"
+}
+
+test_codex_precompact_without_a_marker_records_the_fallback() {
+  local id=cx-jump rec rc
+  rec=$(new_hook_case "$id"); read_hook_case "$rec"
+  write_codex_log "$TRANSCRIPT" 129200 258400
+  run_codex_hook "$rec" "$id" precompact; rc=$?
+  expect_code 0 "$rc" "a Codex PreCompact with no marker must exit 0"
+  [ "$(marker_field "$STATE_DIR" "$id" state)" = fallback ] || fail "a compaction no tool call saw coming must still record the fallback"
+  assert_grep "before a tool call saw the 40 percent handoff threshold" "$STATE_DIR/$id.status" "the note must say the threshold was never seen"
+  write_codex_log "$TRANSCRIPT" 103360 258400
+  [ -z "$(run_codex_hook "$rec" "$id" posttooluse)" ] || fail "the incarnation must not hand off after its fallback compaction"
+  [ "$(marker_field "$STATE_DIR" "$id" state)" = fallback ] || fail "a later threshold crossing must not reopen the handoff"
+  pass "a Codex compaction that overtakes the threshold between tool calls is recorded as the fallback"
+}
+
+test_codex_manual_and_stale_compactions_leave_no_record() {
+  local id=cx-ignored rec rc
+  rec=$(new_hook_case "$id"); read_hook_case "$rec"
+  write_codex_log "$TRANSCRIPT" 129200 258400
+  run_codex_hook "$rec" "$id" precompact manual; rc=$?
+  expect_code 0 "$rc" "a manual Codex compaction must exit 0"
+  run_codex_hook "$rec" "$id" precompact auto gstale.1.1; rc=$?
+  expect_code 0 "$rc" "a stale-gen Codex PreCompact must exit 0"
+  [ -z "$(run_codex_hook "$rec" "$id" posttooluse auto gstale.1.1)" ] || fail "a stale-gen PostToolUse must never speak for the replacement"
+  assert_absent "$STATE_DIR/$id.context-handoff" "manual and stale-gen calls must write no marker"
+  assert_absent "$STATE_DIR/$id.status" "manual and stale-gen calls must append no status event"
+  pass "manual and superseded-incarnation Codex compactions leave no handoff record"
+}
+
 # --- spawn wiring ---------------------------------------------------------------
 
 make_spawn_case() {  # <name> <harness> <id> [flag]
@@ -301,7 +407,7 @@ make_spawn_case() {  # <name> <harness> <id> [flag]
   home="$case_dir/home"
   proj="$case_dir/project"
   wt="$case_dir/wt"
-  fakebin=$(make_spawn_fakebin "$case_dir/fake" claude codex)
+  fakebin=$(make_spawn_fakebin "$case_dir/fake" claude codex qwen)
   fm_test_spawn_home "$home" "$harness"
   [ "$flag" = off ] || : > "$home/config/worker-context-handoff"
   fm_git_worktree "$proj" "$wt" "wt-$name"
@@ -375,14 +481,47 @@ test_flag_on_adds_the_hooks_for_a_claude_scout() {
 }
 
 test_flag_on_adds_nothing_for_another_harness() {
-  local rec id=sp-codex out
+  local rec id=sp-qwen out
+  rec=$(make_spawn_case qwen qwen "$id" on); read_spawn_case "$rec"
+  printf 'CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=40\n' > "$HOME_DIR/config/launch-env"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --mode no-mistakes --yolo off)
+  expect_code 0 $? "qwen ship spawn should succeed: $out"
+  assert_absent "$WT_DIR/.claude/settings.local.json" "a qwen worker must get no claude settings file"
+  out=$(grep -rl "fm-context-handoff.sh" "$WT_DIR" "$HOME_DIR/state" "$CASE_DIR/launch.log" 2>/dev/null || true)
+  [ -z "$out" ] || fail "the handoff hooks must never be wired for a harness without the handoff: $out"
+  pass "with the flag on a qwen worker gets no handoff wiring"
+}
+
+# The codex hooks ride the launch command, so these drive the command codex
+# would run, parsed from the launch the spawn typed (fm_test_codex_hook_command).
+test_flag_on_adds_the_hooks_for_a_codex_ship() {
+  local rec id=sp-codex out cmd rc log state_real
   rec=$(make_spawn_case codex codex "$id" on); read_spawn_case "$rec"
-  out=$(fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --mode no-mistakes --yolo off)
+  printf 'CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=40\n' > "$HOME_DIR/config/launch-env"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --mode no-mistakes --yolo off)
   expect_code 0 $? "codex ship spawn should succeed: $out"
   assert_absent "$WT_DIR/.claude/settings.local.json" "a codex worker must get no claude settings file"
-  out=$(grep -rl "fm-context-handoff.sh precompact" "$WT_DIR" "$HOME_DIR/state" 2>/dev/null || true)
-  [ -z "$out" ] || fail "the handoff hooks must never be wired for a non-claude harness: $out"
-  pass "with the flag on a codex worker gets no handoff wiring"
+  state_real=$(cd "$HOME_DIR/state" && pwd -P)
+  log="$CASE_DIR/session.jsonl"
+  write_codex_log "$log" 103360 258400
+  cmd=$(fm_test_codex_hook_command "$CASE_DIR/launch.log" PostToolUse "$CASE_DIR/codex-args") \
+    || fail "the codex launch carries no PostToolUse hook"
+  out=$(posttooluse_payload "$log" | sh -c "$cmd"); rc=$?
+  expect_code 0 "$rc" "the generated PostToolUse command must exit 0"
+  printf '%s' "$out" | jq -e '.hookSpecificOutput.additionalContext | contains("handoff-1.md")' >/dev/null \
+    || fail "the generated PostToolUse command must deliver the notice at 40 percent, got '$out'"
+  [ "$(marker_field "$state_real" "$id" gen)" = "$(cat "$state_real/$id.busy-gen")" ] \
+    || fail "the generated command must bind the marker to the gen fm-spawn armed"
+  [ "$(marker_field "$state_real" "$id" ceiling_pct)" = 80 ] || fail "the generated command must carry the default ceiling"
+  cmd=$(fm_test_codex_hook_command "$CASE_DIR/launch.log" PreCompact "$CASE_DIR/codex-args") \
+    || fail "the codex launch carries no PreCompact hook"
+  write_codex_log "$log" 206720 258400
+  out=$(precompact_payload "$log" auto | sh -c "$cmd"); rc=$?
+  expect_code 0 "$rc" "the generated PreCompact command must exit 0"
+  [ -z "$out" ] || fail "the generated PreCompact command must print nothing, got '$out'"
+  [ "$(marker_field "$state_real" "$id" state)" = fallback ] \
+    || fail "the generated PreCompact command must record the fallback compaction"
+  pass "with the flag on a codex ship gets working handoff hooks bound to its incarnation"
 }
 
 # run_flag_precompact <settings.json> <transcript> <override> <tokens>: drive the
@@ -672,10 +811,16 @@ test_stale_incarnation_and_bad_input_let_compaction_through
 test_second_handoff_gets_the_next_number
 test_posttooluse_is_silent_without_a_marker
 test_posttooluse_delivers_the_notice_sparingly_until_the_handoff_exists
+test_codex_posttooluse_is_silent_below_the_threshold
+test_codex_posttooluse_marks_the_handoff_due_at_the_threshold
+test_codex_precompact_never_blocks_and_records_a_missed_handoff
+test_codex_precompact_without_a_marker_records_the_fallback
+test_codex_manual_and_stale_compactions_leave_no_record
 test_flag_off_leaves_the_claude_settings_exactly_as_today
 test_flag_on_adds_the_hooks_for_a_claude_ship
 test_flag_on_adds_the_hooks_for_a_claude_scout
 test_flag_on_adds_nothing_for_another_harness
+test_flag_on_adds_the_hooks_for_a_codex_ship
 test_flag_file_fallback_pct_is_baked_into_the_precompact_command
 test_comment_only_flag_file_keeps_the_default_ceiling
 test_bad_fallback_pct_refuses_the_spawn

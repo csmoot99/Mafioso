@@ -25,9 +25,10 @@
 #              still exists, and the agent is still alive where the backend can
 #              classify that. Cancellation is confirmed only from an adapter-
 #              owned acknowledgement and otherwise reported unconfirmed. Busy
-#              state is never rewritten as proof of the action. Devin
-#              cancellation invalidates it to unknown because its native hooks
-#              emit no cancellation close; this is not a success claim.
+#              state is never rewritten as proof of the action. Devin, qwen,
+#              and codex cancellation invalidates it to unknown because their
+#              native hooks emit no verified cancellation close; this is not a
+#              success claim.
 #              An adapter whose repeated interrupt key does something else on
 #              an idle agent (Devin's revert picker) sends its later presses
 #              only after the first press rendered a running turn, and
@@ -528,10 +529,11 @@ interrupt_cancel_claim() {
 deliver_interrupt() {
   local cancel nostop_gen=
   # Devin and qwen do not emit Stop for cancellation (verified live, devin
-  # 3000.11.1 and qwen 0.25.1). Capture this incarnation before keys, then
+  # 3000.11.1 and qwen 0.25.1), and codex's Stop on cancellation is unverified
+  # (codex-cli 0.162.1). Capture this incarnation before keys, then
   # invalidate its state conservatively rather than claiming idle.
   case "$HARNESS" in
-    devin|qwen) nostop_gen=$(fm_busy_current_gen "$STATE" "$ID" 2>/dev/null || true) ;;
+    devin|qwen|codex*) nostop_gen=$(fm_busy_current_gen "$STATE" "$ID" 2>/dev/null || true) ;;
   esac
   prepare_interrupt_ack
   send_interrupt_keys

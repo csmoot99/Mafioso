@@ -337,6 +337,31 @@ fm_test_run_spawn() {
     "$ROOT/bin/fm-spawn.sh" "$@" 2>&1
 }
 
+# fm_test_codex_launch_argv <launch-log> <scratch-dir>
+# Records in <scratch-dir>/args, NUL-separated, the argv the codex crewmate
+# launch in <launch-log> (FM_FAKE_LAUNCH_LOG) hands codex: bash itself parses the
+# launch, against a codex that only records its arguments.
+fm_test_codex_launch_argv() {
+  local log=$1 dir=$2 launch
+  launch=$(grep -m1 -- '--dangerously-bypass-hook-trust' "$log") || return 1
+  mkdir -p "$dir"
+  # shellcheck disable=SC2016 # the recorder expands its own arguments
+  printf '%s\n' '#!/usr/bin/env bash' 'printf "%s\0" "$@" > "$FM_TEST_CODEX_ARGS"' > "$dir/codex"
+  chmod +x "$dir/codex"
+  FM_TEST_CODEX_ARGS="$dir/args" PATH="$dir:$PATH" bash -c "$launch"
+}
+
+# fm_test_codex_hook_command <launch-log> <hook-event> <scratch-dir>
+# Prints the shell command codex would run for <hook-event> from the
+# `-c hooks.<Event>=...` session flags on that launch's argv.
+fm_test_codex_hook_command() {
+  local log=$1 event=$2 dir=$3
+  fm_test_codex_launch_argv "$log" "$dir" || return 1
+  perl -0 -ne 'BEGIN { $ev = shift @ARGV } chomp;
+    if (/^hooks\.\Q$ev\E=.*?command="((?:[^"\\]|\\.)*)"/s) { ($c = $1) =~ s/\\(.)/$1/gs; print $c; $found = 1; exit }
+    END { exit($found ? 0 : 1) }' "$event" "$dir/args"
+}
+
 # --- send-world stubs -------------------------------------------------------
 
 # make_stubs <dir>

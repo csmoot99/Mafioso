@@ -3,18 +3,22 @@
 #
 # The verdict here comes from the installed codex, not from a stub: a stub can
 # only confirm the assumption already written into it, and what this guard
-# protects is exactly a vendor-owned surface. Codex blocks a fresh crewmate
-# launch on an unanswerable "Hooks need review" modal whenever the machine's
-# ~/.codex/hooks.json or a project's .codex/hooks.json carries a hook it has no
-# persisted trust for, so the crewmate launch disables codex's hook layer
-# outright (bin/fm-spawn.sh's launch template owns the flag).
+# protects is exactly a vendor-owned surface. A crewmate runs codex's hook
+# layer the way a claude worker runs its hooks: --enable hooks plus
+# --dangerously-bypass-hook-trust, so the machine's ~/.codex/hooks.json and a
+# project's .codex/hooks.json run without the unanswerable "Hooks need review"
+# modal, and Firstmate's own busy-state, turn-end, and context-handoff hooks
+# ride the launch as `-c hooks.<Event>=...` session flags (bin/fm-spawn.sh's
+# launch template owns the flags).
 #
 # The guard replays the REAL launch flags fm-spawn builds - captured from a
-# spawn driven through a fake pane - against the installed codex and asks codex
-# itself whether hooks ended up disabled. If a codex release renames or drops
-# the feature, the flag becomes a hard "Unknown feature flag" error and this
-# guard fails naming the harness and version instead of letting the modal
-# silently come back.
+# spawn driven through a fake pane - against the installed codex. It asks
+# codex whether hooks ended up enabled, and asks codex's app-server which hooks
+# it loaded: every Firstmate hook must come back as a session-flag hook with
+# exactly the command the launch carries. A release that renames the feature,
+# the bypass flag, or the session-flag hook shape fails here naming the harness
+# and version, instead of codex silently ignoring an unknown key and a worker
+# losing its turn-end signal.
 #
 # The same captured flags carry the crewmate's safety posture: codex's
 # workspace-write sandbox with network off, its automatic approval reviewer
@@ -25,9 +29,9 @@
 # for example a release that renames a config key, which would otherwise be
 # ignored as an unknown key and quietly restore pane prompts.
 #
-# It spends no model tokens (`codex features list` and `codex debug
-# prompt-input` resolve configuration only), so it runs by default wherever
-# codex is installed.
+# It spends no model tokens (`codex features list`, the app-server's
+# `hooks/list`, and `codex debug prompt-input` resolve configuration only), so
+# it runs by default wherever codex is installed.
 set -u
 
 # shellcheck source=tests/fixtures.sh
@@ -39,7 +43,9 @@ CODEX_VERSION=$(codex --version 2>&1)
 TMP_ROOT=$(fm_test_tmproot fm-codex-hook-layer-live)
 
 # capture_codex_launch <name> <extra fm-spawn args...>: spawns a codex crewmate
-# against a fake pane and echoes the literal launch command firstmate sent.
+# against a fake pane and echoes the literal launch command firstmate sent. The
+# home opts into the context handoff at 40 percent, so the launch carries every
+# hook Firstmate can wire.
 capture_codex_launch() {
   local name=$1
   shift
@@ -52,6 +58,8 @@ capture_codex_launch() {
   id="codex-hook-layer-$name"
   fakebin=$(fm_test_make_spawn_fakebin "$case_dir/fake")
   fm_test_spawn_home "$home" codex
+  printf 'CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=40\n' > "$home/config/launch-env"
+  : > "$home/config/worker-context-handoff"
   fm_test_spawn_brief "$home" "$id"
   fm_git_worktree "$proj" "$wt" "wt-$name"
   : > "$launchlog"
@@ -70,25 +78,72 @@ codex_global_flags() {
   printf '%s' "$flags"
 }
 
-test_installed_codex_disables_hooks_for_the_captured_crewmate_launch() {
+test_installed_codex_enables_hooks_for_the_captured_crewmate_launch() {
   local launch flags state
   launch=$(capture_codex_launch ship --mode no-mistakes --yolo off)
   flags=$(codex_global_flags "$launch")
 
-  # The whole point: every flag firstmate will launch with, handed to the real
-  # codex, must leave the hook layer off. `features list` reports the effective
+  # Every flag firstmate will launch with, handed to the real codex, must be
+  # accepted and leave the hook layer on. `features list` reports the effective
   # state after those flags are applied and contacts no model.
   state=$(eval "codex $flags features list" 2>&1) ||
     fail "codex $CODEX_VERSION rejected firstmate's crewmate launch flags: $state"
-  case "$state" in
-    *"Unknown feature flag"*)
-      fail "codex $CODEX_VERSION no longer knows the hook feature firstmate disables: $state"
-      ;;
-  esac
-  printf '%s\n' "$state" | awk '$1 == "hooks" { print $NF }' | grep -qx false ||
-    fail "codex $CODEX_VERSION left hooks enabled for firstmate's crewmate launch flags, so a fresh launch can park on the hook-trust modal"
+  printf '%s\n' "$state" | awk '$1 == "hooks" { print $NF }' | grep -qx true ||
+    fail "codex $CODEX_VERSION left hooks disabled for firstmate's crewmate launch flags, so the worker has no busy state or turn-end signal"
 
-  printf 'ok - codex %s runs a firstmate crewmate launch with its hook layer disabled\n' "$CODEX_VERSION"
+  printf 'ok - codex %s accepts a firstmate crewmate launch with its hook layer enabled\n' "$CODEX_VERSION"
+}
+
+# codex_session_flag_hooks <case-dir>: the hooks/list result codex's app-server
+# reports for the captured launch's `-c hooks.*` session flags, from the case's
+# worktree.
+codex_session_flag_hooks() {
+  local case_dir=$1 wt line prev a hookargs=()
+  wt="$case_dir/wt"
+  fm_test_codex_launch_argv "$case_dir/launch.log" "$case_dir/argv" ||
+    fail "codex $CODEX_VERSION: the captured launch did not run against an argument recorder"
+  prev=
+  while IFS= read -r -d '' a; do
+    if [ "$prev" = -c ]; then
+      case "$a" in hooks.*) hookargs+=(-c "$a") ;; esac
+    fi
+    prev=$a
+  done < "$case_dir/argv/args"
+  [ "${#hookargs[@]}" -gt 0 ] || fail "codex $CODEX_VERSION: the captured launch carries no session-flag hooks"
+  coproc CODEX_AS { cd "$wt" && exec timeout 60 codex app-server --listen stdio:// -c features.hooks=true "${hookargs[@]}" 2>/dev/null; }
+  printf '%s\n' \
+    '{"id":1,"method":"initialize","params":{"clientInfo":{"name":"fm-codex-hook-layer-live","version":"0"}}}' \
+    '{"method":"initialized"}' \
+    "{\"id\":2,\"method\":\"hooks/list\",\"params\":{\"cwds\":[\"$wt\"]}}" >&"${CODEX_AS[1]}"
+  while IFS= read -r -t 30 line <&"${CODEX_AS[0]}"; do
+    case "$line" in *'"id":2'*) break ;; esac
+    line=
+  done
+  kill "$CODEX_AS_PID" 2>/dev/null
+  wait "$CODEX_AS_PID" 2>/dev/null
+  [ -n "${line:-}" ] || fail "codex $CODEX_VERSION app-server did not answer hooks/list"
+  printf '%s' "$line"
+}
+
+test_installed_codex_loads_every_firstmate_hook_from_the_captured_launch() {
+  local case_dir listing event name want got
+  capture_codex_launch hooks --mode no-mistakes --yolo off >/dev/null
+  case_dir="$TMP_ROOT/hooks"
+  listing=$(codex_session_flag_hooks "$case_dir")
+  for event in UserPromptSubmit:userPromptSubmit Stop:stop SessionEnd:sessionEnd PreCompact:preCompact PostToolUse:postToolUse; do
+    name=${event#*:}
+    event=${event%%:*}
+    want=$(fm_test_codex_hook_command "$case_dir/launch.log" "$event" "$case_dir/parse") ||
+      fail "codex $CODEX_VERSION: the captured launch carries no $event hook"
+    got=$(printf '%s' "$listing" | jq -r --arg e "$name" \
+      '[.result.data[]?.hooks[]? | select(.source == "sessionFlags" and .eventName == $e and .enabled == true)] | if length == 1 then .[0].command else empty end')
+    [ -n "$got" ] ||
+      fail "codex $CODEX_VERSION did not load exactly one enabled session-flag $event hook from firstmate's crewmate launch"
+    [ "$got" = "$want" ] ||
+      fail "codex $CODEX_VERSION parsed firstmate's $event hook as '$got', not the command the launch carries: '$want'"
+  done
+
+  printf 'ok - codex %s loads every firstmate session-flag hook from the crewmate launch with its exact command\n' "$CODEX_VERSION"
 }
 
 test_installed_codex_still_reports_the_hook_feature() {
@@ -98,7 +153,7 @@ test_installed_codex_still_reports_the_hook_feature() {
   printf '%s\n' "$listing" | awk '{ print $1 }' | grep -qx hooks ||
     fail "codex $CODEX_VERSION no longer publishes a hook feature flag; firstmate's crewmate launch needs a new control"
 
-  printf 'ok - codex %s still publishes the hook feature flag firstmate disables\n' "$CODEX_VERSION"
+  printf 'ok - codex %s still publishes the hook feature flag firstmate enables\n' "$CODEX_VERSION"
 }
 
 test_installed_codex_renders_the_captured_crewmate_safety_posture() {
@@ -130,7 +185,8 @@ test_installed_codex_renders_the_captured_crewmate_safety_posture() {
 }
 
 test_installed_codex_still_reports_the_hook_feature
-test_installed_codex_disables_hooks_for_the_captured_crewmate_launch
+test_installed_codex_enables_hooks_for_the_captured_crewmate_launch
+test_installed_codex_loads_every_firstmate_hook_from_the_captured_launch
 test_installed_codex_renders_the_captured_crewmate_safety_posture
 
 echo "# all fm-codex-hook-layer-live-e2e tests passed"

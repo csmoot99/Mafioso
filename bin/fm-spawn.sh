@@ -423,8 +423,13 @@
 #                  own trailing space)
 #     __CODEXCOMPACT__ optional -c model_auto_compact_token_limit and its
 #                  scope, the launch-env threshold share of the selected
-#                  model's window (codex_compact_limit_flag below; supplies its
-#                  own trailing space, empty when it does not apply)
+#                  model's window, or the handoff fallback ceiling's share when
+#                  the context handoff is wired (codex_compact_limit_flag below;
+#                  supplies its own trailing space, empty when it does not apply)
+#     __CODEXHOOKS__ quoted -c hooks.<Event> session-flag hooks for a codex
+#                  ship or scout: busy state, the turn-end notification, and
+#                  the opt-in context handoff (built beside the other harnesses'
+#                  busy wiring below; supplies its own trailing space)
 #     __PIBIN__    quoted concrete Pi-family executable path resolved from PATH
 #     __PITUIMODE__ optional --tui-mode regular when that executable advertises it
 #     __PIAPPROVE__ optional --approve on a seeded Pi/pi-signed secondmate when
@@ -438,8 +443,6 @@
 #                  reports (relaunch_resume_args below owns it; it supplies its
 #                  own leading space, and is empty on every fresh spawn and for
 #                  every other harness)
-#     __TURNEND__  absolute path to state/<task-id>.turn-ended (for harnesses whose
-#                  turn-end signal rides the launch command, e.g. codex -c notify=[...])
 #     __PIEXT__    absolute path to state/<task-id>.pi-ext.ts (pi turn-end extension,
 #                  written by this script; outside the worktree to avoid pi's trust gate)
 #     __PITURNEND__ absolute path to .pi/extensions/fm-primary-turnend-guard.ts in a pi secondmate home
@@ -464,8 +467,10 @@
 #     __DEVINCONFIG__ private per-task Devin config with lifecycle hooks
 #     __AGYBIN__    resolved, agy-verified executable for an agy launch
 # Verified per-harness turn-end hooks are installed automatically where enabled; some live outside the worktree.
-# Under config/worker-context-handoff a claude ship or scout also gets the PreCompact and
-# PostToolUse hook commands owned by bin/fm-context-handoff.sh in the same settings file.
+# Under config/worker-context-handoff a claude or codex ship or scout also gets the
+# PreCompact and PostToolUse hook commands owned by bin/fm-context-handoff.sh: a claude
+# worker in the same settings file, a codex worker as session-flag hooks on its launch
+# with codex's own compaction moved to the fallback ceiling (codex_handoff_pct below).
 # That flag file may hold one optional `fallback-pct=<N>` line (blank lines and `#`
 # comments ignored): the percentage of the window at which the hook lets compaction
 # through if the handoff never arrives, baked into the PreCompact command as
@@ -703,24 +708,23 @@ launch_template() {
     # naming it is passed. A record that cannot be published stops the spawn.
     printf '%s' '__MODELFLAG____EFFORTFLAG____BRIEFDOORBELL__'
     ;;
-  # --disable hooks (equivalent to -c features.hooks=false) turns codex's whole
-  # lifecycle-hook layer off for CREWMATE and SCOUT launches only.
-  # Without it a crewmate launch parks forever on codex's hook-trust modal
-  # ("N hooks are new or changed"), whose selection sits on "Review hooks" -
-  # neither trusting nor declining. Firstmate's key plane carries Enter, Escape
-  # and Ctrl-C with no arrow navigation, so the selection cannot be moved, and
-  # pre-accepting the prompt by writing codex's own trust store would manufacture
-  # an operator consent that was never given. The hooks it asks about are the
-  # OPERATOR's machine-level ~/.codex/hooks.json plus any project-local
-  # .codex/hooks.json, and a crewmate needs none of them: its turn-end signal is
-  # the -c notify= program on this same launch (verified still firing with hooks
-  # disabled, codex-cli 0.151.0), and firstmate's own .codex/hooks.json registers
-  # PRIMARY-session infrastructure that already stands down in a child worktree.
-  # This is the opposite of --dangerously-bypass-hook-trust, which RUNS untrusted
-  # hooks; disabling the feature runs none of them and leaves the operator's
-  # ~/.codex untouched. An unknown feature name is a hard codex error, so a future
-  # release that drops this flag fails the launch loudly instead of silently
-  # restoring the modal.
+  # A crewmate or scout runs codex's hook layer the way a claude worker runs
+  # its hooks: --enable hooks plus --dangerously-bypass-hook-trust runs the
+  # operator's ~/.codex/hooks.json, the project's .codex/hooks.json (codex
+  # resolves it from the main repository root), and Firstmate's own
+  # session-flag hooks (__CODEXHOOKS__) for this invocation only. Without the
+  # bypass a fresh launch parks forever on codex's hook-trust modal ("N hooks
+  # are new or changed"), whose selection sits on "Review hooks" and which
+  # Firstmate's key plane (Enter, Escape, Ctrl-C, no arrows) cannot answer;
+  # writing codex's own trust store to pre-accept it would manufacture an
+  # operator consent that was never given, and the bypass writes nothing.
+  # Hooks run outside codex's sandbox, as claude hooks run outside claude's
+  # permission check. Firstmate's own project hooks (.codex/hooks.json in this
+  # repo) are PRIMARY-session infrastructure that already stands down in a
+  # child worktree. The turn-end NOTIFICATION rides the Stop hook, not codex's
+  # notify program, which also fires when the TUI's side request that names
+  # the conversation finishes, seconds into the turn (verified live,
+  # codex-cli 0.162.1).
   # A secondmate is a firstmate PRIMARY in its own home, and its turn-end guard,
   # session-start digest, and cd/arm seatbelts are exactly those project hooks
   # (docs/turnend-guard.md, docs/sessionstart-nudge.md, docs/cd-guard.md), so the
@@ -741,7 +745,8 @@ launch_template() {
   # the no-mistakes daemon socket stay outside the sandbox, so those steps run as
   # reviewed escalations. __CODEXCOMPACT__ (codex_compact_limit_flag below)
   # compacts the worker in place at the share of the window a claude worker
-  # stops growing at. developer_instructions carries the same task-worker
+  # stops growing at, or at the fallback ceiling when the worker hands off
+  # there instead. developer_instructions carries the same task-worker
   # trust statement claude gets through --append-system-prompt.
   # project_doc_max_bytes lifts codex's 32 KiB AGENTS.md cap so a worker reads a
   # project's instructions in full, as claude reads CLAUDE.md, and
@@ -755,7 +760,7 @@ launch_template() {
       printf '%s' 'codex __MODELFLAG____EFFORTFLAG__-c '\''sandbox_mode="workspace-write"'\'' -c '\''approval_policy="on-request"'\'' -c '\''approvals_reviewer="auto_review"'\'' -c '\''sandbox_workspace_write.network_access=false'\'' __CODEXWRITABLEROOTS____CODEXCOMPACT__'
       printf '%s' "-c 'developer_instructions=\"$TASK_WORKER_TRUST_STATEMENT\"' "
       printf '%s' '-c '\''project_doc_max_bytes=1048576'\'' -c '\''project_doc_fallback_filenames=["CLAUDE.md"]'\'' -c '\''check_for_update_on_startup=false'\'' '
-      printf '%s' '--disable hooks -c "notify=[\"bash\",\"-c\",\"touch __TURNEND__\"]" "$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
+      printf '%s' '--enable hooks --dangerously-bypass-hook-trust __CODEXHOOKS__"$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
     fi
     ;;
   opencode) printf '%s' 'OPENCODE_CONFIG_CONTENT='\''{"permission":{"*":"allow"}__EFFORTFLAG__}'\'' opencode __MODELFLAG__--prompt "$(__OPINPUT__ encode launch-brief < __BRIEF__)"' ;;
@@ -1130,8 +1135,8 @@ auto) QWEN_APPROVAL_FLAG='--approval-mode auto' ;;
 esac
 # config/worker-context-handoff (docs/configuration.md "Worker context
 # handoff"): a presence flag read at every launch and relaunch. Present, a
-# claude ship or scout also gets the PreCompact and PostToolUse hook commands
-# owned by bin/fm-context-handoff.sh; absent, nothing changes. Its optional
+# claude or codex ship or scout also gets the PreCompact and PostToolUse hook
+# commands owned by bin/fm-context-handoff.sh; absent, nothing changes. Its optional
 # `fallback-pct=<N>` line (header above) is validated here, before anything
 # mutates, against the CLAUDE_AUTOCOMPACT_PCT_OVERRIDE config/launch-env
 # gives the worker, so a ceiling the hook could never honor refuses the launch
@@ -3252,25 +3257,66 @@ codex_writable_roots_flag() {  # <state-dir> <data-dir> <task-id>
 # Codex's knob is an absolute token count, so the share is applied to the
 # selected model's effective window (context_window times
 # effective_context_window_percent) from codex's model catalog cache, counting
-# the full active context as claude's percentage does. This is a compaction in
-# place, not claude's handoff to a fresh worker. No override, a value outside
-# 1-99, no selected model, or a model the catalog does not list omits the flags
-# and leaves codex's own compaction point.
+# the full active context as claude's percentage does. When the context
+# handoff is wired (codex_handoff_pct below) the worker hands off at that share
+# instead and the point moves to the fallback ceiling. No override, a value
+# outside 1-99, no selected model, or a model the catalog does not list omits
+# the flags and leaves codex's own compaction point.
 codex_compact_limit_flag() {  # <model>
-  local model=$1 pct='' limit i=0
-  while [ "$i" -lt "${#LAUNCH_ENV_SET_NAMES[@]}" ]; do
-    [ "${LAUNCH_ENV_SET_NAMES[$i]}" != CLAUDE_AUTOCOMPACT_PCT_OVERRIDE ] || pct=${LAUNCH_ENV_SET_VALUES[$i]}
-    i=$((i + 1))
-  done
+  local model=$1 pct limit
+  pct=$(launch_env_autocompact_pct)
   case "$pct" in '' | *[!0-9]*) return 0 ;; esac
   pct=$((10#$pct))
   [ "$pct" -ge 1 ] && [ "$pct" -le 99 ] || return 0
+  # With the context handoff wired the worker hands off at that share, so
+  # codex compacts only at the fallback ceiling, as a held claude worker does.
+  ! codex_handoff_pct >/dev/null || pct=$(context_handoff_ceiling_pct)
   [ -n "$model" ] && [ "$model" != default ] && command -v jq >/dev/null 2>&1 || return 0
   limit=$(jq -r --arg m "$model" --argjson p "$pct" \
     'first(.models[]? | select(.slug == $m) | select((.context_window | type) == "number")) | (.context_window * (.effective_context_window_percent // 100) * $p / 10000 | floor)' \
     "${CODEX_HOME:-$HOME/.codex}/models_cache.json" 2>/dev/null) || return 0
   case "$limit" in '' | 0 | *[!0-9]*) return 0 ;; esac
   printf -- '-c %s -c %s ' "$(shell_quote "model_auto_compact_token_limit=$limit")" "$(shell_quote 'model_auto_compact_token_limit_scope="total"')"
+}
+
+# The CLAUDE_AUTOCOMPACT_PCT_OVERRIDE value config/launch-env gives every
+# worker, empty when it sets none.
+launch_env_autocompact_pct() {
+  local i=0
+  while [ "$i" -lt "${#LAUNCH_ENV_SET_NAMES[@]}" ]; do
+    if [ "${LAUNCH_ENV_SET_NAMES[$i]}" = CLAUDE_AUTOCOMPACT_PCT_OVERRIDE ]; then
+      printf '%s' "${LAUNCH_ENV_SET_VALUES[$i]}"
+      return 0
+    fi
+    i=$((i + 1))
+  done
+}
+
+# The handoff fallback ceiling percentage: config/worker-context-handoff's
+# validated fallback-pct, or bin/fm-context-handoff.sh's default of 80.
+context_handoff_ceiling_pct() {
+  printf '%s' "${CONTEXT_HANDOFF_CEILING_PCT:-80}"
+}
+
+# The share of the window at which a codex worker hands off, printed only when
+# config/worker-context-handoff is present and the launch-env override is a
+# threshold the handoff can honor: 1 up to one below the fallback ceiling, the
+# range bin/fm-context-handoff.sh accepts from a claude worker's environment.
+# Otherwise it fails, and the codex worker compacts in place as before.
+codex_handoff_pct() {
+  local pct
+  [ "$CONTEXT_HANDOFF_PRESENT" = 1 ] || return 1
+  pct=$(launch_env_autocompact_pct)
+  case "$pct" in '' | *[!0-9]*) return 1 ;; esac
+  pct=$((10#$pct))
+  [ "$pct" -ge 1 ] && [ "$pct" -lt "$(context_handoff_ceiling_pct)" ] || return 1
+  printf '%s' "$pct"
+}
+
+# codex_hook_flag <event> <shell-command>: one quoted -c session-flag hook,
+# with a trailing space. Codex runs the command through a login shell.
+codex_hook_flag() {
+  printf -- '-c %s ' "$(shell_quote "hooks.$1=[{hooks=[{type=\"command\",command=\"$(json_escape "$2")\",timeout=30}]}]")"
 }
 
 resolved_existing_dir() {
@@ -4961,6 +5007,7 @@ if [ "$RELAUNCH" -eq 1 ]; then
   RELAUNCH_REPLACEMENT_STATE=$STATE_REAL
   RELAUNCH_REPLACEMENT_WT=$WT
 fi
+CODEX_HOOKS=
 if [ "$KIND" != secondmate ]; then
   # Arm the semantic busy-state contract (bin/fm-busy-lib.sh) for every
   # adapter with a verified semantic source. The launch brief sent below IS a
@@ -4970,19 +5017,12 @@ if [ "$KIND" != secondmate ]; then
   # rendered-tail fallbacks and standalone Kimi stays unknown until
   # fm_busy_kimi_verified opens, so none of the three is armed here. Gemini IS
   # armed: its BeforeAgent / AfterAgent / SessionEnd hooks are a verified
-  # open-close pair, and so is qwen (UserPromptSubmit / Stop / SessionEnd).
+  # open-close pair, and so are qwen and codex (UserPromptSubmit / Stop /
+  # SessionEnd).
   BUSY_GEN=
   # A context-handoff marker (bin/fm-context-handoff.sh) is bound to one
   # incarnation; whatever harness the replacement runs on, it starts fresh.
   rm -f "$STATE_REAL/$ID.context-handoff"
-  case "$HARNESS" in
-  codex*)
-    if fm_busy_codex_semantic_source; then
-      echo "error: codex semantic busy-state wiring is not implemented; extend the probe only together with verified wiring" >&2
-      exit 1
-    fi
-    ;;
-  esac
   case "$HARNESS" in
   claude* | opencode* | pi | pi-signed | omp)
     BUSY_GEN=$("$FM_ROOT/bin/fm-busy-event.sh" arm "$STATE_REAL" "$ID") || {
@@ -4991,7 +5031,7 @@ if [ "$KIND" != secondmate ]; then
     }
     [ "$RELAUNCH" -ne 1 ] || RELAUNCH_REPLACEMENT_BUSY_GEN=$BUSY_GEN
     ;;
-  gemini | qwen | devin)
+  gemini | qwen | devin | codex*)
     if [ "$RAW_LAUNCH" -eq 0 ]; then
       BUSY_GEN=$("$FM_ROOT/bin/fm-busy-event.sh" arm "$STATE_REAL" "$ID") || {
         echo "error: failed to arm the busy-state contract for $ID" >&2
@@ -5285,14 +5325,35 @@ export default function (pi: any) {
 EOF
     ;;
   codex*)
-    # Semantic busy-state source negotiation (bin/fm-busy-lib.sh owns the
-    # probes and the evidence). Neither Codex path is usable on the
-    # installed binary: a pane worker's turns are not observable through
-    # the app-server protocol, and its lifecycle hooks did not fire for a
-    # firstmate-launched worker. Codex therefore classifies unknown with
-    # an explicit reason rather than falling back to idle, and no busy
-    # wiring is installed. The turn-end NOTIFICATION marker still rides
-    # the launch command via -c notify=[...] and __TURNEND__.
+    if [ "$RAW_LAUNCH" -eq 0 ]; then
+      # Semantic busy-state hooks (bin/fm-busy-lib.sh), passed as -c
+      # session-flag hooks so nothing is written into the worktree or
+      # ~/.codex: UserPromptSubmit opens a turn, Stop closes it and touches
+      # the turn-ended NOTIFICATION, and SessionEnd closes it on process
+      # shutdown (verified live on codex-cli 0.162.1, each once per event,
+      # with claude-shaped payloads). Codex has no StopFailure hook, and
+      # whether Stop fires on a manual Escape is unverified, so
+      # bin/fm-control.sh invalidates the record to unknown after an
+      # interrupt, as for qwen. Every command tolerates a refused event and
+      # prints nothing, so a stale-gen writer can never break codex's own
+      # lifecycle.
+      busy_cmd_prefix="$(shell_quote "$FM_ROOT/bin/fm-busy-event.sh") apply $(shell_quote "$STATE_REAL") $(shell_quote "$ID")"
+      busy_suffix="--gen $(shell_quote "$BUSY_GEN") --source codex-hook"
+      CODEX_HOOKS=$(codex_hook_flag UserPromptSubmit "$busy_cmd_prefix busy $busy_suffix --event user-prompt-submit >/dev/null 2>&1 || true")
+      CODEX_HOOKS+=$(codex_hook_flag Stop "touch $(shell_quote "$TURNEND"); $busy_cmd_prefix idle $busy_suffix --event stop >/dev/null 2>&1 || true")
+      CODEX_HOOKS+=$(codex_hook_flag SessionEnd "$busy_cmd_prefix idle $busy_suffix --event session-end >/dev/null 2>&1 || true")
+      # Opt-in context handoff: codex's PreCompact cannot block, so the
+      # PostToolUse hook watches the handoff threshold itself and codex's own
+      # compaction sits at the fallback ceiling (codex_compact_limit_flag);
+      # bin/fm-context-handoff.sh owns the codex mode both commands select.
+      if handoff_pct=$(codex_handoff_pct); then
+        DATA_REAL=$(cd "$DATA" && pwd -P)
+        handoff_cmd_prefix="$(shell_quote "$FM_ROOT/bin/fm-context-handoff.sh")"
+        handoff_suffix="$(shell_quote "$STATE_REAL") $(shell_quote "$ID") --gen $(shell_quote "$BUSY_GEN") --data-dir $(shell_quote "$DATA_REAL") --fm-root $(shell_quote "$FM_ROOT") --ceiling-pct $(context_handoff_ceiling_pct) --codex-threshold-pct $handoff_pct"
+        CODEX_HOOKS+=$(codex_hook_flag PreCompact "$handoff_cmd_prefix precompact $handoff_suffix >/dev/null 2>&1 || true")
+        CODEX_HOOKS+=$(codex_hook_flag PostToolUse "$handoff_cmd_prefix posttooluse $handoff_suffix 2>/dev/null || true")
+      fi
+    fi
     ;;
   grok*)
     # grok fires a Stop hook at every turn boundary (verified, grok 0.2.73), the
@@ -5648,7 +5709,6 @@ fi
 [ "$BACKEND" = orca ] && ORCA_ABORT_CLEANUP=0
 
 sq_brief=$(shell_quote "$BRIEF")
-sq_turnend=$(shell_quote "$TURNEND")
 sq_piext=$(shell_quote "$STATE/$ID.pi-ext.ts")
 sq_piturnend=$(shell_quote "$PROJ_ABS/.pi/extensions/fm-primary-turnend-guard.ts")
 sq_piwatch=$(shell_quote "$PROJ_ABS/.pi/extensions/fm-primary-pi-watch.ts")
@@ -5687,7 +5747,7 @@ if [ "$HARNESS" = rovo ]; then
   LAUNCH=${LAUNCH//__ROVOCONFIGOVERRIDE__/$ROVOCONFIGOVERRIDE}
 fi
 LAUNCH=${LAUNCH//__BRIEF__/$sq_brief}
-LAUNCH=${LAUNCH//__TURNEND__/$sq_turnend}
+LAUNCH=${LAUNCH//__CODEXHOOKS__/"$CODEX_HOOKS"}
 LAUNCH=${LAUNCH//__PIEXT__/$sq_piext}
 LAUNCH=${LAUNCH//__PITURNEND__/$sq_piturnend}
 LAUNCH=${LAUNCH//__PIWATCH__/$sq_piwatch}

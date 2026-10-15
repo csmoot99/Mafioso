@@ -353,6 +353,20 @@ test_devin_interrupt_invalidates_busy() {
   pass "fm-control Devin interrupt: second press only after the armed hint, then busy invalidated without fabricating idle"
 }
 
+# Whether codex's Stop hook fires on a cancelled turn is unverified, so an
+# interrupt leaves its busy record unknown rather than busy or a fabricated idle.
+test_codex_interrupt_invalidates_busy() {
+  local dir out
+  dir=$(new_case codex-busy)
+  add_task "$dir" t1 codex
+  alive_as "$dir" codex
+  "$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" t1 >/dev/null
+  out=$(run_control "$dir" t1 interrupt) || fail "codex interrupt failed: $out"
+  assert_contains "$out" 'cancel=unconfirmed' 'codex cancellation must not claim semantic confirmation'
+  assert_grep 'state=unknown source=fm-interrupt' "$dir/home/state/t1.busy-state" 'cancelled codex turn stayed busy'
+  pass "fm-control codex interrupt: busy invalidated to unknown without fabricating idle"
+}
+
 # The revert-picker hazard: on an idle Devin a fast double Escape opens the
 # /revert picker, where Enter reverts file changes. A turn that ended just
 # before the interrupt must get exactly one Escape and keep its busy record.
@@ -1176,6 +1190,7 @@ EOF
 test_exit_types_each_harness_verified_command
 test_interrupt_sends_each_harness_verified_key
 test_devin_interrupt_invalidates_busy
+test_codex_interrupt_invalidates_busy
 test_devin_idle_interrupt_sends_one_press
 test_devin_exit_after_turn_ended_types_quit_once
 test_devin_interrupt_dismisses_revert_picker

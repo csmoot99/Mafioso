@@ -218,12 +218,10 @@ test_stale_gen_record_unknown() {
 test_missing_record_unknown_not_idle() {
   local state out h
   state=$(new_state_dir missing)
-  for h in claude opencode pi pi-signed; do
+  for h in claude opencode pi pi-signed codex; do
     out=$(fm_busy_classify tmux w1 "$h" t1 "$state")
     [ "$out" = "unknown missing" ] || fail "$h with no record must be 'unknown missing', got '$out'"
   done
-  out=$(fm_busy_classify tmux w1 codex t1 "$state")
-  [ "$out" = "unknown codex-unverified" ] || fail "codex with no verified source must be 'unknown codex-unverified', got '$out'"
   pass "a converted adapter with no record classifies unknown, never idle"
 }
 
@@ -280,12 +278,10 @@ test_converted_adapters_ignore_footer_text() {
    ■■■■⬝⬝⬝⬝  esc interrupt
 Working...
 Ctrl+c:cancel'
-  for h in claude opencode pi pi-signed; do
+  for h in claude opencode pi pi-signed codex; do
     out=$(fm_busy_classify tmux w1 "$h" t1 "$state" "$tail")
     [ "$out" = "unknown missing" ] || fail "$h must never classify from footer text, got '$out'"
   done
-  out=$(fm_busy_classify tmux w1 codex t1 "$state" "$tail")
-  [ "$out" = "unknown codex-unverified" ] || fail "codex must never classify from footer text, got '$out'"
   pass "converted adapters never classify busy from rendered footer text"
 }
 
@@ -462,16 +458,52 @@ Ctrl+c:cancel')
 
 # --- kimi verification gate -----------------------------------------------------
 
-test_codex_unverified_gate() {
+test_codex_hook_records_classify() {
   local state gen out
-  state=$(new_state_dir codex-gate)
+  state=$(new_state_dir codex-hook)
   gen=$("$EV" arm "$state" t1)
   "$EV" apply "$state" t1 busy --gen "$gen" --source codex-hook --event user-prompt-submit
   out=$(fm_busy_classify tmux w1 codex t1 "$state")
-  [ "$out" = "unknown codex-unverified" ] || fail "unverified codex must classify unknown, got '$out'"
-  [ -z "$(fm_busy_sources_for_harness codex)" ] \
-    || fail "codex must trust no semantic source until one is verified"
-  pass "codex classifies unknown until a semantic source passes its verification gate"
+  [ "$out" = "busy codex-hook" ] || fail "a codex-hook turn open must classify busy, got '$out'"
+  "$EV" apply "$state" t1 idle --gen "$gen" --source codex-hook --event stop
+  out=$(fm_busy_classify tmux w1 codex t1 "$state")
+  [ "$out" = "idle codex-hook" ] || fail "a codex-hook Stop must classify idle, got '$out'"
+  out=$(fm_busy_classify tmux w1 qwen t1 "$state")
+  [ "$out" = "unknown source-mismatch" ] || fail "a codex-hook record must not speak for qwen, got '$out'"
+  "$EV" apply "$state" t1 busy --gen "$gen" --source qwen-hook --event user-prompt-submit
+  out=$(fm_busy_classify tmux w1 codex t1 "$state")
+  [ "$out" = "unknown source-mismatch" ] || fail "a qwen-hook record must not speak for codex, got '$out'"
+  pass "codex classifies from its own hook records and trusts no other adapter's"
+}
+
+test_launch_prompt_codex_trust_dialog() {
+  local state out
+  state=$(new_state_dir launch-prompt-codex-trust)
+  "$EV" arm "$state" t1 >/dev/null
+  # The dialog codex-cli 0.162.1 rendered on a fresh repository root, verbatim.
+  # shellcheck disable=SC1112
+  out=$(fm_busy_classify tmux w1 codex t1 "$state" '  Folder access
+  /tmp/wt1
+
+  Note: You’re in a subdirectory of a Git project. Trusting will apply to the repository root:
+  /tmp/proj
+
+  Trust this folder? Codex can read, edit, and run files here, subject to your permission settings. Folder settings can run code automatically, even without a model request. Continue only if you
+  trust these files. Your trust decision will be saved.
+
+› 1. Trust and continue
+  2. Quit
+
+  enter continue · esc quit')
+  [ "$out" = "unknown launch-prompt" ] \
+    || fail "a codex launch parked on its directory-trust dialog must classify unknown launch-prompt, got '$out'"
+  # The question alone is prose a worker could render; the option row is required.
+  state=$(new_state_dir launch-prompt-codex-prose)
+  "$EV" arm "$state" t1 >/dev/null
+  out=$(fm_busy_classify tmux w1 codex t1 "$state" 'Codex asked: Trust this folder? Codex can read files here.')
+  [ "$out" = "busy fm-spawn" ] \
+    || fail "codex prose quoting the trust question must stay busy fm-spawn, got '$out'"
+  pass "a codex launch parked on its directory-trust dialog classifies unknown launch-prompt"
 }
 
 test_kimi_unverified_gate() {
@@ -635,12 +667,13 @@ test_launch_prompt_pi_trust_dialog
 test_launch_prompt_pi_requires_both_markers
 test_launch_prompt_gemini_dialogs
 test_launch_prompt_qwen_dialog
+test_launch_prompt_codex_trust_dialog
 test_launch_prompt_never_shortens_a_working_launch
 test_launch_prompt_scoped_to_armed_harnesses
 test_launch_prompt_never_reclassifies_an_advanced_record
 test_launch_prompt_requires_a_captured_tail
 test_grok_regex_isolated
-test_codex_unverified_gate
+test_codex_hook_records_classify
 test_kimi_unverified_gate
 test_cursor_ignores_rendered_and_native_signals
 test_dead_endpoint_overrides

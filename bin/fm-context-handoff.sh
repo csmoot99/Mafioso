@@ -1,21 +1,31 @@
 #!/usr/bin/env bash
 # fm-context-handoff.sh - the opt-in worker context handoff: instead of
-# auto-compacting at its context threshold, a Claude worker writes a handoff
-# document and firstmate replaces it with a fresh worker that continues the
-# same task from that document.
+# auto-compacting at its context threshold, a Claude or Codex worker writes a
+# handoff document and firstmate replaces it with a fresh worker that
+# continues the same task from that document.
 #
 # The whole feature is off unless the home holds the presence flag
 # config/worker-context-handoff (docs/configuration.md "Worker context
-# handoff"). bin/fm-spawn.sh reads the flag at every claude ship or scout
-# launch and relaunch, validates its one optional `fallback-pct=<N>` line
-# (blank and `#` lines ignored; see fm-spawn's header for the exact rule),
-# and only then wires the two hook commands below into the worker's
-# .claude/settings.local.json beside the busy-state hooks; a secondmate, the
+# handoff"). bin/fm-spawn.sh reads the flag at every claude or codex ship or
+# scout launch and relaunch, validates its one optional `fallback-pct=<N>`
+# line (blank and `#` lines ignored; see fm-spawn's header for the exact
+# rule), and only then wires the two hook commands below beside the
+# busy-state hooks: into a claude worker's .claude/settings.local.json, and
+# as session-flag hooks on a codex worker's launch command. A secondmate, the
 # primary, and every other harness never get them.
+#
+# Codex mode (--codex-threshold-pct P on either hook): Codex's PreCompact
+# cannot block a compaction (codex-cli 0.162.1 reports exit 2 as a failed hook
+# and a block decision as invalid output, then compacts), so a codex worker
+# gets the same outcome another way. fm-spawn moves Codex's own compaction
+# to the fallback ceiling, PostToolUse watches the handoff threshold P itself
+# in Codex's session log, and PreCompact only records that the fallback
+# compaction arrived. Both always exit 0; the records, status events, notice,
+# and replacement are exactly the Claude ones.
 #
 # Subcommands:
 #
-#   precompact <state-dir> <id> --gen G --data-dir D --fm-root R [--ceiling-pct N]
+#   precompact <state-dir> <id> --gen G --data-dir D --fm-root R [--ceiling-pct N] [--codex-threshold-pct P]
 #       Claude PreCompact hook (matcher `auto`; a manual /compact is never
 #       blocked). Reads the hook payload on stdin. The threshold is Claude's
 #       own: the hook fires exactly when auto-compaction would, which
@@ -59,11 +69,23 @@
 #       payload, a missing transcript, or any other error lets compaction
 #       proceed: this hook must never break Claude's own lifecycle, exactly as
 #       the busy hooks tolerate a refused event.
+#       With --codex-threshold-pct (Codex mode above) it never blocks: on an
+#       auto compaction while the marker is `due`, it moves the marker to
+#       `fallback` and notes the missed handoff exactly as the ceiling path
+#       does; with no marker for G yet (usage jumped past the threshold and
+#       the ceiling between two tool calls) it writes a `fallback` marker and
+#       the same note, so this incarnation hands off no later, as on Claude.
 #
-#   posttooluse <state-dir> <id> --gen G --data-dir D --fm-root R
+#   posttooluse <state-dir> <id> --gen G --data-dir D --fm-root R [--ceiling-pct N] [--codex-threshold-pct P]
 #       Claude PostToolUse hook, every tool. With no marker for the task it is
 #       one file-existence test and exits 0 with no output, so the common path
-#       costs nothing. With a `due` marker for gen G and no handoff file yet,
+#       costs nothing. In Codex mode the no-marker path instead reads the
+#       latest `token_count` record in the payload's transcript_path (the
+#       Codex session log): once `last_token_usage.total_tokens` reaches P
+#       percent of its `model_context_window`, it writes the `due` marker and
+#       note the Claude PreCompact writes at its first block (window from the
+#       log, ceiling N percent of it) and delivers the notice on this call.
+#       With a `due` marker for gen G and no handoff file yet,
 #       it returns hookSpecificOutput.additionalContext telling the worker to
 #       finish the step in hand and start nothing new, read the handoff skill
 #       at its absolute path, write the handoff to the exact durable path the
@@ -116,8 +138,8 @@ set -u
 usage() {
   cat >&2 <<'EOF'
 usage:
-  fm-context-handoff.sh precompact <state-dir> <id> --gen G --data-dir D --fm-root R [--ceiling-pct N]   (PreCompact payload on stdin)
-  fm-context-handoff.sh posttooluse <state-dir> <id> --gen G --data-dir D --fm-root R  (PostToolUse payload on stdin)
+  fm-context-handoff.sh precompact <state-dir> <id> --gen G --data-dir D --fm-root R [--ceiling-pct N] [--codex-threshold-pct P]   (PreCompact payload on stdin)
+  fm-context-handoff.sh posttooluse <state-dir> <id> --gen G --data-dir D --fm-root R [--ceiling-pct N] [--codex-threshold-pct P]  (PostToolUse payload on stdin)
   fm-context-handoff.sh replace <id>                                                (FM_HOME-resolved)
 See the header comment for the full contract.
 EOF
@@ -179,14 +201,16 @@ payload_field() {
     print $v;' -- "$1" 2>/dev/null
 }
 
-# transcript_usage <transcript-path> -> context tokens of the latest assistant
-# record carrying message.usage (input + cache_read + cache_creation), reading a
-# bounded tail first and the whole file only when the tail holds none.
+# transcript_usage <transcript-path> [scanner] -> what the scanner prints for
+# the latest usage record, reading a bounded tail first and the whole file only
+# when the tail holds none. The default scanner reads a Claude transcript: the
+# context tokens of the latest assistant record carrying message.usage (input +
+# cache_read + cache_creation). _codex_usage_scan reads a Codex session log.
 transcript_usage() {
-  local f=$1 n
+  local f=$1 scan=${2:-_transcript_usage_scan} n
   [ -f "$f" ] && [ -r "$f" ] || return 1
-  n=$(tail -n 400 "$f" 2>/dev/null | _transcript_usage_scan) && [ -n "$n" ] && { printf '%s' "$n"; return 0; }
-  n=$(_transcript_usage_scan < "$f") && [ -n "$n" ] && { printf '%s' "$n"; return 0; }
+  n=$(tail -n 400 "$f" 2>/dev/null | "$scan") && [ -n "$n" ] && { printf '%s' "$n"; return 0; }
+  n=$("$scan" < "$f") && [ -n "$n" ] && { printf '%s' "$n"; return 0; }
   return 1
 }
 _transcript_usage_scan() {
@@ -201,6 +225,21 @@ _transcript_usage_scan() {
       my $v = $u->{$k}; $t += $v if defined $v && $v =~ /^\d+$/;
     }
     $last = $t;
+    END { print $last if defined $last }'
+}
+# "<usage> <window>" from the latest Codex token_count event: the context the
+# last model response used (last_token_usage.total_tokens, what Codex's own
+# compaction limit is measured against) and the model's effective window.
+_codex_usage_scan() {
+  perl -MJSON::PP -ne '
+    next unless /"token_count"/;
+    my $d = eval { JSON::PP->new->decode($_) } or next;
+    next unless ref $d eq "HASH" && ($d->{type} // "") eq "event_msg" && ref $d->{payload} eq "HASH";
+    my $i = $d->{payload}{info};
+    next unless ($d->{payload}{type} // "") eq "token_count" && ref $i eq "HASH" && ref $i->{last_token_usage} eq "HASH";
+    my ($u, $w) = ($i->{last_token_usage}{total_tokens}, $i->{model_context_window});
+    next unless defined $u && $u =~ /^\d+$/ && defined $w && $w =~ /^[1-9]\d*$/;
+    $last = "$u $w";
     END { print $last if defined $last }'
 }
 
@@ -223,13 +262,14 @@ hook_args() {
   STATE=${1:-}; ID=${2:-}
   [ -n "$STATE" ] && [ -n "$ID" ] || usage
   shift 2
-  GEN=; DATA_DIR=; SKILL_ROOT=; CEILING_PCT=$CEILING_PCT_DEFAULT
+  GEN=; DATA_DIR=; SKILL_ROOT=; CEILING_PCT=$CEILING_PCT_DEFAULT; CODEX_PCT=
   while [ $# -gt 0 ]; do
     case "$1" in
       --gen) GEN=${2:-}; shift 2 || usage ;;
       --data-dir) DATA_DIR=${2:-}; shift 2 || usage ;;
       --fm-root) SKILL_ROOT=${2:-}; shift 2 || usage ;;
       --ceiling-pct) CEILING_PCT=${2:-}; shift 2 || usage ;;
+      --codex-threshold-pct) CODEX_PCT=${2:-}; shift 2 || usage ;;
       *) usage ;;
     esac
   done
@@ -239,6 +279,13 @@ hook_args() {
   case "$CEILING_PCT" in ''|*[!0-9]*) usage ;; esac
   [ "$CEILING_PCT" -ge 1 ] && [ "$CEILING_PCT" -le "$CEILING_PCT_DEFAULT" ] || usage
   MARKER_MAX_PCT=$((CEILING_PCT - 1))
+  # The same bound a claude worker's override must meet, checked by fm-spawn
+  # before it bakes the value in.
+  case "$CODEX_PCT" in
+    '') ;;
+    *[!0-9]*) usage ;;
+    *) [ "$CODEX_PCT" -ge 1 ] && [ "$CODEX_PCT" -le "$MARKER_MAX_PCT" ] || usage ;;
+  esac
   id_ok "$ID" || usage
   STATUS="$STATE/$ID.status"
   MARKER=$(marker_path "$STATE" "$ID")
@@ -254,9 +301,10 @@ incarnation_current() {
 do_precompact() {
   # Every failure path below ends in `exit 0` (proceed): a hook that cannot
   # decide must never block Claude.
-  local trigger transcript usage pct marker state ceiling n handoff key window epoch
+  local trigger transcript usage pct marker state ceiling handoff epoch
   hook_args "$@"
   PAYLOAD=$(cat 2>/dev/null || true)
+  if [ -n "$CODEX_PCT" ]; then codex_precompact; exit 0; fi
   trigger=$(payload_field trigger) || exit 0
   [ "$trigger" = auto ] || exit 0
   incarnation_current || exit 0
@@ -304,20 +352,74 @@ do_precompact() {
   fi
 
   # First fire for this incarnation.
-  window=$((usage * 100 / pct))
   ceiling=$((usage * CEILING_PCT / pct))
-  n=$(next_handoff_number "$DATA_DIR" "$ID")
-  handoff="$DATA_DIR/$ID/handoff-$n.md"
-  key="context-handoff-$n"
-  marker_write "$MARKER" "v1 gen=$GEN state=due seq=$n handoff=$handoff key=$key usage=$usage pct=$pct window=$window ceiling=$ceiling ceiling_pct=$CEILING_PCT notices=0 calls=0 at=$epoch" || exit 0
-  status_note "$STATUS" "note: context handoff due: usage $usage of about $window tokens at $pct percent; the worker was told to write $handoff and report it with key $key" || true
-  echo "firstmate: auto-compaction blocked; write the context handoff to $handoff first (fallback compaction at $ceiling tokens)" >&2
+  mark_due "$usage" "$pct" $((usage * 100 / pct)) "$ceiling" || exit 0
+  echo "firstmate: auto-compaction blocked; write the context handoff to $DUE_HANDOFF first (fallback compaction at $ceiling tokens)" >&2
   exit 2
+}
+
+# mark_due <usage> <pct> <window> <ceiling>: write the incarnation's `due`
+# marker naming the next handoff (left in DUE_HANDOFF) and append the one
+# handoff-due note.
+mark_due() {
+  local n key
+  n=$(next_handoff_number "$DATA_DIR" "$ID")
+  DUE_HANDOFF="$DATA_DIR/$ID/handoff-$n.md"
+  key="context-handoff-$n"
+  marker_write "$MARKER" "v1 gen=$GEN state=due seq=$n handoff=$DUE_HANDOFF key=$key usage=$1 pct=$2 window=$3 ceiling=$4 ceiling_pct=$CEILING_PCT notices=0 calls=0 at=$(date +%s 2>/dev/null || echo 0)" || return 1
+  status_note "$STATUS" "note: context handoff due: usage $1 of about $3 tokens at $2 percent; the worker was told to write $DUE_HANDOFF and report it with key $key" || true
+}
+
+# Codex mode: the marker this incarnation already has, or a new `due` one once
+# the session log shows usage at the threshold. 0 when a marker for GEN exists
+# afterwards.
+codex_mark_due_at_threshold() {
+  local marker='' scan usage window
+  [ ! -f "$MARKER" ] || IFS= read -r marker < "$MARKER" || marker=
+  [ -z "$marker" ] || [ "$(marker_field "$marker" gen)" != "$GEN" ] || return 0
+  incarnation_current || return 1
+  [ -d "$STATE" ] || return 1
+  scan=$(transcript_usage "$(payload_field transcript_path)" _codex_usage_scan) || return 1
+  usage=${scan% *} window=${scan#* }
+  [ $((usage * 100)) -ge $((CODEX_PCT * window)) ] || return 1
+  mark_due "$usage" "$CODEX_PCT" "$window" $((window * CEILING_PCT / 100))
+}
+
+# Codex mode PreCompact: never blocks; records that the fallback compaction
+# arrived before a handoff did.
+codex_precompact() {
+  local marker='' state usage handoff epoch
+  [ "$(payload_field trigger)" = auto ] || return 0
+  incarnation_current || return 0
+  [ -d "$STATE" ] || return 0
+  [ ! -f "$MARKER" ] || IFS= read -r marker < "$MARKER" || marker=
+  [ -z "$marker" ] || [ "$(marker_field "$marker" gen)" = "$GEN" ] || marker=
+  state=$(marker_field "$marker" state)
+  usage=$(transcript_usage "$(payload_field transcript_path)" _codex_usage_scan) || usage='? ?'
+  usage=${usage% *}
+  epoch=$(date +%s 2>/dev/null || echo 0)
+  case "$state" in
+    due)
+      handoff=$(marker_field "$marker" handoff)
+      [ -s "$handoff" ] && return 0
+      marker_write "$MARKER" "$(printf '%s' "$marker" | sed 's/ state=due / state=fallback /') usage_now=$usage fallback_at=$epoch" || return 0
+      status_note "$STATUS" "note: context handoff missed: codex compacted at $usage tokens, its fallback point, before $handoff appeared" || true
+      ;;
+    '')
+      marker_write "$MARKER" "v1 gen=$GEN state=fallback seq=0 usage_now=$usage fallback_at=$epoch at=$epoch" || return 0
+      status_note "$STATUS" "note: context handoff missed: codex compacted at $usage tokens before a tool call saw the $CODEX_PCT percent handoff threshold" || true
+      ;;
+  esac
+  return 0
 }
 
 do_posttooluse() {
   local marker handoff key calls notices skill
   hook_args "$@"
+  if [ -n "$CODEX_PCT" ]; then
+    PAYLOAD=$(cat 2>/dev/null || true)
+    codex_mark_due_at_threshold || exit 0
+  fi
   [ -f "$MARKER" ] || exit 0
   cat >/dev/null 2>&1 || true
   IFS= read -r marker < "$MARKER" || exit 0
