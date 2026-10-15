@@ -727,6 +727,7 @@ A `stale-agent` pane is reused by recovery, never closed as a husk, because the 
 Native registration still identifies Pi by name where tmux would see a generic interpreter.
 The process-level proof decides whether that registration is backed by a running process.
 Herdr registers only the harnesses it recognizes, so an unregistered pane is read at process level too, and a harness there, such as a qwen or gemini node bundle identified by its script argument, is `alive`.
+An unregistered pane whose process view cannot be read is `unreadable`, because a harness there cannot be ruled out, so it is never closed as a husk.
 `tests/fm-backend-herdr-agent-exit-shell-e2e.test.sh` pins the live-Pi versus leftover-shell distinction.
 [`verification/runtime-backends.md`](verification/runtime-backends.md#agent-lifecycle-control) owns the versioned evidence.
 

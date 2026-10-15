@@ -34,6 +34,8 @@ cat > "$FAKE_PS" <<'SH'
 case "$*" in
   "-axo pid=,ppid=") printf '1 0\n67 1\n' ;;
   "-p 67 -o stat=") printf 'Ss\n' ;;
+  "-axo pid=,ppid=,comm=") printf '1 0 init\n67 1 sh\n' ;;
+  "-p 67 -o args=") printf '/bin/sh\n' ;;
   *) exit 1 ;;
 esac
 SH
@@ -65,6 +67,7 @@ FIXTURE_DIR="$TMP_ROOT/fixture"
 LOCK_LOG="$TMP_ROOT/locks.log"
 CLOSE_LOG="$TMP_ROOT/closes.log"
 mkdir -p "$FIXTURE_DIR"
+export FM_HERDR_PS_BIN="$FAKE_PS"
 
 fm_backend_name() { printf herdr; }
 fm_backend_herdr_session() { printf test; }
@@ -167,6 +170,9 @@ fm_backend_herdr_cli() {
         live) printf '%s\n' '{"result":{"agent":{"agent_status":"idle"}}}' ;;
         unknown) printf '%s\n' '{"error":{"code":"internal_error"}}' >&2; return 1 ;;
       esac
+      ;;
+    "pane process-info")
+      printf '%s\n' "$LINUX_PROCESS_INFO"
       ;;
     "api snapshot")
       : > "$FIXTURE_DIR/snapshotted"

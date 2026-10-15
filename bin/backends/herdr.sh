@@ -2276,7 +2276,7 @@ EOF
 #                 and its tab from `pane get`/`tab list`).
 #   no-agent    - `pane get` succeeds (the pane structurally exists), `agent
 #                 get` responds with error code agent_not_found, and the
-#                 process-level view does not show a verified harness: nothing
+#                 readable process-level view shows no harness: nothing
 #                 is registered or running in it - exactly what a herdr
 #                 session-layout restore produces (verified empirically:
 #                 `session stop` + fresh `herdr server` restart leaves the pane
@@ -2312,7 +2312,9 @@ EOF
 #                 response shape change as "the pane exists"), or a registered
 #                 agent whose process-level view is unreadable - the
 #                 registration alone is no longer trusted, and its absence is
-#                 not claimed either. The caller must fail safe toward refusal
+#                 not claimed either, or an agent_not_found pane whose
+#                 process-level view is unreadable - an unregistered harness
+#                 cannot be ruled out. The caller must fail safe toward refusal
 #                 here, never toward closing - this is the conservative
 #                 backstop the husk check depends on.
 fm_backend_herdr_pane_agent_state() {  # <session> <pane_id>
@@ -2331,10 +2333,11 @@ fm_backend_herdr_pane_agent_state() {  # <session> <pane_id>
     [ "$code" = "agent_not_found" ] || { printf 'unknown'; return 0; }
     # Herdr registers only the harnesses it recognizes natively, so a
     # node-bundle harness such as qwen or gemini runs with no registration at
-    # all. Positive process evidence alone makes it live; anything else keeps
-    # the no-agent verdict this branch always gave.
+    # all. Positive process evidence alone makes it live, and an unreadable
+    # process view cannot rule such a harness out.
     case "$(fm_backend_herdr_pane_process_state "$session" "$pane_id")" in
       agent) printf 'live' ;;
+      unreadable) printf 'unknown' ;;
       *) printf 'no-agent' ;;
     esac
     return 0
