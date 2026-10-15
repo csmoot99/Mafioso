@@ -367,7 +367,7 @@ That presentation lock lives in a namespace private to the OS account, so anothe
 A namespace at this account's name that another account owns, or that is not mode 700, is still refused and is never adopted, chowned, or removed.
 
 A same-identity version 2 binding may replace one exact agent-free restart husk in place.
-A husk is a restored same-labeled tab with a missing pane or no registered agent, as [Restart and liveness behavior](#restart-and-liveness-behavior) describes.
+A husk is a restored same-labeled tab with a missing pane or with neither a registered agent nor a running harness process, as [Restart and liveness behavior](#restart-and-liveness-behavior) describes.
 The replacement is allowed only when all of these agree:
 
 - The physical home.
@@ -673,7 +673,7 @@ No Herdr-specific copy of that protocol exists.
 
 Stopping and restarting a named Herdr server preserves workspace, tab, pane, and label ids.
 The underlying harness processes and live agent registrations do not survive.
-A restored same-labeled tab with a missing pane or no registered agent is a husk.
+A restored same-labeled tab with a missing pane, or with neither a registered agent nor a running harness process, is a husk.
 
 Create replaces only a confidently dead or no-agent husk, creates the replacement before closing the old tab, and refuses live or unknown states.
 This prevents closing the workspace's last tab before a replacement exists.
@@ -717,7 +717,7 @@ The generic Herdr agent-liveness probe reuses that pane classifier, then applies
 | --- | --- |
 | A structurally gone pane, or a pane read from a session positively reported as having no running server | `missing` |
 | A restored agent-less shell, or a stale registration over a shell-only pane | `dead` |
-| A registered agent with a live process | `alive` |
+| A registered agent with a live process, or an unregistered pane running a harness process | `alive` |
 | Every other unexpected read | `unreadable` |
 
 Neither the stopped-server exception nor the stale-registration verdict widens husk detection or any close authority.
@@ -725,7 +725,8 @@ Those paths still refuse an unreadable pane.
 A `stale-agent` pane is reused by recovery, never closed as a husk, because the shell it holds may be a nested worktree shell.
 
 Native registration still identifies Pi by name where tmux would see a generic interpreter.
-The process-level proof only decides whether that registration is backed by a running process.
+The process-level proof decides whether that registration is backed by a running process.
+Herdr registers only the harnesses it recognizes, so an unregistered pane is read at process level too, and a harness there, such as a qwen or gemini node bundle identified by its script argument, is `alive`.
 `tests/fm-backend-herdr-agent-exit-shell-e2e.test.sh` pins the live-Pi versus leftover-shell distinction.
 [`verification/runtime-backends.md`](verification/runtime-backends.md#agent-lifecycle-control) owns the versioned evidence.
 

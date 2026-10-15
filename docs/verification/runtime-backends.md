@@ -1405,12 +1405,27 @@ qwen3-coder:30b    06c1097efce0    21 GB    100% GPU     32768      llamacpp    
 `ollama show qwen3-coder:30b` reports `parameters 30.5B`, `context length 262144`, `quantization Q4_K_M`, and `systemctl show ollama -p Environment` printed an empty `Environment=`, so the running service sets no `OLLAMA_CONTEXT_LENGTH` and grants the default 32768 while qwen's footer claims `262.1k Context`.
 qwen will therefore not compact before the server truncates; raising the limit is the operator's call and the adapter changes neither the service nor the models.
 
+### Herdr pane liveness
+
+Verified on 2026-10-15 on Linux (WSL2) against Herdr 0.8.0 and Qwen Code 0.25.1, in an isolated `fm-lab-` session driven only through `bin/fm-herdr-lab.sh`, with `qwen` launched idle in a pane and no prompt submitted.
+Herdr registered no agent for it: `agent get` answered `agent_not_found` before launch, while qwen ran, and after `/quit`.
+`pane process-info` reported the running foreground as `name=MainThread argv=node /home/<user>/.local/bin/qwen`, so only the argv rule in `bin/fm-qwen-lib.sh` identifies it.
+`fm_backend_herdr_pane_agent_state` and `fm_backend_herdr_agent_state` read that pane as follows:
+
+```text
+before launch: pane=no-agent recovery=dead
+qwen running:  pane=live     recovery=alive
+after /quit:   pane=no-agent recovery=dead
+```
+
+`tests/fm-backend-herdr.test.sh` pins the unregistered-pane verdicts with real processes and no harness.
+
 ### Not verified
 
 Qwen Code as a PRIMARY or SECONDMATE runtime is unverified and refused by `bin/fm-spawn.sh`: no wake protocol exists under `docs/supervision-protocols/` and no turn-end guard adapter was built or exercised.
 No reasoning-effort axis was found; `qwen --help` on 0.25.1 exposes no effort, reasoning, or thinking flag, so the record-and-omit contract applies.
 `--approval-mode auto` was verified only as the flag shape `config/qwen-approval-mode` selects, not for which actions it blocks.
-The `/<skill>` submit shape, the Herdr backend (its identity probe reports native agent names and was never exercised with qwen), `--exclude-tools`, and whether `ui.enableFollowupSuggestions=false` is what removed the follow-up row (none appeared in any guard run with it set, with no A/B) remain unverified.
+The `/<skill>` submit shape, the Herdr backend beyond pane liveness (its identity probe reports native agent names, and Herdr registers no qwen agent), `--exclude-tools`, and whether `ui.enableFollowupSuggestions=false` is what removed the follow-up row (none appeared in any guard run with it set, with no A/B) remain unverified.
 `tests/fm-composer-matrix-live-e2e.test.sh` was not extended with qwen because it launches each harness bare, which needs the operator credential; the qwen guard asserts the same composer verdict through the real tmux path instead.
 
 ## Herdr

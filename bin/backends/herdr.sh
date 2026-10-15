@@ -2263,26 +2263,28 @@ EOF
 
 # fm_backend_herdr_pane_agent_state: classify <pane_id> in <session> as one of
 # dead|no-agent|stale-agent|live|unknown, from the JSON body of two read-only
-# calls plus, for a registered agent, the pane's process-level view - never
-# from process exit status, since a business-logic "not found" response is a
-# normal, expected outcome here, not a call failure (real herdr 0.7.1 exits 1
-# for it; the canned-response test fakes exit 0; parsing only the JSON keeps
-# this function correct against either).
+# calls plus the pane's process-level view - never from process exit status,
+# since a business-logic "not found" response is a normal, expected outcome
+# here, not a call failure (real herdr 0.7.1 exits 1 for it; the
+# canned-response test fakes exit 0; parsing only the JSON keeps this function
+# correct against either).
 #
 #   dead        - `pane get` responds with error code pane_not_found: the pane
 #                 itself is gone (closed, or its process died and herdr already
 #                 reaped it - verified empirically: killing a pane's shell pid
 #                 on a live server makes herdr immediately drop both the pane
 #                 and its tab from `pane get`/`tab list`).
-#   no-agent    - `pane get` succeeds (the pane structurally exists) but `agent
-#                 get` responds with error code agent_not_found: nothing is
-#                 registered in it - exactly what a herdr session-layout restore
-#                 produces (verified empirically: `session stop` + fresh `herdr
-#                 server` restart leaves the pane alive, agent_status "unknown",
-#                 agent get -> agent_not_found - docs/herdr-backend.md "ID
-#                 stability across a server restart"), and what a future
-#                 `resume_agents_on_restore = false` restore would produce too
-#                 (a plain shell, never an agent).
+#   no-agent    - `pane get` succeeds (the pane structurally exists), `agent
+#                 get` responds with error code agent_not_found, and the
+#                 process-level view does not show a verified harness: nothing
+#                 is registered or running in it - exactly what a herdr
+#                 session-layout restore produces (verified empirically:
+#                 `session stop` + fresh `herdr server` restart leaves the pane
+#                 alive, agent_status "unknown", agent get -> agent_not_found -
+#                 docs/herdr-backend.md "ID stability across a server
+#                 restart"), and what a future `resume_agents_on_restore =
+#                 false` restore would produce too (a plain shell, never an
+#                 agent).
 #   stale-agent - `agent get` reports a registered agent_status (working, idle,
 #                 done, or blocked) but fm_backend_herdr_pane_process_state
 #                 proves the pane is shell-only: the registered agent's process
@@ -2299,7 +2301,11 @@ EOF
 #                 is running, or something that is not a bare shell is, so the
 #                 registration keeps its authority. An idle or blocked agent
 #                 is still a genuine, still-registered agent, not a restored
-#                 husk, so it is never a close-and-replace candidate.
+#                 husk, so it is never a close-and-replace candidate. An
+#                 agent_not_found pane whose process view is `agent` is live
+#                 too: Herdr never registers a harness it does not recognize,
+#                 such as qwen or gemini, whose node bundle only the argv rule
+#                 in bin/fm-agent-process-lib.sh identifies.
 #   unknown     - anything else: an unparseable/unexpected response from
 #                 either call, a `pane get` success whose own echoed pane_id
 #                 does not round-trip (guards against misreading a herdr
@@ -2322,7 +2328,15 @@ fm_backend_herdr_pane_agent_state() {  # <session> <pane_id>
   out=$(fm_backend_herdr_cli "$session" agent get "$pane_id" 2>&1)
   code=$(printf '%s' "$out" | jq -r '.error.code // empty' 2>/dev/null)
   if [ -n "$code" ]; then
-    [ "$code" = "agent_not_found" ] && printf 'no-agent' || printf 'unknown'
+    [ "$code" = "agent_not_found" ] || { printf 'unknown'; return 0; }
+    # Herdr registers only the harnesses it recognizes natively, so a
+    # node-bundle harness such as qwen or gemini runs with no registration at
+    # all. Positive process evidence alone makes it live; anything else keeps
+    # the no-agent verdict this branch always gave.
+    case "$(fm_backend_herdr_pane_process_state "$session" "$pane_id")" in
+      agent) printf 'live' ;;
+      *) printf 'no-agent' ;;
+    esac
     return 0
   fi
   status=$(printf '%s' "$out" | jq -r '.result.agent.agent_status // empty' 2>/dev/null)
