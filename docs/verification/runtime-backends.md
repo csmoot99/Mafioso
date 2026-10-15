@@ -786,7 +786,7 @@ With `-c model_auto_compact_token_limit=103360 -c 'model_auto_compact_token_limi
 
 `tests/fm-codex-hook-layer-live-e2e.test.sh` is the command that refreshes this record: it replays the captured crewmate launch through `codex debug prompt-input` and fails naming the version if the sandbox, reviewer, writable roots, or trust statement stop rendering.
 
-The push guard rules file (`.agents/skills/harness-adapters/references/harness/codex.md` "Push guard rules") was checked the same day, installed at `~/.codex/rules/firstmate-push-guard.rules`, with Codex's own policy evaluator:
+The push guard rules file (`.agents/skills/harness-adapters/references/harness/codex-push-guard.rules`, installed as `~/.codex/rules/firstmate-push-guard.rules` per `codex.md` "Push guard rules") was checked the same day with Codex's own policy evaluator:
 
 ```sh
 codex execpolicy check --rules ~/.codex/rules/firstmate-push-guard.rules git push --force origin fm/x
@@ -807,6 +807,13 @@ DEBUG codex_core::exec_policy: loaded rules from 1 files
 ```
 
 A model command refused by a rule inside a live worker was not observed.
+`tests/fm-codex-push-guard-live-e2e.test.sh` is the command that refreshes the evaluator half of this record against the tracked file, at no token cost.
+
+Live run-1792018316 on the same day and release showed the context handoff's notice path in a crewmate pane running session-flag probe hooks.
+Each `PostToolUse` payload named the rollout log in `transcript_path`, and that log carried `token_count` records with `last_token_usage` and `model_context_window`.
+The hook fired once for each of the worker's five shell calls.
+The first call's `additionalContext` appeared in the log as a developer message tagged `hooks.additional_context`, and the worker's next call created the file it asked for.
+`tests/captures/codex-cli-0.162.1/` holds the captured payload and log excerpt that `tests/fm-context-handoff.test.sh` replays through the hook.
 
 ## Composer classification matrix
 

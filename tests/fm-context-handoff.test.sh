@@ -353,6 +353,32 @@ test_codex_posttooluse_marks_the_handoff_due_at_the_threshold() {
   pass "a Codex worker at its threshold gets the same due marker, note, and notice a held Claude worker gets"
 }
 
+# The recorded live capture (tests/captures/codex-cli-0.162.1/README.md): a real
+# Codex PostToolUse payload and the session log as it stood when that hook ran,
+# whose latest token_count reports 18183 of a 258400-token window (7.04
+# percent). Only transcript_path is pointed at the case's copy of the log.
+test_codex_recorded_live_payload_marks_the_handoff_due_at_the_threshold() {
+  local id=cx-live rec out rc ctx capture="$ROOT/tests/captures/codex-cli-0.162.1" payload
+  rec=$(new_hook_case "$id"); read_hook_case "$rec"
+  cp "$capture/rollout-excerpt.jsonl" "$TRANSCRIPT"
+  payload=$(jq -c --arg t "$TRANSCRIPT" '.transcript_path = $t' "$capture/posttooluse-payload.json") \
+    || fail "the recorded PostToolUse payload is not readable JSON"
+  out=$(printf '%s\n' "$payload" | "$HANDOFF" posttooluse "$STATE_DIR" "$id" --gen "$GEN" --data-dir "$DATA_DIR" --fm-root "$ROOT" --ceiling-pct 60 --codex-threshold-pct 8); rc=$?
+  expect_code 0 "$rc" "the recorded PostToolUse below an 8 percent threshold must exit 0"
+  [ -z "$out" ] || fail "the recorded usage is below 8 percent, so no notice may be printed, got '$out'"
+  assert_absent "$STATE_DIR/$id.context-handoff" "no marker may be written below the threshold"
+  out=$(printf '%s\n' "$payload" | "$HANDOFF" posttooluse "$STATE_DIR" "$id" --gen "$GEN" --data-dir "$DATA_DIR" --fm-root "$ROOT" --ceiling-pct 60 --codex-threshold-pct 7); rc=$?
+  expect_code 0 "$rc" "the recorded PostToolUse at a 7 percent threshold must exit 0"
+  [ "$(marker_field "$STATE_DIR" "$id" state)" = due ] || fail "the recorded usage must cross a 7 percent threshold, got '$(cat "$STATE_DIR/$id.context-handoff" 2>/dev/null)'"
+  [ "$(marker_field "$STATE_DIR" "$id" usage)" = 18183 ] || fail "the usage must be the latest token_count's last_token_usage (18183), got '$(marker_field "$STATE_DIR" "$id" usage)'"
+  [ "$(marker_field "$STATE_DIR" "$id" window)" = 258400 ] || fail "the window must be the recorded model_context_window (258400), got '$(marker_field "$STATE_DIR" "$id" window)'"
+  [ "$(marker_field "$STATE_DIR" "$id" ceiling)" = 155040 ] || fail "the ceiling must be the --ceiling-pct 60 share of the window (155040), got '$(marker_field "$STATE_DIR" "$id" ceiling)'"
+  [ "$(printf '%s' "$out" | jq -r '.hookSpecificOutput.hookEventName')" = PostToolUse ] || fail "the notice must use the PostToolUse output shape Codex delivered live, got '$out'"
+  ctx=$(printf '%s' "$out" | jq -r '.hookSpecificOutput.additionalContext')
+  assert_contains "$ctx" "$DATA_DIR/$id/handoff-1.md" "the notice must name the handoff path"
+  pass "a recorded live Codex PostToolUse payload and session log fire the handoff notice at the threshold"
+}
+
 test_codex_precompact_never_blocks_and_records_a_missed_handoff() {
   local id=cx-fallback rec rc before
   rec=$(new_hook_case "$id"); read_hook_case "$rec"
@@ -813,6 +839,7 @@ test_posttooluse_is_silent_without_a_marker
 test_posttooluse_delivers_the_notice_sparingly_until_the_handoff_exists
 test_codex_posttooluse_is_silent_below_the_threshold
 test_codex_posttooluse_marks_the_handoff_due_at_the_threshold
+test_codex_recorded_live_payload_marks_the_handoff_due_at_the_threshold
 test_codex_precompact_never_blocks_and_records_a_missed_handoff
 test_codex_precompact_without_a_marker_records_the_fallback
 test_codex_manual_and_stale_compactions_leave_no_record

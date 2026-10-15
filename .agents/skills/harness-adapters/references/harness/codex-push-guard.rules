@@ -1,0 +1,72 @@
+# Firstmate push guard for Codex: forbids force pushes and pushes that target
+# main or master, for every Codex session on this machine.
+# Source of truth: .agents/skills/harness-adapters/references/harness/codex-push-guard.rules
+# in the Firstmate repository, installed as ~/.codex/rules/firstmate-push-guard.rules;
+# codex.md "Push guard rules" beside it gives the install and check commands.
+# Prefix rules match whole argv words in order, so each form is spelled out;
+# the forms a prefix cannot reach are listed in that reference.
+
+# A force flag right after `push`, or after `-u` / `--set-upstream`.
+prefix_rule(
+    pattern = ["git", "push", ["--force", "-f", "--force-with-lease", "--force-if-includes", "--mirror"]],
+    decision = "forbidden",
+    justification = "Firstmate push guard: force pushes are forbidden; push a new branch instead.",
+    match = ["git push --force origin fm/x", "git push -f", "git push --force-with-lease origin fm/x", "git push --force-if-includes", "git push --mirror origin"],
+    not_match = ["git push origin fm/x", "git push --dry-run origin fm/x"],
+)
+prefix_rule(
+    pattern = ["git", "push", ["-u", "--set-upstream"], ["--force", "-f", "--force-with-lease", "--force-if-includes"]],
+    decision = "forbidden",
+    justification = "Firstmate push guard: force pushes are forbidden; push a new branch instead.",
+    match = ["git push -u --force origin fm/x", "git push --set-upstream -f origin fm/x"],
+    not_match = ["git push -u origin fm/x"],
+)
+
+# A force flag or a forced (+) refspec right after the remote.
+prefix_rule(
+    pattern = ["git", "push", ["origin", "upstream"], ["--force", "-f", "--force-with-lease", "--force-if-includes", "--mirror", "+HEAD"]],
+    decision = "forbidden",
+    justification = "Firstmate push guard: force pushes are forbidden; push a new branch instead.",
+    match = ["git push origin --force fm/x", "git push origin -f", "git push upstream --force-with-lease", "git push origin +HEAD"],
+    not_match = ["git push origin fm/x", "git push origin HEAD", "git push origin --delete fm/x"],
+)
+prefix_rule(
+    pattern = ["git", "push", ["-u", "--set-upstream"], ["origin", "upstream"], ["--force", "-f", "--force-with-lease", "--force-if-includes", "+HEAD"]],
+    decision = "forbidden",
+    justification = "Firstmate push guard: force pushes are forbidden; push a new branch instead.",
+    match = ["git push -u origin --force fm/x", "git push --set-upstream origin +HEAD"],
+    not_match = ["git push -u origin fm/x"],
+)
+
+# A push whose refspec targets main or master, forced or not, or deletes it.
+prefix_rule(
+    pattern = ["git", "push", ["origin", "upstream"], [
+        "main", "master", "+main", "+master", ":main", ":master",
+        "HEAD:main", "HEAD:master", "+HEAD:main", "+HEAD:master",
+        "main:main", "master:master", "+main:main", "+master:master",
+        "HEAD:refs/heads/main", "HEAD:refs/heads/master",
+        "+HEAD:refs/heads/main", "+HEAD:refs/heads/master",
+        "refs/heads/main", "refs/heads/master",
+    ]],
+    decision = "forbidden",
+    justification = "Firstmate push guard: pushes to main or master are forbidden; push an fm/ branch and open a pull request.",
+    match = ["git push origin main", "git push origin HEAD:main", "git push upstream master", "git push origin +HEAD:refs/heads/main", "git push origin :main"],
+    not_match = ["git push origin fm/x", "git push origin HEAD:fm/x", "git push origin maintenance"],
+)
+prefix_rule(
+    pattern = ["git", "push", ["-u", "--set-upstream"], ["origin", "upstream"], [
+        "main", "master", "+main", "+master",
+        "HEAD:main", "HEAD:master", "+HEAD:main", "+HEAD:master",
+        "HEAD:refs/heads/main", "HEAD:refs/heads/master",
+    ]],
+    decision = "forbidden",
+    justification = "Firstmate push guard: pushes to main or master are forbidden; push an fm/ branch and open a pull request.",
+    match = ["git push -u origin main", "git push --set-upstream origin HEAD:master"],
+    not_match = ["git push -u origin fm/x"],
+)
+prefix_rule(
+    pattern = ["git", "push", ["origin", "upstream"], ["--delete", "-d"], ["main", "master"]],
+    decision = "forbidden",
+    justification = "Firstmate push guard: deleting main or master is forbidden.",
+    match = ["git push origin --delete main"],
+)

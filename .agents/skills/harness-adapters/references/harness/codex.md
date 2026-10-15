@@ -45,12 +45,15 @@ Codex ignores a misspelled or renamed `-c` key without an error, which is why th
 
 The launch also gives the worker what a Claude crewmate gets: the task-worker trust statement as `developer_instructions`, a project's instructions in full (Codex otherwise truncates `AGENTS.md` at 32 KiB), `CLAUDE.md` where a project has no `AGENTS.md`, and no startup update check.
 It also compacts at the share of the window a Claude worker stops growing at: `model_auto_compact_token_limit` is an absolute token count, so the launch applies the `config/launch-env` threshold percentage to the selected model's effective window from the catalog cache, with the scope pinned to the full active context.
-Under `config/worker-context-handoff` the worker hands off at that share instead and the compaction limit moves to the handoff's fallback ceiling, because Codex's `PreCompact` hook cannot block a compaction (exit 2 is reported as a failed hook and a block decision as invalid output); `../../../../../bin/fm-context-handoff.sh` owns that Codex mode.
+Under `config/worker-context-handoff` the worker hands off at that share instead and the compaction limit moves to the handoff's fallback ceiling (the flag file's `fallback-pct`), because Codex's `PreCompact` hook cannot block a compaction (exit 2 is reported as a failed hook and a block decision as invalid output); `../../../../../bin/fm-context-handoff.sh` owns that Codex mode.
+The notice path that replaces the block was observed live on codex-cli 0.162.1: every `PostToolUse` payload names the session log in `transcript_path`, that log carries the `token_count` usage the hook reads, the hook fired for every shell call a worker made, and its `additionalContext` reached the model as a developer message the worker then acted on.
+[`../../../../../tests/captures/codex-cli-0.162.1/README.md`](../../../../../tests/captures/codex-cli-0.162.1/README.md) records that run, and its captured payload and log drive the hook in `../../../../../tests/fm-context-handoff.test.sh`.
 
 Parity gaps that remain against a Claude crewmate:
 
 - No `StopFailure` hook closes a turn that ends in an API error, and `Stop` on an Escape interrupt is unverified.
-- A handoff notice arrives on the next tool call after usage crosses the threshold, so usage that jumps past the fallback ceiling between two tool calls ends in one compaction, recorded as a missed handoff.
+- A handoff notice arrives on a tool call, and Codex writes a response's usage to the session log only after that response's tool call and its `PostToolUse` finish, so the notice comes one response after usage crosses the threshold; usage that jumps past the fallback ceiling in that span ends in one compaction, recorded as a missed handoff.
+- `PostToolUse` was seen firing for shell calls only; `apply_patch` and MCP tool calls were not exercised live.
 - A project's `.mcp.json` servers are Claude-only; Codex reads MCP servers only from its own config.
 - The status-file append, `git commit`, a push, `gh`, `no-mistakes`, and package installs run as reviewed escalations where a Claude worker's operator allowlist lets some of them through unreviewed.
 - The automatic reviewer judges an escalation against what the worker was asked to do, so it approved a force push to `main` that a test prompt explicitly requested; the push guard rules below are the hard block for the pushes Firstmate never wants.
@@ -58,81 +61,14 @@ Parity gaps that remain against a Claude crewmate:
 ## Push guard rules
 
 Codex refuses a command that matches a `forbidden` prefix rule from a `.rules` file in its config directory ("blocked by policy"), and loads no rules file from a session flag, so the guard is one machine-wide file that also binds the operator's own Codex sessions.
-Install it as `~/.codex/rules/firstmate-push-guard.rules` with exactly this content, and reinstall it the same way after it is lost or changed:
+The rules live in [`codex-push-guard.rules`](codex-push-guard.rules) beside this reference, the one source of their content.
+Install it from the repository root, and reinstall it the same way after it is lost or changed or after that file changes:
 
-```python
-# Firstmate push guard for Codex: forbids force pushes and pushes that target
-# main or master, for every Codex session on this machine.
-# Source of truth: .agents/skills/harness-adapters/references/harness/codex.md
-# "Push guard rules" in the Firstmate repository; reinstall from there.
-# Prefix rules match whole argv words in order, so each form is spelled out;
-# the forms a prefix cannot reach are listed in that reference.
-
-# A force flag right after `push`, or after `-u` / `--set-upstream`.
-prefix_rule(
-    pattern = ["git", "push", ["--force", "-f", "--force-with-lease", "--force-if-includes", "--mirror"]],
-    decision = "forbidden",
-    justification = "Firstmate push guard: force pushes are forbidden; push a new branch instead.",
-    match = ["git push --force origin fm/x", "git push -f", "git push --force-with-lease origin fm/x", "git push --force-if-includes", "git push --mirror origin"],
-    not_match = ["git push origin fm/x", "git push --dry-run origin fm/x"],
-)
-prefix_rule(
-    pattern = ["git", "push", ["-u", "--set-upstream"], ["--force", "-f", "--force-with-lease", "--force-if-includes"]],
-    decision = "forbidden",
-    justification = "Firstmate push guard: force pushes are forbidden; push a new branch instead.",
-    match = ["git push -u --force origin fm/x", "git push --set-upstream -f origin fm/x"],
-    not_match = ["git push -u origin fm/x"],
-)
-
-# A force flag or a forced (+) refspec right after the remote.
-prefix_rule(
-    pattern = ["git", "push", ["origin", "upstream"], ["--force", "-f", "--force-with-lease", "--force-if-includes", "--mirror", "+HEAD"]],
-    decision = "forbidden",
-    justification = "Firstmate push guard: force pushes are forbidden; push a new branch instead.",
-    match = ["git push origin --force fm/x", "git push origin -f", "git push upstream --force-with-lease", "git push origin +HEAD"],
-    not_match = ["git push origin fm/x", "git push origin HEAD", "git push origin --delete fm/x"],
-)
-prefix_rule(
-    pattern = ["git", "push", ["-u", "--set-upstream"], ["origin", "upstream"], ["--force", "-f", "--force-with-lease", "--force-if-includes", "+HEAD"]],
-    decision = "forbidden",
-    justification = "Firstmate push guard: force pushes are forbidden; push a new branch instead.",
-    match = ["git push -u origin --force fm/x", "git push --set-upstream origin +HEAD"],
-    not_match = ["git push -u origin fm/x"],
-)
-
-# A push whose refspec targets main or master, forced or not, or deletes it.
-prefix_rule(
-    pattern = ["git", "push", ["origin", "upstream"], [
-        "main", "master", "+main", "+master", ":main", ":master",
-        "HEAD:main", "HEAD:master", "+HEAD:main", "+HEAD:master",
-        "main:main", "master:master", "+main:main", "+master:master",
-        "HEAD:refs/heads/main", "HEAD:refs/heads/master",
-        "+HEAD:refs/heads/main", "+HEAD:refs/heads/master",
-        "refs/heads/main", "refs/heads/master",
-    ]],
-    decision = "forbidden",
-    justification = "Firstmate push guard: pushes to main or master are forbidden; push an fm/ branch and open a pull request.",
-    match = ["git push origin main", "git push origin HEAD:main", "git push upstream master", "git push origin +HEAD:refs/heads/main", "git push origin :main"],
-    not_match = ["git push origin fm/x", "git push origin HEAD:fm/x", "git push origin maintenance"],
-)
-prefix_rule(
-    pattern = ["git", "push", ["-u", "--set-upstream"], ["origin", "upstream"], [
-        "main", "master", "+main", "+master",
-        "HEAD:main", "HEAD:master", "+HEAD:main", "+HEAD:master",
-        "HEAD:refs/heads/main", "HEAD:refs/heads/master",
-    ]],
-    decision = "forbidden",
-    justification = "Firstmate push guard: pushes to main or master are forbidden; push an fm/ branch and open a pull request.",
-    match = ["git push -u origin main", "git push --set-upstream origin HEAD:master"],
-    not_match = ["git push -u origin fm/x"],
-)
-prefix_rule(
-    pattern = ["git", "push", ["origin", "upstream"], ["--delete", "-d"], ["main", "master"]],
-    decision = "forbidden",
-    justification = "Firstmate push guard: deleting main or master is forbidden.",
-    match = ["git push origin --delete main"],
-)
+```sh
+mkdir -p ~/.codex/rules && cp .agents/skills/harness-adapters/references/harness/codex-push-guard.rules ~/.codex/rules/firstmate-push-guard.rules
 ```
+
+Nothing installs or checks it at launch, so a machine without the file runs Codex workers with no hard push block.
 
 Codex validates each rule's `match` and `not_match` examples when it loads the file, so a broken rule fails loudly instead of silently matching nothing.
 Check it without spending tokens, one command per form:
@@ -145,6 +81,7 @@ codex execpolicy check --rules ~/.codex/rules/firstmate-push-guard.rules git pus
 A forbidden form prints `"decision":"forbidden"` with the matched rule, and an ordinary `fm/` branch push prints `{"matchedRules":[]}`.
 A session's load of the file shows in an app-server trace: under `RUST_LOG=codex_core::exec_policy=debug`, `codex app-server --listen stdio://` logs `loaded 1 .rules files in <home>/.codex/rules` when a client starts a thread.
 Both checks were verified on codex-cli 0.162.1 on 2026-10-14; a live worker refusing a matching push was not run.
+`../../../../../tests/fm-codex-push-guard-live-e2e.test.sh` runs the tracked file through `codex execpolicy check` for the force and `main` or `master` forms the rules cover and for ordinary `fm/` pushes, wherever Codex is installed, and skips elsewhere.
 
 Prefix rules match whole argv words in order, so these push forms are not caught and still rely on the sandbox escalation and the automatic reviewer:
 
