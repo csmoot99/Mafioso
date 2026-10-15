@@ -1136,24 +1136,26 @@ CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=40
 ```
 
 A Codex crewmate or scout follows the same value: Codex's compaction knob is an absolute token count, so Firstmate applies that percentage to the selected model's effective window from Codex's own model catalog and launches the worker with that limit.
-It is a compaction in place, not the [worker context handoff](#worker-context-handoff-configworker-context-handoff), which stays Claude-only; a Codex launch with no selected model, or a model the catalog does not list, keeps Codex's own compaction point.
+It is a compaction in place unless the [worker context handoff](#worker-context-handoff-configworker-context-handoff) is on, which moves it to the handoff's fallback ceiling; a Codex launch with no selected model, or a model the catalog does not list, keeps Codex's own compaction point.
 
 Under an enabled `config/launch-env-allowlist`, these values are assigned after Firstmate's operational floor, so they win over any forwarded pane value.
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the exact parsing and delivery mechanics, with regression coverage that executes emitted launch commands with synthetic values in [`tests/fm-spawn-launch-env.test.sh`](../tests/fm-spawn-launch-env.test.sh).
 
 ## Worker context handoff (config/worker-context-handoff)
 
-The optional local, gitignored presence flag `config/worker-context-handoff` changes what a Claude ship or scout worker does when its context reaches the auto-compaction threshold: instead of compacting and continuing in the same session, it writes a handoff document and Firstmate replaces it with a fresh worker that continues the same task from that document, automatically and without asking.
+The optional local, gitignored presence flag `config/worker-context-handoff` changes what a Claude or Codex ship or scout worker does when its context reaches the auto-compaction threshold: instead of compacting and continuing in the same session, it writes a handoff document and Firstmate replaces it with a fresh worker that continues the same task from that document, automatically and without asking.
 Absent, nothing changes: workers compact exactly as they do today.
 The threshold itself stays wherever `config/launch-env` places it through `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`; there is no second threshold setting, and a worker whose environment carries no lowering override compacts as before and says so in its status log, because a handoff at the full window would be too late to be safe.
 If the handoff never arrives, the hook lets compaction through once usage passes a fallback ceiling, by default 80 percent of the window it derives at the first block.
 The flag file may carry one optional line `fallback-pct=<N>` to lower that ceiling; blank lines and `#` comment lines are ignored, and a file with no such line keeps 80.
 `N` must be a whole number, at most 80 (Claude keeps its own threshold near 83 percent), and greater than the `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` value `config/launch-env` gives the worker; anything else, an unknown key, or a repeated line refuses the launch with a message naming the file and the value rather than falling back to a default.
 The validated value is baked into the worker's hook command at launch, so a running worker keeps the ceiling it started with and a relaunch picks up a changed file.
-The flag is read at every launch and relaunch and applies only to Claude ship and scout workers; a secondmate, the primary Firstmate session, and every other harness are untouched.
+The flag is read at every launch and relaunch and applies only to Claude and Codex ship and scout workers; a secondmate, the primary Firstmate session, and every other harness are untouched.
+Codex cannot hold back a compaction, so a Codex worker gets the same outcome another way: it is told to hand off once its context reaches the `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` share of the selected model's window, and Codex's own compaction waits at the fallback ceiling, so a handoff that never arrives ends in one compaction there, as on Claude.
+A Codex worker whose override is missing, or not below the ceiling, keeps compacting in place at the override share.
 [`bin/fm-context-handoff.sh --help`](../bin/fm-context-handoff.sh) owns the hook mechanics, the fallback ceiling, the durable records, and the replacement command, and the `context-handoff` skill owns what the handoff document carries.
-The file is inherited into secondmate homes through the [primary-authoritative configuration contract](../.agents/skills/secondmate-provisioning/SKILL.md), so a secondmate's own Claude workers hand off the same way.
-Regression coverage runs the real hook commands, spawn wiring, and replacement command in [`tests/fm-context-handoff.test.sh`](../tests/fm-context-handoff.test.sh); the blocking and in-band-notice behaviors are Claude's own and are proven on the installed Claude Code by the opt-in live guard recorded in [`docs/verification/runtime-backends.md`](verification/runtime-backends.md).
+The file is inherited into secondmate homes through the [primary-authoritative configuration contract](../.agents/skills/secondmate-provisioning/SKILL.md), so a secondmate's own Claude and Codex workers hand off the same way.
+Regression coverage runs the real hook commands, spawn wiring, and replacement command in [`tests/fm-context-handoff.test.sh`](../tests/fm-context-handoff.test.sh); the blocking and in-band-notice behaviors are Claude's own and are proven on the installed Claude Code by the opt-in live guard recorded in [`docs/verification/runtime-backends.md`](verification/runtime-backends.md), and the installed Codex's loading of the Codex hooks is checked by [`tests/fm-codex-hook-layer-live-e2e.test.sh`](../tests/fm-codex-hook-layer-live-e2e.test.sh).
 
 ## Crew dispatch profiles (config/crew-dispatch.json)
 

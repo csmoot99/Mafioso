@@ -6,7 +6,7 @@ Verified on 2026-06-11 with codex-cli 0.139.0 unless a fact gives a newer versio
 
 | Fact | Value |
 |---|---|
-| Busy state | Unknown until a semantic source is live-verified: the app-server turn lifecycle is unreachable for a pane worker, and project lifecycle hooks did not fire for a Firstmate-launched worker. |
+| Busy state | Session-flag hooks on a crewmate or scout launch: `UserPromptSubmit` opens a turn, `Stop` and `SessionEnd` close it (source `codex-hook`), verified on codex-cli 0.162.1. Codex has no `StopFailure` hook and `Stop` on an Escape interrupt is unverified, so an interrupt leaves the record unknown. |
 | Exit command | `/quit`; its slash popup needs about one second between text and Enter, which the shared submit path used by the control plane handles. |
 | Interrupt | Single Escape. |
 | Skill invocation | `$<skill>`, for example `$no-mistakes`; `/<skill>` is Claude-only and Codex rejects it as "Unrecognized command". |
@@ -25,9 +25,12 @@ The decision persists for the repository root as a `[projects."<root>"]` `trust_
 A second dialog, "Hooks need review - N hooks are new or changed", appears whenever the machine's `~/.codex/hooks.json` or a project's own `.codex/hooks.json` carries a hook Codex has not persisted trust for.
 It is unanswerable rather than merely inconvenient: its selection starts on "Review hooks", which is neither trusting nor declining, and Firstmate's key plane carries Enter, Escape and Ctrl-C with no arrow navigation.
 Writing Codex's own trust store to pre-accept it would manufacture an operator consent that was never given.
-So crewmate and scout launches disable Codex's hook layer outright (`bin/fm-spawn.sh`'s launch template owns the flag), which is the opposite of `--dangerously-bypass-hook-trust` - that flag RUNS the untrusted hooks.
-A crewmate loses nothing: its turn-end signal is the `-c notify=` program on the same launch, and the Firstmate hooks in a project's `.codex/hooks.json` are primary-session infrastructure that stands down in a child worktree.
-A secondmate is a primary in its own home and keeps its hooks, so an unanswerable modal there is still possible and is the operator's own hook review to settle.
+So crewmate and scout launches pass `--enable hooks --dangerously-bypass-hook-trust` (`../../../../../bin/fm-spawn.sh`'s launch template owns the flags), which runs the operator's and the project's hooks for that invocation only, the way a Claude worker runs its operator and project hooks, and writes no trust.
+Codex resolves a worktree's project hooks from the main repository root, and Firstmate's own `.codex/hooks.json` hooks are primary-session infrastructure that stands down in a child worktree.
+Firstmate's worker hooks ride the launch as `-c hooks.<Event>=...` session flags, so nothing is written into the worktree or `~/.codex`: busy state, the turn-end notification on `Stop`, and the opt-in context handoff.
+The turn-end notification cannot use Codex's `notify` program, which on codex-cli 0.162.1 also fires for the TUI's side request that names the conversation, seconds into the turn.
+Hooks run outside Codex's sandbox, as Claude hooks run outside Claude's permission check.
+A secondmate is a primary in its own home and keeps its hooks without the bypass, so an unanswerable modal there is still possible and is the operator's own hook review to settle.
 
 ## Crewmate safety posture
 
@@ -42,13 +45,116 @@ Codex ignores a misspelled or renamed `-c` key without an error, which is why th
 
 The launch also gives the worker what a Claude crewmate gets: the task-worker trust statement as `developer_instructions`, a project's instructions in full (Codex otherwise truncates `AGENTS.md` at 32 KiB), `CLAUDE.md` where a project has no `AGENTS.md`, and no startup update check.
 It also compacts at the share of the window a Claude worker stops growing at: `model_auto_compact_token_limit` is an absolute token count, so the launch applies the `config/launch-env` threshold percentage to the selected model's effective window from the catalog cache, with the scope pinned to the full active context.
+Under `config/worker-context-handoff` the worker hands off at that share instead and the compaction limit moves to the handoff's fallback ceiling, because Codex's `PreCompact` hook cannot block a compaction (exit 2 is reported as a failed hook and a block decision as invalid output); `../../../../../bin/fm-context-handoff.sh` owns that Codex mode.
 
-Parity gaps that remain with the hook layer off, because Codex treats every hook - a `-c` session-flag hook included - as untrusted until the operator trusts it, and ignores trust state passed with `-c`:
+Parity gaps that remain against a Claude crewmate:
 
-- No semantic busy state (no `userPromptSubmit`/`stop` hooks); the turn-end notify still fires.
-- No context handoff: the worker compacts in place at the threshold instead of handing off to a fresh worker, because the handoff needs a `preCompact` hook to hold compaction.
-- The operator's `~/.codex/hooks.json` and a project's `.codex/hooks.json` do not run, while a Claude crewmate runs the operator's and project's Claude hooks.
+- No `StopFailure` hook closes a turn that ends in an API error, and `Stop` on an Escape interrupt is unverified.
+- A handoff notice arrives on the next tool call after usage crosses the threshold, so usage that jumps past the fallback ceiling between two tool calls ends in one compaction, recorded as a missed handoff.
 - A project's `.mcp.json` servers are Claude-only; Codex reads MCP servers only from its own config.
+- The status-file append, `git commit`, a push, `gh`, `no-mistakes`, and package installs run as reviewed escalations where a Claude worker's operator allowlist lets some of them through unreviewed.
+- The automatic reviewer judges an escalation against what the worker was asked to do, so it approved a force push to `main` that a test prompt explicitly requested; the push guard rules below are the hard block for the pushes Firstmate never wants.
+
+## Push guard rules
+
+Codex refuses a command that matches a `forbidden` prefix rule from a `.rules` file in its config directory ("blocked by policy"), and loads no rules file from a session flag, so the guard is one machine-wide file that also binds the operator's own Codex sessions.
+Install it as `~/.codex/rules/firstmate-push-guard.rules` with exactly this content, and reinstall it the same way after it is lost or changed:
+
+```python
+# Firstmate push guard for Codex: forbids force pushes and pushes that target
+# main or master, for every Codex session on this machine.
+# Source of truth: .agents/skills/harness-adapters/references/harness/codex.md
+# "Push guard rules" in the Firstmate repository; reinstall from there.
+# Prefix rules match whole argv words in order, so each form is spelled out;
+# the forms a prefix cannot reach are listed in that reference.
+
+# A force flag right after `push`, or after `-u` / `--set-upstream`.
+prefix_rule(
+    pattern = ["git", "push", ["--force", "-f", "--force-with-lease", "--force-if-includes", "--mirror"]],
+    decision = "forbidden",
+    justification = "Firstmate push guard: force pushes are forbidden; push a new branch instead.",
+    match = ["git push --force origin fm/x", "git push -f", "git push --force-with-lease origin fm/x", "git push --force-if-includes", "git push --mirror origin"],
+    not_match = ["git push origin fm/x", "git push --dry-run origin fm/x"],
+)
+prefix_rule(
+    pattern = ["git", "push", ["-u", "--set-upstream"], ["--force", "-f", "--force-with-lease", "--force-if-includes"]],
+    decision = "forbidden",
+    justification = "Firstmate push guard: force pushes are forbidden; push a new branch instead.",
+    match = ["git push -u --force origin fm/x", "git push --set-upstream -f origin fm/x"],
+    not_match = ["git push -u origin fm/x"],
+)
+
+# A force flag or a forced (+) refspec right after the remote.
+prefix_rule(
+    pattern = ["git", "push", ["origin", "upstream"], ["--force", "-f", "--force-with-lease", "--force-if-includes", "--mirror", "+HEAD"]],
+    decision = "forbidden",
+    justification = "Firstmate push guard: force pushes are forbidden; push a new branch instead.",
+    match = ["git push origin --force fm/x", "git push origin -f", "git push upstream --force-with-lease", "git push origin +HEAD"],
+    not_match = ["git push origin fm/x", "git push origin HEAD", "git push origin --delete fm/x"],
+)
+prefix_rule(
+    pattern = ["git", "push", ["-u", "--set-upstream"], ["origin", "upstream"], ["--force", "-f", "--force-with-lease", "--force-if-includes", "+HEAD"]],
+    decision = "forbidden",
+    justification = "Firstmate push guard: force pushes are forbidden; push a new branch instead.",
+    match = ["git push -u origin --force fm/x", "git push --set-upstream origin +HEAD"],
+    not_match = ["git push -u origin fm/x"],
+)
+
+# A push whose refspec targets main or master, forced or not, or deletes it.
+prefix_rule(
+    pattern = ["git", "push", ["origin", "upstream"], [
+        "main", "master", "+main", "+master", ":main", ":master",
+        "HEAD:main", "HEAD:master", "+HEAD:main", "+HEAD:master",
+        "main:main", "master:master", "+main:main", "+master:master",
+        "HEAD:refs/heads/main", "HEAD:refs/heads/master",
+        "+HEAD:refs/heads/main", "+HEAD:refs/heads/master",
+        "refs/heads/main", "refs/heads/master",
+    ]],
+    decision = "forbidden",
+    justification = "Firstmate push guard: pushes to main or master are forbidden; push an fm/ branch and open a pull request.",
+    match = ["git push origin main", "git push origin HEAD:main", "git push upstream master", "git push origin +HEAD:refs/heads/main", "git push origin :main"],
+    not_match = ["git push origin fm/x", "git push origin HEAD:fm/x", "git push origin maintenance"],
+)
+prefix_rule(
+    pattern = ["git", "push", ["-u", "--set-upstream"], ["origin", "upstream"], [
+        "main", "master", "+main", "+master",
+        "HEAD:main", "HEAD:master", "+HEAD:main", "+HEAD:master",
+        "HEAD:refs/heads/main", "HEAD:refs/heads/master",
+    ]],
+    decision = "forbidden",
+    justification = "Firstmate push guard: pushes to main or master are forbidden; push an fm/ branch and open a pull request.",
+    match = ["git push -u origin main", "git push --set-upstream origin HEAD:master"],
+    not_match = ["git push -u origin fm/x"],
+)
+prefix_rule(
+    pattern = ["git", "push", ["origin", "upstream"], ["--delete", "-d"], ["main", "master"]],
+    decision = "forbidden",
+    justification = "Firstmate push guard: deleting main or master is forbidden.",
+    match = ["git push origin --delete main"],
+)
+```
+
+Codex validates each rule's `match` and `not_match` examples when it loads the file, so a broken rule fails loudly instead of silently matching nothing.
+Check it without spending tokens, one command per form:
+
+```sh
+codex execpolicy check --rules ~/.codex/rules/firstmate-push-guard.rules git push --force origin fm/x
+codex execpolicy check --rules ~/.codex/rules/firstmate-push-guard.rules git push origin fm/x
+```
+
+A forbidden form prints `"decision":"forbidden"` with the matched rule, and an ordinary `fm/` branch push prints `{"matchedRules":[]}`.
+A session's load of the file shows in an app-server trace: under `RUST_LOG=codex_core::exec_policy=debug`, `codex app-server --listen stdio://` logs `loaded 1 .rules files in <home>/.codex/rules` when a client starts a thread.
+Both checks were verified on codex-cli 0.162.1 on 2026-10-14; a live worker refusing a matching push was not run.
+
+Prefix rules match whole argv words in order, so these push forms are not caught and still rely on the sandbox escalation and the automatic reviewer:
+
+- A force flag after the refspec or after another flag (`git push origin fm/x --force`, `git push -q -f origin fm/x`), and `--force-with-lease=<ref>:<sha>`.
+- A forced refspec other than `+HEAD` (`git push origin +fm/x`), and a local branch pushed onto the default branch (`git push origin fm/x:main`, `fm/x:refs/heads/main`).
+- A remote other than `origin` or `upstream`, or a URL.
+- A bare `git push` whose upstream is the default branch.
+- Git options before `push` (`git -C <dir> push --force`, `git -c k=v push --force`), an absolute `/usr/bin/git`, an `env VAR=1` prefix, a git alias, or a script that pushes.
+- A command with a redirection, substitution, environment assignment, or wildcard, which Codex's own permissions text says is not evaluated against rules at all, and a `bash -lc '...'` wrapper, which the check command does not unwrap.
+- A ref update through another tool, such as the GitHub API.
 
 ## Skill popup
 
