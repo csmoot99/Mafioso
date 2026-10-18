@@ -15,6 +15,7 @@
 # sections when the task genuinely deviates (e.g. working an existing external
 # PR instead of shipping a new one).
 # Usage: fm-brief.sh <task-id> <repo-name> --mode <no-mistakes|direct-PR|local-only> [--branch-prefix <prefix>] [--base-branch <branch>] [--forge <none|gerrit> [--shape squash]] [--herdr-lab]
+#        fm-brief.sh <task-id> <repo-name> --mode direct-PR --harness qwen --plan <file> --files '<path>...' --done-command '<command>' [--branch-prefix <prefix>] [--base-branch <branch>]
 #        fm-brief.sh <task-id> <repo-name> --scout [--base-branch <branch>] [--herdr-lab]
 #        fm-brief.sh <task-id> --secondmate {<project>...|--no-projects}
 #   --scout writes the scout contract instead: the deliverable is a report at
@@ -116,6 +117,28 @@
 # additions of missing knowledge. A correction edits only the wrong text and
 # never runs fm-ensure-agents-md.sh, whose inserted sections and created
 # pointer file are themselves additions.
+# --harness qwen renders the compact qwen-shaped ship brief instead, the one
+# exception to the scaffold-wide sections above, for a small, fully specified
+# direct-PR task from a file-level plan on a project with no bound forge: a
+# qwen worker on a small local model followed every concrete command and path
+# in the standard brief and skipped its process prose. The shape inlines the
+# --plan file verbatim inside a fence longer than any fence in it, so the brief
+# names no plan path; lists --files, worktree-relative paths that are the only
+# files the worker writes and the only ones its commit adds; makes
+# --done-command the one command that must exit 0; and turns reporting into
+# literal shell commands stamped with `$(date +%s)`, which the shell evaluates
+# when the worker runs them, instead of an <epoch> placeholder it would leave
+# unfilled. It tells the worker its branch already exists: bin/fm-spawn.sh
+# reads the brief's "Brief shape: qwen" line, creates that branch, and makes
+# every firstmate file the brief names read-only. It keeps the isolation check,
+# fm_ship_rule_one's push and merge rule, the working, done and blocked status
+# lines, the inbox acknowledgement, and the machine-read Delivery contract, Ship
+# branch, and Base branch lines; it drops what a direct-PR qwen task cannot
+# use, namely the Herdr declaration (--herdr-lab is refused), the no-mistakes
+# daemon rule (its worktree-pool half shrinks to the git and treehouse commands
+# the worker may never run), the waiting and paused protocols, and the
+# coding-discipline and project-memory sections. --plan, --files, and
+# --done-command are refused without it.
 # Scaffolds carry no role scope: fm-spawn.sh supplies fm_brief_worker_role from
 # fm-dod-lib.sh to every ship/scout launch brief, so this file never becomes a
 # second owner of a contract that must stay current across relaunches.
@@ -204,6 +227,11 @@ FORGE=none
 FORGE_SET=0
 SHAPE=
 SHAPE_SET=0
+HARNESS=
+HARNESS_SET=0
+PLAN_FILE=
+WRITE_FILES=
+DONE_COMMAND=
 POS=()
 want_value=
 for a in "$@"; do
@@ -217,6 +245,10 @@ for a in "$@"; do
       base-branch) BASE_BRANCH=$a; BASE_BRANCH_SET=1 ;;
       forge) FORGE=$a; FORGE_SET=1 ;;
       shape) SHAPE=$a; SHAPE_SET=1 ;;
+      harness) HARNESS=$a; HARNESS_SET=1 ;;
+      plan) PLAN_FILE=$a ;;
+      files) WRITE_FILES=$a ;;
+      done-command) DONE_COMMAND=$a ;;
       *) echo "error: internal parser state for --$want_value" >&2; exit 1 ;;
     esac
     want_value=
@@ -237,6 +269,14 @@ for a in "$@"; do
     --forge=*) FORGE=${a#--forge=}; FORGE_SET=1 ;;
     --shape) want_value=shape ;;
     --shape=*) SHAPE=${a#--shape=}; SHAPE_SET=1 ;;
+    --harness) want_value=harness ;;
+    --harness=*) HARNESS=${a#--harness=}; HARNESS_SET=1 ;;
+    --plan) want_value=plan ;;
+    --plan=*) PLAN_FILE=${a#--plan=} ;;
+    --files) want_value=files ;;
+    --files=*) WRITE_FILES=${a#--files=} ;;
+    --done-command) want_value="done-command" ;;
+    --done-command=*) DONE_COMMAND=${a#--done-command=} ;;
     # yolo never reaches the worker: it is firstmate's merge authority, not a
     # brief input. Refuse it loudly so it is never silently dropped here and then
     # believed to have been recorded.
@@ -302,6 +342,34 @@ if [ "$BASE_BRANCH_SET" -eq 1 ]; then
     exit 1
   fi
   fm_base_branch_valid "$BASE_BRANCH" "$MODE" "$FORGE" "fm-brief.sh --base-branch" || exit 1
+fi
+# The qwen rendering is one closed shape (header above): every input it renders
+# is checked, and the plan read, before anything is written.
+PLAN_BODY=
+if [ "$HARNESS_SET" -eq 1 ]; then
+  [ "$HARNESS" = qwen ] || { echo "error: --harness accepts only qwen (got '$HARNESS'); every other harness reads the standard brief" >&2; exit 1; }
+  if [ "$KIND" != ship ] || [ "$MODE" != direct-PR ] || [ "$FORGE" != none ]; then
+    echo "error: --harness qwen renders only a direct-PR ship brief on a project with no bound forge" >&2
+    exit 1
+  fi
+  [ "$HERDR_LAB" -eq 0 ] || { echo "error: --harness qwen cannot carry --herdr-lab: Herdr lifecycle work never fits the qwen shape" >&2; exit 1; }
+  if [ -z "$PLAN_FILE" ] || [ -z "$(printf '%s' "$WRITE_FILES" | tr -d '[:space:]')" ] || [ -z "$(printf '%s' "$DONE_COMMAND" | tr -d '[:space:]')" ]; then
+    echo "error: --harness qwen requires --plan <file>, --files '<path>...' and --done-command '<command>'" >&2
+    exit 1
+  fi
+  { [ -f "$PLAN_FILE" ] && PLAN_BODY=$(cat "$PLAN_FILE" 2>/dev/null) && [ -n "$(printf '%s' "$PLAN_BODY" | tr -d '[:space:]')" ]; } || {
+    echo "error: --plan must name a readable, nonempty regular file (got '$PLAN_FILE')" >&2
+    exit 1
+  }
+  read -r -d '' -a WRITE_FILE_LIST <<<"$WRITE_FILES" || true
+  for f in "${WRITE_FILE_LIST[@]}"; do
+    case "$f" in
+      /*) echo "error: --files takes paths relative to the worktree, never an absolute path (got '$f')" >&2; exit 1 ;;
+    esac
+  done
+elif [ -n "$PLAN_FILE$WRITE_FILES$DONE_COMMAND" ]; then
+  echo "error: --plan, --files and --done-command apply only with --harness qwen" >&2
+  exit 1
 fi
 ID=${POS[0]}
 BRANCH="$BRANCH_PREFIX$ID"
@@ -649,6 +717,87 @@ If your findings reveal work that should ship (e.g. you reproduced a bug and the
 EOF
 append_brief_include
 echo "scaffolded: $BRIEF (scout; replace {TASK} and {FIRSTMATE_SPEC})"
+exit 0
+fi
+
+if [ "$HARNESS" = qwen ]; then
+RULE1=$(fm_ship_rule_one "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH") || exit 1
+if [ -n "$BASE_BRANCH" ]; then
+  QWEN_SETUP="Your copy of $REPO is the current directory: a disposable worktree on the branch \`$BRANCH\`, which firstmate already created from a clean copy of its base branch.
+Base branch: $BASE_BRANCH"
+  printf -v QWEN_PR_BASE ' --base %q' "$BASE_BRANCH"
+else
+  QWEN_SETUP="Your copy of $REPO is the current directory: a disposable worktree on the branch \`$BRANCH\`, which firstmate already created from a clean copy of its default branch."
+  QWEN_PR_BASE=
+fi
+QWEN_FILES=
+QWEN_FILES_Q=
+for f in "${WRITE_FILE_LIST[@]}"; do
+  QWEN_FILES="$QWEN_FILES${QWEN_FILES:+, }\`$f\`"
+  printf -v q '%q' "$f"
+  QWEN_FILES_Q="$QWEN_FILES_Q $q"
+done
+# The fence is one backtick longer than any fence inside the plan, so the plan's
+# own headings and code blocks stay inside it for every heading reader.
+PLAN_FENCE_LEN=$(printf '%s\n' "$PLAN_BODY" | awk '
+  { s = $0; i = 0
+    while (i < 3 && substr(s, 1, 1) == " ") { s = substr(s, 2); i++ }
+    n = 0
+    while (substr(s, n + 1, 1) == "`") n++
+    if (n > max) max = n }
+  END { print (max >= 3 ? max + 1 : 3) }')
+PLAN_FENCE=$(printf '%*s' "$PLAN_FENCE_LEN" '' | tr ' ' '`')
+DONE_COMMAND_BLOCK=$(printf '%s\n' "$DONE_COMMAND" | sed 's/^/    /')
+cat > "$BRIEF" <<EOF
+You are a worker agent run by firstmate. Work alone; do not wait for a human.
+$QWEN_SETUP
+Stay on that branch. Never run \`git checkout\`, \`git switch\`, \`git stash\`, \`git reset\`, \`git clean\`, \`git worktree\` or \`treehouse\`.
+
+Delivery contract: mode=direct-PR
+Ship branch: $BRANCH
+Brief shape: qwen
+
+$TASK_SECTION
+
+# The plan
+This is the whole plan. You already have it, so never look for a plan file or read it again.
+$PLAN_FENCE
+$PLAN_BODY
+$PLAN_FENCE
+
+# Working rules
+1. First, run \`pwd -P && git rev-parse --show-toplevel && git branch --show-current\`.
+   The first two lines must be the same disposable worktree path, not the project's main checkout, and the third must be \`$BRANCH\`.
+   If they are not, run the blocked command under Reporting with \`launched in primary checkout, not an isolated worktree\` and stop.
+   Otherwise run \`echo "working [at=\$(date +%s)]: started" >> $STATUS_FILE\` before you read anything.
+2. Write only these files, by their paths relative to the current directory: $QWEN_FILES.
+   Every other path is read-only, including every path that starts with \`/\`; the reporting commands below are the only writes outside this directory.
+3. Read each file at most once.
+4. Never open whole a file the plan calls large, minified or one line long: no \`cat\`, \`head\`, \`read_file\`, or \`grep\` without \`-o\` on it.
+   If you must look, run exactly \`grep -o '<short pattern>' <file> | head -5\`.
+5. Edit by re-reading the file and rewriting it whole with \`write_file\`.
+   Run any formatter the plan names, such as \`prettier --write\`, once, after your last edit; it changes the files, so re-read a file before editing it again.
+6. Copy every regular expression, string literal and expected value from the plan character for character. Do not improve them.
+7. ${RULE1#1. }
+
+# Done means this command exits 0
+$DONE_COMMAND_BLOCK
+Run it. If it does not exit 0 you are not done: do not summarise; fix the first failure and run it again.
+Never write that tests or checks pass unless this command printed a passing result in this turn.
+
+# Reporting
+When the done command exits 0, run:
+    git add --$QWEN_FILES_Q && git commit -m "<conventional commit title>" && git push -u origin $BRANCH_Q && gh-axi pr create$QWEN_PR_BASE --title "<the same title>" --body "<two or three sentences on what changed>"
+Then run \`gh-axi pr view <number>\` with the number from the PR URL; if it prints \`draft: yes\`, run \`gh-axi pr ready <number>\`.
+Then run this, and stop:
+    echo "done [at=\$(date +%s)]: PR <the full https URL gh-axi printed>" >> $STATUS_FILE
+If you are stuck after two attempts at the same thing, or the plan does not answer something you need, run this, and stop:
+    echo "blocked [at=\$(date +%s)]: <one line>" >> $STATUS_FILE
+Firstmate answers through message files in $INBOX_DIR; when your terminal announces one, read it, act on it, then move it with \`mv $INBOX_DIR/NNN.msg $INBOX_DIR/handled/\`.
+Never open a draft PR. Whenever you mention the PR, write its full https URL exactly as gh-axi printed it.
+EOF
+append_brief_include
+echo "scaffolded: $BRIEF (ship, mode=$MODE, qwen shape; replace {TASK} and {FIRSTMATE_SPEC})"
 exit 0
 fi
 

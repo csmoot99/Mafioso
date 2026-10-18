@@ -298,6 +298,13 @@
 #   containment test reads local refs only and never fetches, so this gate stays
 #   usable offline; a stale remote-tracking ref can therefore make an unpushed
 #   commit look contained, which is exactly why no remedy command is printed.
+#   A ship brief carrying the "Brief shape: qwen" line (bin/fm-brief.sh
+#   --harness qwen) tells the worker its branch already exists, so a fresh
+#   launch then creates the ship branch at the refreshed base, reusing one only
+#   when it already sits at that commit and refusing one anywhere else, and
+#   every launch of it makes each regular file under this home or code root
+#   that the brief names by absolute path read-only, except the task's own
+#   status file and inbox records. Those files stay read-only after the task.
 # Batch dispatch: pass one or more `id=repo` pairs instead of a single <id> <project>, e.g.
 #     fm-spawn.sh fix-a-k3=projects/foo add-b-q7=projects/bar [--scout]
 #   Each pair re-execs this script in single-task mode, so the single path stays the only
@@ -3949,6 +3956,41 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
   fi
 }
 
+# The qwen-shaped brief's branch (header above). A same-named branch still at
+# this base tip is a failed earlier spawn's, so it is reused.
+create_qwen_brief_branch() { # <worktree> <branch>
+  local worktree=$1 branch=$2 head existing
+  head=$(git -C "$worktree" rev-parse --verify --quiet HEAD) || return 1
+  if existing=$(git -C "$worktree" rev-parse --verify --quiet "refs/heads/$branch"); then
+    [ "$existing" = "$head" ] || {
+      echo "error: branch $branch already exists at a commit other than this launch's base; refusing to launch a qwen-shaped brief onto it" >&2
+      return 1
+    }
+    git -C "$worktree" checkout -q "$branch" --
+  else
+    git -C "$worktree" checkout -q -b "$branch" --
+  fi
+}
+
+# The qwen-shaped brief's named firstmate files become read-only (header
+# above), because a qwen worker wrote its module over the plan file a standard
+# brief named; the status file and inbox stay writable for its reporting.
+protect_qwen_brief_named_files() { # <brief> <worktree>
+  local brief=$1 worktree=$2 path state_real
+  state_real=$(cd "$STATE" && pwd -P)
+  while IFS= read -r path; do
+    path=${path%[.,:;]}
+    case "$path" in
+    "$STATE/$ID.status" | "$state_real/$ID.status" | "$STATE/$ID.inbox"/* | "$state_real/$ID.inbox"/* | "$worktree"/*) continue ;;
+    "$FM_HOME"/* | "$FM_ROOT"/*) ;;
+    *) continue ;;
+    esac
+    [ -f "$path" ] && [ ! -L "$path" ] || continue
+    chmod a-w -- "$path" || return 1
+    echo "notice: $ID's qwen-shaped brief names $path; it is now read-only" >&2
+  done < <(grep -oE "/[^[:space:]\`'\"<>()]+" "$brief" | sort -u)
+}
+
 herdr_projection_meta_field_exact() { # <meta> <key>
   local meta=$1 key=$2 count
   [ -f "$meta" ] && [ ! -L "$meta" ] || return 1
@@ -4901,6 +4943,16 @@ fi
 if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then
   freshen_spawn_worktree_base "$WT" "$BASE_BRANCH" || exit 1
 fi
+if [ "$KIND" = ship ] && grep -qx 'Brief shape: qwen' "$SOURCE_BRIEF"; then
+  if [ "$RELAUNCH" -eq 0 ] && ! create_qwen_brief_branch "$WT" "$BRANCH"; then
+    echo "error: could not create branch $BRANCH in $WT, which the qwen-shaped brief tells the worker already exists; inspect window $T" >&2
+    exit 1
+  fi
+  protect_qwen_brief_named_files "$SOURCE_BRIEF" "$WT" || {
+    echo "error: could not make the firstmate files $SOURCE_BRIEF names read-only; inspect window $T" >&2
+    exit 1
+  }
+fi
 
 # Re-assert the durable task copy after either treehouse acquisition or endpoint
 # adoption. This also updates Herdr's restored pane shell before any harness is
@@ -5158,6 +5210,16 @@ EOF
       # memory` and the pre-turn recall, so a worker neither reads nor
       # writes it (the captain's call; the extractor spent as many tokens as
       # the main loop and a poisoned memory steered later sessions).
+      # model.generationConfig.contextWindowSize=65536 pins the window the
+      # local Ollama server actually serves (OLLAMA_CONTEXT_LENGTH): qwen
+      # otherwise auto-detects 262144 from the model id and never compacts,
+      # while the server silently shifts the oldest half (system prompt,
+      # brief, plan) out once a request passes 65536.
+      # context.autoCompactThreshold=0.6 states the intended compaction
+      # fraction; at 65536 qwen's own ceiling (window minus its 20k summary
+      # reserve and 13k buffer, 32536) binds first, and a live session
+      # compacted there with no server shift (docs/verification/
+      # runtime-backends.md). Change the window with the server's.
       # Hook commands print nothing: qwen's hook contract accepts an empty
       # stdout (verified), and every command tolerates a refused event so a
       # stale-gen writer can never break qwen's own lifecycle.
@@ -5167,7 +5229,7 @@ EOF
       q_stop=$(json_escape "touch $(shell_quote "$TURNEND"); $busy_cmd_prefix idle $busy_suffix --event stop >/dev/null 2>&1 || true")
       q_sessionend=$(json_escape "$busy_cmd_prefix idle $busy_suffix --event session-end >/dev/null 2>&1 || true")
       cat >"$STATE_REAL/$ID.qwen-settings.json" <<EOF
-{"\$version":4,"security":{"folderTrust":{"enabled":false}},"ui":{"enableFollowupSuggestions":false,"enableUserFeedback":false},"memory":{"enableManagedAutoMemory":false},"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"$q_submit"}]}],"Stop":[{"hooks":[{"type":"command","command":"$q_stop"}]}],"SessionEnd":[{"hooks":[{"type":"command","command":"$q_sessionend"}]}]}}
+{"\$version":4,"security":{"folderTrust":{"enabled":false}},"ui":{"enableFollowupSuggestions":false,"enableUserFeedback":false},"memory":{"enableManagedAutoMemory":false},"model":{"generationConfig":{"contextWindowSize":65536}},"context":{"autoCompactThreshold":0.6},"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"$q_submit"}]}],"Stop":[{"hooks":[{"type":"command","command":"$q_stop"}]}],"SessionEnd":[{"hooks":[{"type":"command","command":"$q_sessionend"}]}]}}
 EOF
     fi
     ;;

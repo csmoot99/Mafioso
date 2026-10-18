@@ -1299,6 +1299,113 @@ test_base_branch_is_rendered_and_bounded() {
   pass "fm-brief.sh: --base-branch records the base, targets the PR at it, and is refused where no PR carries it"
 }
 
+qwen_scaffold() { # <home> <id> <plan> [extra fm-brief args...]
+  local home=$1 id=$2 plan=$3
+  shift 3
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" some-proj --mode direct-PR --harness qwen \
+    --plan "$plan" --files 'src/a.ts src/a.test.ts' --done-command 'pnpm test && pnpm lint' "$@"
+}
+
+test_qwen_shape_inlines_the_plan_and_keeps_the_contract() {
+  local home plan brief id=brief-qwen-q1 standard cmd before after epoch n=0
+  home="$TMP_ROOT/qwen-home"
+  mkdir -p "$home/data"
+  plan="$TMP_ROOT/qwen-plan.md"
+  # A plan with its own fence and headings, which must stay quoted material.
+  printf '%s\n' '```ts' 'const re = /^(.*), ([^,]+)$/;' '```' '# Task' '## Firstmate spec' 'decoy spec' 'PLAN-END-MARKER' > "$plan"
+  # shellcheck source=bin/fm-dod-lib.sh
+  . "$ROOT/bin/fm-dod-lib.sh"
+
+  qwen_scaffold "$home" "$id" "$plan" --base-branch feature/hub >/dev/null 2>&1 || fail "the qwen shape should scaffold"
+  brief="$home/data/$id/brief.md"
+  assert_grep 'const re = /^(.*), ([^,]+)$/;' "$brief" "the qwen brief did not inline the plan verbatim"
+  assert_grep 'PLAN-END-MARKER' "$brief" "the qwen brief cut the plan short"
+  assert_no_grep "$plan" "$brief" "the qwen brief names the plan file it inlined"
+  # shellcheck disable=SC2016 # Literal backticks are the fence being checked.
+  [ "$(awk 'f { print; exit } /^This is the whole plan\./ { f = 1 }' "$brief")" = '````' ] \
+    && [ "$(awk 'f { print; exit } /^PLAN-END-MARKER$/ { f = 1 }' "$brief")" = '````' ] \
+    || fail "the plan is not enclosed in a fence longer than its own"
+  fm_brief_task_placeholders_present "$brief" || fail "the plan's decoy headings hid the scaffold placeholders"
+  [ "$(fm_brief_task_heading_body "$brief" "## Firstmate spec")" = '{FIRSTMATE_SPEC}' ] \
+    || fail "the Firstmate spec body picked up plan text"
+  [ "$(fm_brief_base_branches "$brief")" = feature/hub ] || fail "the qwen brief did not record its base branch"
+  grep -qxF 'Delivery contract: mode=direct-PR' "$brief" || fail "the qwen brief lost its delivery contract line"
+  grep -qxF "Ship branch: fm/$id" "$brief" || fail "the qwen brief lost its ship branch line"
+  grep -qxF 'Brief shape: qwen' "$brief" || fail "the qwen brief does not tell the spawn to create its branch"
+  # shellcheck disable=SC2016 # Literal backticks in rendered prose must stay unexpanded.
+  assert_grep 'Write only these files, by their paths relative to the current directory: `src/a.ts`, `src/a.test.ts`.' "$brief" \
+    "the qwen brief does not list the files the worker may write"
+  assert_grep 'git add -- src/a.ts src/a.test.ts && git commit' "$brief" "the qwen commit does not add exactly the listed files"
+  assert_grep "gh-axi pr create --base feature/hub " "$brief" "the qwen PR does not target the base branch"
+  grep -qxF '    pnpm test && pnpm lint' "$brief" || fail "the qwen brief does not state its done command"
+  # shellcheck disable=SC2016
+  assert_grep 'Never push to the base branch `feature/hub` or the default branch' "$brief" \
+    "the qwen brief lost the push and merge rule"
+  assert_grep 'git rev-parse --show-toplevel' "$brief" "the qwen brief lost its isolation check"
+  assert_grep "$home/state/$id.inbox" "$brief" "the qwen brief does not name its steering inbox"
+  for absent in 'no-mistakes' 'Herdr' 'paused' 'ponytail' '# Project memory'; do
+    assert_no_grep "$absent" "$brief" "the qwen brief still carries '$absent', which a direct-PR qwen task cannot use"
+  done
+
+  # Each reporting command runs as written and records the time it ran.
+  mkdir -p "$home/state"
+  before=$(date +%s)
+  # shellcheck disable=SC2016 # The literal substitution is what is matched.
+  while IFS= read -r cmd; do
+    cmd=${cmd//<the full https URL gh-axi printed>/https://example.invalid/pull/1}
+    cmd=${cmd//<one line>/stuck}
+    bash -c "$cmd" || fail "a qwen reporting command failed: $cmd"
+    n=$((n + 1))
+  done < <(grep -o 'echo "[a-z]* \[at=\$(date +%s)\]: [^`]*' "$brief")
+  after=$(date +%s)
+  [ "$n" -eq 3 ] || fail "the qwen brief carries $n stamped reporting commands, not working, done and blocked"
+  while IFS= read -r line; do
+    epoch=$(bash -c '. "$1"; status_line_at_epoch "$2"' _ "$ROOT/bin/fm-classify-lib.sh" "$line")
+    [ "$epoch" -ge "$before" ] && [ "$epoch" -le "$after" ] || fail "a qwen status line carries no run-time stamp: $line"
+  done < "$home/state/$id.status"
+  grep -q '^done \[at=[0-9]*\]: PR https://example.invalid/pull/1$' "$home/state/$id.status" \
+    || fail "the qwen done line does not carry the PR URL"
+
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-qwen-standard some-proj --mode direct-PR >/dev/null 2>&1
+  standard=$(wc -c < "$home/data/brief-qwen-standard/brief.md")
+  [ $(( ($(wc -c < "$brief") - $(wc -c < "$plan")) * 2 )) -lt "$standard" ] \
+    || fail "the qwen brief beside its plan is not under half the standard direct-PR brief"
+
+  sed -i.bak -e 's/^{TASK}$/Build it./' -e 's/^{FIRSTMATE_SPEC}$/Follow the plan./' "$brief"
+  fm_brief_task_content_valid "$brief" || fail "a filled qwen brief does not pass the spawn's Task check"
+  pass "fm-brief.sh --harness qwen: plan inlined, machine lines and safety contract kept, runnable reporting, under half the size"
+}
+
+test_qwen_shape_is_refused_outside_its_shape() {
+  local home plan out rc i=0 args argv
+  home="$TMP_ROOT/qwen-refuse-home"
+  mkdir -p "$home/data"
+  plan="$TMP_ROOT/qwen-refuse-plan.md"
+  printf 'plan\n' > "$plan"
+  while IFS= read -r args; do
+    i=$((i + 1))
+    read -r -a argv <<<"$args"
+    out=$(FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "brief-qwen-r$i" some-proj "${argv[@]}" 2>&1); rc=$?
+    [ "$rc" -ne 0 ] || fail "fm-brief.sh must refuse: $args"
+    [ ! -e "$home/data/brief-qwen-r$i/brief.md" ] || fail "a refused qwen scaffold wrote a brief: $args"
+    assert_contains "$out" "error:" "the refusal did not explain itself: $args"
+  done <<EOF
+--mode no-mistakes --harness qwen --plan $plan --files a --done-command make
+--mode local-only --harness qwen --plan $plan --files a --done-command make
+--scout --harness qwen --plan $plan --files a --done-command make
+--mode direct-PR --harness claude --plan $plan --files a --done-command make
+--mode direct-PR --harness qwen --files a --done-command make
+--mode direct-PR --harness qwen --plan $plan --done-command make
+--mode direct-PR --harness qwen --plan $plan --files a
+--mode direct-PR --harness qwen --plan $TMP_ROOT/missing.md --files a --done-command make
+--mode direct-PR --harness qwen --plan $plan --files /etc/passwd --done-command make
+--mode direct-PR --harness qwen --plan $plan --files a --done-command make --herdr-lab
+--mode direct-PR --harness qwen --plan $plan --files a --done-command make --forge gerrit
+--mode direct-PR --plan $plan --files a --done-command make
+EOF
+  pass "fm-brief.sh --harness qwen is refused outside a direct-PR ship with its plan, files and done command"
+}
+
 # (a) An unregistered/default project - no --branch-prefix passed at all - must
 # keep every generated ship mode's branch on the legacy "fm/<task-id>" name, byte
 # for byte, so every existing firstmate installation is unaffected.
@@ -1556,3 +1663,5 @@ test_branch_prefix_is_refused_where_it_does_not_apply
 test_branch_prefix_value_is_validated
 test_branch_prefix_command_is_shell_safe
 test_crewmate_scaffolds_forbid_pool_administration
+test_qwen_shape_inlines_the_plan_and_keeps_the_contract
+test_qwen_shape_is_refused_outside_its_shape

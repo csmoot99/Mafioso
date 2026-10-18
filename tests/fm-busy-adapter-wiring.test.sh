@@ -496,6 +496,12 @@ test_qwen_hooks_semantic_lifecycle() {
     || fail "qwen settings must disable the session survey that swallows typed input"
   [ "$(jq -r '.memory.enableManagedAutoMemory' "$settings")" = false ] \
     || fail "qwen settings must keep managed auto-memory off so a worker never reads or writes ~/.qwen/memories"
+  # The served window, not the 262144 qwen auto-detects, so qwen compacts
+  # before the local server silently shifts the brief out of the window.
+  [ "$(jq -r '.model.generationConfig.contextWindowSize' "$settings")" = 65536 ] \
+    || fail "qwen settings must pin the served 65536-token context window"
+  [ "$(jq -r '.context.autoCompactThreshold' "$settings")" = 0.6 ] \
+    || fail "qwen settings must pin the 0.6 auto-compaction threshold"
   # The worktree's own .qwen/settings.json is the PROJECT's file; firstmate
   # must never write it.
   assert_absent "$WT_DIR/.qwen/settings.json" \

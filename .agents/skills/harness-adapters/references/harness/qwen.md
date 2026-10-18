@@ -72,7 +72,7 @@ The same rule backs pane liveness in `bin/backends/tmux.sh` and the composer ide
 ## Worker busy state and the per-task settings file
 
 `../../../../../bin/fm-spawn.sh` writes a firstmate-owned per-task settings file at `state/<id>.qwen-settings.json` and the launch reaches it through `QWEN_CODE_SYSTEM_SETTINGS_PATH`.
-It carries the three busy hooks bound to the minted busy generation, `"$version": 4`, `security.folderTrust.enabled=false`, `ui.enableFollowupSuggestions=false`, `ui.enableUserFeedback=false`, and `memory.enableManagedAutoMemory=false`.
+It carries the three busy hooks bound to the minted busy generation, `"$version": 4`, `security.folderTrust.enabled=false`, `ui.enableFollowupSuggestions=false`, `ui.enableUserFeedback=false`, `memory.enableManagedAutoMemory=false`, and the two context-window pins described below.
 Hook arrays merge across qwen's settings layers, so a project's own hooks still run alongside firstmate's.
 This wiring belongs only to the canonical exact `qwen` adapter template; a raw qwen-shaped launch receives no busy-state wiring and has no trusted busy state.
 It is deliberately NOT the worktree's `.qwen/settings.json`, which is the project's own file.
@@ -86,9 +86,28 @@ After a turn with enough tool calls it can also open a session survey (`How is Q
 
 ## Context window on a local Ollama model
 
-`ollama ps` during a session showed the server granting a 32768-token context while the model declares a 262144-token context length and qwen's footer claims `262.1k Context`, so qwen will not compact before the server truncates.
-The service's unit sets no `OLLAMA_CONTEXT_LENGTH`.
-Raising it (for example `OLLAMA_CONTEXT_LENGTH=131072` on the service, or a Modelfile variant with `PARAMETER num_ctx`) is the captain's call, sized to the card's memory, and firstmate never changes the service or the models.
+The captain's Ollama runs as the systemd user unit `ollama.service`, whose drop-in sets `OLLAMA_CONTEXT_LENGTH=65536 OLLAMA_KV_CACHE_TYPE=q8_0 OLLAMA_FLASH_ATTENTION=1` (`systemctl --user show ollama -p Environment`), so the model's `llama-server` starts with `-c 65536 --context-shift --keep 4` (its launch line is in the journal under the `ollama` identifier).
+The model still declares a 262144-token context length, and unpinned qwen auto-detects `contextWindowSize: 262144` from the model id, so it never compacts on its own.
+Past the window the server does not refuse: it keeps the first 4 tokens, discards the next 32,765 (the system prompt, the brief, and the earliest reads), finishes against the remaining half, and answers 200; only its log says `slot context shift` and `truncated = 1`.
+The next request re-sends the full history, so its cache hit is near zero, its time to first token is 17 to 20 s, and it shifts again as soon as output pushes it past the window.
+
+The per-task settings file therefore pins `model.generationConfig.contextWindowSize=65536` (the served window) and `context.autoCompactThreshold=0.6`.
+qwen compacts once its own estimate passes `min(threshold * window, window - 33000)` (a 20k summary reserve plus a 13k buffer), so at 65,536 the trigger is 32,536 and the fraction is inert; it would bind at a larger window.
+A live session verified on 2026-10-18 that qwen compacts there and the server never shifts ([`runtime-backends.md`](../../../../../docs/verification/runtime-backends.md#context-window-on-the-local-model)).
+Changing the served window is the captain's call, sized to the card's memory, and firstmate never changes the service or the models; when it changes, the pin in `../../../../../bin/fm-spawn.sh` must change with it.
+
+## Hazards seen in production launches
+
+- **Brief prose is not followed; commands are.**
+  A qwen worker on the standard brief skipped its branch step and every status append while following each concrete path and command, and wrote its module over the plan file the brief named by absolute path.
+  Scaffold a qwen ship with `../../../../../bin/fm-brief.sh --harness qwen`, whose help owns that shape: the plan is inlined, the spawn creates the branch, and the spawn makes every firstmate file the brief names read-only.
+- **A pane read as dead may be a live TUI.**
+  Before Herdr pane liveness recognized qwen (2026-10-15), a relaunch read a working qwen pane as dead and typed `cd -- '<worktree>'`, its `export` lines, and the launch-script line into qwen's idle composer.
+  qwen ran the `cd` line as a prompt, executing the commit it had been describing on a detached HEAD, and took the rest as mid-turn steers.
+  `fm-control.sh exit` and `relaunch` on a running qwen under Herdr still refuse, so stop a stuck one by its PID.
+- **A formatter breaks qwen's edit guard.**
+  `prettier --write` changes a file's mtime, after which qwen refuses `edit` and `write_file` on it with `file_changed_since_read` until the file is re-read.
+  The qwen-shaped brief tells the worker to format once, after its last edit.
 
 ## Primary integration
 
