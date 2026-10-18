@@ -502,6 +502,10 @@ test_qwen_hooks_semantic_lifecycle() {
     || fail "qwen settings must pin the served 65536-token context window"
   [ "$(jq -r '.context.autoCompactThreshold' "$settings")" = 0.6 ] \
     || fail "qwen settings must pin the 0.6 auto-compaction threshold"
+  # One batch of tool output must not jump the history past the window
+  # between two compaction checks.
+  [ "$(jq -r '.tools.toolOutputBatchBudget' "$settings")" = 25000 ] \
+    || fail "qwen settings must cap one batch of tool output at 25000 characters"
   # The worktree's own .qwen/settings.json is the PROJECT's file; firstmate
   # must never write it.
   assert_absent "$WT_DIR/.qwen/settings.json" \
