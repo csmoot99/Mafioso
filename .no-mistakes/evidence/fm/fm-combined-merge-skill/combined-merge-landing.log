@@ -1,0 +1,38 @@
+== setup: integrator task task-x1 is a reused worker still bound to its own folded PR
+window=fm-task-x1
+worktree=/tmp/fm-pr-merge-tests.sVCdkl/combined-integrator/wt
+project=/tmp/fm-pr-merge-tests.sVCdkl/combined-integrator/project
+kind=ship
+mode=no-mistakes
+pr=https://github.com/example/repo/pull/80
+
+== step A (adversarial): merge the combined PR before registering it
+$ bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/90 -- --merge
+error: task task-x1 is bound to https://github.com/example/repo/pull/80, not https://github.com/example/repo/pull/90
+exit=1
+gh pr merge calls so far: 0
+
+== step B: register the combined PR on the integrator task (Land step 1)
+$ bin/fm-pr-check.sh task-x1 https://github.com/example/repo/pull/90
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+armed: state/task-x1.check.sh
+exit=0
+-- meta pr=/pr_head= after registration:
+pr=https://github.com/example/repo/pull/90
+pr_head=9090909090909090909090909090909090909090
+
+== step C: merge the combined PR with a merge commit (Land step 3)
+$ bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/90 -- --merge
+armed: state/task-x1.check.sh
+verified: https://github.com/example/repo/pull/90 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+verified: https://github.com/example/repo/pull/90 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 9090909090909090909090909090909090909090
+exit=0
+-- forge merge call(s) the script issued:
+pr merge 90 --repo example/repo --match-head-commit 9090909090909090909090909090909090909090 --merge

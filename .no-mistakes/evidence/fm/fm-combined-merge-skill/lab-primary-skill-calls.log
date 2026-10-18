@@ -1,0 +1,9 @@
+## session a976bae2-8ec8-4e50-b22d-951ef64efebf.jsonl
+captain prompt: Captain here. Merge these two approved PRs: https://github.com/example/b2b/pull/84 into staging, and https://github.com/example/web/pull/12 into main (a differe...
+assistant tool_use: Skill {"skill": "ship-landing"}
+assistant tool_use: Read {"file_path": "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M58PBGB20B41Y58CTJ0C9CCH/bin/fm-pr-merge.sh", "limit": 80}
+assistant tool_use: Read {"file_path": "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M58PBGB20B41Y58CTJ0C9CCH/bin/fm-pr-merge.sh", "offset": 80, "limit": 80}
+## session 2945e886-5a53-4886-9250-6b9c29201589.jsonl
+captain prompt: Captain here. Merge the four approved B2B PRs into staging: https://github.com/example/b2b/pull/80, https://github.com/example/b2b/pull/79, https://github.com/e...
+assistant tool_use: Skill {"skill": "combined-merge"}
+assistant tool_use: Skill {"skill": "ship-landing"}

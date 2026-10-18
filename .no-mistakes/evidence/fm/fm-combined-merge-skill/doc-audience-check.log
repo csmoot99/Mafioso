@@ -1,0 +1,7 @@
+$ bin/fm-doc-audience-check.sh
+fm-doc-audience-check: ok surfaces=122 local_links=754
+exit=0
+
+$ bin/fm-doc-audience-check.sh --inventory <copy without the combined-merge entry>
+fm-doc-audience-check: unclassified: .agents/skills/combined-merge/SKILL.md
+exit=1

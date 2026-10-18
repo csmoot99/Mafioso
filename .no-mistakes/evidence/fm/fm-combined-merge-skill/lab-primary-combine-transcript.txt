@@ -1,0 +1,50 @@
+  same project and the same base branch. I didn't check any PR's live state, so every check below is still to be done.
+  Why combine: All four edit ai-map/CHANGELOG, NOW and DECISIONS. Merging them one at a time would put the remaining PRs into conflict after each merge. Instead they all land through one combined PR, so the conflicts get
+  resolved once.
+  Landing plan
+  1. Confirm the group
+  - Check that all four PRs target staging in example/b2b.
+  - Check that the repo allows merge commits on staging. If it only allows squash or rebase, I stop and ask you, because a squashed combined PR would leave all four originals open.
+  - Check whether any PR has a real dependency on another, such as a migration its consumer needs first. Editing the same files doesn't count as one. If there's no dependency, I fold them oldest first: #79, #80, #81,
+    #83. The order you listed them in isn't a dependency order.
+  2. Check merge authority for each PR
+  - Your message gives explicit merge approval for each of the four, so no standing auto-merge setting is needed.
+  - Before folding a PR in, I confirm two things: its checks are green at the exact commit being folded, and its task has no open decision waiting on you (bin/fm-captain-hold.sh open <id> for each). The final merge
+    script only checks the combined PR, so this has to happen first.
+  - A PR with a red check, an open decision, or a destructive or security-sensitive change stays out and comes back to you on its own.
+  3. Pick the worker who builds the combined PR
+  - Use a live worker from one of the four PRs that has spare context and the strictest delivery mode among them. Full validation beats a plain PR.
+  - If none qualifies, file and spawn a fresh worker in that mode with --base-branch staging.
+  - Tell the other three workers through bin/fm-send.sh not to push or start validation, and to wait until their PR lands through the combined one.
+  - Add your merge instruction and the intent of all four tasks to the building worker's instructions, so its validation covers the whole combined PR.
+  4. What that worker does
+  1. Cut a fresh -combined branch from current staging.
+  2. Merge each PR's current head with git merge --no-ff, in the order from step 1. No squash, rebase, cherry-pick or force-push: GitHub only marks a PR merged when its exact head commit lands.
+  3. Resolve the ai-map/ conflicts once, keeping every PR's entries in CHANGELOG, NOW and DECISIONS. If two DECISIONS entries actually contradict each other, it comes back to you as a decision rather than being settled
+     quietly.
+  4. Run all four PRs' tests plus the repo's own checks.
+  5. Publish the combined PR into staging. If the project uses full validation, that's exactly one validation run on the combined branch; nobody has validated the conflict resolutions yet, so it isn't skipped.
+  6. List each PR's full URL and the exact commit folded from it in the combined PR's description.
+  5. Land
+  1. Register the combined PR on the building worker's task: bin/fm-pr-check.sh <integrator-task> <combined-url>.
+  2. Check each original PR's live head against the commit listed in the description. If one has moved, the worker merges the new head and reports ready again.
+  3. Merge command:
+  bin/fm-pr-merge.sh <integrator-task> <combined-url> -- --merge
+     It has to be a merge commit, because only that lands every folded head intact. I wouldn't run fm-pr-merge.sh on #79, #80, #81 or #83 individually.
+  4. Confirm GitHub now shows all four originals as merged. Any still open holds work the combined PR didn't carry and lands on its own later.
+  5. Refresh the local copy of b2b, then clean up the building worker and all four tasks with bin/fm-teardown.sh <id>, never --force. If cleanup refuses, I investigate rather than bypass it.
+  6. Send you the combined PR's URL plus the four originals:
+     - https://github.com/example/b2b/pull/79
+     - https://github.com/example/b2b/pull/80
+     - https://github.com/example/b2b/pull/81
+     - https://github.com/example/b2b/pull/83
+  Nothing needs your decision right now. The only things that would come back to you are:
+  - the repo refusing merge commits on staging
+  - a red check or open decision on one of the four PRs
+  - a DECISIONS conflict that can't keep both intents
+✻ Worked for 36s · done 7:49 PM
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 | ctx: 6% used
+  ⏵⏵ bypass permissions on (shift+tab to cycle)

@@ -1,0 +1,26 @@
+ ▐▛███▛█   Claude Code v2.1.303
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+ ▝▝   ▝▝   ~/.no-mistakes/worktrees/5f69104d19ce/01M58PBGB20B41Y58CTJ0C9CCH · /rc
+❯ /clear
+❯ Captain here. Merge these two approved PRs: https://github.com/example/b2b/pull/84 into staging, and https://github.com/example/web/pull/12 into main (a different project). This is a lab dry run: do NOT run any shell
+  commands or scripts and do not touch any repo or forge. Load whichever firstmate skill(s) you would load before landing these, then tell me in a few lines whether you would combine them and the exact merge command(s)
+  you would run.
+● Skill(ship-landing)
+  ⎿  Successfully loaded skill
+  Read 1 file
+● Captain, I loaded the landing skill. I did not load the combined-merge skill, because it only applies when two or more approved PRs land on the same project and the same base branch. These two are in different projects
+  (b2b and web) and go to different bases (staging and main). The only thing that could have justified combining them was a conflict on a shared base, and that can't happen here.
+  I would not combine them. I'd run two separate guarded merges, one per PR:
+  bin/fm-pr-merge.sh <b2b-task-id> https://github.com/example/b2b/pull/84
+  bin/fm-pr-merge.sh <web-task-id> https://github.com/example/web/pull/12
+  - Where each lands: the script takes no base-branch flag. Each PR merges into whatever base it already targets. Before the first command, I'd confirm #84 actually targets staging. If it doesn't, I'd stop and ask you
+    rather than retarget it.
+  - Method: squash, which is the default. Your instruction is the merge authority, so no extra flags are needed. Each merge still stops unless the PR is open, not a draft, conflict-free, and green on every required check
+    at its current head.
+  - Not filled in: the two task IDs. A dry run with no commands meant I didn't look them up. If either PR is still marked as awaiting your approval, I'd first record your go-ahead as releasing that hold.
+✻ Cogitated for 27s · done 7:51 PM
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ Now what if both PRs were on b2b staging?
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 | ctx: 6% used
+  ⏵⏵ bypass permissions on (shift+tab to cycle)

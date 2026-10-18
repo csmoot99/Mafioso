@@ -1,0 +1,45 @@
+== case folded-head-kept: role=folded head-branch=kept local-staging=fresh extra-unfolded-commit=no (expect ALLOW)
+  folded head A=5a09b9f21769a3a3018d2a07802e439afa8a8632  other head B=588506d9b3fca97f82fa2bf0190a4858ab9920c6  combined head=8975624448a4e0dd25f64e0e7f3212c8e3161cc4
+  is A an ancestor of origin staging? yes
+  project's origin/staging: c397cde (remote: c397cde)
+  $ bin/fm-teardown.sh task-x1
+  exit=0  meta-retained=no
+  RESULT: PASS (ALLOW)
+
+== case folded-head-deleted: role=folded head-branch=deleted local-staging=fresh extra-unfolded-commit=no (expect ALLOW)
+  folded head A=ad78121ffad5ffca1b66458eb0db804e63face1c  other head B=aaa3d51513c1d207ee6ea4c3e16831bb4fd57184  combined head=efe1499a267103ededc2791e43a422873751b72b
+  is A an ancestor of origin staging? yes
+  project's origin/staging: 9274152 (remote: 9274152)
+  $ bin/fm-teardown.sh task-x1
+  exit=0  meta-retained=no
+  RESULT: PASS (ALLOW)
+
+== case folded-stale-staging: role=folded head-branch=deleted local-staging=stale extra-unfolded-commit=no (expect ALLOW)
+  folded head A=91367aea77e88642f26589e8519e4ec0380ed689  other head B=1abe7e96589091c9a65c4087bed2eedcde8c0dab  combined head=388de7f3e8fe608c47cd1f9146b6a30488719259
+  is A an ancestor of origin staging? yes
+  project's origin/staging: 993c542 (remote: 15bf20c)
+  $ bin/fm-teardown.sh task-x1
+  exit=0  meta-retained=no
+  RESULT: PASS (ALLOW)
+
+== case integrator-combined: role=integrator head-branch=deleted local-staging=fresh extra-unfolded-commit=no (expect ALLOW)
+  folded head A=0917714d77767a2795681d5f2b9461575c306935  other head B=e2f1cb3dea7239b4d00adeee0c8a4d00d061957b  combined head=fe54dd3cc0e4bfe0cdfc70c532f3767dc99a3ee0
+  is A an ancestor of origin staging? yes
+  project's origin/staging: 8aa679f (remote: 8aa679f)
+  $ bin/fm-teardown.sh task-x1
+  exit=0  meta-retained=no
+  RESULT: PASS (ALLOW)
+
+== case folded-unfolded-extra: role=folded head-branch=deleted local-staging=fresh extra-unfolded-commit=yes (expect REFUSE)
+  folded head A=ca0ed942abbddcf0aee4f9028b153e8fd21ef531  other head B=f7dbae91409cf5e9e733aacf7c4b65fcbb9ed99a  combined head=d9197779a93322df65a2a5bed0709353b5bd903c
+  is A an ancestor of origin staging? yes
+  project's origin/staging: 29ef1ce (remote: 29ef1ce)
+  $ bin/fm-teardown.sh task-x1
+  | REFUSED: worktree /tmp/fm-teardown-tests.nCTYpe/folded-unfolded-extra/wt has work not on any remote and not landed.
+  | unpushed commits:
+  | 9158558 later local commit the combined PR never carried
+  | Push the branch, land its PR, or get the captain's explicit OK to discard, then --force.
+  exit=1  meta-retained=yes
+  RESULT: PASS (REFUSE)
+
+overall: PASS
