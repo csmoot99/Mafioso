@@ -100,7 +100,7 @@ Changing the served window is the captain's call, sized to the card's memory, an
 
 - **Brief prose is not followed; commands are.**
   A qwen worker on the standard brief skipped its branch step and every status append while following each concrete path and command, and wrote its module over the plan file the brief named by absolute path.
-  Scaffold a qwen ship with `../../../../../bin/fm-brief.sh --harness qwen`, whose help owns that shape: the plan is inlined, the spawn creates the branch, and the spawn makes every firstmate file the brief names read-only.
+  Scaffold a qwen ship with `../../../../../bin/fm-brief.sh --harness qwen`, whose help owns that shape: the plan is inlined, the spawn creates the branch and refuses one that already exists, and the spawn makes every untracked file in a subdirectory of the home's `data/` that the brief names read-only for good, while top-level `data/` records, `state/`, `config/`, `projects/` and tracked files stay writable.
 - **A pane read as dead may be a live TUI.**
   Before Herdr pane liveness recognized qwen (2026-10-15), a relaunch read a working qwen pane as dead and typed `cd -- '<worktree>'`, its `export` lines, and the launch-script line into qwen's idle composer.
   qwen ran the `cd` line as a prompt, executing the commit it had been describing on a detached HEAD, and took the rest as mid-turn steers.

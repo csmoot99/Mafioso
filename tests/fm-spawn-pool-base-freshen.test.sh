@@ -800,12 +800,12 @@ test_named_base_branch_starts_from_that_branch() {
   pass "--base-branch picks the copy's starting point and is recorded; a missing or local-only base refuses"
 }
 
-qwen_brief() { # <id> <named-path>...
-  local id=$1 brief
-  shift
-  printf '# Plan\nWrite x.txt.\n' > "$CASE_DIR/plan-$id.md"
+qwen_brief() { # <id> <plan> <named-path>...
+  local id=$1 plan=$2 brief
+  shift 2
+  printf '# Plan\nWrite x.txt.\n' > "$plan"
   FM_HOME="$HOME_DIR" "$ROOT/bin/fm-brief.sh" "$id" project --mode direct-PR --base-branch feature/hub \
-    --harness qwen --plan "$CASE_DIR/plan-$id.md" --files x.txt --done-command 'test -s x.txt' >/dev/null \
+    --harness qwen --plan "$plan" --files x.txt --done-command 'test -s x.txt' >/dev/null \
     || fail "could not scaffold the qwen-shaped brief for $id"
   brief="$HOME_DIR/data/$id/brief.md"
   sed -i.bak -e 's/^{TASK}$/Write x.txt./' -e "s|^{FIRSTMATE_SPEC}\$|Context lives in $* .|" "$brief"
@@ -817,18 +817,25 @@ owner_writable() { # <path>
 }
 
 test_qwen_shaped_brief_gets_its_branch_and_read_only_named_files() {
-  local rec id out status notes outside
+  local rec id out status plan record project_file tracked outside path taken
   id='pool-qwen-shape-r1'
   rec=$(make_case qwen-shape "$id")
   read_case_record "$rec"
   publish_feature_branch feature/hub
   rm -f "$HOME_DIR/data/$id/brief.md"
-  notes="$HOME_DIR/data/$id/notes.md"
+  plan="$HOME_DIR/data/$id/plan.md"
+  record="$HOME_DIR/data/projects.md"
+  project_file="$HOME_DIR/projects/notes.md"
+  tracked="$HOME_DIR/data/tracked-sub/tracked.md"
   outside="$CASE_DIR/outside.md"
-  printf 'notes\n' > "$notes"
-  printf 'outside\n' > "$outside"
+  mkdir -p "$HOME_DIR/data/tracked-sub"
+  git init --quiet "$HOME_DIR/data/tracked-sub"
+  for path in "$record" "$project_file" "$tracked" "$outside"; do
+    printf 'keep writable\n' > "$path"
+  done
+  git -C "$HOME_DIR/data/tracked-sub" add tracked.md
   touch "$HOME_DIR/state/$id.status"
-  qwen_brief "$id" "$notes" "$outside" "$HOME_DIR/state/$id.status"
+  qwen_brief "$id" "$plan" "$plan" "$record" "$project_file" "$tracked" "$outside" "$HOME_DIR/state/$id.status"
   out=$(run_spawn "$id" --mode direct-PR --yolo off --base-branch feature/hub)
   status=$?
   expect_code 0 "$status" "a qwen-shaped ship brief should launch"$'\n'"$out"
@@ -836,24 +843,33 @@ test_qwen_shaped_brief_gets_its_branch_and_read_only_named_files() {
     || fail "the spawn did not put the copy on the branch the qwen-shaped brief says exists"
   [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$(git -C "$POOL_DIR" rev-parse origin/feature/hub)" ] \
     || fail "the qwen branch does not start from the refreshed base"
-  ! owner_writable "$notes" || fail "a home file the qwen-shaped brief names is still writable"
-  assert_contains "$out" "$notes" "the spawn did not report the file it made read-only"
-  owner_writable "$HOME_DIR/state/$id.status" || fail "the task's own status file was made read-only"
-  owner_writable "$outside" || fail "a file outside the home was made read-only"
+  ! owner_writable "$plan" || fail "the data/<subdir>/ plan the qwen-shaped brief names is still writable"
+  assert_contains "$out" "$plan" "the spawn did not report the file it made read-only"
+  for path in "$record" "$project_file" "$tracked" "$outside" "$HOME_DIR/state/$id.status"; do
+    owner_writable "$path" || fail "$path, outside the protected data/<subdir>/ untracked scope, was made read-only"
+  done
 
-  id='pool-qwen-shape-taken-r1'
-  rec=$(make_case qwen-shape-taken "$id")
-  read_case_record "$rec"
-  publish_feature_branch feature/hub
-  rm -f "$HOME_DIR/data/$id/brief.md"
-  qwen_brief "$id" "$HOME_DIR/state/$id.status"
-  git -C "$PROJECT_DIR" branch "fm/$id" "$INITIAL_SHA"
-  out=$(run_spawn "$id" --mode direct-PR --yolo off --base-branch feature/hub)
-  status=$?
-  [ "$status" -ne 0 ] || fail "a qwen-shaped spawn onto an existing branch elsewhere should refuse"
-  assert_contains "$out" "fm/$id already exists" "the refusal did not name the existing branch"
-  [ "$(git -C "$PROJECT_DIR" rev-parse "fm/$id")" = "$INITIAL_SHA" ] || fail "the refused spawn moved the existing branch"
-  pass "a qwen-shaped brief launches on its created branch with named home files read-only, and refuses a taken branch"
+  for taken in elsewhere at-base; do
+    id="pool-qwen-shape-taken-$taken-r1"
+    rec=$(make_case "qwen-shape-taken-$taken" "$id")
+    read_case_record "$rec"
+    publish_feature_branch feature/hub
+    rm -f "$HOME_DIR/data/$id/brief.md"
+    qwen_brief "$id" "$CASE_DIR/plan.md" "$HOME_DIR/state/$id.status"
+    if [ "$taken" = at-base ]; then
+      git -C "$PROJECT_DIR" fetch --quiet origin feature/hub
+      git -C "$PROJECT_DIR" branch "fm/$id" FETCH_HEAD
+    else
+      git -C "$PROJECT_DIR" branch "fm/$id" "$INITIAL_SHA"
+    fi
+    taken=$(git -C "$PROJECT_DIR" rev-parse "fm/$id")
+    out=$(run_spawn "$id" --mode direct-PR --yolo off --base-branch feature/hub)
+    status=$?
+    [ "$status" -ne 0 ] || fail "a qwen-shaped spawn onto an existing branch should refuse"
+    assert_contains "$out" "fm/$id already exists" "the refusal did not name the existing branch"
+    [ "$(git -C "$PROJECT_DIR" rev-parse "fm/$id")" = "$taken" ] || fail "the refused spawn moved the existing branch"
+  done
+  pass "a qwen-shaped brief launches on its created branch with only untracked data/<subdir>/ files it names read-only, and refuses any existing branch"
 }
 
 test_base_branch_must_agree_with_the_brief() {

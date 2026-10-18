@@ -130,14 +130,15 @@
 # when the worker runs them, instead of an <epoch> placeholder it would leave
 # unfilled. It tells the worker its branch already exists: bin/fm-spawn.sh
 # reads the brief's "Brief shape: qwen" line, creates that branch, and makes
-# every firstmate file the brief names read-only. It keeps the isolation check,
-# fm_ship_rule_one's push and merge rule, the working, done and blocked status
-# lines, the inbox acknowledgement, and the machine-read Delivery contract, Ship
-# branch, and Base branch lines; it drops what a direct-PR qwen task cannot
-# use, namely the Herdr declaration (--herdr-lab is refused), the no-mistakes
-# daemon rule (its worktree-pool half shrinks to the git and treehouse commands
-# the worker may never run), the waiting and paused protocols, and the
-# coding-discipline and project-memory sections. --plan, --files, and
+# every untracked file under a data/<subdir>/ that the brief names read-only.
+# It keeps the isolation check, fm_ship_rule_one's push and merge rule, the
+# working, done and blocked status lines, the inbox acknowledgement, and the
+# machine-read Delivery contract, Ship branch, and Base branch lines; it drops
+# what a direct-PR qwen task cannot use, namely the Herdr declaration
+# (--herdr-lab is refused), the no-mistakes daemon rule (its worktree-pool half
+# shrinks to the git and treehouse commands the worker may never run), the
+# waiting and paused protocols, and the coding-discipline and project-memory
+# sections. --plan, --files, and
 # --done-command are refused without it.
 # Scaffolds carry no role scope: fm-spawn.sh supplies fm_brief_worker_role from
 # fm-dod-lib.sh to every ship/scout launch brief, so this file never becomes a
@@ -773,7 +774,7 @@ $PLAN_FENCE
 2. Write only these files, by their paths relative to the current directory: $QWEN_FILES.
    Every other path is read-only, including every path that starts with \`/\`; the reporting commands below are the only writes outside this directory.
 3. Read each file at most once.
-4. Never open whole a file the plan calls large, minified or one line long: no \`cat\`, \`head\`, \`read_file\`, or \`grep\` without \`-o\` on it.
+4. Never open a whole file that the plan calls large, minified or one line long: no \`cat\`, \`head\`, \`read_file\`, or \`grep\` without \`-o\` on it.
    If you must look, run exactly \`grep -o '<short pattern>' <file> | head -5\`.
 5. Edit by re-reading the file and rewriting it whole with \`write_file\`.
    Run any formatter the plan names, such as \`prettier --write\`, once, after your last edit; it changes the files, so re-read a file before editing it again.

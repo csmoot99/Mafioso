@@ -300,11 +300,12 @@
 #   commit look contained, which is exactly why no remedy command is printed.
 #   A ship brief carrying the "Brief shape: qwen" line (bin/fm-brief.sh
 #   --harness qwen) tells the worker its branch already exists, so a fresh
-#   launch then creates the ship branch at the refreshed base, reusing one only
-#   when it already sits at that commit and refusing one anywhere else, and
-#   every launch of it makes each regular file under this home or code root
-#   that the brief names by absolute path read-only, except the task's own
-#   status file and inbox records. Those files stay read-only after the task.
+#   launch then creates the ship branch at the refreshed base and refuses one
+#   that already exists, and every launch of it makes each regular file in a
+#   subdirectory of this home's data/ that the brief names by absolute path
+#   read-only, unless git tracks it; top-level data/ records, state/, config/,
+#   projects/ and every other path stay writable. Those files stay read-only
+#   after the task, and nothing records or restores them.
 # Batch dispatch: pass one or more `id=repo` pairs instead of a single <id> <project>, e.g.
 #     fm-spawn.sh fix-a-k3=projects/foo add-b-q7=projects/bar [--scout]
 #   Each pair re-execs this script in single-task mode, so the single path stays the only
@@ -3956,36 +3957,33 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
   fi
 }
 
-# The qwen-shaped brief's branch (header above). A same-named branch still at
-# this base tip is a failed earlier spawn's, so it is reused.
+# The qwen-shaped brief's branch (header above).
 create_qwen_brief_branch() { # <worktree> <branch>
-  local worktree=$1 branch=$2 head existing
-  head=$(git -C "$worktree" rev-parse --verify --quiet HEAD) || return 1
-  if existing=$(git -C "$worktree" rev-parse --verify --quiet "refs/heads/$branch"); then
-    [ "$existing" = "$head" ] || {
-      echo "error: branch $branch already exists at a commit other than this launch's base; refusing to launch a qwen-shaped brief onto it" >&2
-      return 1
-    }
-    git -C "$worktree" checkout -q "$branch" --
-  else
-    git -C "$worktree" checkout -q -b "$branch" --
+  local worktree=$1 branch=$2
+  if git -C "$worktree" rev-parse --verify --quiet "refs/heads/$branch" >/dev/null; then
+    echo "error: branch $branch already exists, but the qwen-shaped brief tells the worker this spawn created it; delete or rename that branch, or use another task id" >&2
+    return 1
   fi
+  git -C "$worktree" checkout -q -b "$branch" --
 }
 
-# The qwen-shaped brief's named firstmate files become read-only (header
+# The qwen-shaped brief's named data/<subdir>/ files become read-only (header
 # above), because a qwen worker wrote its module over the plan file a standard
-# brief named; the status file and inbox stay writable for its reporting.
+# brief named.
 protect_qwen_brief_named_files() { # <brief> <worktree>
-  local brief=$1 worktree=$2 path state_real
-  state_real=$(cd "$STATE" && pwd -P)
+  local brief=$1 worktree=$2 path dir data_real worktree_real
+  data_real=$(cd "$DATA" && pwd -P) || return 1
+  worktree_real=$(cd "$worktree" && pwd -P) || return 1
   while IFS= read -r path; do
     path=${path%[.,:;]}
-    case "$path" in
-    "$STATE/$ID.status" | "$state_real/$ID.status" | "$STATE/$ID.inbox"/* | "$state_real/$ID.inbox"/* | "$worktree"/*) continue ;;
-    "$FM_HOME"/* | "$FM_ROOT"/*) ;;
+    [ -f "$path" ] && [ ! -L "$path" ] || continue
+    dir=$(cd "$(dirname -- "$path")" && pwd -P) || continue
+    case "$dir/" in
+    "$worktree_real"/*) continue ;;
+    "$data_real"/*/) ;;
     *) continue ;;
     esac
-    [ -f "$path" ] && [ ! -L "$path" ] || continue
+    ! git -C "$dir" ls-files --error-unmatch -- "$path" >/dev/null 2>&1 || continue
     chmod a-w -- "$path" || return 1
     echo "notice: $ID's qwen-shaped brief names $path; it is now read-only" >&2
   done < <(grep -oE "/[^[:space:]\`'\"<>()]+" "$brief" | sort -u)
@@ -4949,7 +4947,7 @@ if [ "$KIND" = ship ] && grep -qx 'Brief shape: qwen' "$SOURCE_BRIEF"; then
     exit 1
   fi
   protect_qwen_brief_named_files "$SOURCE_BRIEF" "$WT" || {
-    echo "error: could not make the firstmate files $SOURCE_BRIEF names read-only; inspect window $T" >&2
+    echo "error: could not make the data files $SOURCE_BRIEF names read-only; inspect window $T" >&2
     exit 1
   }
 fi
