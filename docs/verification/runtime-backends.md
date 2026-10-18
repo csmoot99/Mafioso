@@ -1408,7 +1408,7 @@ Past the window the server does not refuse: it logs `slot context shift, n_keep 
 Unpinned, qwen auto-detects `contextWindowSize: 262144` from the model id and never compacts, which is what let four such shifts drop a production worker's brief.
 
 The per-task settings file therefore pins `model.generationConfig.contextWindowSize=65536` and `context.autoCompactThreshold=0.6`.
-qwen's trigger is `min(threshold * window, window - 20000 - 13000)` (its summary reserve and buffer, `computeThresholds` in the 0.25.1 bundle), so at 65,536 the absolute ceiling of 32,536 binds and the fraction is inert.
+qwen's trigger is `min(threshold * window, window - 20000 - 13000)` (its summary reserve and buffer, `computeThresholds` in the 0.25.1 bundle), so at the pinned 65,536 the absolute ceiling of 32,536 binds and the threshold is inert; it becomes the active trigger if the window is raised above about 82,500.
 One headless session under an isolated user home, with the settings file the branch's `bin/fm-spawn.sh` wrote and a prompt that read six 20,828-character hex files through the shell tool, recorded `contextWindowSize: 65536` on every assistant record and five `chat_compression` records, all `triggerReason: token_limit`, at qwen-estimated sizes of 33,345 to 35,457 tokens.
 The journal for that session had no `context shift` line and every request released with `truncated = 0`; prompt tokens per request were:
 
