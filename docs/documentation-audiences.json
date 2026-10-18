@@ -569,6 +569,10 @@
       "audience": "agent-runtime"
     },
     {
+      "path": ".agents/skills/combined-merge/SKILL.md",
+      "audience": "agent-runtime"
+    },
+    {
       "path": ".agents/skills/operational-home-layout/SKILL.md",
       "audience": "agent-runtime"
     },
