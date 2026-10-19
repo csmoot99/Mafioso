@@ -635,6 +635,7 @@ It hands the visible pane's ANSI viewport plus Herdr's capability facts to the f
 - Bare agent-glyph rows, including muse's `⟩`, which the adapter's retired local pattern silently omitted.
 - opencode's left bar.
 - The Pi separator region this adapter pioneered, admitted only when native `agent get` identity is exactly Pi and state is idle or done.
+- qwen's `*` separator row, admitted only when the pane's foreground process is qwen and its busy footer is absent, because Herdr never registers qwen and `agent get` answers `agent_not_found` for it.
 
 ### Pi composer states
 

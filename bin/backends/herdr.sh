@@ -3235,11 +3235,41 @@ fm_backend_herdr_agent_identity_raw() {  # <session> <pane> -> <agent>\t<status>
 }
 
 # fm_backend_herdr_composer_identity: the native agent identity/state probe
-# backing the shared classifier's separated (pi) shape - the genuine herdr
-# primitive no other backend has natively.
+# backing the shared classifier's separated (pi, qwen) shapes - the genuine
+# herdr primitive no other backend has natively. Herdr never registers qwen
+# (`agent get` answers agent_not_found while it runs, verified Herdr 0.8.0 with
+# qwen 0.25.1), so only that answer falls back to tmux's identity rule
+# (fm_tmux_composer_identity): a qwen process in the pane's foreground, read
+# from argv, with its verified busy footer as the status. Any other read
+# yields no identity.
 fm_backend_herdr_composer_identity() {  # <target> -> "<agent>\t<status>"
+  local out rc=0 pid args found=
   fm_backend_herdr_parse_target "$1" || return 1
-  fm_backend_herdr_agent_identity_raw "$FM_BACKEND_HERDR_SESSION" "$FM_BACKEND_HERDR_PANE"
+  # Real herdr reports agent_not_found on stderr with exit 1; only the JSON
+  # decides, as in fm_backend_herdr_pane_agent_state.
+  out=$(fm_backend_herdr_cli "$FM_BACKEND_HERDR_SESSION" agent get "$FM_BACKEND_HERDR_PANE" 2>&1) || rc=$?
+  if [ "$(printf '%s' "$out" | jq -r '.error.code // empty' 2>/dev/null)" != agent_not_found ]; then
+    [ "$rc" -eq 0 ] || return 1
+    printf '%s' "$out" | jq -r '[.result.agent.agent // "", .result.agent.agent_status // ""] | @tsv' 2>/dev/null
+    return
+  fi
+  out=$(fm_backend_herdr_cli "$FM_BACKEND_HERDR_SESSION" pane process-info --pane "$FM_BACKEND_HERDR_PANE" 2>/dev/null) || return 1
+  while IFS=$'\t' read -r pid args; do
+    if { [ "$pid" != 0 ] && fm_qwen_pid_is_qwen "$pid"; } || fm_qwen_args_are_qwen "$args"; then
+      found=1
+      break
+    fi
+  done <<EOF
+$(printf '%s' "$out" | jq -r --arg pane "$FM_BACKEND_HERDR_PANE" '
+  .result.process_info | select(.pane_id == $pane) | .foreground_processes[]?
+  | [(.pid // 0 | tostring), (.cmdline // ((.argv // []) | join(" ")))] | @tsv' 2>/dev/null)
+EOF
+  [ -n "$found" ] || return 1
+  case "$(fm_backend_herdr_rendered_busy_state "$1" qwen)" in
+    busy) printf 'qwen\tworking' ;;
+    idle) printf 'qwen\tidle' ;;
+    *) return 1 ;;
+  esac
 }
 
 # fm_backend_herdr_composer_state: thin adapter - capture plus capabilities

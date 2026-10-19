@@ -1444,12 +1444,34 @@ after /quit:   pane=no-agent recovery=dead
 
 `tests/fm-backend-herdr.test.sh` pins the unregistered-pane verdicts with real processes and no harness.
 
+### Herdr composer and lifecycle control
+
+Verified on 2026-10-18 on Linux (WSL2) against Herdr 0.8.0 and Qwen Code 0.25.1 serving `qwen3-coder:30b` from the local Ollama, in an isolated `fm-lab-` session provisioned and torn down by `bin/fm-herdr-lab.sh`, with a real qwen worker launched by `bin/fm-control.sh relaunch` onto an agent-free pane.
+While the worker ran, `agent get` answered `agent_not_found` and `pane process-info` reported its foreground as `name=MainThread`, `argv=node /home/<user>/.local/bin/qwen -y --model qwen3-coder:30b -i <brief>`, with its pid.
+The ANSI viewport drew the composer row as `ESC[38;2;139;58;74m* ESC[0m`, a background-colored cursor cell, and the placeholder in `38;2;108;112;134`, between two rules in the same `139;58;74`, with four footer rows below the closing rule; a typed draft followed the glyph as default-foreground text.
+That glyph's luminance is about 84, below the ghost strip's 128, so the stripped row was empty: the composer read `unknown` even with a qwen identity supplied, and `fm-control exit` refused an idle qwen with `composer state is 'unknown', not proven empty`.
+
+```sh
+FM_QWEN_HERDR_CONTROL_LIVE=1 bash tests/fm-qwen-herdr-control-live-e2e.test.sh
+```
+
+```text
+ok - herdr 0.8.0, qwen 0.25.1: an idle unregistered qwen composer reads empty
+ok - herdr 0.8.0, qwen 0.25.1: a typed draft reads pending and exit refuses without touching it
+ok - herdr 0.8.0, qwen 0.25.1: exit stops an idle qwen
+ok - herdr 0.8.0, qwen 0.25.1: exit interrupts and stops a qwen in the middle of a long turn
+ok - herdr 0.8.0, qwen 0.25.1: relaunch replaces a running mid-turn qwen on the same endpoint
+ok - herdr 0.8.0, qwen 0.25.1: the task record and brief are intact after every exit and relaunch
+```
+
+That command is the guard that refreshes this record; `tests/fm-composer-lib.test.sh` and `tests/fm-backend-herdr.test.sh` pin the dark-glyph row and the unregistered-qwen identity with no harness.
+
 ### Not verified
 
 Qwen Code as a PRIMARY or SECONDMATE runtime is unverified and refused by `bin/fm-spawn.sh`: no wake protocol exists under `docs/supervision-protocols/` and no turn-end guard adapter was built or exercised.
 No reasoning-effort axis was found; `qwen --help` on 0.25.1 exposes no effort, reasoning, or thinking flag, so the record-and-omit contract applies.
 `--approval-mode auto` was verified only as the flag shape `config/qwen-approval-mode` selects, not for which actions it blocks.
-The `/<skill>` submit shape, the Herdr backend beyond pane liveness (its identity probe reports native agent names, and Herdr registers no qwen agent), `--exclude-tools`, and whether `ui.enableFollowupSuggestions=false` is what removed the follow-up row (none appeared in any guard run with it set, with no A/B) remain unverified.
+The `/<skill>` submit shape, steer delivery on the Herdr backend, `--exclude-tools`, and whether `ui.enableFollowupSuggestions=false` is what removed the follow-up row (none appeared in any guard run with it set, with no A/B) remain unverified.
 `tests/fm-composer-matrix-live-e2e.test.sh` was not extended with qwen because it launches each harness bare, which needs the operator credential; the qwen guard asserts the same composer verdict through the real tmux path instead.
 
 ## Herdr
