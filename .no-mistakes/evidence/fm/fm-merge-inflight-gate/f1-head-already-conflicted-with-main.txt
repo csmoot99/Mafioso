@@ -1,0 +1,6 @@
+Observation during the live run (2026-10-19 ~15:50Z):
+420usa-f1-accounts run head c6329b71 (PR #33, ci step auto-fixing) did NOT contain the fleet clone's origin/main (b8c4ab42)
+and `git merge-tree origin/main c6329b71` conflicted in ai-map/CHANGELOG.md, ai-map/NOW.md (rc=1).
+So S1/S2 named f1 for ai-map files the merging PR never touched: the sibling already conflicted with the base itself.
+Minutes later the run's CI step rebased it to 909be408 (contains origin/main, merge-tree rc=0) and restarted review,
+after which S3/S5 no longer saw an ai-map conflict except where the PR itself edited ai-map/CHANGELOG.md.
