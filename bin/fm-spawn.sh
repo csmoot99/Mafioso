@@ -704,8 +704,21 @@ launch_template() {
   # Claude's system-prompt carrier while preserving the normal distrust of
   # project and fetched content. A persistent secondmate receives its own
   # supervisor contract instead, so this task-worker statement does not apply.
+  # A ship or scout's inline settings also set its MCP surface to the servers
+  # its project declares. "disableClaudeAiConnectors":true keeps the captain's
+  # claude.ai connectors out of the worker: no worker uses them, yet their tool
+  # definitions (10,700 tokens on 2.1.303) are re-read on every API call.
+  # "enableAllProjectMcpServers":true approves the servers in the worktree's own
+  # .mcp.json, so they load without the interactive "New MCP server found"
+  # dialog, which an unapproved project server otherwise raises at launch, and
+  # regardless of the folder trust a repository's own committed approval needs.
+  # A disabledMcpjsonServers entry still rejects a server. User-scope servers
+  # still load, which --strict-mcp-config would drop along with the connectors.
+  # A secondmate keeps the captain's full MCP surface.
   claude)
-    printf '%s' 'CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude __CLAUDEPERMFLAG__ __CLAUDEADDDIRS__--settings '\''{"feedbackDrafts":"off"__CLAUDEATTRIBUTION__}'\'' '
+    local worker_settings=
+    [ "$kind" = secondmate ] || worker_settings=',"disableClaudeAiConnectors":true,"enableAllProjectMcpServers":true'
+    printf '%s' 'CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude __CLAUDEPERMFLAG__ __CLAUDEADDDIRS__--settings '\''{"feedbackDrafts":"off"'"$worker_settings"'__CLAUDEATTRIBUTION__}'\'' '
     if [ "$kind" != secondmate ]; then
       printf '%s' "--append-system-prompt '$TASK_WORKER_TRUST_STATEMENT' "
     fi
@@ -3989,6 +4002,50 @@ protect_qwen_brief_named_files() { # <brief> <worktree>
   done < <(grep -oE "/[^[:space:]\`'\"<>()]+" "$brief" | sort -u)
 }
 
+# A project kg answers only from a graph built in the copy: a fresh copy has
+# none, and one a pooled slot kept from an earlier task can be stale. A qwen
+# worker's copy gets the project's dependencies installed when it has a pnpm
+# lockfile and no node_modules, then an incremental ingest without embeddings
+# (symbol and caller lookups need none), which builds a missing graph and
+# refreshes a kept one, under flock(1) where it exists so one ingest runs on
+# the machine at a time. The install, the lock wait and the ingest share one
+# bound, and the repo's own `kg-query.mjs stats` confirms the graph answers;
+# when it cannot be had, the reason is printed and the status is nonzero.
+qwen_kg_graph_built() { # <worktree>
+  (cd "$1" && fm_run_timed 30 node scripts/kg-query.mjs stats) </dev/null >/dev/null 2>&1
+}
+
+ensure_qwen_kg_graph() { # <worktree> <log>
+  local worktree=$1 log=$2 bound=120 status=0 deadline left lock=()
+  [ -f "$worktree/scripts/kg-query.mjs" ] || { echo "the worktree has no scripts/kg-query.mjs"; return 1; }
+  [ -f "$worktree/scripts/kg-ingest.mjs" ] || { echo "the worktree has no scripts/kg-ingest.mjs to build or refresh the graph"; return 1; }
+  deadline=$((SECONDS + bound))
+  : >"$log"
+  if [ -f "$worktree/pnpm-lock.yaml" ] && [ ! -e "$worktree/node_modules" ]; then
+    (cd "$worktree" && fm_run_timed "$bound" pnpm install --frozen-lockfile --prefer-offline) </dev/null >>"$log" 2>&1 || status=$?
+    if fm_timed_out "$status"; then
+      echo "installing dependencies timed out after ${bound}s (log: $log)"
+      return 1
+    elif [ "$status" -ne 0 ]; then
+      echo "pnpm install --frozen-lockfile --prefer-offline exited $status (log: $log)"
+      return 1
+    fi
+  fi
+  left=$((deadline - SECONDS))
+  [ "$left" -gt 0 ] || { echo "installing dependencies used the whole ${bound}s bound (log: $log)"; return 1; }
+  ! command -v flock >/dev/null 2>&1 || lock=(flock /tmp/kg-ingest.lock)
+  (cd "$worktree" && fm_run_timed "$left" ${lock[@]+"${lock[@]}"} node scripts/kg-ingest.mjs --no-embed) </dev/null >>"$log" 2>&1 || status=$?
+  if fm_timed_out "$status"; then
+    echo "building the graph timed out within the ${bound}s bound (log: $log)"
+    return 1
+  elif [ "$status" -ne 0 ]; then
+    echo "node scripts/kg-ingest.mjs --no-embed exited $status (log: $log)"
+    return 1
+  fi
+  qwen_kg_graph_built "$worktree" ||
+    { echo "node scripts/kg-query.mjs stats reports no graph after node scripts/kg-ingest.mjs --no-embed (log: $log)"; return 1; }
+}
+
 herdr_projection_meta_field_exact() { # <meta> <key>
   local meta=$1 key=$2 count
   [ -f "$meta" ] && [ ! -L "$meta" ] || return 1
@@ -5230,8 +5287,19 @@ EOF
       q_submit=$(json_escape "$busy_cmd_prefix busy $busy_suffix --event user-prompt-submit >/dev/null 2>&1 || true")
       q_stop=$(json_escape "touch $(shell_quote "$TURNEND"); $busy_cmd_prefix idle $busy_suffix --event stop >/dev/null 2>&1 || true")
       q_sessionend=$(json_escape "$busy_cmd_prefix idle $busy_suffix --event session-end >/dev/null 2>&1 || true")
+      # A project kg server (`kg` in the worktree's .mcp.json) is re-declared
+      # here: qwen gates every .mcp.json server behind a per-path approval
+      # (`qwen mcp list` reads "Pending approval", and outside -y the TUI
+      # opens an approval dialog at startup), while a server in this system
+      # layer is never gated and replaces the project's entry by name (qwen
+      # 0.25.2). The copy drops `type` as qwen's .mcp.json reader does. The
+      # graph it reads is built, and the server excluded for a qwen-shaped
+      # brief, once the Treehouse project lock is released (below).
+      q_mcp=
+      q_kg=$(jq -c '.mcpServers.kg | objects | select(has("command")) | del(.type)' "$WT/.mcp.json" 2>/dev/null) || q_kg=
+      [ -z "$q_kg" ] || q_mcp="\"mcpServers\":{\"kg\":$q_kg},"
       cat >"$STATE_REAL/$ID.qwen-settings.json" <<EOF
-{"\$version":4,"security":{"folderTrust":{"enabled":false}},"ui":{"enableFollowupSuggestions":false,"enableUserFeedback":false},"memory":{"enableManagedAutoMemory":false},"model":{"generationConfig":{"contextWindowSize":65536}},"context":{"autoCompactThreshold":0.6},"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"$q_submit"}]}],"Stop":[{"hooks":[{"type":"command","command":"$q_stop"}]}],"SessionEnd":[{"hooks":[{"type":"command","command":"$q_sessionend"}]}]}}
+{"\$version":4,"security":{"folderTrust":{"enabled":false}},"ui":{"enableFollowupSuggestions":false,"enableUserFeedback":false},"memory":{"enableManagedAutoMemory":false},"model":{"generationConfig":{"contextWindowSize":65536}},"context":{"autoCompactThreshold":0.6},${q_mcp}"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"$q_submit"}]}],"Stop":[{"hooks":[{"type":"command","command":"$q_stop"}]}],"SessionEnd":[{"hooks":[{"type":"command","command":"$q_sessionend"}]}]}}
 EOF
     fi
     ;;
@@ -5771,6 +5839,39 @@ if [ "$SPAWN_TASK_SET_LOCK_HELD" = 1 ]; then
 fi
 "$SCRIPT_DIR/fm-home-summary-refresh.sh" --best-effort || true
 [ "$BACKEND" = orca ] && ORCA_ABORT_CLEANUP=0
+# A qwen worker's project kg graph (ensure_qwen_kg_graph) is built here,
+# after the Treehouse project lock is released, so a dependency install or an
+# ingest never holds slot allocation and return for other spawns. A
+# qwen-shaped brief tells the worker to query the kg through
+# scripts/kg-query.mjs (bin/fm-brief.sh); when the graph cannot be had, that
+# line is dropped from the launch brief, and while it stays the kg server the
+# qwen settings file re-declares is excluded: qwen defers MCP tools, so one
+# lookup through the server takes a tool_search turn more than the command,
+# and its tool listing adds 466 tokens to every request
+# (docs/verification/runtime-backends.md).
+if [ "$HARNESS" = qwen ] && [ "$RAW_LAUNCH" -eq 0 ]; then
+  q_lookup=$(fm_qwen_kg_lookup_line)
+  if { [ -f "$WT/scripts/kg-query.mjs" ] || grep -qxF -- "$q_lookup" "$BRIEF"; } &&
+    ! q_why=$(ensure_qwen_kg_graph "$WT" "$STATE_REAL/$ID.kg-ingest.log"); then
+    if grep -qxF -- "$q_lookup" "$BRIEF"; then
+      if ! { { grep -vxF -- "$q_lookup" "$BRIEF" || :; } >"$BRIEF.kg.tmp" && mv -- "$BRIEF.kg.tmp" "$BRIEF"; }; then
+        rm -f -- "$BRIEF.kg.tmp"
+        echo "error: could not drop the kg-query lookup from $BRIEF; inspect window $T" >&2
+        exit 1
+      fi
+      q_why="$q_why; the kg-query lookup is dropped from its brief"
+    fi
+    echo "warning: $ID's kg graph is unavailable: $q_why" >&2
+  fi
+  q_settings="$STATE_REAL/$ID.qwen-settings.json"
+  if grep -qxF -- "$q_lookup" "$BRIEF" && jq -e '.mcpServers.kg' "$q_settings" >/dev/null 2>&1; then
+    if ! { jq -c '.mcp = {excluded: ["kg"]}' "$q_settings" >"$q_settings.tmp" && mv -- "$q_settings.tmp" "$q_settings"; }; then
+      rm -f -- "$q_settings.tmp"
+      echo "error: could not exclude the kg server in $q_settings; inspect window $T" >&2
+      exit 1
+    fi
+  fi
+fi
 
 sq_brief=$(shell_quote "$BRIEF")
 sq_piext=$(shell_quote "$STATE/$ID.pi-ext.ts")

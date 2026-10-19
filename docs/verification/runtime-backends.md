@@ -529,6 +529,47 @@ What the run established on this version:
 - A PostToolUse hook's `hookSpecificOutput.additionalContext` reaches the model: the blocking run ended with the reply the prompt reserved for having seen the notice, without running the command the notice told it not to start.
 - The compaction fired after the first assistant response, so with a lowering override the hook runs before the model's next call rather than at the full window.
 
+## Claude worker MCP servers
+
+Verified 2026-10-19 on Claude Code 2.1.303, on an account with five claude.ai connectors and no user-scope MCP servers.
+`BASE` is the ship and scout `--settings` JSON without the two MCP keys and `NEW` is the one `bin/fm-spawn.sh` emits:
+
+```sh
+BASE='{"feedbackDrafts":"off","attribution":{"commit":"","pr":"","sessionUrl":false}}'
+NEW='{"feedbackDrafts":"off","disableClaudeAiConnectors":true,"enableAllProjectMcpServers":true,"attribution":{"commit":"","pr":"","sessionUrl":false}}'
+```
+
+In a linked worktree of a project whose `.mcp.json` declares a `kg` stdio server and whose committed settings do not approve it, the token-free server listing shows both halves:
+
+```sh
+claude --settings "$BASE" mcp list
+claude --settings "$NEW" mcp list
+```
+
+```text
+claude.ai Claude Docs: https://api.anthropic.com/v1/pages/mcp - ✔ Connected
+claude.ai Google Sheets: https://sheetsmcp.googleapis.com/mcp/v1 - ✔ Connected
+claude.ai Adobe for creativity: https://adobe-creativity.adobe.io/mcp - ✔ Connected
+claude.ai Google Drive: https://drivemcp.googleapis.com/mcp/v1 - ✔ Connected
+claude.ai Ideogram: https://mcp.ideogram.ai/mcp - ✔ Connected
+kg: node scripts/kg-mcp-bootstrap.mjs - ⏸ Pending approval (run `claude` to approve)
+
+kg: node scripts/kg-mcp-bootstrap.mjs - ✔ Connected
+```
+
+A no-op `claude -p 'Reply with exactly the word OK and nothing else. Do not use any tools.' --model sonnet --effort high --permission-mode auto --settings "$X" --output-format stream-json --verbose` in a repository with no `.mcp.json` measured input plus cache-creation plus cache-read tokens of 33,584 and 33,579 with `BASE` (153 connector tools) and 22,871 and 22,875 with `NEW` (no MCP tools).
+
+Interactive launches in tmux with `NEW` and the worker's other launch flags reached the composer and answered the prompt in all six runs, with no MCP or trust dialog:
+
+- Three runs in the unapproved project and two in the same project with its committed `enabledMcpjsonServers: ["kg"]` each logged `MCP server "kg": Successfully connected` before the first model response, and the claude.ai connectors were never fetched (`[claudeai-mcp] Disabled via disableClaudeAiConnectors setting`).
+- One run in a repository with no `.mcp.json` connected no MCP server.
+- The `BASE` control in the unapproved project stopped at `New MCP server found in this project: kg` with the selection on "Continue without using this MCP server".
+
+Two alternatives were rejected on the same version:
+
+- `--strict-mcp-config` also drops user-scope servers.
+- `--mcp-config <worktree>/.mcp.json` alone still raised the dialog for the project-scope copy of the same server, and exits at launch with `Error: Invalid MCP configuration` when the file is not valid JSON or has no `mcpServers` object.
+
 ## Pi seeded-secondmate project trust
 
 [`fm-spawn.sh --help`](../../bin/fm-spawn.sh) owns the seeded-secondmate project-trust approval contract and compatibility fallback.
@@ -1465,6 +1506,98 @@ ok - herdr 0.8.0, qwen 0.25.1: the task record and brief are intact after every 
 ```
 
 That command is the guard that refreshes this record; `tests/fm-composer-lib.test.sh` and `tests/fm-backend-herdr.test.sh` pin the dark-glyph row and the unregistered-qwen identity with no harness.
+
+### Project kg on qwen
+
+Verified on 2026-10-19 on Linux (WSL2) with Qwen Code 0.25.2, Herdr 0.8.0, and Ollama 0.40.3 serving `qwen3-coder:30b`, in a disposable clone of 420soflo whose `.mcp.json` declares `kg` as `node scripts/kg-mcp-bootstrap.mjs` and which ships `scripts/kg-query.mjs`, under an isolated user home holding only the three-line `.qwen/.env`.
+In that clone `qwen mcp list` printed `kg: node scripts/kg-mcp-bootstrap.mjs (stdio) - Pending approval`.
+Three system settings files, each the per-task file's non-hook keys, differed only in their MCP keys: none, `mcpServers.kg` re-declared, and that plus `"mcp":{"excluded":["kg"]}`.
+Each ran headless:
+
+```sh
+QWEN_CODE_SYSTEM_SETTINGS_PATH=<settings> qwen -y -m qwen3-coder:30b -o json 'Reply with the single word OK. Do not call any tool.'
+```
+
+```text
+none:        mcp_servers=[kg connected]    tools=38  input_tokens=13206
+re-declared: mcp_servers=[kg connected]    tools=38  input_tokens=13206
+excluded:    mcp_servers=[kg disconnected] tools=30  input_tokens=12740
+```
+
+So under `-y` the project's own server connects despite `Pending approval`, and its deferred listing costs 466 tokens per request.
+One lookup each way, twice, with the prompt naming the tool or the command:
+
+```text
+mcp__kg__kg_symbol: num_turns=4 input_tokens=53670; num_turns=3 input_tokens=40136
+kg-query.mjs symbol: num_turns=2 input_tokens=25664; num_turns=2 input_tokens=25646
+```
+
+The MCP runs went through `tool_search` and `tool_call`; a direct first call was refused with `[tool_call bridge refused] Deferred tool "mcp__kg__kg_symbol" has no verified schema review in the current context. Run tool_search with select:mcp__kg__kg_symbol`.
+Both routes returned `[3674] function:allows  420mia/src/modules/identity/access.ts:96-108`.
+
+Real workers then ran through `bin/fm-control.sh relaunch` onto a pane of an `fm-lab-` Herdr session provisioned and torn down by `bin/fm-herdr-lab.sh`, with a local bare origin and a stub `gh-axi`.
+A raw `qwen --approval-mode auto` in the kg clone, with no re-declared server, opened `Untrusted MCP server in .mcp.json` with `1. Approve this server`, `2. Approve all pending servers in this work…`, `3. Reject (esc)` at startup.
+With `config/qwen-approval-mode` set to `auto` and a standard brief asking for one kg lookup, the spawned settings re-declared `kg`, no dialog appeared, and the worker called `tool_search` then `mcp__kg__kg_symbol` and answered with that result line.
+With a `bin/fm-brief.sh --harness qwen` brief whose plan named no source file, the spawned settings re-declared and excluded `kg`, no dialog appeared, and the worker's calls were the isolation check, `node scripts/kg-query.mjs symbol allows`, the write, the done command (passing), commit and push, the PR, and the done line, with no source file read.
+The same brief shape on a project without a kg rendered no lookup lines, and the spawned settings carried no MCP keys.
+`tests/fm-busy-adapter-wiring.test.sh` and `tests/fm-brief.test.sh` pin the settings and the brief lines with no harness; no reusable live guard covers the gate, so re-run such a session after a qwen upgrade.
+
+### Loop-detection halt
+
+Verified on 2026-10-19 on Linux (WSL2) against Herdr 0.8.0 and Qwen Code 0.25.2 serving `qwen3-coder:30b` from the local Ollama, in an isolated `fm-lab-` session provisioned and torn down by `bin/fm-herdr-lab.sh`, with a real qwen worker launched by `bin/fm-control.sh relaunch` and its user settings capping `model.maxToolCallsPerTurn` at 3, loop detection left on.
+When the detector fired, no `Stop` hook ran, so the busy record stayed `state=busy source=qwen-hook event=user-prompt-submit`, and the pane ended in this dialog (a 40x120 viewer; the prose rows wrap with the pane width):
+
+```text
+   ╭─────────────────────────────────────────────────────────────────────────────────────
+   │ ?  A potential loop was detected
+   │
+   │ This can happen due to repetitive tool calls or other model behavior. Do you want to
+   │ keep loop detection enabled or disable it for this session?
+   │
+   │ › 1. Keep loop detection enabled (esc)
+   │   2. Disable loop detection for this session
+   │
+   │ Note: Setting "model.skipLoopDetection" to true in your settings.json disables only
+   │ the heuristic loop checks for future sessions; the always-on guards (consecutive
+   │ identical tool calls, repeated shell inspection commands, and the per-turn tool-call
+   │ cap) are not affected by it. The cap is tunable via "model.maxToolCallsPerTurn" (0
+   │ disables it). Disabling for this session above suppresses everything.
+   ╰─────────────────────────────────────────────────────────────────────────────────────
+```
+
+Without the halt check, `bin/fm-crew-state.sh` read that worker as `state: working · source: pane · harness busy (qwen-hook)`.
+With it, `fm_busy_classify` printed `unknown halt-prompt`, `fm_composer_blocking_dialog` printed `qwen loop-detection dialog`, crew state read `state: blocked · source: pane · halted on its harness's own dialog, which waits for a keypress (halt-prompt); never answer it - inspect the worker and relaunch it`, and `bin/fm-watch.sh` at `FM_POLL=5` exited with `stale: <target>` 12 seconds after it started.
+`bin/fm-send.sh` recorded the steer as `001.msg`, reported `doorbell did not reach`, and left the dialog on screen.
+
+```sh
+FM_QWEN_LOOP_DIALOG_LIVE=1 bash tests/fm-qwen-loop-dialog-live-e2e.test.sh
+```
+
+```text
+ok - herdr 0.8.0, qwen 0.25.2: a halted qwen classifies unknown halt-prompt while its record still reads busy
+ok - herdr 0.8.0, qwen 0.25.2: crew state reads the halted qwen as blocked
+ok - herdr 0.8.0, qwen 0.25.2: a steer is recorded and its doorbell is not typed into the dialog
+ok - herdr 0.8.0, qwen 0.25.2: relaunch replaces a halted qwen on the same endpoint
+ok - herdr 0.8.0, qwen 0.25.2: exit stops a halted qwen
+```
+
+That command is the guard that refreshes this record; `tests/fm-composer-lib.test.sh`, `tests/fm-busy-state.test.sh`, and `tests/fm-crew-state.test.sh` pin the dialog's structure, the halt verdict over a busy record, and the blocked state with no harness.
+
+### Edit guard and the compact brief
+
+Verified on 2026-10-19 against Qwen Code 0.25.2, which self-updated under `~/.qwen/updates/`; 0.25.1 carries the same refusal messages.
+In the bundle's `checkPriorRead`, `edit` and `write_file` on an existing file refuse with `has not been read in this session` when the session holds no read record for it and with `modified since you last read it` when its mtime or size changed.
+A `read_file` or `grep_search` result and a successful edit or write record a read, a shell `cat` does not, a new file needs none, and every chat compression calls `getFileReadCache().clear()`.
+In the production session that the qwen shape's editing rule replaced (read each file once, rewrite it whole), each of the 11 `has not been read in this session` refusals came after a chat compression since that file's last read or write.
+
+The qwen shape's commands were then run by real qwen workers in the same lab, launched by `bin/fm-spawn.sh --relaunch` onto an agent-free pane so the launch brief carried no progress note, on a disposable project with a local bare origin and a stub `gh-axi`, with a plan to create one file and change two and a done command that runs no tests.
+With the start command as the brief's first lines, the worker's first call was its own `ls -la`, and no working line was written.
+At the brief's end, a longer form that also wrote the blocked line was replaced by the worker's own `pwd && git branch --show-current`, and a check followed by a separate working echo lost the echo in one of three runs.
+The shipped form, one command at the end that writes the working line and prints `OK` or `STOP`, ran first and wrote the working line in all six runs.
+The runs took 17 to 23 seconds and 10 to 14 model requests, no `edit` or `write_file` was refused, and every first done line carried the URL the stub printed.
+While the chain only appended the done line, seven of eight runs then wrote more lines on their own, three with an invented URL and one after re-running `gh-axi pr create`; with the chain printing the line it wrote, two of three runs added only an exact copy of it.
+The first request carried about 15,710 input tokens, nearly all of them qwen's own system prompt and tool declarations.
+No reusable live guard covers the brief; re-run such a task after a qwen upgrade or a change to the qwen shape in `bin/fm-brief.sh`.
 
 ### Not verified
 

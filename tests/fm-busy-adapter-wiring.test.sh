@@ -545,6 +545,119 @@ test_qwen_hooks_stale_incarnation_harmless() {
   pass "qwen hook events from a superseded incarnation are rejected without breaking the hook"
 }
 
+# A project kg server rides the same settings file: re-declared in its system
+# layer, which qwen never holds behind its .mcp.json approval, and excluded for
+# a qwen-shaped brief, which queries the kg through scripts/kg-query.mjs. The
+# graph is gitignored, so the spawn installs missing dependencies, runs an
+# incremental ingest that builds a missing graph and refreshes a kept one,
+# confirms it with the project's `kg-query.mjs stats`, and, when the build
+# fails, drops the brief's kg-query lookup and keeps the server connected.
+test_qwen_settings_carry_the_project_kg_server() {
+  local rec id out status settings launch shape lookup
+  lookup=$(. "$ROOT/bin/fm-dod-lib.sh" && fm_qwen_kg_lookup_line)
+  for shape in standard qwen-present qwen-built qwen-deps qwen-unbuilt no-kg; do
+    id=busy-qw-kg-$shape
+    rec=$(make_spawn_case "qwen-kg-$shape" qwen "$id")
+    read_case_record "$rec"
+    if [ "$shape" != no-kg ]; then
+      # The spawn starts the copy from origin, so the kg ships in the project.
+      mkdir -p "$PROJ_DIR/scripts"
+      printf '%s\n' 'import fs from "node:fs";' \
+        'if (process.argv[2] === "stats" && !fs.existsSync("ai-map/kg.db")) { console.error("the graph is not built"); process.exit(1); }' \
+        > "$PROJ_DIR/scripts/kg-query.mjs"
+      if [ "$shape" = qwen-unbuilt ]; then
+        printf '%s\n' 'console.error("unknown option --no-embed"); process.exit(2);' > "$PROJ_DIR/scripts/kg-ingest.mjs"
+      else
+        printf '%s\n' 'import fs from "node:fs";' \
+          'if (fs.existsSync("pnpm-lock.yaml") && !fs.existsSync("node_modules")) { console.error("ERR_MODULE_NOT_FOUND"); process.exit(1); }' \
+          'fs.mkdirSync("ai-map", { recursive: true });' \
+          'fs.writeFileSync("ai-map/ingest", (fs.existsSync("ai-map/kg.db") ? "refresh " : "build ") + process.argv.slice(2).join(" "));' \
+          'if (process.argv.includes("--no-embed") && !process.argv.includes("--rebuild")) fs.writeFileSync("ai-map/kg.db", "");' \
+          > "$PROJ_DIR/scripts/kg-ingest.mjs"
+      fi
+      printf '%s\n' 'ai-map/' 'node_modules/' > "$PROJ_DIR/.gitignore"
+      printf '%s\n' '{"mcpServers":{"kg":{"type":"stdio","command":"node","args":["scripts/kg-mcp-bootstrap.mjs"],"env":{}},"other":{"command":"other-server"}}}' > "$PROJ_DIR/.mcp.json"
+      git -C "$PROJ_DIR" add .gitignore .mcp.json scripts
+      if [ "$shape" = qwen-deps ]; then
+        printf 'lockfileVersion: 9.0\n' > "$PROJ_DIR/pnpm-lock.yaml"
+        git -C "$PROJ_DIR" add pnpm-lock.yaml
+        printf '%s\n' '#!/usr/bin/env bash' 'mkdir -p ai-map node_modules && printf "%s\n" "$*" > ai-map/pnpm-args' > "$FAKEBIN_DIR/pnpm"
+        chmod +x "$FAKEBIN_DIR/pnpm"
+      fi
+      git -C "$PROJ_DIR" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit --quiet -m 'add the kg'
+      git -C "$PROJ_DIR" push --quiet origin HEAD
+      git -C "$WT_DIR" reset --quiet --hard "$(git -C "$PROJ_DIR" rev-parse HEAD)"
+    fi
+    if [ "$shape" = qwen-present ]; then
+      mkdir -p "$WT_DIR/ai-map"
+      : > "$WT_DIR/ai-map/kg.db"
+    fi
+    case "$shape" in
+      qwen-*)
+        # The brief reads the project's clone, which ships the kg command.
+        mkdir -p "$HOME_DIR/projects/project/scripts"
+        : > "$HOME_DIR/projects/project/scripts/kg-query.mjs"
+        rm -f "$HOME_DIR/data/$id/brief.md"
+        printf 'Write x.txt.\n' > "$CASE_DIR/plan.md"
+        FM_HOME="$HOME_DIR" "$ROOT/bin/fm-brief.sh" "$id" project --mode direct-PR --harness qwen \
+          --plan "$CASE_DIR/plan.md" --files x.txt --done-command 'test -s x.txt' >/dev/null \
+          || fail "could not scaffold the qwen-shaped brief for $id"
+        grep -qxF -- "$lookup" "$HOME_DIR/data/$id/brief.md" || fail "the qwen-shaped brief for $id should carry the kg-query lookup"
+        sed -i.bak -e 's/^{TASK}$/Write x.txt./' -e 's/^{FIRSTMATE_SPEC}$/Nothing else./' "$HOME_DIR/data/$id/brief.md"
+        out=$(fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --mode direct-PR --yolo off) ;;
+      *)
+        out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR") ;;
+    esac
+    status=$?
+    expect_code 0 "$status" "qwen $shape spawn should succeed: $out"
+    settings="$HOME_DIR/state/$id.qwen-settings.json"
+    launch="$HOME_DIR/data/$id/launch-brief.md"
+    jq -e . "$settings" >/dev/null || fail "qwen $shape settings are not valid JSON"
+    case "$shape" in
+      no-kg)
+        [ "$(jq -c '[.mcpServers, .mcp]' "$settings")" = '[null,null]' ] \
+          || fail "a project without a kg server must leave qwen's MCP settings alone"
+        assert_not_contains "$out" "kg graph" "a project without a kg must not report on its graph"
+        continue ;;
+    esac
+    [ "$(jq -c '.mcpServers' "$settings")" = '{"kg":{"command":"node","args":["scripts/kg-mcp-bootstrap.mjs"],"env":{}}}' ] \
+      || fail "qwen $shape settings must re-declare exactly the project's kg server, without its type"
+    case "$shape" in
+      qwen-present)
+        [ "$(cat "$WT_DIR/ai-map/ingest" 2>/dev/null)" = 'refresh --no-embed' ] \
+          || fail "a graph a pooled slot kept must be refreshed incrementally without embeddings" ;;
+      standard | qwen-built | qwen-deps)
+        [ "$(cat "$WT_DIR/ai-map/ingest" 2>/dev/null)" = 'build --no-embed' ] \
+          || fail "qwen $shape spawn must build the missing graph incrementally without embeddings"
+        [ -f "$WT_DIR/ai-map/kg.db" ] || fail "qwen $shape spawn must leave the built graph in the worktree" ;;
+    esac
+    if [ "$shape" = qwen-deps ]; then
+      [ "$(cat "$WT_DIR/ai-map/pnpm-args" 2>/dev/null)" = 'install --frozen-lockfile --prefer-offline' ] \
+        || fail "a worktree with a pnpm lockfile and no node_modules must get its dependencies installed before the build"
+    else
+      [ ! -e "$WT_DIR/ai-map/pnpm-args" ] || fail "qwen $shape spawn must not install dependencies"
+    fi
+    case "$shape" in
+      qwen-present | qwen-built | qwen-deps)
+        grep -qxF -- "$lookup" "$launch" || fail "qwen $shape: a worker whose graph is built must keep the kg-query lookup"
+        [ "$(jq -c '.mcp.excluded' "$settings")" = '["kg"]' ] \
+          || fail "qwen $shape: a qwen-shaped brief must keep the kg server's tool definitions out of every request"
+        assert_not_contains "$out" "kg graph is unavailable" "qwen $shape must not report an unavailable graph" ;;
+      qwen-unbuilt)
+        assert_not_contains "$(cat "$launch")" "kg-query" "a worker whose graph could not be built must not be told to query it"
+        [ "$(jq -c '.mcp' "$settings")" = null ] || fail "a worker without the kg-query lookup must keep the kg server connected"
+        assert_contains "$out" "kg graph is unavailable: node scripts/kg-ingest.mjs --no-embed exited 2" \
+          "the spawn must say why the graph is unavailable"
+        assert_contains "$out" "the kg-query lookup is dropped from its brief" "the spawn must say the lookup was dropped"
+        assert_contains "$(cat "$HOME_DIR/state/$id.kg-ingest.log")" "unknown option --no-embed" \
+          "the failed build's output must be kept" ;;
+      standard)
+        [ "$(jq -c '.mcp' "$settings")" = null ] || fail "a standard brief must keep the kg server connected" ;;
+    esac
+  done
+  pass "qwen settings re-declare a project kg server, the spawn installs missing dependencies and builds or refreshes the graph, and the kg-query lookup and kg exclusion stay only while the graph answers"
+}
+
 test_raw_qwen_launch_has_no_semantic_wiring() {
   local rec id=busy-qw-raw out state
   rec=$(make_spawn_case qwen-raw qwen "$id")
@@ -600,6 +713,7 @@ test_raw_gemini_launch_has_no_semantic_wiring
 test_gemini_is_refused_as_a_secondmate
 test_qwen_hooks_semantic_lifecycle
 test_qwen_hooks_stale_incarnation_harmless
+test_qwen_settings_carry_the_project_kg_server
 test_raw_qwen_launch_has_no_semantic_wiring
 test_qwen_is_refused_as_a_secondmate
 test_codex_hooks_semantic_lifecycle

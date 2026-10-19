@@ -14,6 +14,7 @@ Verified as a CREWMATE and SCOUT adapter only; `../../../../../bin/fm-spawn.sh` 
 | Exit | `/quit` (alias `/exit`), one Enter, exit status 0; prints `To continue this session, run` / `qwen --resume <session-id>`. `SessionEnd` fires once. |
 | Interrupt | Single `Escape`, then `Ctrl+U`. On a turn with streamed output Escape prints `●︎ Request cancelled.`, leaves the agent running, and RESTORES the cancelled prompt into the composer as `* <prompt>`, where the next typed line would concatenate onto it; `Ctrl+U` clears it and is harmless on an empty composer. An Escape that lands before any output streams withdraws the prompt from the transcript with no cancel notice. Escape on an idle composer does nothing. |
 | Composer | A separated shape: one row between two `─` rules opening with a literal ASCII `*`, then the `Type your message or @path/to/file` placeholder as dark truecolor text. On Herdr the `*` itself is dark truecolor too, so the glyph is read from the plain row and only the text after it through the ghost strip. It classifies `empty` only with a live idle qwen identity - tmux's foreground-process probe, or on Herdr, which never registers qwen, the pane's foreground process plus the absent busy footer - and a typed draft is `pending`; `*` is never an agent glyph on its own. |
+| Loop halt | When qwen's loop detector fires (repeated identical tool calls, repeated shell inspection commands, or the per-turn tool-call cap `model.maxToolCallsPerTurn`), the turn ends with no `Stop` hook and a boxed `? A potential loop was detected` dialog with `› 1. Keep loop detection enabled (esc)` and `2. Disable loop detection for this session` waits for a keypress, so the busy record keeps reading busy. `../../../../../bin/fm-busy-lib.sh` classifies the rendered dialog `unknown halt-prompt`, `../../../../../bin/fm-crew-state.sh` reads the task blocked, the watcher's stale path then wakes firstmate, and `fm-send` records a steer without typing its doorbell into the dialog. `fm-control.sh relaunch` and `exit` replace or stop the halted worker; their interrupt Escape is the dialog's keep-detection choice. Never answer `2` or turn detection off: the loops it catches are real. |
 | Steering mid-turn | The running turn's footer reads `Enter to steer · Ctrl+Q to queue`: text submitted while a turn runs is consumed by that turn as a steer rather than opening a new one. |
 | Skill | Workspace skills under `.agents/skills` load (a lab skill was listed in the init event's `slash_commands`); the `/<skill>` submit shape was not exercised and is unverified. |
 | Autonomy | `-y` / `--yolo`, footer `YOLO mode (shift + tab to cycle)`, verified unattended on a real file write and a `git commit` shell call with no approval gate; `config/qwen-approval-mode` selects `--approval-mode auto` instead. qwen's own tool policy blocks a standalone `sleep` shell call (`Run blocking commands in the background`), so a long turn for a probe is generation, not a sleeping tool. |
@@ -72,7 +73,7 @@ The same rule backs pane liveness in `bin/backends/tmux.sh` and the composer ide
 ## Worker busy state and the per-task settings file
 
 `../../../../../bin/fm-spawn.sh` writes a firstmate-owned per-task settings file at `state/<id>.qwen-settings.json` and the launch reaches it through `QWEN_CODE_SYSTEM_SETTINGS_PATH`.
-It carries the three busy hooks bound to the minted busy generation, `"$version": 4`, `security.folderTrust.enabled=false`, `ui.enableFollowupSuggestions=false`, `ui.enableUserFeedback=false`, `memory.enableManagedAutoMemory=false`, and the two context-window pins described below.
+It carries the three busy hooks bound to the minted busy generation, `"$version": 4`, `security.folderTrust.enabled=false`, `ui.enableFollowupSuggestions=false`, `ui.enableUserFeedback=false`, `memory.enableManagedAutoMemory=false`, the two context-window pins described below, and on a project with a kg server the entries described under [Project kg](#project-kg).
 Hook arrays merge across qwen's settings layers, so a project's own hooks still run alongside firstmate's.
 This wiring belongs only to the canonical exact `qwen` adapter template; a raw qwen-shaped launch receives no busy-state wiring and has no trusted busy state.
 It is deliberately NOT the worktree's `.qwen/settings.json`, which is the project's own file.
@@ -98,18 +99,37 @@ The pin does not cover growth inside one request, because qwen checks its trigge
 Later sessions that day still reached the shift that way, from one turn of six large, token-dense reads batched together and from one long response on a prompt already near the trigger.
 Changing the served window is the captain's call, sized to the card's memory, and firstmate never changes the service or the models; when it changes, the pin in `../../../../../bin/fm-spawn.sh` must change with it.
 
+## Project kg
+
+A project's kg is its code knowledge graph, served to agents by a `kg` MCP server in its `.mcp.json` and by the shell command `scripts/kg-query.mjs`.
+qwen 0.25.2 reads `.mcp.json`, but holds each of its servers behind a per-path approval recorded in `~/.qwen/mcpApprovals.json`, so a disposable worktree's server is never approved: `qwen mcp list` reads `Pending approval`, and outside `-y` an interactive launch opens an approval dialog at startup.
+Under `-y` qwen skips that gate and connects the server.
+A server declared in the system settings layer is never gated and replaces a `.mcp.json` server of the same name, so the per-task settings file re-declares the project's `kg` entry there, without its `type` as qwen's own `.mcp.json` reader drops it, and no approval mode prompts for it.
+qwen defers MCP tools: a first `mcp__kg__kg_symbol` call is refused until the model loads its schema with `tool_search`, so one lookup through the server takes three or four turns against two through `kg-query`, which prints the same result line, and the deferred listing adds 466 tokens to every request ([`runtime-backends.md`](../../../../../docs/verification/runtime-backends.md#project-kg-on-qwen)).
+So when the project ships `scripts/kg-query.mjs`, `../../../../../bin/fm-brief.sh --harness qwen` gives rule 3 the `kg-query` and `ai-map/master_map.md` lookups, and while the launch brief keeps the `kg-query` line the settings file also lists `kg` in `mcp.excluded`.
+Any other launch through the canonical `qwen` adapter keeps the kg server connected.
+Both routes answer only from a graph built in the copy: a fresh copy has none, and one a pooled slot kept from an earlier task can be stale.
+So before every launch through the canonical `qwen` adapter whose worktree ships `scripts/kg-query.mjs`, once the Treehouse project lock is released so slot allocation and return for other spawns never wait on it, the spawn runs `pnpm install --frozen-lockfile --prefer-offline` when the worktree has `pnpm-lock.yaml` and no `node_modules`, then the incremental `node scripts/kg-ingest.mjs --no-embed`, which builds a missing graph and refreshes a kept one.
+The ingest runs under `flock /tmp/kg-ingest.lock` where `flock` is installed (not on macOS, where it runs unlocked) so one ingest runs on the machine at a time; the install, the lock wait and the ingest share one 120-second bound, and their output goes to `state/<id>.kg-ingest.log`.
+The project's own `node scripts/kg-query.mjs stats`, which exits 0 only on a built graph, then confirms the graph answers.
+A graph built that way has no embeddings, so the `kg-query` line names only `symbol` and `callers`, which answer without them; `search` does not.
+When the install or the ingest fails or `stats` reports no graph, the spawn prints why and drops the `kg-query` line from the launch brief, so the worker is never told to run a lookup that cannot answer.
+
 ## Hazards seen in production launches
 
 - **Brief prose is not followed; commands are.**
   A qwen worker on the standard brief skipped its branch step and every status append while following each concrete path and command, and wrote its module over the plan file the brief named by absolute path.
   Scaffold a qwen ship with `../../../../../bin/fm-brief.sh --harness qwen`, whose help owns that shape: the plan is inlined, the spawn creates the branch and refuses one that already exists, and the spawn makes every untracked file in a subdirectory of the home's `data/` that the brief names read-only for good, while top-level `data/` records, `state/`, `config/`, `projects/` and tracked files stay writable.
+  In lab runs on 0.25.2 the worker ran the start command first from the brief's last section, and opened with its own `ls` when the command came first.
+  It ran the reporting chain, sometimes split in two, and then often wrote more done lines on its own, so the chain prints the line it wrote; without that echo some repeats re-ran `gh-axi pr create` or carried an invented URL ([`runtime-backends.md`](../../../../../docs/verification/runtime-backends.md#edit-guard-and-the-compact-brief)).
 - **A pane read as dead may be a live TUI.**
   Before Herdr pane liveness recognized qwen (2026-10-15), a relaunch read a working qwen pane as dead and typed `cd -- '<worktree>'`, its `export` lines, and the launch-script line into qwen's idle composer.
   qwen ran the `cd` line as a prompt, executing the commit it had been describing on a detached HEAD, and took the rest as mid-turn steers.
   `fm-control.sh exit` and `relaunch` now stop and replace a running qwen under Herdr, idle or mid-turn, so stop a stuck one through them rather than by its PID.
-- **A formatter breaks qwen's edit guard.**
-  `prettier --write` changes a file's mtime, after which qwen refuses `edit` and `write_file` on it with `file_changed_since_read` until the file is re-read.
-  The qwen-shaped brief tells the worker to format once, after its last edit.
+- **qwen's edit guard needs a current read.**
+  `edit` and `write_file` on an existing file refuse (`has not been read in this session`, or `modified since you last read it`) unless the session holds a current read of it: a `read_file` or `grep_search` result, or the session's own successful edit or write, counts, and a shell `cat` does not.
+  A change in mtime or size voids that read, which is what a formatter such as `prettier --write` does, and every chat compression clears all of them; a new file needs no read.
+  The qwen-shaped brief therefore creates with `write_file`, changes with `edit`, re-reads once after a refusal, and formats once after the last edit; rewriting every change with `write_file` meets the same guard at a far larger output cost.
 
 ## Primary integration
 

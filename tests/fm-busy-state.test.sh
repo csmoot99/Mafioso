@@ -393,6 +393,51 @@ Trusting a folder allows Qwen Code to execute commands it suggests.
   pass "a qwen launch parked on its folder-trust dialog classifies unknown launch-prompt"
 }
 
+# --- halt-prompt (a running turn halted on the harness's own dialog) --------
+
+# qwen 0.25.2's loop-detection dialog as Herdr captured it, the last rows of
+# the pane: the loop halt ends the turn with no Stop hook.
+qwen_loop_tail() {
+  printf '%s\n' \
+    '  ✓ Shell date +%N' \
+    '    768671907' \
+    '   ╭─────────────────────────────────────────────────────' \
+    '   │ ?  A potential loop was detected' \
+    '   │' \
+    '   │ › 1. Keep loop detection enabled (esc)' \
+    '   │   2. Disable loop detection for this session' \
+    '   │' \
+    '   ╰─────────────────────────────────────────────────────'
+}
+
+test_halt_prompt_qwen_loop_dialog() {
+  local state gen out tail
+  tail=$(qwen_loop_tail)
+  state=$(new_state_dir halt-prompt-qwen)
+  gen=$("$EV" arm "$state" t1)
+  "$EV" apply "$state" t1 busy --gen "$gen" --source qwen-hook --event user-prompt-submit >/dev/null
+  out=$(fm_busy_classify herdr s:w1:p1 qwen t1 "$state")
+  [ "$out" = "busy qwen-hook" ] || fail "the halted turn's record must still read busy qwen-hook without a tail, got '$out'"
+  out=$(fm_busy_classify herdr s:w1:p1 qwen t1 "$state" "$tail")
+  [ "$out" = "unknown halt-prompt" ] \
+    || fail "a busy qwen record under its loop dialog must classify unknown halt-prompt, got '$out'"
+  "$EV" apply "$state" t1 idle --gen "$gen" --source qwen-hook --event stop >/dev/null
+  out=$(fm_busy_classify herdr s:w1:p1 qwen t1 "$state" "$tail")
+  [ "$out" = "unknown halt-prompt" ] || fail "an idle qwen record under its loop dialog must classify unknown halt-prompt, got '$out'"
+  out=$(fm_busy_classify herdr s:w1:p1 qwen t1 "$state" "$(printf '%s\n' "$tail" '' '*  Type your message or @path/to/file')")
+  [ "$out" = "idle qwen-hook" ] || fail "the dialog's text above qwen's composer must keep the record verdict, got '$out'"
+  state=$(new_state_dir halt-prompt-claude)
+  gen=$("$EV" arm "$state" t1)
+  "$EV" apply "$state" t1 busy --gen "$gen" --source claude-hook --event user-prompt-submit >/dev/null
+  out=$(fm_busy_classify herdr s:w1:p1 claude t1 "$state" "$tail")
+  [ "$out" = "busy claude-hook" ] || fail "the qwen dialog must never classify another harness, got '$out'"
+  # A caller that never loaded the composer library still gets the verdict.
+  # shellcheck disable=SC2016 # The inner script expands after bash -c receives positional args.
+  out=$(env -i PATH="$PATH" bash -c '. "$1/bin/fm-busy-lib.sh"; fm_busy_classify herdr s:w1:p1 qwen t1 "$2" "$3"' _ "$ROOT" "$TMP_ROOT/halt-prompt-qwen/state" "$tail")
+  [ "$out" = "unknown halt-prompt" ] || fail "fm-busy-lib alone must still read the loop dialog, got '$out'"
+  pass "a qwen worker halted on its loop-detection dialog classifies unknown halt-prompt, whatever its record says"
+}
+
 test_launch_prompt_never_shortens_a_working_launch() {
   local state out
   state=$(new_state_dir launch-prompt-working)
@@ -667,6 +712,7 @@ test_launch_prompt_pi_trust_dialog
 test_launch_prompt_pi_requires_both_markers
 test_launch_prompt_gemini_dialogs
 test_launch_prompt_qwen_dialog
+test_halt_prompt_qwen_loop_dialog
 test_launch_prompt_codex_trust_dialog
 test_launch_prompt_never_shortens_a_working_launch
 test_launch_prompt_scoped_to_armed_harnesses
