@@ -617,7 +617,7 @@ test_relaunch_appends_the_progress_note_to_the_instructions() {
 # note lands above Start, and the inbox check joins Start's one first step
 # instead of opening a second one.
 test_relaunch_note_keeps_a_qwen_brief_start_last() {
-  local dir out rc brief plan inbox ack n
+  local dir out rc brief plan inbox n start_cmd
   dir=$(new_case qwen-note rlq1)
   add_ship_task "$dir" rlq1 claude
   sed -i 's/^mode=no-mistakes$/mode=direct-PR/' "$dir/home/state/rlq1.meta"
@@ -638,14 +638,22 @@ test_relaunch_note_keeps_a_qwen_brief_start_last() {
   done
   grep -q '^First, ' "$brief" && fail "a qwen relaunch note opened a second first step"
   inbox="$dir/home/state/rlq1.inbox"
-  [ "$(grep -c "^If it printed OK, run \`ls $inbox/\*.msg\`" "$brief")" = 1 ] \
+  [ "$(grep -c '^If it printed OK and then messages' "$brief")" = 1 ] \
     || fail "the qwen relaunch did not fold one inbox check into the Start step"
+  # qwen runs Start's one command but skips a separate inbox listing or mv, so
+  # that command must print a waiting steer and acknowledge it, and print OK
+  # alone when the inbox is empty.
+  start_cmd=$(awk '/^# Start$/ { s = 1 } s && /^    / { sub(/^    /, ""); print; exit }' "$brief")
+  git init -q -b "$(sed -n 's/^Ship branch: //p' "$brief")" "$dir/qwen-wt" || fail "could not create the qwen worktree"
   mkdir -p "$inbox/handled"
-  printf 'steer\n' > "$inbox/001.msg"
-  # shellcheck disable=SC2016 # Literal backticks delimit the command in the brief.
-  ack=$(grep '^If it printed OK, run' "$brief" | grep -o 'mv [^`]*')
-  bash -c "${ack//NNN/001}" || fail "the folded inbox acknowledgement failed: $ack"
-  [ -f "$inbox/handled/001.msg" ] || fail "the folded inbox acknowledgement did not move the steer"
+  out=$(cd "$dir/qwen-wt" && bash -c "$start_cmd")
+  [ "$out" = OK ] || fail "Start's command should print only OK with an empty inbox, got: $out"
+  printf 'use title fix: steer\n' > "$inbox/001.msg"
+  out=$(cd "$dir/qwen-wt" && bash -c "$start_cmd")
+  [ "$out" = "OK"$'\n'"message 001.msg:"$'\n'"use title fix: steer" ] \
+    || fail "Start's command did not print the waiting steer, got: $out"
+  [ -f "$inbox/handled/001.msg" ] && [ ! -e "$inbox/001.msg" ] \
+    || fail "Start's command did not move the printed steer into handled/"
   pass "fm-control relaunch: a qwen brief keeps Start last with one first step across relaunch notes"
 }
 
