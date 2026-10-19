@@ -46,7 +46,7 @@ A PR approved meanwhile waits for the next combined PR or lands after this one, 
 
 - The integrator is one live worker of a folded PR with spare context whose task mode is the strictest among the folded tasks (no-mistakes over direct-PR).
 - Without one, file and spawn a fresh ship worker in that mode with `--base-branch <base>` when the base is not the default; a spawn past the project's capacity stays queued.
-- Steer every other folded worker through `bin/fm-send.sh` not to push to its PR branch, start a validation run, or edit the project's rolling bookkeeping files (`ai-map/CHANGELOG.md` and `ai-map/NOW.md`, or the project's equivalent), and to declare a `paused:` wait until its PR lands through the combined PR.
+- Steer every other folded worker through `bin/fm-send.sh` not to push to its PR branch or start a validation run, and to declare a `paused:` wait until its PR lands through the combined PR.
 - Append the captain's merge words and the substance of every folded task's captain intent to the integrator's `## Captain's intent` and relay them, so a no-mistakes integrator's `--intent` covers the whole combined PR under `bin/fm-dod-lib.sh`.
 - Quote the captain's merge words verbatim in the integrator's steer beside its merge and publish steps, so the worker's own permission check sees the approval for those commands, and name any waived check carried into the combined PR.
 
