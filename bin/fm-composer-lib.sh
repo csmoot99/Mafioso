@@ -1989,28 +1989,33 @@ _fm_composer_pi_verdict() {  # <screen> <styled> <has_identity> <identity>
 }
 
 # qwen's rows between the separator pair (verified live, qwen 0.25.1 through
-# tmux): the first row opens with a literal `*` glyph, followed by the
-# `Type your message or @path/to/file` placeholder in a dark truecolor
-# foreground that the ghost strip removes, leaving the bare `*`, or by the
-# typed text as bright bytes (`* hello draft` plus a trailing U+200B cursor
-# cell). A plain capture cannot tell that placeholder from typed text, so it
-# stays unknown; a wrapped draft continues on the rows below the glyph row.
+# tmux and Herdr 0.8.0): the first row opens with a literal `*` glyph, followed
+# by the `Type your message or @path/to/file` placeholder in a dark truecolor
+# foreground that the ghost strip removes, or by the typed text as bright bytes
+# (`* hello draft` plus a trailing cursor cell). On Herdr the glyph itself is
+# dark truecolor (38;2;139;58;74), so the ghost strip removes it too: the glyph
+# is read from the plain row and only the text after it from the ghost-stripped
+# row. A plain capture cannot tell that placeholder from typed text, so it stays
+# unknown; a wrapped draft continues on the rows below the glyph row.
 _fm_composer_classify_qwen_rows() {  # <screen> <styled>
-  local screen=$1 styled=$2 row raw content first=1
+  local screen=$1 styled=$2 row raw plain content first=1
   [ "$styled" = 1 ] || { printf 'unknown'; return 0; }
   row=$((FM_COMPOSER_SCAN_PI_OPEN + 1))
   while [ "$row" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")
-    content=$(_fm_composer_row_content "$raw" "$styled")
-    fm_composer_normalize_trim_var content
     if [ "$first" = 1 ]; then
       first=0
-      case "$content" in
-        '*') ;;
-        '* '*) printf 'pending'; return 0 ;;
+      plain=$(printf '%s\n' "$raw" | fm_composer_strip_ansi)
+      fm_composer_normalize_trim_var plain
+      case "$plain" in
+        '*'|'* '*) ;;
         *) printf 'unknown'; return 0 ;;
       esac
-    elif [ -n "$content" ]; then
+      raw=${raw#*\*}
+    fi
+    content=$(_fm_composer_row_content "$raw" "$styled")
+    fm_composer_normalize_trim_var content
+    if [ -n "$content" ]; then
       printf 'pending'
       return 0
     fi

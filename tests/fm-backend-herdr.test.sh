@@ -4222,6 +4222,59 @@ test_composer_state_pi_separator_requires_safe_native_identity() {
   pass "fm_backend_herdr_composer_state: Pi separators never authorize working, non-Pi, unreadable, or over-tall targets"
 }
 
+# Real qwen 0.25.1 on Herdr 0.8.0 (captured live 2026-10-18). Herdr never
+# registers qwen, so `agent get` answers agent_not_found while it runs; its
+# separated composer is proven through the pane's foreground qwen process and
+# qwen's own busy footer instead, as tmux proves it.
+QWEN_HERDR_RULE=$'\x1b[0m\x1b[38;2;139;58;74m────────────────────────────────────────\x1b[0m\r'
+QWEN_HERDR_IDLE="  ◆ READY"$'\n'"$QWEN_HERDR_RULE"$'\n\x1b[0m\x1b[38;2;139;58;74m* \x1b[0m\x1b[48;2;212;212;212m \x1b[0m\x1b[38;2;108;112;134m Type your message or @path/to/file\x1b[0m\r\n'"$QWEN_HERDR_RULE"$'\n  \x1b[0m\x1b[38;2;243;139;168mYOLO mode\x1b[0m\x1b[38;2;108;112;134m (shift + tab to cycle)\x1b[0m'
+QWEN_HERDR_DRAFT="$QWEN_HERDR_RULE"$'\n\x1b[0m\x1b[38;2;139;58;74m* \x1b[0mhello draft\x1b[0m\x1b[48;2;212;212;212m \x1b[0m\r\n'"$QWEN_HERDR_RULE"
+QWEN_HERDR_BUSY="  (3s · esc to cancel)"$'\n'"$QWEN_HERDR_IDLE"
+
+# qwen_herdr_composer_case <dir> <screen> <agent-get-body|exit> <process-info-body|exit> [footer-screen]
+# Calls: 1 visible capture, 2 agent get, 3 process-info, 4 the busy-footer read.
+# Prints the verdict, then the number of process-info calls.
+qwen_herdr_composer_case() {
+  local dir="$TMP_ROOT/composer-qwen-$1" resp log fb
+  mkdir -p "$dir/responses"; resp="$dir/responses"; log="$dir/log"; : > "$log"
+  printf '%s\n' "$2" > "$resp/1.out"
+  case "$3" in
+    exit) printf '1\n' > "$resp/2.exit" ;;
+    exit-err) printf '{"error":{"code":"agent_not_found","message":"agent target w1:p2 not found"}}\n' > "$resp/2.err"; printf '1\n' > "$resp/2.exit" ;;
+    *) printf '%s\n' "$3" > "$resp/2.out" ;;
+  esac
+  case "$4" in
+    exit) printf '1\n' > "$resp/3.exit" ;;
+    *) printf '%s\n' "$4" > "$resp/3.out" ;;
+  esac
+  printf '%s\n' "${5:-$2}" > "$resp/4.out"
+  fb=$(make_herdr_fakebin "$dir")
+  PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_composer_state lab:w1:p2' "$ROOT"
+  printf ' %s' "$(grep -c $'\x1f''process-info' "$log")"
+}
+
+test_composer_state_unregistered_qwen_separator() {
+  local not_found qwen out
+  not_found='{"error":{"code":"agent_not_found","message":"agent target w1:p2 not found"}}'
+  qwen=$(node_bundle_process_info /home/u/.local/bin/qwen)
+  out=$(qwen_herdr_composer_case idle "$QWEN_HERDR_IDLE" "$not_found" "$qwen")
+  [ "$out" = "empty 1" ] || fail "an idle unregistered qwen should read empty through its foreground process, got '$out'"
+  out=$(qwen_herdr_composer_case idle-exit-err "$QWEN_HERDR_IDLE" exit-err "$qwen")
+  [ "$out" = "empty 1" ] || fail "agent_not_found reported on stderr with a failing exit is the same answer, got '$out'"
+  out=$(qwen_herdr_composer_case draft "$QWEN_HERDR_DRAFT" "$not_found" "$qwen")
+  [ "$out" = "pending 1" ] || fail "a typed draft in an unregistered qwen composer should read pending, got '$out'"
+  out=$(qwen_herdr_composer_case busy "$QWEN_HERDR_IDLE" "$not_found" "$qwen" "$QWEN_HERDR_BUSY")
+  [ "$out" = "unknown 1" ] || fail "a qwen whose busy footer shows a running turn must not read empty, got '$out'"
+  out=$(qwen_herdr_composer_case stranger "$QWEN_HERDR_IDLE" "$not_found" "$(node_bundle_process_info /srv/app/server.js)")
+  [ "$out" = "unknown 1" ] || fail "a stranger's node process must not prove a qwen composer, got '$out'"
+  out=$(qwen_herdr_composer_case process-info-failed "$QWEN_HERDR_IDLE" "$not_found" exit)
+  [ "$out" = "unknown 1" ] || fail "an unreadable process view must not prove a qwen composer, got '$out'"
+  out=$(qwen_herdr_composer_case agent-get-failed "$QWEN_HERDR_IDLE" exit "$qwen")
+  [ "$out" = "unknown 0" ] || fail "an agent read that is not agent_not_found must yield no identity and no process probe, got '$out'"
+  pass "fm_backend_herdr_composer_state: an unregistered qwen is identified from its foreground process and busy footer, and nothing weaker proves its composer"
+}
+
 # --- composer_state: unbordered (bare) composer rows -------------------------
 # Regression coverage for the away-mode redelivery-loop incident
 # (docs/herdr-backend.md "Incident (2026-07-07)"): real claude and codex
@@ -6157,6 +6210,7 @@ test_composer_state_pi_dollar_status_footer_is_empty
 test_composer_state_pi_separator_real_text_is_pending
 test_composer_state_pi_incomplete_separator_below_stale_generic_is_unknown
 test_composer_state_pi_separator_requires_safe_native_identity
+test_composer_state_unregistered_qwen_separator
 test_composer_state_claude_unbordered_prompt_is_empty
 test_composer_state_claude_unbordered_prompt_is_pending
 test_composer_state_bare_prompt_below_stale_bordered_banner_wins

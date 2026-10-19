@@ -648,6 +648,29 @@ test_matrix_qwen_separated_glyph_row_needs_identity() {
   pass "matrix: qwen's * glyph row needs identity + structure; the glyph alone never proves it"
 }
 
+test_matrix_qwen_herdr_dark_glyph_row() {
+  # Real idle qwen 0.25.1 on Herdr 0.8.0 (captured live 2026-10-18): the `*`
+  # glyph and both rules are dark truecolor 139;58;74, the cursor is a
+  # background-colored space, rows end in CR, and four footer rows follow.
+  local rule glyph footer screen typed star qwen_idle qwen_working
+  rule=$'\033[0m\033[38;2;139;58;74m────────────────────────\033[0m\r'
+  glyph=$'\033[0m\033[38;2;139;58;74m* \033[0m'
+  footer=$'  \033[0m\033[38;2;203;166;247m\xe2\x9e\x9c wt \xc2\xb7 git:(fm/qlab) \xc2\xb7 qwen3-coder:30b \xc2\xb7 65.5k \033[0m\r\n  \033[0m\033[38;2;203;166;247mContext 22.3% used\033[0m\r\n  \033[0m\033[38;2;243;139;168mYOLO mode\033[0m\033[38;2;108;112;134m (shift + tab to cycle)\033[0m\r\n  \033[0m\033[38;2;108;112;134m22.3% used\033[0m'
+  screen="  ◆ READY"$'\n'"$rule"$'\n'"$glyph"$'\033[48;2;212;212;212m \033[0m\033[38;2;108;112;134m Type your message or @path/to/file\033[0m\r\n'"$rule"$'\n'"$footer"
+  typed="$rule"$'\n'"$glyph"$'hello draft\033[0m\033[48;2;212;212;212m \033[0m\r\n'"$rule"$'\n'"$footer"
+  star="$rule"$'\n'"$glyph"$'*\033[0m\033[48;2;212;212;212m \033[0m\r\n'"$rule"$'\n'"$footer"
+  qwen_idle=$(printf 'qwen\tidle'); qwen_working=$(printf 'qwen\tworking')
+  case "$(printf '%s\n' "$glyph" | fm_composer_strip_ghost)" in
+    *'*'*) fail "the fixture's dark glyph must be one the ghost strip removes, or this case is vacuous" ;;
+  esac
+  assert_screen "qwen dark-glyph idle on herdr" empty "$CAPS_STYLED" "$screen" '' "$qwen_idle"
+  assert_screen "qwen dark-glyph draft on herdr" pending "$CAPS_STYLED" "$typed" '' "$qwen_idle"
+  assert_screen "a draft that is itself a lone * stays pending" pending "$CAPS_STYLED" "$star" '' "$qwen_idle"
+  assert_screen "working qwen with a dark glyph defers" unknown "$CAPS_STYLED" "$screen" '' "$qwen_working"
+  assert_screen "absent identity cannot prove the dark glyph row" unknown "$CAPS_STYLED" "$screen" '' probe-absent
+  pass "matrix: qwen's dark * glyph on herdr is read from the plain row, and only the text after it decides"
+}
+
 test_matrix_pi_dollar_status_footer_is_empty() {
   # Pi's status row `$0.000 (sub) 5.4%/272k (auto)` at column 0 used to read
   # as a dead-shell prompt, so an idle separated composer classified unknown.
@@ -1062,6 +1085,7 @@ test_matrix_omp_status_row_bounds_bare_composer
 test_matrix_codex_idle_starfield_furniture
 test_matrix_pi_separated_needs_identity
 test_matrix_qwen_separated_glyph_row_needs_identity
+test_matrix_qwen_herdr_dark_glyph_row
 test_matrix_pi_dollar_status_footer_is_empty
 test_matrix_opencode_leftbar_signals
 test_matrix_grok_titled_bottom_border
