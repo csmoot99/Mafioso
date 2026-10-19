@@ -77,7 +77,7 @@ Hand the captain that exact command to type as `! <command>` in the integrator's
 - Every folded worker other than the integrator stays paused with no new work until cleanup.
 - Its declared wait re-surfaces on the long recheck cadence; confirm the combined PR is still in flight without steering the worker, because every steer spends one of its turns.
 - To end an idle folded worker once its head is folded, run `bin/fm-control.sh <id> exit`: it stops only the agent and keeps the local copy, branch, records, and merge poll, and `bin/fm-teardown.sh`'s landed-work test reads that copy rather than the agent, so cleanup after the combined merge is unchanged.
-- A context handoff from a folded worker that is only waiting gets no replacement: exit it that way, then close the handoff with `bin/fm-send.sh <id> --resolve-key context-handoff-<n> "<no replacement needed>"`, which records the answer without ringing the stopped worker.
+- A context handoff from a folded worker that is only waiting gets no replacement: while it is still running, close the handoff with `bin/fm-send.sh <id> --resolve-key context-handoff-<n> "<no replacement needed>"`, let it move that record into handled/, then exit it that way.
 - When an exited folded worker is needed again, such as for a PR that must land on its own, `bin/fm-control.sh <id> relaunch --note "<why>"` resumes it in the same copy.
 
 ## Land
