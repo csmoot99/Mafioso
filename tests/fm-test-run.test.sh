@@ -58,6 +58,20 @@ test_family_selection() {
   pass "family selection returns a proper subset of the suite"
 }
 
+# The supervision-host suite is split across files only so CI can spread it over
+# separate shards. Every part must keep the afk family that --changed selects
+# for the host's own sources: an unmapped part lands in unclassified and drops
+# out of that selection.
+test_split_supervision_host_suites_keep_their_family() {
+  local listed s
+  listed=$("$RUNNER" --list --family afk)
+  for s in fm-supervision-host fm-supervision-host-turns fm-supervision-host-session; do
+    printf '%s\n' "$listed" | grep -Fxq "tests/$s.test.sh" \
+      || fail "the afk family must include tests/$s.test.sh"
+  done
+  pass "every split supervision-host suite stays in the serial afk family"
+}
+
 test_single_script_selection() {
   local listed
   listed=$("$RUNNER" --list tests/fm-lint.test.sh)
@@ -1828,6 +1842,7 @@ assert len(doc["scripts"])==3
 
 test_list_all_exact_suite_coverage
 test_family_selection
+test_split_supervision_host_suites_keep_their_family
 test_single_script_selection
 test_changed_file_selection_is_conservative
 test_task_marker_refuses_the_primary_checkout
