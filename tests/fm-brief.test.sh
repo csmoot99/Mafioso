@@ -1424,8 +1424,9 @@ test_qwen_shape_looks_up_through_the_project_kg_and_map() {
     case "$id" in
       brief-qwen-k1 | brief-qwen-k2)
         # shellcheck disable=SC2016 # Backticks are literal generated Markdown.
-        assert_contains "$rule3" 'look it up with `node scripts/kg-query.mjs symbol <name>` or `node scripts/kg-query.mjs search' \
-          "$id: a project with the kg command does not get the kg lookup in rule 3" ;;
+        assert_contains "$rule3" 'look it up with `node scripts/kg-query.mjs symbol <name>`, or find what uses it with `node scripts/kg-query.mjs callers <name>`' \
+          "$id: a project with the kg command does not get the kg lookup in rule 3"
+        assert_not_contains "$rule3" "kg-query.mjs search" "$id: the kg lookup must not name search, which needs embeddings" ;;
       *) assert_not_contains "$rule3" "kg-query" "$id: a project without the kg command got the kg lookup" ;;
     esac
     case "$id" in

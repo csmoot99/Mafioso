@@ -3989,24 +3989,31 @@ protect_qwen_brief_named_files() { # <brief> <worktree>
   done < <(grep -oE "/[^[:space:]\`'\"<>()]+" "$brief" | sort -u)
 }
 
-# A project kg answers only from ai-map/kg.db, which is gitignored and so
-# missing from a fresh copy. A qwen worker's copy gets it built here, without
-# embeddings (symbol and caller lookups need none) and under a bound; when it
-# cannot be had, the reason is printed and the status is nonzero.
+# A project kg answers only once its graph is built in the copy, and a fresh
+# copy has none; the repo's own `kg-query.mjs stats` says whether it is built.
+# A qwen worker's copy gets a missing graph built here, without embeddings
+# (symbol and caller lookups need none), under flock(1) where it exists so one
+# ingest runs on the machine at a time, with the lock wait and the build under
+# one bound; when the graph cannot be had, the reason is printed and the
+# status is nonzero.
+qwen_kg_graph_built() { # <worktree>
+  (cd "$1" && fm_run_timed 30 node scripts/kg-query.mjs stats) </dev/null >/dev/null 2>&1
+}
+
 ensure_qwen_kg_graph() { # <worktree> <log>
-  local worktree=$1 log=$2 bound=120 status=0
+  local worktree=$1 log=$2 bound=120 status=0 lock=()
   [ -f "$worktree/scripts/kg-query.mjs" ] || { echo "the worktree has no scripts/kg-query.mjs"; return 1; }
-  [ ! -f "$worktree/ai-map/kg.db" ] || return 0
-  [ -f "$worktree/scripts/kg-ingest.mjs" ] || { echo "the worktree has no ai-map/kg.db and no scripts/kg-ingest.mjs to build it"; return 1; }
-  (cd "$worktree" && fm_run_timed "$bound" node scripts/kg-ingest.mjs --rebuild --no-embed) </dev/null >"$log" 2>&1 || status=$?
-  [ "$status" -ne 0 ] || [ ! -f "$worktree/ai-map/kg.db" ] || return 0
-  rm -f -- "$worktree/ai-map/kg.db"
+  ! qwen_kg_graph_built "$worktree" || return 0
+  [ -f "$worktree/scripts/kg-ingest.mjs" ] || { echo "the graph is not built and the worktree has no scripts/kg-ingest.mjs to build it"; return 1; }
+  ! command -v flock >/dev/null 2>&1 || lock=(flock /tmp/kg-ingest.lock)
+  (cd "$worktree" && fm_run_timed "$bound" ${lock[@]+"${lock[@]}"} node scripts/kg-ingest.mjs --rebuild --no-embed) </dev/null >"$log" 2>&1 || status=$?
+  ! qwen_kg_graph_built "$worktree" || return 0
   if fm_timed_out "$status"; then
-    echo "building ai-map/kg.db timed out after ${bound}s (log: $log)"
+    echo "building the graph timed out after ${bound}s (log: $log)"
   elif [ "$status" -ne 0 ]; then
     echo "node scripts/kg-ingest.mjs --rebuild --no-embed exited $status (log: $log)"
   else
-    echo "node scripts/kg-ingest.mjs --rebuild --no-embed left no ai-map/kg.db (log: $log)"
+    echo "node scripts/kg-query.mjs stats still reports no graph after node scripts/kg-ingest.mjs --rebuild --no-embed (log: $log)"
   fi
   return 1
 }
@@ -5258,7 +5265,7 @@ EOF
       # opens an approval dialog at startup), while a server in this system
       # layer is never gated and replaces the project's entry by name (qwen
       # 0.25.2). The copy drops `type` as qwen's .mcp.json reader does. Both
-      # routes read the worktree's ai-map/kg.db, built first when missing
+      # routes read the worktree's built graph, built first when missing
       # (ensure_qwen_kg_graph). A qwen-shaped brief tells the worker to query
       # the kg through scripts/kg-query.mjs (bin/fm-brief.sh); when the graph
       # cannot be had, that line is dropped from the launch brief, and while

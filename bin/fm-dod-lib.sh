@@ -212,9 +212,10 @@ fm_brief_is_qwen_shape() {  # <brief>
 # The qwen-shaped brief's rule 3 kg lookup line: bin/fm-brief.sh writes it, and
 # bin/fm-spawn.sh removes it from the launch brief when the worktree's graph
 # cannot be built and keeps the kg MCP server out of requests while it stays.
+# It names only lookups that answer on a graph built without embeddings.
 fm_qwen_kg_lookup_line() {
   # shellcheck disable=SC2016 # Backticks are literal generated Markdown.
-  printf '%s\n' '   Before you read a file the plan does not name, look it up with `node scripts/kg-query.mjs symbol <name>` or `node scripts/kg-query.mjs search "<what it does>"`; each result names `<repo>/<path>:<start>-<end>`, so read only those lines of `<path>`.'
+  printf '%s\n' '   Before you read a file the plan does not name, look it up with `node scripts/kg-query.mjs symbol <name>`, or find what uses it with `node scripts/kg-query.mjs callers <name>`; each result names `<repo>/<path>:<start>-<end>`, so read only those lines of `<path>`.'
 }
 
 fm_ship_rule_one() {  # <no-mistakes|direct-PR|local-only> <task-id> [branch] [<forge>] [<base>]

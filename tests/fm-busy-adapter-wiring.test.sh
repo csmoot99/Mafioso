@@ -548,8 +548,9 @@ test_qwen_hooks_stale_incarnation_harmless() {
 # A project kg server rides the same settings file: re-declared in its system
 # layer, which qwen never holds behind its .mcp.json approval, and excluded for
 # a qwen-shaped brief, which queries the kg through scripts/kg-query.mjs. The
-# graph is gitignored, so the spawn builds a missing one and, when the build
-# fails, drops the brief's kg-query lookup and keeps the server connected.
+# graph is gitignored, so the spawn builds a missing one, as the project's
+# `kg-query.mjs stats` judges it, and, when the build fails, drops the brief's
+# kg-query lookup and keeps the server connected.
 test_qwen_settings_carry_the_project_kg_server() {
   local rec id out status settings launch shape lookup
   lookup=$(. "$ROOT/bin/fm-dod-lib.sh" && fm_qwen_kg_lookup_line)
@@ -560,7 +561,9 @@ test_qwen_settings_carry_the_project_kg_server() {
     if [ "$shape" != no-kg ]; then
       # The spawn starts the copy from origin, so the kg ships in the project.
       mkdir -p "$PROJ_DIR/scripts"
-      : > "$PROJ_DIR/scripts/kg-query.mjs"
+      printf '%s\n' 'import fs from "node:fs";' \
+        'if (process.argv[2] === "stats" && !fs.existsSync("ai-map/kg.db")) { console.error("the graph is not built"); process.exit(1); }' \
+        > "$PROJ_DIR/scripts/kg-query.mjs"
       if [ "$shape" = qwen-unbuilt ]; then
         printf '%s\n' 'console.error("unknown option --no-embed"); process.exit(2);' > "$PROJ_DIR/scripts/kg-ingest.mjs"
       else
@@ -627,7 +630,6 @@ test_qwen_settings_carry_the_project_kg_server() {
       qwen-unbuilt)
         assert_not_contains "$(cat "$launch")" "kg-query" "a worker whose graph could not be built must not be told to query it"
         [ "$(jq -c '.mcp' "$settings")" = null ] || fail "a worker without the kg-query lookup must keep the kg server connected"
-        [ ! -e "$WT_DIR/ai-map/kg.db" ] || fail "a failed build must not leave a graph behind"
         assert_contains "$out" "kg graph is unavailable: node scripts/kg-ingest.mjs --rebuild --no-embed exited 2" \
           "the spawn must say why the graph is unavailable"
         assert_contains "$out" "the kg-query lookup is dropped from its brief" "the spawn must say the lookup was dropped"
