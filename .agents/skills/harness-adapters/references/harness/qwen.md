@@ -107,10 +107,12 @@ A server declared in the system settings layer is never gated and replaces a `.m
 qwen defers MCP tools: a first `mcp__kg__kg_symbol` call is refused until the model loads its schema with `tool_search`, so one lookup through the server takes three or four turns against two through `kg-query`, which prints the same result line, and the deferred listing adds 466 tokens to every request ([`runtime-backends.md`](../../../../../docs/verification/runtime-backends.md#project-kg-on-qwen)).
 So when the project ships `scripts/kg-query.mjs`, `../../../../../bin/fm-brief.sh --harness qwen` gives rule 3 the `kg-query` and `ai-map/master_map.md` lookups, and while the launch brief keeps the `kg-query` line the settings file also lists `kg` in `mcp.excluded`.
 Any other qwen launch keeps the kg server connected.
-Both routes answer only once the graph is built in the copy, and a fresh copy has none; the spawn asks the project's own `node scripts/kg-query.mjs stats`, which exits 0 only on a built graph.
-Before every qwen launch whose worktree ships `scripts/kg-query.mjs` without a built graph, the spawn runs `node scripts/kg-ingest.mjs --rebuild --no-embed` in the worktree, under `flock /tmp/kg-ingest.lock` where `flock` is installed (not on macOS, where it runs unlocked) so one ingest runs on the machine at a time, with the lock wait and the build under one 120-second bound and the output in `state/<id>.kg-ingest.log`.
+Both routes answer only from a graph built in the copy: a fresh copy has none, and one a pooled slot kept from an earlier task can be stale.
+So before every qwen launch whose worktree ships `scripts/kg-query.mjs`, once the Treehouse project lock is released so slot allocation and return for other spawns never wait on it, the spawn runs `pnpm install --frozen-lockfile --prefer-offline` when the worktree has `pnpm-lock.yaml` and no `node_modules`, then the incremental `node scripts/kg-ingest.mjs --no-embed`, which builds a missing graph and refreshes a kept one.
+The ingest runs under `flock /tmp/kg-ingest.lock` where `flock` is installed (not on macOS, where it runs unlocked) so one ingest runs on the machine at a time; the install, the lock wait and the ingest share one 120-second bound, and their output goes to `state/<id>.kg-ingest.log`.
+The project's own `node scripts/kg-query.mjs stats`, which exits 0 only on a built graph, then confirms the graph answers.
 A graph built that way has no embeddings, so the `kg-query` line names only `symbol` and `callers`, which answer without them; `search` does not.
-When `stats` still reports no graph after that, the spawn prints why and drops the `kg-query` line from the launch brief, so the worker is never told to run a lookup that cannot answer.
+When the install or the ingest fails or `stats` reports no graph, the spawn prints why and drops the `kg-query` line from the launch brief, so the worker is never told to run a lookup that cannot answer.
 
 ## Hazards seen in production launches
 

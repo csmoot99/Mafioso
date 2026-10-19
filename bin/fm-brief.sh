@@ -135,10 +135,10 @@
 # When the project's clone (projects/<repo-name>) ships scripts/kg-query.mjs,
 # the shell command for its kg code graph, or ai-map/master_map.md, rule 3
 # gains a line telling the worker to look up through it any file the plan
-# does not name before reading one; bin/fm-spawn.sh builds the kg's graph in
-# the worktree when it is missing, drops the kg line when the graph cannot be
-# built, and while the line stays keeps that kg's MCP server out of the
-# worker's requests, because a lookup through it costs more.
+# does not name before reading one; bin/fm-spawn.sh builds or refreshes the
+# kg's graph in the worktree, drops the kg line when the graph cannot be had,
+# and while the line stays keeps that kg's MCP server out of the worker's
+# requests, because a lookup through it costs more.
 # It keeps the isolation check, fm_ship_rule_one's push and merge rule, the
 # working, done and blocked status lines, the inbox acknowledgement, and the
 # machine-read Delivery contract, Ship branch, and Base branch lines; it drops
