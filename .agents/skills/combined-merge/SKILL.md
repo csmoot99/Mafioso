@@ -57,7 +57,7 @@ Project workers do not load firstmate's skills, so put these steps in the integr
 1. Cut a new branch from the current base: `<ship-branch>-combined` for a worker reusing its own copy, or a fresh task's own ship branch.
 2. Merge each folded PR's current head with `git merge --no-ff -m "Merge #<number> from <branch> at <head>" <head>`, in dependency order; never squash, rebase, cherry-pick, or force-push, because GitHub marks a folded PR merged only when its exact head commit lands.
 3. Resolve each conflict once, keeping every PR's intent as the steer describes it; a conflict that cannot keep both intents is a `needs-decision`, not the integrator's choice.
-   In the project's rolling bookkeeping files, resolve each fold's conflict by keeping the combined branch's side, then after the last fold write one combined entry naming every folded PR in one commit, within the caps the project sets for those files.
+   In the project's rolling bookkeeping files, resolve each fold's conflict by keeping the combined branch's side, then after the last fold make one commit that replaces every folded PR's own entries in those files, including ones that merged without a conflict, with one combined entry naming every folded PR, within the caps the project sets for those files.
 4. Run the union of the folded PRs' tests and the repository's own gates.
 5. Publish a combined PR into the base by the integrator's mode: no-mistakes runs one validation on the combined branch, while direct-PR pushes and opens the PR itself.
 6. List in the combined PR body each folded PR's full URL and the exact head commit folded from it.
