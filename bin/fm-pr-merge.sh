@@ -127,7 +127,8 @@
 # run's push then refuses to reconcile its mirror ref, so the run needs a full
 # re-validation; a clean base advance only re-arms the monitor. Siblings are
 # only this home's other recorded tasks: no-mistakes ships on the same project
-# and recorded base branch whose worktree still exists. One is in flight while
+# and recorded base branch, an unrecorded base read on both sides as the project
+# clone's default branch, whose worktree still exists. One is in flight while
 # the run on its checked-out branch has not ended and has completed or skipped
 # its rebase step, pushed or not, green or not, parked at a gate or not; an
 # ended run, including one aborted after its PR went green, never blocks.
@@ -139,7 +140,11 @@
 # directory, so the clone is never written. The refusal names each sibling,
 # its PR or branch, and the conflicting files. A sibling whose run state,
 # rebase step, or head cannot be read, or whose trial cannot run, refuses too
-# rather than being guessed either way. --allow-in-flight, parsed before the
+# rather than being guessed either way. The refusal names the ways out: a
+# named run whose PR is already green but whose run is still monitoring CI
+# ends when it is aborted (no-mistakes axi abort in its worktree, as after
+# every green run), and then this merge proceeds; two green PRs that conflict
+# with each other land through combined-merge. --allow-in-flight, parsed before the
 # optional -- separator, skips this gate for an explicit captain instruction
 # to merge anyway and is refused while the away-posture record exists.
 #
@@ -185,6 +190,8 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 . "$SCRIPT_DIR/fm-afk-contract.sh"
 # shellcheck source=bin/fm-nm-run-lib.sh
 . "$SCRIPT_DIR/fm-nm-run-lib.sh"
+# shellcheck source=bin/fm-tangle-lib.sh
+. "$SCRIPT_DIR/fm-tangle-lib.sh"
 
 if [ "$#" -lt 2 ]; then
   echo "error: invalid PR merge request" >&2
@@ -1131,12 +1138,14 @@ meta_value() {  # <meta-file> <key>
 # head in FM_PR_MERGE_HEAD. Every conflicting or unreadable sibling is
 # collected first, so one refusal names them all.
 refuse_conflicting_siblings() {
-  local project base sibling_meta sibling wt branch run rc rebase pr head line label
+  local project default base sibling_base sibling_meta sibling wt branch run rc rebase pr head line label
   local in_flight='' refusals='' objects='' common gate unavailable='' pr_head='' sibling_head files
   local -a trial
   [ "$ALLOW_IN_FLIGHT" = false ] || return 0
   project=$(meta_value "$META" project)
+  default=$(fm_default_branch "$project" 2>/dev/null) || default=''
   base=$(meta_value "$META" base_branch)
+  base=${base:-$default}
   for sibling_meta in "$STATE"/*.meta; do
     if [ ! -f "$sibling_meta" ] || [ -L "$sibling_meta" ]; then
       continue
@@ -1147,7 +1156,8 @@ refuse_conflicting_siblings() {
     case "$(meta_value "$sibling_meta" kind)" in ''|ship) ;; *) continue ;; esac
     [ "$(meta_value "$sibling_meta" mode)" = no-mistakes ] || continue
     [ "$(meta_value "$sibling_meta" project)" = "$project" ] || continue
-    [ "$(meta_value "$sibling_meta" base_branch)" = "$base" ] || continue
+    sibling_base=$(meta_value "$sibling_meta" base_branch)
+    [ "${sibling_base:-$default}" = "$base" ] || continue
     wt=$(meta_value "$sibling_meta" worktree)
     if [ -z "$wt" ] || [ ! -d "$wt" ]; then
       continue
@@ -1244,7 +1254,7 @@ EOF
   printf 'error: refusing to merge %s: another validation in flight on the same project and base conflicts with it or cannot be ruled out; after this merge its CI monitor would rebase over the conflict and its push would stop it for a full re-validation\n' \
     "$URL" >&2
   printf '%s' "$refusals" >&2
-  printf 'error: merge once each listed run has ended (passed, failed, or aborted after its PR went green) or no longer conflicts; pass --allow-in-flight only on an explicit captain instruction to merge anyway\n' >&2
+  printf 'error: merge once each listed run has ended (passed, failed, or aborted) or no longer conflicts; a listed run whose PR is already green but whose run is still monitoring CI does not end on its own, so abort it (no-mistakes axi abort in its worktree, as after every green run) and this merge proceeds; two green PRs that conflict with each other land together through combined-merge; pass --allow-in-flight only on an explicit captain instruction to merge anyway\n' >&2
   return 1
 }
 

@@ -4040,6 +4040,55 @@ test_unreadable_sibling_state_refuses() {
   pass "fm-pr-merge refuses, naming the sibling, when its run state or run head cannot be read"
 }
 
+# The incident's mutual hold: this PR is green and the conflicting sibling's PR
+# is green too, but its run is still monitoring CI and will not end on its own.
+# The refusal names both ways out, and aborting the sibling's run lets the
+# merge proceed.
+test_conflict_refusal_names_the_ways_out_of_a_mutual_hold() {
+  local case_dir pr_head sibling_head sibling_pr=https://github.com/example/repo/pull/341
+
+  case_dir=$(make_case sibling-mutual-hold)
+  pr_head=$(make_trial_project "$case_dir")
+  add_gh_mocks "$case_dir" "$pr_head"
+  sibling_head=$(add_sibling "$case_dir" task-y2 CHANGELOG.md)
+  write_sibling_in_ci "$case_dir" task-y2 "$sibling_pr" "$sibling_head"
+  expect_conflict_refusal "$case_dir" sibling-mutual-hold \
+    "task task-y2 ($sibling_pr) conflicts with it in CHANGELOG.md"
+  assert_grep 'abort it (no-mistakes axi abort in its worktree' "$case_dir/stderr" \
+    "sibling-mutual-hold: the refusal did not name aborting a green sibling's monitoring run"
+  assert_grep 'land together through combined-merge' "$case_dir/stderr" \
+    "sibling-mutual-hold: the refusal did not name combined-merge for two conflicting green PRs"
+
+  write_sibling_run "$case_dir" task-y2 cancelled "$sibling_pr" "$sibling_head" \
+    rebase,completed,0,0 push,completed,0,0 pr,completed,0,0 ci,cancelled,0,0 'outcome: cancelled'
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/300 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    || fail "sibling-mutual-hold: the merge must proceed once the sibling's run is aborted: $(cat "$case_dir/stderr")"
+  assert_logged_gh_merge "$case_dir" 300 example/repo --squash
+  pass "fm-pr-merge names aborting a green sibling's run and combined-merge as the ways out of a conflict hold"
+}
+
+# A task spawned without --base-branch records no base_branch and targets the
+# project's default branch, the same base as a sibling that names it.
+test_unrecorded_base_matches_a_sibling_on_the_default_branch() {
+  local case_dir pr_head sibling_head name sibling_pr=https://github.com/example/repo/pull/351
+  for name in sibling-names-default merger-names-default; do
+    case_dir=$(make_case "sibling-base-$name")
+    pr_head=$(make_trial_project "$case_dir")
+    add_gh_mocks "$case_dir" "$pr_head"
+    if [ "$name" = sibling-names-default ]; then
+      sibling_head=$(add_sibling "$case_dir" task-y2 CHANGELOG.md base_branch=main)
+    else
+      printf 'base_branch=main\n' >> "$case_dir/state/task-x1.meta"
+      sibling_head=$(add_sibling "$case_dir" task-y2 CHANGELOG.md)
+    fi
+    write_sibling_in_ci "$case_dir" task-y2 "$sibling_pr" "$sibling_head"
+    expect_conflict_refusal "$case_dir" "sibling-base-$name" \
+      "task task-y2 ($sibling_pr) conflicts with it in CHANGELOG.md"
+  done
+  pass "fm-pr-merge reads an unrecorded base as the project's default branch when matching siblings"
+}
+
 test_allow_in_flight_overrides_the_gate_only_when_attended() {
   local case_dir rc pr_head sibling_head
 
@@ -4141,3 +4190,5 @@ test_conflicting_in_flight_sibling_refuses_the_merge
 test_siblings_outside_the_gate_do_not_block
 test_unreadable_sibling_state_refuses
 test_allow_in_flight_overrides_the_gate_only_when_attended
+test_conflict_refusal_names_the_ways_out_of_a_mutual_hold
+test_unrecorded_base_matches_a_sibling_on_the_default_branch
