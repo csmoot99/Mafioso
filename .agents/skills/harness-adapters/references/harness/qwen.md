@@ -93,7 +93,9 @@ The next request re-sends the full history, so its cache hit is near zero, its t
 
 The per-task settings file therefore pins `model.generationConfig.contextWindowSize=65536` (the served window) and `context.autoCompactThreshold=0.6`.
 qwen compacts once its own estimate passes `min(threshold * window, window - 33000)` (a 20k summary reserve plus a 13k buffer), so at the pinned 65,536 the trigger is 32,536 and the threshold is inert; it becomes the active trigger if the window is raised above about 82,500.
-A live session verified on 2026-10-18 that qwen compacts there and the server never shifts ([`runtime-backends.md`](../../../../../docs/verification/runtime-backends.md#context-window-on-the-local-model)).
+A live session of sequential reads verified on 2026-10-18 that qwen compacts there with no server shift ([`runtime-backends.md`](../../../../../docs/verification/runtime-backends.md#context-window-on-the-local-model)).
+The pin does not cover growth inside one request, because qwen checks its trigger only between turns and estimates tokens from characters, which undercounts token-dense content.
+Later sessions that day still reached the shift that way, from one turn of six large, token-dense reads batched together and from one long response on a prompt already near the trigger.
 Changing the served window is the captain's call, sized to the card's memory, and firstmate never changes the service or the models; when it changes, the pin in `../../../../../bin/fm-spawn.sh` must change with it.
 
 ## Hazards seen in production launches

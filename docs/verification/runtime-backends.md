@@ -1418,6 +1418,15 @@ The journal for that session had no `context shift` line and every request relea
 
 The 49k requests are the summarization calls, which carry the whole history; the largest prompt plus output was 50,920, leaving 14,616 tokens under the window.
 qwen estimates tokens from characters, and on that token-dense content each summarization call the server received was 7k to 16k tokens larger than qwen's estimate of the history it summarized, so denser content or larger single tool results shrink that margin.
+
+qwen checks its trigger only between turns, so the pin does not cover growth inside one request, and later sessions that day with the same settings reached the shift that way.
+Three sessions read six 26,000-character hex files and were free to batch the calls.
+Two batched all six into one turn, so the next request carried 64,618 and 64,439 prompt tokens while qwen estimated 38,417; each compaction kept the recent tool results (to an estimated 36,619 and 36,324), the session stayed at the window edge, and the final answers were degenerate (`IIItappe`, `IIBasedIt`).
+In the first of those, the summarization request itself logged `slot context shift, n_keep = 4, n_left = 65531, n_discard = 32765` and `truncated = 1`, and the summary it returned read `No explicit requests or intents were provided by the user`.
+The third batched three reads and compacted twice with no shift, at prompt tokens `11945 48312 57978 28370 49753 28295`.
+Two further sessions that read 21,153-character files one per turn shifted from a long response instead: an ordinary turn generated `32768 tokens` on a 33,046-token prompt, and a summarization request generated its full `20000 tokens` budget on a prompt of about 58,000.
+Those two sessions also carried a 25,000-character tool-output batch cap that the per-task settings do not keep, and each single read was below it.
+The shifts are in the server journal (`journalctl --user -u ollama | grep 'context shift'`), and each request's output size is on its `eval time` line.
 No reusable live guard covers this yet; re-run such a session after a qwen or Ollama upgrade, or after the served window changes, which also requires changing the pin.
 
 ### Herdr pane liveness

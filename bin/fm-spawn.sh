@@ -5215,8 +5215,11 @@ EOF
       # brief, plan) out once a request passes 65536.
       # context.autoCompactThreshold=0.6 is inert at the pinned 65536:
       # qwen's own ceiling (window minus its 20k summary reserve and 13k
-      # buffer, 32536) binds first, and a live session compacted there with
-      # no server shift (docs/verification/runtime-backends.md). It becomes
+      # buffer, 32536) binds first, and a live session of sequential reads
+      # compacted there with no server shift. qwen checks only between
+      # turns, so one turn of large batched tool results or one long
+      # response can still pass the window and shift
+      # (docs/verification/runtime-backends.md). It becomes
       # the active trigger if the window is raised above about 82500. Change
       # the window with the server's.
       # Hook commands print nothing: qwen's hook contract accepts an empty
