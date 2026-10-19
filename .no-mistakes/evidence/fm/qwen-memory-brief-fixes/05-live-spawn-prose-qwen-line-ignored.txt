@@ -1,0 +1,16 @@
+## standard direct-PR brief whose Captain's intent quotes the qwen header:
+6:Delivery contract: mode=direct-PR
+7:Ship branch: fm/qwen-lab-c3
+8:Brief shape: qwen
+97:Delivery contract: mode=direct-PR
+98:Ship branch: fm/qwen-lab-c3
+## live fm-spawn.sh output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+notice: qwen-lab-c3 ships mode=direct-PR while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+spawned qwen-lab-c3 harness=claude kind=ship mode=direct-PR yolo=off window=primary:fm-qwen-lab-c3 worktree=$LAB/treehouse-root/.treehouse/demo-ed9332/3/demo
+SPAWN_EXIT=0
+
+fm/qwen-lab-c3 exists in project/worktree after spawn: no
+worktree HEAD state: detached
+named plan perms: -rw-rw-r--

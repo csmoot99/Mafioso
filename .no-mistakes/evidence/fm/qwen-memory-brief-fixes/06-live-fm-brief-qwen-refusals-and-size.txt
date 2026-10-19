@@ -1,0 +1,30 @@
+## live fm-brief.sh refusals (FM_HOME=$LAB)
+
+$ fm-brief.sh qwen-ref-1 demo --mode no-mistakes --harness qwen --plan $LAB/data/qwen-lab-a1/plan.md --files a --done-command make
+error: --harness qwen renders only a direct-PR ship brief on a project with no bound forge
+exit=1 brief-written=no
+
+$ fm-brief.sh qwen-ref-2 demo --mode direct-PR --harness qwen --plan $LAB/data/qwen-lab-a1/plan.md --files a --done-command make --forge gerrit
+error: --harness qwen renders only a direct-PR ship brief on a project with no bound forge
+exit=1 brief-written=no
+
+$ fm-brief.sh qwen-ref-3 demo --mode direct-PR --harness qwen --plan $LAB/data/qwen-lab-a1/plan.md --files a --done-command make --herdr-lab
+error: --harness qwen cannot carry --herdr-lab: Herdr lifecycle work never fits the qwen shape
+exit=1 brief-written=no
+
+$ fm-brief.sh qwen-ref-4 demo --mode direct-PR --harness qwen --files a --done-command make
+error: --harness qwen requires --plan <file>, --files '<path>...' and --done-command '<command>'
+exit=1 brief-written=no
+
+$ fm-brief.sh qwen-ref-5 demo --mode direct-PR --harness qwen --plan $LAB/data/qwen-lab-a1/plan.md --files /etc/passwd --done-command make
+error: --files takes paths relative to the worktree, never an absolute path (got '/etc/passwd')
+exit=1 brief-written=no
+
+$ fm-brief.sh qwen-ref-6 demo --mode direct-PR --plan $LAB/data/qwen-lab-a1/plan.md --files a --done-command make
+error: --plan, --files and --done-command apply only with --harness qwen
+exit=1 brief-written=no
+
+## size: qwen brief (filled, incl. inlined plan) vs standard direct-PR brief for the same task
+ 4010 $LAB/data/qwen-lab-a1/brief.md
+ 9735 $LAB/data/qwen-lab-std/brief.md
+13745 total

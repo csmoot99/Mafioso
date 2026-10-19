@@ -1,0 +1,21 @@
+## pre-existing branch: git branch fm/qwen-lab-b2 main  (781a49e99eda85d041377955bc533b4a3fa59669)
+## live fm-spawn.sh output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warn: project "demo" not in registry; defaulting to no-mistakes off
+notice: qwen-lab-b2 ships mode=direct-PR while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+error: branch fm/qwen-lab-b2 already exists, but the qwen-shaped brief tells the worker this spawn created it; delete or rename that branch, or use another task id
+error: could not create branch fm/qwen-lab-b2 in $LAB/treehouse-root/.treehouse/demo-ed9332/2/demo, which the qwen-shaped brief tells the worker already exists; inspect window primary:fm-qwen-lab-b2
+SPAWN_EXIT=1
+
+fm/qwen-lab-b2 after refusal: 781a49e99eda85d041377955bc533b4a3fa59669 (unchanged: yes)
+plan perms: -rw-r--r--
+tmux windows on lab socket:
+bash
+fm-qwen-lab-b2

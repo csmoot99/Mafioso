@@ -1,0 +1,29 @@
+## live fm-spawn.sh output (lab home, real tmux socket fm-lab, real treehouse, claude harness)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+warn: project "demo" not in registry; defaulting to no-mistakes off
+notice: qwen-lab-a1 ships mode=direct-PR while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+notice: qwen-lab-a1's qwen-shaped brief names $LAB/data/qwen-lab-a1/notes.md; it is now read-only
+notice: qwen-lab-a1's qwen-shaped brief names $LAB/data/qwen-lab-a1/plan.md; it is now read-only
+spawned qwen-lab-a1 harness=claude kind=ship mode=direct-PR yolo=off window=primary:fm-qwen-lab-a1 worktree=$LAB/treehouse-root/.treehouse/demo-ed9332/1/demo
+SPAWN_EXIT=0
+
+## worktree branch / HEAD vs origin/feature/hub
+branch: fm/qwen-lab-a1
+HEAD:               6673774a80736741dfeb9f3e95aede0f34ebf6d7
+origin/feature/hub: 6673774a80736741dfeb9f3e95aede0f34ebf6d7
+
+## permissions of every path the brief names
+-r--r--r--  READ-ONLY  $LAB/data/qwen-lab-a1/plan.md
+-r--r--r--  READ-ONLY  $LAB/data/qwen-lab-a1/notes.md
+-rw-rw-r--  writable  $LAB/data/projects.md
+-rw-rw-r--  writable  $LAB/data/tracked-sub/tracked.md
+-rw-rw-r--  writable  $LAB/projects/notes.md
+-rw-rw-r--  writable  $LAB/state/qwen-lab-a1.status
+
+## worktree-local brief / settings
+qwen-lab-a1.busy-gen
+qwen-lab-a1.busy-state
+qwen-lab-a1.git-hooks
+qwen-lab-a1.inbox
+qwen-lab-a1.meta
+qwen-lab-a1.status

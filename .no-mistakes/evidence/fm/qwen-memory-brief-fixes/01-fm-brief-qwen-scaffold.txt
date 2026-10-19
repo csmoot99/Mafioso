@@ -1,0 +1,3 @@
+$ FM_HOME=$LAB bin/fm-brief.sh qwen-lab-a1 demo --mode direct-PR --base-branch feature/hub --harness qwen --plan $LAB/data/qwen-lab-a1/plan.md --files greet.txt --done-command "grep -qx 'hello, qwen' greet.txt"
+scaffolded: $LAB/data/qwen-lab-a1/brief.md (ship, mode=direct-PR, qwen shape; replace {TASK} and {FIRSTMATE_SPEC})
+exit=0
