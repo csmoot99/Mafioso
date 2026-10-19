@@ -1,0 +1,14 @@
+--- without waiver:
+armed: state/task-x1.check.sh
+error: refusing to merge https://github.com/example/repo/pull/90
+  - check 'Behavior portable serial 2' is not green
+error: these checks are not green: Behavior portable serial 2
+exit 1
+--- with skill form --allow-red 'Behavior portable serial 2' -- --merge:
+armed: state/task-x1.check.sh
+verified: https://github.com/example/repo/pull/91 is open and mergeable, with every unwaived required check reported and every unwaived check green at head aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+verified: https://github.com/example/repo/pull/91 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+exit 0
+gh merge call logged:
+pr merge 91 --repo example/repo --match-head-commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --merge
+ASSERT OK: merged with --merge at the verified head

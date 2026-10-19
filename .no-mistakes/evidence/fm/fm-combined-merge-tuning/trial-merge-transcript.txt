@@ -1,0 +1,51 @@
+== group: prA prB
+merge-tree origin/main prA -> exit 0
+merge-tree origin/main prB -> exit 0
+merge-tree prA prB -> exit 1
+  conflicted files (after tree id):
+    src/app.txt
+  changed files per PR (git diff --name-only origin/main...<head>):
+    prA: ai-map/CHANGELOG.md
+    prA: src/app.txt
+    prB: ai-map/NOW.md
+    prB: src/app.txt
+  shared files: src/app.txt
+== group: prC prD
+merge-tree origin/main prC -> exit 0
+merge-tree origin/main prD -> exit 0
+merge-tree prC prD -> exit 0
+  changed files per PR (git diff --name-only origin/main...<head>):
+    prC: src/app.txt
+    prD: src/app.txt
+  shared files: src/app.txt
+== group: prE prF
+merge-tree origin/main prE -> exit 0
+merge-tree origin/main prF -> exit 0
+merge-tree prE prF -> exit 0
+  changed files per PR (git diff --name-only origin/main...<head>):
+    prE: src/a.txt
+    prF: src/b.txt
+  shared files: <none>
+== trial touched refs/index/worktree? NO (unchanged)
+== integrator fold of prA, prB
+git merge --no-ff -m 'Merge #prA from prA at 8bfc2637' -> exit 0; conflicted: 
+git merge --no-ff -m 'Merge #prB from prB at 3b6d4dbf' -> exit 1; conflicted: src/app.txt 
+  CHANGELOG after folds (prA's entry merged cleanly):
+    # Changelog
+    - base entry
+    - PR #A entry
+  NOW after folds:
+    # Now
+    Recent work: B
+  CHANGELOG after combined entry:
+    # Changelog
+    - base entry
+    - Combined #A and #B
+  NOW after combined entry:
+    # Now
+    Recent work: combined #A and #B
+  exact head of prA contained in combined branch: yes
+  exact head of prB contained in combined branch: yes
+  merge commit subjects:
+    Merge #prB from prB at 3b6d4dbf1846116bc554e431b53c4a6ecfe4826a
+    Merge #prA from prA at 8bfc263754379b725c439280b8aa734cf20dc50f

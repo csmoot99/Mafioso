@@ -1,0 +1,60 @@
+
+ ▐▛███▛█   Claude Code v2.1.303
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+ ▝▝   ▝▝   ~/.no-mistakes/worktrees/5f69104d19ce/01M59VM31VGKXHN1Y8P27HCDYM · /rc            
+
+
+❯ Tabletop exercise only: do not run any fleet, spawn, send, merge, or git commands, and do not change any files. Load the combined-merge skill (read .agents/skills/combined-merge/SKILL.md). Then     
+  answer each case in two or three lines, quoting the skill sentence you rely on. (1) The captain approved PRs #1 and #2 on project P, base main, to merge now; the trial merge shows no conflict and   
+  no shared file. What do you do? (2) A combined PR for #3 and #4 is in no-mistakes validation on main and the captain approves #5 on main. What happens to #5? (3) The integrator worker's Claude      
+  permission check refused git merge --no-ff for the third fold. What does the integrator do, and what do you do? (4) A folded worker that is only waiting reaches its context-handoff threshold. What  
+  exactly do you do, in what order? (5) Two folded PRs each had the CI job "Behavior portable serial 2" time out and the captain approved merging each over it individually. Does the waiver carry into 
+  the combined PR?                                                                                                                                                                                      
+
+  Read 1 file                                   
+
+● Captain, here are the five answers, each based on .agents/skills/combined-merge/SKILL.md. I only read that file. Nothing was run and nothing changed.
+
+  1. #1 and #2: no conflict, no shared file
+  I merge them one at a time the ordinary way and tell you why one combined PR wasn't needed.
+
+  ▎ "With no conflict and no shared file, merge the PRs one by one through ordinary landing and tell the captain why combining was not needed." (line 31)
+
+  2. #5 approved while the combined PR for #3 and #4 is in validation
+  #5 doesn't merge yet. It either goes into the next combined PR or lands after this one, unless you say otherwise. I note that wait on its backlog item so a restart doesn't lose it.
+
+  ▎ "While a combined PR is being built or validated, hold every other merge on that base…" / "A PR approved meanwhile waits for the next combined PR or lands after this one, unless the captain says 
+  ▎ otherwise; note that wait on its backlog item so a restart keeps it." (lines 34–35)
+
+  3. The integrator's permission check refused the third git merge --no-ff
+  The integrator reports that it is blocked, quotes the exact refused command, and stops. It doesn't retry in another form or find a way around the check. I give you that exact command to type as ! 
+  <command> in the integrator's session, and once you've run it I tell the integrator to continue. I never run it myself and never offer a workaround.
+
+  ▎ "When the integrator's own permission check refuses a merge, push, or validation start, it reports blocked: with the exact refused command and stops, never retrying it in another form or routing 
+  ▎ around the check." / "Hand the captain that exact command to type as ! <command> in the integrator's session, then steer the integrator to continue once it ran; never run it from firstmate or 
+  ▎ offer a workaround." (lines 66–67)
+
+  4. A waiting folded worker hits its context-handoff threshold
+  No replacement worker. In order:
+  1. While it's still running, I close the handoff with bin/fm-send.sh <id> --resolve-key context-handoff-<n> "<no replacement needed>".
+  2. I wait for the worker to move that record into handled/.                                                                           
+  3. I stop it with bin/fm-control.sh <id> exit, which keeps its local copy, branch and records.
+  ▎ "A context handoff from a folded worker that is only waiting gets no replacement: while it is still running, close the handoff with bin/fm-send.sh <id> --resolve-key context-handoff-<n> "<no 
+  replacement needed>", let it move that record into handled/, then exit it that way." (line 80)                                                                                                   
+
+  5. Each folded PR had "Behavior portable serial 2" waived on its own
+  No, the waiver doesn't carry over. You approved merging each PR over that check separately, not merging them together over it. So I ask you before folding them in. If you do approve merging them
+  together over it, the combined merge names the check with --allow-red "Behavior portable serial 2".
+
+  ▎ "The one exception to green is a named check the captain waived on a folded PR: that waiver carries into the combined PR only when the captain's approval covered merging those PRs together over 
+  ▎ that check; otherwise ask before folding that PR." (line 43)
+
+✻ Baked for 22s · done 6:40 AM
+
+
+                                                                                                                                                                                                      
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯                                       
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 | ctx: 6% used
+  ⏵⏵ bypass permissions on (shift+tab to cycle)               
