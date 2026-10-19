@@ -1,0 +1,10 @@
+stopped: lab tmux server and lab processes
+removed: task temp /tmp/fm-lab836e371f5775-mate+938e8ff0dab672384fbb6def644b2f2e538c2dbbbcba7b922cc262c900e3f25d
+removed: task temp /tmp/fm-lab836e371f5775-mate
+removed: task temp /tmp/fm-lab836e371f5775-worker+938e8ff0dab672384fbb6def644b2f2e538c2dbbbcba7b922cc262c900e3f25d
+removed: task temp /tmp/fm-lab836e371f5775-worker
+removed: task temp /tmp/fm-lab836e371f5775-badmcp+938e8ff0dab672384fbb6def644b2f2e538c2dbbbcba7b922cc262c900e3f25d
+removed: task temp /tmp/fm-lab836e371f5775-kgoff+938e8ff0dab672384fbb6def644b2f2e538c2dbbbcba7b922cc262c900e3f25d
+removed: task temp /tmp/fm-lab836e371f5775-kgwork+938e8ff0dab672384fbb6def644b2f2e538c2dbbbcba7b922cc262c900e3f25d
+removed: 10 Claude project entries under /tmp/fmlab.UxlErC
+removed: /tmp/fmlab.UxlErC

@@ -1,0 +1,25 @@
+lab: /tmp/fmlab.UxlErC (tear down with: bin/fm-live-lab.sh down /tmp/fmlab.UxlErC)
+tree: 4e709caa8b6d8bea7048dbd8732ce2d9bfd6beb3 from /home/work/.no-mistakes/worktrees/5f69104d19ce/01M59BNZH9WDXK6QHZ34A84QWC
+scaffolded: /tmp/fmlab.UxlErC/home/data/lab836e371f5775-mate/brief.md (secondmate charter)
+home=/tmp/fmlab.UxlErC/mate
+spawned lab836e371f5775-mate harness=claude kind=secondmate mode=secondmate yolo=off window=firstmate:fm-lab836e371f5775-mate worktree=/tmp/fmlab.UxlErC/mate
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+spawned lab836e371f5775-worker harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-lab836e371f5775-worker worktree=/tmp/fmlab.UxlErC/treehouse/.treehouse/notes-3069b8/1/notes
+gate: /tmp/fmlab.UxlErC/home/data/lab836e371f5775-worker/gate (touch, then message the worker to resume)
+primary: claude --setting-sources project,local --model sonnet --effort medium --permission-mode auto
+ok primary: claude pid 2397261 in /tmp/fmlab.UxlErC/home
+ok probe: the primary answered LABREADY-836e371f5775
+ok trust: /tmp/fmlab.UxlErC/home is trusted in the Claude store
+ok mirror: verified writer, check passed, captain=1 main=1
+ok host: supervision host pid 2409647
+ok watcher: live watcher with a fresh beacon
+ok mate: lab836e371f5775-mate pid 2389507 in /tmp/fmlab.UxlErC/mate
+ok worker: lab836e371f5775-worker parked on /tmp/fmlab.UxlErC/home/data/lab836e371f5775-worker/gate
+ok treehouse: ~/.treehouse unchanged
+ready: /tmp/fmlab.UxlErC

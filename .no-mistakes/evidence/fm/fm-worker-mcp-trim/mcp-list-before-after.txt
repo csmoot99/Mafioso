@@ -1,0 +1,14 @@
+$ claude --settings BASE mcp list   # pre-change worker settings
+Checking MCP server health…
+
+claude.ai Claude Docs: https://api.anthropic.com/v1/pages/mcp - ✔ Connected
+claude.ai Google Sheets: https://sheetsmcp.googleapis.com/mcp/v1 - ✔ Connected
+claude.ai Adobe for creativity: https://adobe-creativity.adobe.io/mcp - ✔ Connected
+claude.ai Google Drive: https://drivemcp.googleapis.com/mcp/v1 - ✔ Connected
+claude.ai Ideogram: https://mcp.ideogram.ai/mcp - ✔ Connected
+kg: python3 scripts/kg_server.py - ⏸ Pending approval (run `claude` to approve)
+
+$ claude --settings NEW mcp list    # settings fm-spawn.sh now emits
+Checking MCP server health…
+
+kg: python3 scripts/kg_server.py - ✔ Connected

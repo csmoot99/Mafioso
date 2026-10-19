@@ -1,0 +1,60 @@
+
+ ▐▛███▛█   Claude Code v2.1.303
+▝▜██████▀  Sonnet 5.5 with low effort · Claude Max
+ ▝▝   ▝▝   /tmp/fmlab.UxlErC/treehouse/.treehouse/badmcp-86c547/1/badmcp · /rc
+
+
+❯ : Firstmate operational input waiting: read '/tmp/fmlab.UxlErC/home/state/operational-inbox/1792390085-99c85355b81f54a8.msg' and handle its contents as Firstmate operational input.
+
+  Read 1 file, ran 1 shell command
+
+● Setup is done. The worktree is isolated (not the primary checkout), and I'm on branch fm/lab836e371f5775-badmcp. I appended a paused status line and am now waiting for a question.
+
+✻ Crunched for 8s · done 2:08 AM
+
+❯ /mcp
+  ⎿  No MCP servers configured. Run claude doctor if this is unexpected — it lists MCP config files that failed validation. Otherwise, run claude mcp --help or visit https://code.claude.com/docs/en/mcp to learn more.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                                                                      tmux focus-events off · add 'set -g focus-events on' to ~/.tmux.conf and reattach for focus tracking
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Sonnet 5.5 | ctx: 4% used
+  ⏵⏵ auto mode on (shift+tab to cycle)

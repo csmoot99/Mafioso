@@ -1,0 +1,2 @@
+# relaunched kg worker pid 2695104 started Mon Oct 19 02:08:44 2026
+{"feedbackDrafts":"off","disableClaudeAiConnectors":true,"enableAllProjectMcpServers":true,"attribution":{"commit":"","pr":"","sessionUrl":false}}
