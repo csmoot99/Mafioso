@@ -704,8 +704,21 @@ launch_template() {
   # Claude's system-prompt carrier while preserving the normal distrust of
   # project and fetched content. A persistent secondmate receives its own
   # supervisor contract instead, so this task-worker statement does not apply.
+  # A ship or scout's inline settings also set its MCP surface to the servers
+  # its project declares. "disableClaudeAiConnectors":true keeps the captain's
+  # claude.ai connectors out of the worker: no worker uses them, yet their tool
+  # definitions (10,700 tokens on 2.1.303) are re-read on every API call.
+  # "enableAllProjectMcpServers":true approves the servers in the worktree's own
+  # .mcp.json, so they load without the interactive "New MCP server found"
+  # dialog, which an unapproved project server otherwise raises at launch, and
+  # regardless of the folder trust a repository's own committed approval needs.
+  # A disabledMcpjsonServers entry still rejects a server. User-scope servers
+  # still load, which --strict-mcp-config would drop along with the connectors.
+  # A secondmate keeps the captain's full MCP surface.
   claude)
-    printf '%s' 'CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude __CLAUDEPERMFLAG__ __CLAUDEADDDIRS__--settings '\''{"feedbackDrafts":"off"__CLAUDEATTRIBUTION__}'\'' '
+    local worker_settings=
+    [ "$kind" = secondmate ] || worker_settings=',"disableClaudeAiConnectors":true,"enableAllProjectMcpServers":true'
+    printf '%s' 'CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude __CLAUDEPERMFLAG__ __CLAUDEADDDIRS__--settings '\''{"feedbackDrafts":"off"'"$worker_settings"'__CLAUDEATTRIBUTION__}'\'' '
     if [ "$kind" != secondmate ]; then
       printf '%s' "--append-system-prompt '$TASK_WORKER_TRUST_STATEMENT' "
     fi
