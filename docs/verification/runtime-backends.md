@@ -1393,17 +1393,41 @@ The guard asserts the file's checksum is unchanged after the session and that th
 
 ### Context window on the local model
 
+Verified on 2026-10-18 on Linux (WSL2) with Qwen Code 0.25.1 and Ollama 0.40.3, where Ollama runs as the operator's systemd user unit:
+
 ```sh
-ollama ps
+systemctl --user show ollama -p Environment
 ```
 
 ```text
-NAME               ID              SIZE     PROCESSOR    CONTEXT    RUNNER      UNTIL
-qwen3-coder:30b    06c1097efce0    21 GB    100% GPU     32768      llamacpp    2 minutes from now
+Environment=OLLAMA_HOST=127.0.0.1:11434 OLLAMA_CONTEXT_LENGTH=65536 OLLAMA_KV_CACHE_TYPE=q8_0 OLLAMA_FLASH_ATTENTION=1
 ```
 
-`ollama show qwen3-coder:30b` reports `parameters 30.5B`, `context length 262144`, `quantization Q4_K_M`, and `systemctl show ollama -p Environment` printed an empty `Environment=`, so the running service sets no `OLLAMA_CONTEXT_LENGTH` and grants the default 32768 while qwen's footer claims `262.1k Context`.
-qwen will therefore not compact before the server truncates; raising the limit is the operator's call and the adapter changes neither the service nor the models.
+`ollama show qwen3-coder:30b` reports `context length 262144`, and the journal's launch line for the model is `llama-server ... -c 65536 -np 1 ... --context-shift --keep 4`.
+Past the window the server does not refuse: it logs `slot context shift, n_keep = 4, n_discard = 32765`, drops the oldest half of the conversation (system prompt and brief first), and answers 200; only its log says `truncated = 1`.
+Unpinned, qwen auto-detects `contextWindowSize: 262144` from the model id and never compacts, which is what let four such shifts drop a production worker's brief.
+
+The per-task settings file therefore pins `model.generationConfig.contextWindowSize=65536` and `context.autoCompactThreshold=0.6`.
+qwen's trigger is `min(threshold * window, window - 20000 - 13000)` (its summary reserve and buffer, `computeThresholds` in the 0.25.1 bundle), so at the pinned 65,536 the absolute ceiling of 32,536 binds and the threshold is inert; it becomes the active trigger if the window is raised above about 82,500.
+One headless session under an isolated user home, with the settings file the branch's `bin/fm-spawn.sh` wrote and a prompt that read six 20,828-character hex files through the shell tool, recorded `contextWindowSize: 65536` on every assistant record and five `chat_compression` records, all `triggerReason: token_limit`, at qwen-estimated sizes of 33,345 to 35,457 tokens.
+The journal for that session had no `context shift` line and every request released with `truncated = 0`; prompt tokens per request were:
+
+```text
+11945 30178 49141 28098 49558 28066 49579 28169 49630 40345 28175 49657 28298
+```
+
+The 49k requests are the summarization calls, which carry the whole history; the largest prompt plus output was 50,920, leaving 14,616 tokens under the window.
+qwen estimates tokens from characters, and on that token-dense content each summarization call the server received was 7k to 16k tokens larger than qwen's estimate of the history it summarized, so denser content or larger single tool results shrink that margin.
+
+qwen checks its trigger only between turns, so the pin does not cover growth inside one request, and later sessions that day with the same settings reached the shift that way.
+Three sessions read six 26,000-character hex files and were free to batch the calls.
+Two batched all six into one turn, so the next request carried 64,618 and 64,439 prompt tokens while qwen estimated 38,417; each compaction kept the recent tool results (to an estimated 36,619 and 36,324), the session stayed at the window edge, and the final answers were degenerate (`IIItappe`, `IIBasedIt`).
+In the first of those, the summarization request itself logged `slot context shift, n_keep = 4, n_left = 65531, n_discard = 32765` and `truncated = 1`, and the summary it returned read `No explicit requests or intents were provided by the user`.
+The third batched three reads and compacted twice with no shift, at prompt tokens `11945 48312 57978 28370 49753 28295`.
+Two further sessions that read 21,153-character files one per turn shifted from a long response instead: an ordinary turn generated `32768 tokens` on a 33,046-token prompt, and a summarization request generated its full `20000 tokens` budget on a prompt of about 58,000.
+Those two sessions also carried a 25,000-character tool-output batch cap that the per-task settings do not keep, and each single read was below it.
+The shifts are in the server journal (`journalctl --user -u ollama | grep 'context shift'`), and each request's output size is on its `eval time` line.
+No reusable live guard covers this yet; re-run such a session after a qwen or Ollama upgrade, or after the served window changes, which also requires changing the pin.
 
 ### Herdr pane liveness
 

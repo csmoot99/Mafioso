@@ -184,14 +184,28 @@ fm_base_branch_valid() {  # <base> <mode> <forge> <caller>
   return 0
 }
 
-# Print the value of every "Base branch: <name>" line that directly follows the
-# base-variant Setup sentence bin/fm-brief.sh writes; return 1 when there is
-# none. Any other "Base branch:" line is prose and ignored.
+# Print the value of every "Base branch: <name>" line that directly follows a
+# base-variant Setup sentence bin/fm-brief.sh writes (the standard one or the
+# qwen shape's); return 1 when there is none. Any other "Base branch:" line is
+# prose and ignored.
 fm_brief_base_branches() {  # <brief>
   awk '
     setup && sub(/^Base branch: /, "") { print; n++ }
-    { setup = /^You are in a disposable git worktree of .*, at a detached HEAD on a clean copy of its base branch\.$/ }
+    { setup = /^You are in a disposable git worktree of .*, at a detached HEAD on a clean copy of its base branch\.$/ || /^Your copy of .* is the current directory: a disposable worktree on the branch .*, which firstmate already created from a clean copy of its base branch\.$/ }
     END { exit !n }
+  ' "$1"
+}
+
+# Return 0 when the brief is the qwen shape bin/fm-brief.sh --harness qwen
+# writes: its "Brief shape: qwen" line directly follows the "Ship branch:" line
+# under "Delivery contract: mode=direct-PR", before the brief's first heading.
+# Any other "Brief shape: qwen" line is prose and ignored.
+fm_brief_is_qwen_shape() {  # <brief>
+  awk '
+    /^#+ / { exit }
+    ship && $0 == "Brief shape: qwen" { found = 1; exit }
+    { ship = contract && /^Ship branch: /; contract = $0 == "Delivery contract: mode=direct-PR" }
+    END { exit !found }
   ' "$1"
 }
 
