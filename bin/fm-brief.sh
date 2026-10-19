@@ -153,7 +153,8 @@
 # A home may carry standing worker instructions without editing this tracked
 # script: when config/brief-include.md exists under the active home, ship and
 # scout scaffolds append its text verbatim as their last section, "# Home brief
-# additions", which defers to every other section of the brief. It goes last
+# additions", which defers to every other section of the brief; the qwen shape
+# writes it just above its closing Start section instead. It goes after # Task
 # because the machine-read `# Task` heading resolves to its first match, so
 # appended text can never shadow it; a later scout promotion appends its ship
 # contract below it, which that position-free deference already covers. An
@@ -413,7 +414,7 @@ if [ "$KIND" != secondmate ] && { [ -e "$BRIEF_INCLUDE_FILE" ] || [ -L "$BRIEF_I
   [ -n "$(printf '%s' "$BRIEF_INCLUDE_BODY" | tr -d '[:space:]')" ] || BRIEF_INCLUDE_BODY=
 fi
 
-# Append the include as the last section of a ship or scout scaffold.
+# Append the include to a ship or scout scaffold.
 append_brief_include() {
   [ -n "$BRIEF_INCLUDE_BODY" ] || return 0
   printf '\n%s\n%s\n%s\n' \
@@ -792,14 +793,16 @@ When the done command exits 0, run this as one command, then reply with one line
 If that fails, if you are stuck after two attempts at the same thing, or if the plan does not answer something you need, run this, and stop:
     echo "blocked [at=\$(date +%s)]: <one line>" >> $STATUS_FILE
 Write status lines only with the commands in this brief.
-Firstmate answers through message files in $INBOX_DIR; when your terminal announces one, read it, act on it, then move it into its \`handled/\` folder.
+Firstmate answers through message files in $INBOX_DIR; when your terminal announces one, read it, act on it, then move it with \`mv $INBOX_DIR/NNN.msg $INBOX_DIR/handled/\`.
+EOF
+append_brief_include
+cat >> "$BRIEF" <<EOF
 
 # Start
 Before you look at any file, run this command:
     [ "\$(pwd -P)" = "\$(git rev-parse --show-toplevel)" ] && [ "\$(git branch --show-current)" = $BRANCH_Q ] && echo "working [at=\$(date +%s)]: started" >> $STATUS_FILE && echo OK || echo STOP
 If it printed STOP, run the blocked command above with \`launched in primary checkout, not an isolated worktree\`, and stop.
 EOF
-append_brief_include
 echo "scaffolded: $BRIEF (ship, mode=$MODE, qwen shape; replace {TASK} and {FIRSTMATE_SPEC})"
 exit 0
 fi

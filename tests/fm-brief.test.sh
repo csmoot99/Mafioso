@@ -1307,7 +1307,7 @@ qwen_scaffold() { # <home> <id> <plan> [extra fm-brief args...]
 }
 
 test_qwen_shape_inlines_the_plan_and_keeps_the_contract() {
-  local home plan brief id=brief-qwen-q1 standard before after epoch status wt fakebin start report blocked out line
+  local home plan brief id=brief-qwen-q1 standard before after epoch status wt fakebin start report blocked out line ack inbox
   home="$TMP_ROOT/qwen-home"
   mkdir -p "$home/data"
   plan="$TMP_ROOT/qwen-plan.md"
@@ -1403,6 +1403,29 @@ test_qwen_shape_inlines_the_plan_and_keeps_the_contract() {
     [ "$epoch" -ge "$before" ] && [ "$epoch" -le "$after" ] || fail "a qwen status line carries no run-time stamp: $line"
   done < "$status"
 
+  # The inbox acknowledgement is a literal command that moves a steer out of
+  # the unhandled set.
+  inbox="$home/state/$id.inbox"
+  mkdir -p "$inbox/handled"
+  printf 'steer\n' > "$inbox/001.msg"
+  # shellcheck disable=SC2016 # Literal backticks delimit the command in the brief.
+  ack=$(grep '^Firstmate answers through message files' "$brief" | grep -o 'mv [^`]*')
+  [ -n "$ack" ] || fail "the qwen brief does not give a literal inbox acknowledgement command"
+  ack=${ack//NNN/001}
+  bash -c "$ack" || fail "the qwen inbox acknowledgement failed: $ack"
+  [ ! -e "$inbox/001.msg" ] && [ -f "$inbox/handled/001.msg" ] \
+    || fail "the qwen inbox acknowledgement did not move the steer into handled/"
+
+  # Start stays the brief's last section, with or without a home include.
+  [ "$(grep '^# ' "$brief" | tail -n 1)" = '# Start' ] || fail "the qwen brief does not end with its Start section"
+  mkdir -p "$home/config"
+  printf '%s\n' 'Prefer small commits.' > "$home/config/brief-include.md"
+  qwen_scaffold "$home" brief-qwen-include "$plan" >/dev/null 2>&1 || fail "the qwen shape should scaffold with a home include"
+  rm -f "$home/config/brief-include.md"
+  assert_grep 'Prefer small commits.' "$home/data/brief-qwen-include/brief.md" "the qwen brief dropped the home include"
+  [ "$(grep '^# ' "$home/data/brief-qwen-include/brief.md" | tail -n 2 | tr '\n' '|')" = '# Home brief additions|# Start|' ] \
+    || fail "the home include did not land just above the qwen brief's closing Start section"
+
   FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-qwen-standard some-proj --mode direct-PR >/dev/null 2>&1
   standard=$(wc -c < "$home/data/brief-qwen-standard/brief.md")
   [ $(( ($(wc -c < "$brief") - $(wc -c < "$plan")) * 2 )) -lt "$standard" ] \
@@ -1410,7 +1433,7 @@ test_qwen_shape_inlines_the_plan_and_keeps_the_contract() {
 
   sed -i.bak -e 's/^{TASK}$/Build it./' -e 's/^{FIRSTMATE_SPEC}$/Follow the plan./' "$brief"
   fm_brief_task_content_valid "$brief" || fail "a filled qwen brief does not pass the spawn's Task check"
-  pass "fm-brief.sh --harness qwen: plan inlined, machine lines and safety contract kept, runnable reporting, under half the size"
+  pass "fm-brief.sh --harness qwen: plan inlined, machine lines and safety contract kept, runnable reporting and inbox ack, Start last, under half the size"
 }
 
 test_qwen_shape_is_refused_outside_its_shape() {
