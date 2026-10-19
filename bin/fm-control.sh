@@ -1061,11 +1061,12 @@ record_note() {
       if [ "$KIND" = ship ] && fm_brief_is_qwen_shape "$RELAUNCH_BRIEF" \
          && start=$(grep -n -x '# Start' "$RELAUNCH_BRIEF" | tail -n 1 | cut -d: -f1) && [ -n "$start" ]; then
         printf -v inbox '%q' "$STATE/$ID.inbox"
-        ack="If it printed OK and then messages, act on each one in numeric order; that command already moved them into $inbox/handled/."
-        # qwen runs Start's one command but skips a separate inbox listing and
-        # the prose mv after it, so that command prints each waiting message
-        # into the worker's context and acknowledges it itself.
-        {
+        ack="If it printed OK and then messages, act on each one in numeric order, then run mv $inbox/NNN.msg $inbox/handled/ for each."
+        # qwen runs Start's one command but skips a separate inbox listing, so
+        # that command prints each waiting message into the worker's context
+        # without moving it; the next line gives the literal mv to run after
+        # acting on each, since qwen follows commands, not brief prose.
+        if {
           head -n "$((start - 1))" "$RELAUNCH_BRIEF"
           echo "## Progress note ($stamp)"
           echo
@@ -1075,13 +1076,15 @@ record_note() {
           printf '%s\n' "$NOTE"
           echo
           tail -n "+$start" "$RELAUNCH_BRIEF" \
-            | show="&& echo OK && { for m in $inbox/*.msg; do [ -f \"\$m\" ] && echo \"message \${m##*/}:\" && cat \"\$m\" && mv \"\$m\" $inbox/handled/; done; true; } || echo STOP" awk '
+            | show="&& echo OK && { for m in $inbox/*.msg; do [ -f \"\$m\" ] && echo \"message \${m##*/}:\" && cat \"\$m\"; done; true; } || echo STOP" awk '
                 !done && sub(/&& echo OK \|\| echo STOP$/, "") { $0 = $0 ENVIRON["show"]; done = 1 }
                 { print }'
           grep -qxF -- "$ack" "$RELAUNCH_BRIEF" || printf '%s\n' "$ack"
-        } > "$RELAUNCH_BRIEF.note.$$" && mv -f "$RELAUNCH_BRIEF.note.$$" "$RELAUNCH_BRIEF" \
-          || die "could not insert the progress note into task $ID's instructions"
-        return 0
+        } > "$RELAUNCH_BRIEF.note.$$" && mv -f "$RELAUNCH_BRIEF.note.$$" "$RELAUNCH_BRIEF"; then
+          return 0
+        else
+          die "could not insert the progress note into task $ID's instructions"
+        fi
       fi
       {
         echo

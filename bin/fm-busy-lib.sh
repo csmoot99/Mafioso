@@ -1067,6 +1067,7 @@ fm_busy_launch_prompt_parked() {  # <harness>
 fm_busy_halt_prompt() {  # <harness> <tail40>
   case "${1:-}" in
     qwen)
+      # shellcheck source=bin/fm-composer-lib.sh
       command -v fm_composer_qwen_loop_dialog >/dev/null 2>&1 \
         || . "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-composer-lib.sh" \
         || return 1

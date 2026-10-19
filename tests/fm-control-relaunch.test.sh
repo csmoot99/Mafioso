@@ -640,9 +640,9 @@ test_relaunch_note_keeps_a_qwen_brief_start_last() {
   inbox="$dir/home/state/rlq1.inbox"
   [ "$(grep -c '^If it printed OK and then messages' "$brief")" = 1 ] \
     || fail "the qwen relaunch did not fold one inbox check into the Start step"
-  # qwen runs Start's one command but skips a separate inbox listing or mv, so
-  # that command must print a waiting steer and acknowledge it, and print OK
-  # alone when the inbox is empty.
+  # qwen runs Start's one command but skips a separate inbox listing, so that
+  # command must print a waiting steer without moving it, and print OK alone
+  # when the inbox is empty; the next line gives the literal mv to run after.
   start_cmd=$(awk '/^# Start$/ { s = 1 } s && /^    / { sub(/^    /, ""); print; exit }' "$brief")
   git init -q -b "$(sed -n 's/^Ship branch: //p' "$brief")" "$dir/qwen-wt" || fail "could not create the qwen worktree"
   mkdir -p "$inbox/handled"
@@ -652,8 +652,10 @@ test_relaunch_note_keeps_a_qwen_brief_start_last() {
   out=$(cd "$dir/qwen-wt" && bash -c "$start_cmd")
   [ "$out" = "OK"$'\n'"message 001.msg:"$'\n'"use title fix: steer" ] \
     || fail "Start's command did not print the waiting steer, got: $out"
-  [ -f "$inbox/handled/001.msg" ] && [ ! -e "$inbox/001.msg" ] \
-    || fail "Start's command did not move the printed steer into handled/"
+  [ -f "$inbox/001.msg" ] && [ ! -e "$inbox/handled/001.msg" ] \
+    || fail "Start's command moved the printed steer before the worker acted on it"
+  assert_grep "then run mv $inbox/NNN.msg $inbox/handled/ for each" "$brief" \
+    "the qwen relaunch did not give the literal mv command after Start's command"
   pass "fm-control relaunch: a qwen brief keeps Start last with one first step across relaunch notes"
 }
 

@@ -81,7 +81,7 @@ A relaunch does take one session reference when the endpoint's own runtime recor
    A secondmate's own crewmates run in their own endpoints and outlive its relaunch; the relaunched secondmate reconciles them from its home's durable records at startup.
 3. **Record the note.**
    A ship or scout relaunch requires `--note`, because the replacement inherits the local copy but none of the conversation; the note is appended to the instructions it reads.
-   A qwen-shaped ship brief must keep `# Start` last, so there the note goes just above it and Start's one command also prints and acknowledges any waiting inbox messages (`record_note` in [`bin/fm-control.sh`](../bin/fm-control.sh)).
+   A qwen-shaped ship brief must keep `# Start` last, so there the note goes just above it and Start's one command also prints any waiting inbox messages, followed by the literal `mv` that acknowledges each after the worker acts on it (`record_note` in [`bin/fm-control.sh`](../bin/fm-control.sh)).
    A secondmate relaunch does not require one and never rewrites its standing charter.
 4. **Stop the old agent** through the `exit` verb, with its postcondition.
 5. **Launch the replacement** through its single owner, `bin/fm-spawn.sh --relaunch`, which reuses the recorded worktree instead of creating one, adopts the recorded endpoint when it still exists, clears the previous harness's per-task wiring, and arms a fresh busy generation.
