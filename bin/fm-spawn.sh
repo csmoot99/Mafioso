@@ -5841,22 +5841,22 @@ if [ "$HARNESS" = qwen ] && [ "$RAW_LAUNCH" -eq 0 ]; then
   if { [ -f "$WT/scripts/kg-query.mjs" ] || grep -qxF -- "$q_lookup" "$BRIEF"; } &&
     ! q_why=$(ensure_qwen_kg_graph "$WT" "$STATE_REAL/$ID.kg-ingest.log"); then
     if grep -qxF -- "$q_lookup" "$BRIEF"; then
-      { grep -vxF -- "$q_lookup" "$BRIEF" || :; } >"$BRIEF.kg.tmp" && mv -- "$BRIEF.kg.tmp" "$BRIEF" || {
+      if ! { { grep -vxF -- "$q_lookup" "$BRIEF" || :; } >"$BRIEF.kg.tmp" && mv -- "$BRIEF.kg.tmp" "$BRIEF"; }; then
         rm -f -- "$BRIEF.kg.tmp"
         echo "error: could not drop the kg-query lookup from $BRIEF; inspect window $T" >&2
         exit 1
-      }
+      fi
       q_why="$q_why; the kg-query lookup is dropped from its brief"
     fi
     echo "warning: $ID's kg graph is unavailable: $q_why" >&2
   fi
   q_settings="$STATE_REAL/$ID.qwen-settings.json"
   if grep -qxF -- "$q_lookup" "$BRIEF" && jq -e '.mcpServers.kg' "$q_settings" >/dev/null 2>&1; then
-    jq -c '.mcp = {excluded: ["kg"]}' "$q_settings" >"$q_settings.tmp" && mv -- "$q_settings.tmp" "$q_settings" || {
+    if ! { jq -c '.mcp = {excluded: ["kg"]}' "$q_settings" >"$q_settings.tmp" && mv -- "$q_settings.tmp" "$q_settings"; }; then
       rm -f -- "$q_settings.tmp"
       echo "error: could not exclude the kg server in $q_settings; inspect window $T" >&2
       exit 1
-    }
+    fi
   fi
 fi
 
