@@ -613,6 +613,42 @@ test_relaunch_appends_the_progress_note_to_the_instructions() {
   pass "fm-control relaunch: progress and the Firstmate-worktree worker identity reach the replacement"
 }
 
+# A qwen-shaped brief keeps Start as its last section across relaunches: each
+# note lands above Start, and the inbox check joins Start's one first step
+# instead of opening a second one.
+test_relaunch_note_keeps_a_qwen_brief_start_last() {
+  local dir out rc brief plan inbox ack n
+  dir=$(new_case qwen-note rlq1)
+  add_ship_task "$dir" rlq1 claude
+  sed -i 's/^mode=no-mistakes$/mode=direct-PR/' "$dir/home/state/rlq1.meta"
+  plan="$dir/plan.md"
+  printf '%s\n' 'Change src/a.ts.' > "$plan"
+  brief="$dir/home/data/rlq1/brief.md"
+  rm -f "$brief"
+  FM_HOME="$dir/home" "$BRIEF" rlq1 some-proj --mode direct-PR --harness qwen --plan "$plan" \
+    --files 'src/a.ts' --done-command 'true' >/dev/null || fail "the qwen brief should scaffold"
+  sed -i -e 's/^{TASK}$/Build it./' -e 's/^{FIRSTMATE_SPEC}$/Follow the plan./' "$brief"
+  for n in 1 2; do
+    printf 'claude' > "$dir/fake/command"
+    out=$(run_control "$dir" rlq1 relaunch --note "qwen note $n"); rc=$?
+    expect_code 0 "$rc" "qwen relaunch $n should succeed"$'\n'"$out"
+    assert_grep "qwen note $n" "$brief" "qwen relaunch $n did not record its note"
+    [ "$(grep '^#' "$brief" | tail -n 1)" = '# Start' ] || fail "qwen relaunch $n left Start short of the brief's last section"
+    [ "$(grep -c '^## Progress note' "$brief")" = "$n" ] || fail "qwen relaunch $n did not keep one note per relaunch above Start"
+  done
+  grep -q '^First, ' "$brief" && fail "a qwen relaunch note opened a second first step"
+  inbox="$dir/home/state/rlq1.inbox"
+  [ "$(grep -c "^If it printed OK, run \`ls $inbox/\*.msg\`" "$brief")" = 1 ] \
+    || fail "the qwen relaunch did not fold one inbox check into the Start step"
+  mkdir -p "$inbox/handled"
+  printf 'steer\n' > "$inbox/001.msg"
+  # shellcheck disable=SC2016 # Literal backticks delimit the command in the brief.
+  ack=$(grep '^If it printed OK, run' "$brief" | grep -o 'mv [^`]*')
+  bash -c "${ack//NNN/001}" || fail "the folded inbox acknowledgement failed: $ack"
+  [ -f "$inbox/handled/001.msg" ] || fail "the folded inbox acknowledgement did not move the steer"
+  pass "fm-control relaunch: a qwen brief keeps Start last with one first step across relaunch notes"
+}
+
 test_relaunch_requires_a_note_for_a_ship_task() {
   local dir out rc before
   dir=$(new_case nonote rl3)
@@ -2540,6 +2576,7 @@ test_relaunch_preserves_durable_task_metadata
 test_relaunch_serializes_concurrent_durable_metadata_publication
 test_disabled_relaunch_clears_prior_trace_context
 test_relaunch_appends_the_progress_note_to_the_instructions
+test_relaunch_note_keeps_a_qwen_brief_start_last
 test_relaunch_requires_a_note_for_a_ship_task
 test_harness_switch_moves_the_record_and_clears_prior_wiring
 test_harness_switch_does_not_carry_the_old_profile_axes

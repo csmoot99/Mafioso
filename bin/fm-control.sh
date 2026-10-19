@@ -182,6 +182,8 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-worker-account-lib.sh"
 # shellcheck source=bin/fm-exclude-tools-lib.sh
 . "$SCRIPT_DIR/fm-exclude-tools-lib.sh"
+# shellcheck source=bin/fm-dod-lib.sh
+. "$SCRIPT_DIR/fm-dod-lib.sh"
 
 POLL=${FM_CONTROL_POLL:-0.5}
 SETTLE_WAIT=${FM_CONTROL_SETTLE_WAIT:-5}
@@ -1044,8 +1046,11 @@ safe_checkpoint() {
 # actually reads. A secondmate's charter is a durable standing document and is
 # never rewritten: a secondmate reconciles its own home's records at startup,
 # so the note stays parent-side audit evidence.
+# A qwen-shaped brief must keep its Start section last (bin/fm-brief.sh header),
+# so there the note goes just above Start and the inbox check joins Start's one
+# first step.
 record_note() {
-  local stamp
+  local stamp start inbox ack
   [ -n "$NOTE" ] || return 0
   stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   printf '%s\n' "$NOTE" > "$NOTE_FILE"
@@ -1053,6 +1058,25 @@ record_note() {
     ship|scout)
       cp -p "$RELAUNCH_BRIEF" "$BRIEF_PRIOR" \
         || die "could not preserve task $ID's instructions before recording the progress note"
+      if [ "$KIND" = ship ] && fm_brief_is_qwen_shape "$RELAUNCH_BRIEF" \
+         && start=$(grep -n -x '# Start' "$RELAUNCH_BRIEF" | tail -n 1 | cut -d: -f1) && [ -n "$start" ]; then
+        printf -v inbox '%q' "$STATE/$ID.inbox"
+        ack="If it printed OK, run \`ls $inbox/*.msg\`; act on each message in numeric order, then move it with \`mv $inbox/NNN.msg $inbox/handled/\`. A steer sent before the relaunch survives there."
+        {
+          head -n "$((start - 1))" "$RELAUNCH_BRIEF"
+          echo "## Progress note ($stamp)"
+          echo
+          echo "This task was relaunched. Continue from here; the local copy and every"
+          echo "uncommitted change are exactly as the previous worker left them."
+          echo
+          printf '%s\n' "$NOTE"
+          echo
+          tail -n "+$start" "$RELAUNCH_BRIEF"
+          grep -qxF -- "$ack" "$RELAUNCH_BRIEF" || printf '%s\n' "$ack"
+        } > "$RELAUNCH_BRIEF.note.$$" && mv -f "$RELAUNCH_BRIEF.note.$$" "$RELAUNCH_BRIEF" \
+          || die "could not insert the progress note into task $ID's instructions"
+        return 0
+      fi
       {
         echo
         echo "## Progress note ($stamp)"
