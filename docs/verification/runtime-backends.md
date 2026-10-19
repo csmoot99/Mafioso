@@ -1418,11 +1418,6 @@ The journal for that session had no `context shift` line and every request relea
 
 The 49k requests are the summarization calls, which carry the whole history; the largest prompt plus output was 50,920, leaving 14,616 tokens under the window.
 qwen estimates tokens from characters, and on that token-dense content each summarization call the server received was 7k to 16k tokens larger than qwen's estimate of the history it summarized, so denser content or larger single tool results shrink that margin.
-
-qwen checks its trigger only between turns, so one turn of batched reads can jump past both the trigger and the window at once.
-Before the per-task settings capped a batch, live sessions that issued six `cat` calls on 26,000-character hex files in one turn went from about 12k to 64k prompt tokens in one request: one summarization request shifted (`n_discard = 32765`, `truncated = 1`), later output degenerated, and a re-run ended on qwen's own `Context is too large to send safely after automatic compression` error.
-The settings file therefore also pins `tools.toolOutputBatchBudget=25000` (default 200,000 characters), which caps the combined output of one batch and persists the rest for a later read.
-With it, the same burst on 2026-10-18, once with 64-character lines and once with single-line files, sent prompts of `11548 32600` and `11550 32650` tokens, with no `context shift` line and no `truncated = 1`.
 No reusable live guard covers this yet; re-run such a session after a qwen or Ollama upgrade, or after the served window changes, which also requires changing the pin.
 
 ### Herdr pane liveness

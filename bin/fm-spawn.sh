@@ -5219,12 +5219,6 @@ EOF
       # no server shift (docs/verification/runtime-backends.md). It becomes
       # the active trigger if the window is raised above about 82500. Change
       # the window with the server's.
-      # tools.toolOutputBatchBudget=25000 (default 200000 characters) caps
-      # the combined output of one batch of tool calls; qwen persists the
-      # rest for a later read. qwen checks its trigger only between turns
-      # and estimates tokens from characters, so one batch of six
-      # token-dense reads jumped a session from 12k to 64k real tokens past
-      # the trigger and the summarization request itself shifted (live).
       # Hook commands print nothing: qwen's hook contract accepts an empty
       # stdout (verified), and every command tolerates a refused event so a
       # stale-gen writer can never break qwen's own lifecycle.
@@ -5234,7 +5228,7 @@ EOF
       q_stop=$(json_escape "touch $(shell_quote "$TURNEND"); $busy_cmd_prefix idle $busy_suffix --event stop >/dev/null 2>&1 || true")
       q_sessionend=$(json_escape "$busy_cmd_prefix idle $busy_suffix --event session-end >/dev/null 2>&1 || true")
       cat >"$STATE_REAL/$ID.qwen-settings.json" <<EOF
-{"\$version":4,"security":{"folderTrust":{"enabled":false}},"ui":{"enableFollowupSuggestions":false,"enableUserFeedback":false},"memory":{"enableManagedAutoMemory":false},"model":{"generationConfig":{"contextWindowSize":65536}},"context":{"autoCompactThreshold":0.6},"tools":{"toolOutputBatchBudget":25000},"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"$q_submit"}]}],"Stop":[{"hooks":[{"type":"command","command":"$q_stop"}]}],"SessionEnd":[{"hooks":[{"type":"command","command":"$q_sessionend"}]}]}}
+{"\$version":4,"security":{"folderTrust":{"enabled":false}},"ui":{"enableFollowupSuggestions":false,"enableUserFeedback":false},"memory":{"enableManagedAutoMemory":false},"model":{"generationConfig":{"contextWindowSize":65536}},"context":{"autoCompactThreshold":0.6},"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"$q_submit"}]}],"Stop":[{"hooks":[{"type":"command","command":"$q_stop"}]}],"SessionEnd":[{"hooks":[{"type":"command","command":"$q_sessionend"}]}]}}
 EOF
     fi
     ;;
