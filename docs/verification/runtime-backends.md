@@ -532,7 +532,7 @@ What the run established on this version:
 ## Claude worker MCP servers
 
 Verified 2026-10-19 on Claude Code 2.1.303, on an account with five claude.ai connectors and no user-scope MCP servers.
-`BASE` is the ship and scout `--settings` JSON before this change and `NEW` is the one `bin/fm-spawn.sh` now emits:
+`BASE` is the ship and scout `--settings` JSON without the two MCP keys and `NEW` is the one `bin/fm-spawn.sh` emits:
 
 ```sh
 BASE='{"feedbackDrafts":"off","attribution":{"commit":"","pr":"","sessionUrl":false}}'
