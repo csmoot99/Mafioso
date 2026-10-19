@@ -120,6 +120,34 @@
 # retains the lock until the accepted merge authority is persisted against the
 # still-matching task metadata.
 #
+# Once the live head is verified and before either forge merge, a sibling
+# validation in flight that this merge would conflict with refuses the merge.
+# A no-mistakes CI monitor repairs a PR the base moved into conflict by
+# rebasing its published branch, even after its checks read green, and the
+# run's push then refuses to reconcile its mirror ref, so the run needs a full
+# re-validation; a clean base advance only re-arms the monitor. Siblings are
+# only this home's other recorded tasks: no-mistakes ships on the same project
+# and recorded base branch, an unrecorded base read on both sides as the project
+# clone's default branch, whose worktree still exists. One is in flight while
+# the run on its checked-out branch has not ended and has completed or skipped
+# its rebase step, pushed or not, green or not, parked at a gate or not; an
+# ended run, including one aborted after its PR went green, never blocks.
+# Each in-flight run head is trial-merged against the verified head with git
+# merge-tree in the project clone, refreshed first through
+# bin/fm-fleet-sync.sh when it lives in this home's projects directory. The
+# trial also reads the gate repository the clone's no-mistakes remote names,
+# where an unpushed run head lives, and writes into a throwaway object
+# directory, so the clone is never written. The refusal names each sibling,
+# its PR or branch, and the conflicting files. A sibling whose run state,
+# rebase step, or head cannot be read, or whose trial cannot run, refuses too
+# rather than being guessed either way. The refusal names the ways out: a
+# named run whose PR is already green but whose run is still monitoring CI
+# ends when it is aborted (no-mistakes axi abort in its worktree, as after
+# every green run), and then this merge proceeds; two green PRs that conflict
+# with each other land through combined-merge. --allow-in-flight, parsed before the
+# optional -- separator, skips this gate for an explicit captain instruction
+# to merge anyway and is refused while the away-posture record exists.
+#
 # Extra args must not include --repo or -R in any form, including a bundled
 # short-option cluster such as -yR, because the repository comes only from the
 # URL, nor --sha or --match-head-commit because the head comes only from the
@@ -135,7 +163,7 @@
 # explicit captain instruction and never skips the live green check, the
 # away-record read, or a captain hold.
 #
-# Usage: fm-pr-merge.sh <task-id> <pr-url> [--attended-override] [--allow-red <check-name>] [--allow-missing <check-name>] [-- <extra forge merge args>]
+# Usage: fm-pr-merge.sh <task-id> <pr-url> [--attended-override] [--allow-red <check-name>] [--allow-missing <check-name>] [--allow-in-flight] [-- <extra forge merge args>]
 #
 # On GitLab, this script confirms the MR is actually merged before reporting it;
 # an auto-merge-queued or unconfirmed request leaves the poll armed and records
@@ -160,6 +188,10 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 . "$SCRIPT_DIR/fm-merge-authority-lib.sh"
 # shellcheck source=bin/fm-afk-contract.sh
 . "$SCRIPT_DIR/fm-afk-contract.sh"
+# shellcheck source=bin/fm-nm-run-lib.sh
+. "$SCRIPT_DIR/fm-nm-run-lib.sh"
+# shellcheck source=bin/fm-tangle-lib.sh
+. "$SCRIPT_DIR/fm-tangle-lib.sh"
 
 if [ "$#" -lt 2 ]; then
   echo "error: invalid PR merge request" >&2
@@ -196,6 +228,7 @@ shift 2
 ATTENDED_OVERRIDE=false
 ALLOW_RED=()
 ALLOW_MISSING=()
+ALLOW_IN_FLIGHT=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --attended-override)
@@ -224,6 +257,14 @@ while [ "$#" -gt 0 ]; do
       ;;
     --allow-missing=*)
       echo "error: --allow-missing requires a separate check name argument" >&2
+      exit 2
+      ;;
+    --allow-in-flight)
+      ALLOW_IN_FLIGHT=true
+      shift
+      ;;
+    --allow-in-flight=*)
+      echo "error: --allow-in-flight takes no value" >&2
       exit 2
       ;;
     --) shift; break ;;
@@ -1089,6 +1130,134 @@ require_released_captain_hold() {
   esac
 }
 
+meta_value() {  # <meta-file> <key>
+  grep "^$2=" "$1" 2>/dev/null | tail -1 | cut -d= -f2- || true
+}
+
+# The in-flight sibling gate the header describes, run against the verified
+# head in FM_PR_MERGE_HEAD. Every conflicting or unreadable sibling is
+# collected first, so one refusal names them all.
+refuse_conflicting_siblings() {
+  local project default base sibling_base sibling_meta sibling wt branch run rc rebase pr head line label
+  local in_flight='' refusals='' objects='' common gate unavailable='' pr_head='' sibling_head files
+  local -a trial
+  [ "$ALLOW_IN_FLIGHT" = false ] || return 0
+  project=$(meta_value "$META" project)
+  default=$(fm_default_branch "$project" 2>/dev/null) || default=''
+  base=$(meta_value "$META" base_branch)
+  base=${base:-$default}
+  for sibling_meta in "$STATE"/*.meta; do
+    if [ ! -f "$sibling_meta" ] || [ -L "$sibling_meta" ]; then
+      continue
+    fi
+    sibling=${sibling_meta##*/}
+    sibling=${sibling%.meta}
+    [ "$sibling" != "$ID" ] || continue
+    case "$(meta_value "$sibling_meta" kind)" in ''|ship) ;; *) continue ;; esac
+    [ "$(meta_value "$sibling_meta" mode)" = no-mistakes ] || continue
+    [ "$(meta_value "$sibling_meta" project)" = "$project" ] || continue
+    sibling_base=$(meta_value "$sibling_meta" base_branch)
+    [ "${sibling_base:-$default}" = "$base" ] || continue
+    wt=$(meta_value "$sibling_meta" worktree)
+    if [ -z "$wt" ] || [ ! -d "$wt" ]; then
+      continue
+    fi
+    branch=$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null) || continue
+    rc=0
+    run=$(fm_nm_run_bounded "$wt" 10 axi status 2>/dev/null) || rc=$?
+    if printf '%s\n' "$run" | grep -q '^error: repo not initialized'; then
+      continue
+    fi
+    if [ "$rc" -ne 0 ] || [ -z "$run" ]; then
+      refusals="$refusals  - task $sibling (branch $branch): its validation run state could not be read
+"
+      continue
+    fi
+    [ "$(fm_nm_strip_quotes "$(fm_nm_field "$run" branch)")" = "$branch" ] || continue
+    fm_nm_run_is_active "$run" || continue
+    pr=$(fm_nm_strip_quotes "$(fm_nm_field "$run" pr)")
+    label="task $sibling (${pr:-branch $branch})"
+    rebase=$(printf '%s\n' "$run" \
+      | sed -n 's/^[[:space:]]*rebase,[[:space:]]*"\{0,1\}\([a-z_]*\)"\{0,1\}[[:space:]]*,.*/\1/p' | head -1)
+    case "$rebase" in
+      completed|skipped) ;;
+      '')
+        refusals="$refusals  - $label: its validation run's rebase step could not be read
+"
+        continue
+        ;;
+      *) continue ;;
+    esac
+    head=$(fm_nm_strip_quotes "$(fm_nm_field "$run" head_sha)")
+    [ -n "$head" ] || head=$(fm_nm_strip_quotes "$(fm_nm_field "$run" head)")
+    in_flight="$in_flight$label|$head
+"
+  done
+
+  if [ -n "$in_flight" ]; then
+    case "$project" in
+      "$FM_HOME"/projects/*)
+        fm_nm_bounded "$project" 60 env FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-fleet-sync.sh" "$project" \
+          >/dev/null 2>&1 || true
+        ;;
+    esac
+    gate=$(git -C "$project" remote get-url no-mistakes 2>/dev/null) || gate=''
+    [ -d "$gate/objects" ] || gate=''
+    if ! common=$(git -C "$project" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
+      || [ -z "$common" ]; then
+      unavailable="the project clone $project could not be read"
+    elif ! objects=$(mktemp -d "${TMPDIR:-/tmp}/fm-pr-merge-trial.XXXXXX"); then
+      objects=''
+      unavailable="no scratch object directory could be created for the trial merge"
+    else
+      trial=(env "GIT_OBJECT_DIRECTORY=$objects" \
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES=$common/objects${gate:+:$gate/objects}" git -C "$project")
+      pr_head=$("${trial[@]}" rev-parse --verify --quiet "$FM_PR_MERGE_HEAD^{commit}" 2>/dev/null) \
+        || unavailable="this PR's head $FM_PR_MERGE_HEAD is not in the project clone"
+    fi
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      label=${line%|*}
+      head=${line##*|}
+      if [ -n "$unavailable" ]; then
+        refusals="$refusals  - $label: a conflict cannot be ruled out because $unavailable
+"
+        continue
+      fi
+      if ! sibling_head=$("${trial[@]}" rev-parse --verify --quiet "$head^{commit}" 2>/dev/null); then
+        refusals="$refusals  - $label: a conflict cannot be ruled out because its run head ${head:-(unrecorded)} is in neither the project clone nor the validation gate repository
+"
+        continue
+      fi
+      rc=0
+      files=$("${trial[@]}" merge-tree --write-tree --name-only --no-messages "$pr_head" "$sibling_head" 2>/dev/null) \
+        || rc=$?
+      case "$rc" in
+        0) ;;
+        1)
+          refusals="$refusals  - $label conflicts with it in $(printf '%s\n' "$files" \
+            | awk 'NR > 1 && NF { printf "%s%s", sep, $0; sep = ", " }')
+"
+          ;;
+        *)
+          refusals="$refusals  - $label: a conflict cannot be ruled out because the trial merge with its run head failed
+"
+          ;;
+      esac
+    done <<EOF
+$in_flight
+EOF
+    [ -z "$objects" ] || rm -rf "$objects"
+  fi
+
+  [ -n "$refusals" ] || return 0
+  printf 'error: refusing to merge %s: another validation in flight on the same project and base conflicts with it or cannot be ruled out; after this merge its CI monitor would rebase over the conflict and its push would stop it for a full re-validation\n' \
+    "$URL" >&2
+  printf '%s' "$refusals" >&2
+  printf 'error: merge once each listed run has ended (passed, failed, or aborted) or no longer conflicts; a listed run whose PR is already green but whose run is still monitoring CI does not end on its own, so abort it (no-mistakes axi abort in its worktree, as after every green run) and this merge proceeds; two green PRs that conflict with each other land together through combined-merge; pass --allow-in-flight only on an explicit captain instruction to merge anyway\n' >&2
+  return 1
+}
+
 FM_PR_MERGE_AUTHORITY=
 # The authority read. bin/fm-merge-authority-lib.sh owns what the away-posture
 # record's presence means; this function owns what a merge run may do about it,
@@ -1139,6 +1308,10 @@ require_current_away_authority() {
   fi
   if [ "$FM_PR_AWAY_POSTURE" = true ] && [ "${#ALLOW_MISSING[@]}" -gt 0 ]; then
     echo "error: --allow-missing is attended-only; while the away-posture record exists every required check must report" >&2
+    return 2
+  fi
+  if [ "$FM_PR_AWAY_POSTURE" = true ] && [ "$ALLOW_IN_FLIGHT" = true ]; then
+    echo "error: --allow-in-flight is attended-only; while the away-posture record exists a conflicting sibling validation in flight always holds the merge" >&2
     return 2
   fi
 }
@@ -1377,6 +1550,7 @@ case "$PROVIDER" in
       fi
       exit 1
     fi
+    refuse_conflicting_siblings || exit 1
     # The away record is locked first, so this last presence and authority read
     # and the forge command below share one live-owner critical section.
     hold_away_record_for_merge || exit 1
@@ -1428,6 +1602,7 @@ case "$PROVIDER" in
     ;;
   gitlab)
     gitlab_verify_mergeable || exit 1
+    refuse_conflicting_siblings || exit 1
     # --sha binds the merge to the head this run verified, so a push that lands
     # in between is refused by GitLab instead of merged unverified. --yes only
     # skips the interactive confirmation, which no supervised run can answer;

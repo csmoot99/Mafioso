@@ -3832,6 +3832,306 @@ test_allow_missing_follows_the_allow_red_rules() {
   pass "fm-pr-merge --allow-missing is single use, attended-only, and GitHub-only like --allow-red"
 }
 
+# The project clone task-x1 records, whose main holds a bookkeeping file every
+# change edits and an unrelated one, plus this PR's head: a commit on its own
+# branch that rewrites the bookkeeping file's last line. Echoes that head.
+# Args: case_dir
+make_trial_project() {
+  local p="$1/project"
+  fm_git_init_commit "$p"
+  printf 'entry\nbase\n' > "$p/CHANGELOG.md"
+  printf 'base\n' > "$p/other.txt"
+  git -C "$p" add CHANGELOG.md other.txt
+  git -C "$p" commit -qm bookkeeping
+  git -C "$p" checkout -qb pr
+  printf 'entry\nthis PR\n' > "$p/CHANGELOG.md"
+  git -C "$p" commit -qam 'this PR'
+  git -C "$p" checkout -q main
+  git -C "$p" rev-parse pr
+}
+
+# A sibling task this home records beside task-x1: a no-mistakes ship on the
+# same project and base whose worktree, like a pooled task copy, is a worktree
+# of the project clone on its own branch, holding one commit that rewrites the
+# named file's last line. A fake no-mistakes answers its run status from the
+# case's nm-run file, and a missing nm-run fails every read. Extra meta lines
+# override the defaults. Echoes the sibling's head.
+# Args: case_dir sibling-id file [meta-line...]
+add_sibling() {
+  local case_dir=$1 id=$2 file=$3 wt
+  shift 3
+  wt="$case_dir/$id-wt"
+  git -C "$case_dir/project" worktree add -q -b "fm/$id" "$wt" main
+  printf 'entry\n%s\n' "$id" > "$wt/$file"
+  git -C "$wt" commit -qam "$id"
+  fm_write_meta "$case_dir/state/$id.meta" \
+    "window=fm-$id" \
+    "worktree=$wt" \
+    "project=$case_dir/project" \
+    "kind=ship" \
+    "mode=no-mistakes" \
+    "$@"
+  cat > "$case_dir/fakebin/no-mistakes" <<'SH'
+#!/usr/bin/env bash
+case "${1:-} ${2:-}" in
+  "axi status") cat "${0%/fakebin/no-mistakes}/nm-run" 2>/dev/null || exit 1 ;;
+esac
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/no-mistakes"
+  git -C "$wt" rev-parse HEAD
+}
+
+# The sibling's run as `no-mistakes axi status` reports it from its worktree.
+# A gate: or outcome: argument is written after the steps table; every other
+# argument is a step row. Args: case_dir sibling-id status pr head row...
+write_sibling_run() {
+  local case_dir=$1 id=$2 status=$3 pr=$4 head=$5 row rows='' extra='' count=0
+  shift 5
+  for row in "$@"; do
+    case "$row" in
+      gate:*|outcome:*) extra="$extra$row"$'\n' ;;
+      *) rows="$rows    $row"$'\n'; count=$((count + 1)) ;;
+    esac
+  done
+  {
+    printf 'run:\n  id: "01SIBLING"\n  branch: fm/%s\n  status: %s\n  head: "%s"\n  head_sha: %s\n  pr: "%s"\n  findings: none\n' \
+      "$id" "$status" "${head:0:8}" "$head" "$pr"
+    printf '  steps[%d]{step,status,findings,duration_ms}:\n%s%s' "$count" "$rows" "$extra"
+  } > "$case_dir/nm-run"
+}
+
+# A sibling run past its rebase step whose published PR is in its CI monitor.
+# The gate never reads whether those checks are green: a green monitor still
+# rebases over a conflicting merge.
+write_sibling_in_ci() {
+  write_sibling_run "$1" "$2" running "$3" "$4" \
+    rebase,completed,0,0 review,completed,0,0 push,completed,0,0 pr,completed,0,0 ci,running,0,0
+}
+
+expect_conflict_refusal() {
+  local case_dir=$1 label=$2 line=$3 rc
+  set +e
+  if [ -s "$case_dir/mr.json" ]; then
+    run_pr_merge "$case_dir" task-x1 "$MR_URL" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  else
+    run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/300 \
+      > "$case_dir/stdout" 2> "$case_dir/stderr"
+  fi
+  rc=$?
+  set -e
+  expect_code 1 "$rc" "$label: a conflicting in-flight sibling must refuse"
+  assert_grep "$line" "$case_dir/stderr" "$label: the refusal did not name the sibling, its PR or branch, and its conflict"$'\n'"$(cat "$case_dir/stderr")"
+  assert_grep 'merge once each listed run has ended' "$case_dir/stderr" \
+    "$label: the refusal did not say when to merge"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" "$label: gh pr merge ran under a conflicting sibling"
+  [ ! -f "$case_dir/glab.log" ] \
+    || assert_no_grep ' mr merge ' "$case_dir/glab.log" "$label: glab mr merge ran under a conflicting sibling"
+}
+
+test_conflicting_in_flight_sibling_refuses_the_merge() {
+  local case_dir pr_head sibling_head sibling_pr=https://github.com/example/repo/pull/301
+  local conflict="task task-y2 ($sibling_pr) conflicts with it in CHANGELOG.md"
+
+  case_dir=$(make_case sibling-conflict-in-ci)
+  pr_head=$(make_trial_project "$case_dir")
+  add_gh_mocks "$case_dir" "$pr_head"
+  sibling_head=$(add_sibling "$case_dir" task-y2 CHANGELOG.md)
+  write_sibling_in_ci "$case_dir" task-y2 "$sibling_pr" "$sibling_head"
+  expect_conflict_refusal "$case_dir" sibling-conflict-in-ci "$conflict"
+
+  # A run parked at a gate after its rebase will push this head later.
+  case_dir=$(make_case sibling-conflict-parked)
+  pr_head=$(make_trial_project "$case_dir")
+  add_gh_mocks "$case_dir" "$pr_head"
+  sibling_head=$(add_sibling "$case_dir" task-y2 CHANGELOG.md)
+  write_sibling_run "$case_dir" task-y2 awaiting_approval '' "$sibling_head" \
+    rebase,completed,0,0 review,awaiting_approval,1,0 push,pending,0,0 'gate: review'
+  expect_conflict_refusal "$case_dir" sibling-conflict-parked \
+    'task task-y2 (branch fm/task-y2) conflicts with it in CHANGELOG.md'
+
+  # An unpushed run head carrying the pipeline's own commit lives only in the
+  # validation gate repository; the sibling's own copy holds no conflict.
+  case_dir=$(make_case sibling-conflict-unpushed)
+  pr_head=$(make_trial_project "$case_dir")
+  add_gh_mocks "$case_dir" "$pr_head"
+  add_sibling "$case_dir" task-y2 other.txt >/dev/null
+  git clone -q --bare "$case_dir/project" "$case_dir/gate.git"
+  git clone -q "$case_dir/gate.git" "$case_dir/pipeline"
+  printf 'entry\npipeline fix\n' > "$case_dir/pipeline/CHANGELOG.md"
+  git -C "$case_dir/pipeline" commit -qam 'pipeline fix'
+  git -C "$case_dir/pipeline" push -q origin HEAD:refs/heads/pipeline-task-y2
+  sibling_head=$(git -C "$case_dir/pipeline" rev-parse HEAD)
+  ! git -C "$case_dir/project" cat-file -e "$sibling_head^{commit}" 2>/dev/null \
+    || fail "sibling-conflict-unpushed: the pipeline head leaked into the project clone"
+  git -C "$case_dir/project" remote add no-mistakes "$case_dir/gate.git"
+  write_sibling_run "$case_dir" task-y2 running '' "$sibling_head" \
+    rebase,completed,0,0 review,completed,0,0 test,running,0,0 push,pending,0,0
+  expect_conflict_refusal "$case_dir" sibling-conflict-unpushed \
+    'task task-y2 (branch fm/task-y2) conflicts with it in CHANGELOG.md'
+  ! git -C "$case_dir/project" cat-file -e "$sibling_head^{commit}" 2>/dev/null \
+    || fail "sibling-conflict-unpushed: the trial merge wrote into the project clone"
+
+  case_dir=$(make_gitlab_case sibling-conflict-gitlab)
+  pr_head=$(make_trial_project "$case_dir")
+  write_mr_json "$case_dir/mr.json" "head=$pr_head" "pipeline_sha=$pr_head"
+  sibling_head=$(add_sibling "$case_dir" task-y2 CHANGELOG.md)
+  write_sibling_in_ci "$case_dir" task-y2 "$sibling_pr" "$sibling_head"
+  expect_conflict_refusal "$case_dir" sibling-conflict-gitlab "$conflict"
+  pass "fm-pr-merge refuses a merge that conflicts with a sibling run in flight past its rebase, pushed or not, parked or not"
+}
+
+test_siblings_outside_the_gate_do_not_block() {
+  local case_dir pr_head sibling_head name file number=310
+  for name in clean before-rebase ended aborted other-base other-project scout direct-pr; do
+    number=$((number + 1))
+    case_dir=$(make_case "sibling-$name")
+    pr_head=$(make_trial_project "$case_dir")
+    add_gh_mocks "$case_dir" "$pr_head"
+    file=CHANGELOG.md
+    [ "$name" != clean ] || file=other.txt
+    case "$name" in
+      other-base) sibling_head=$(add_sibling "$case_dir" task-y2 "$file" base_branch=release) ;;
+      other-project) sibling_head=$(add_sibling "$case_dir" task-y2 "$file" "project=$case_dir/elsewhere") ;;
+      scout) sibling_head=$(add_sibling "$case_dir" task-y2 "$file" kind=scout) ;;
+      direct-pr) sibling_head=$(add_sibling "$case_dir" task-y2 "$file" mode=direct-PR) ;;
+      *) sibling_head=$(add_sibling "$case_dir" task-y2 "$file") ;;
+    esac
+    case "$name" in
+      before-rebase)
+        write_sibling_run "$case_dir" task-y2 running '' "$sibling_head" \
+          intent,completed,0,0 rebase,running,0,0 review,pending,0,0
+        ;;
+      ended)
+        write_sibling_run "$case_dir" task-y2 completed https://github.com/example/repo/pull/399 "$sibling_head" \
+          rebase,completed,0,0 push,completed,0,0 ci,completed,0,0 'outcome: passed'
+        ;;
+      aborted)
+        write_sibling_run "$case_dir" task-y2 cancelled https://github.com/example/repo/pull/399 "$sibling_head" \
+          rebase,completed,0,0 push,completed,0,0 ci,cancelled,0,0 'outcome: cancelled'
+        ;;
+      *) write_sibling_in_ci "$case_dir" task-y2 https://github.com/example/repo/pull/399 "$sibling_head" ;;
+    esac
+    run_pr_merge "$case_dir" task-x1 "https://github.com/example/repo/pull/$number" \
+      > "$case_dir/stdout" 2> "$case_dir/stderr" \
+      || fail "sibling-$name: the sibling must not block the merge: $(cat "$case_dir/stderr")"
+    assert_logged_gh_merge "$case_dir" "$number" example/repo --squash
+  done
+  pass "fm-pr-merge is not held by a clean, pre-rebase, ended, other-base, other-project, scout, or direct-PR sibling"
+}
+
+test_unreadable_sibling_state_refuses() {
+  local case_dir pr_head missing=dddddddddddddddddddddddddddddddddddddddd
+
+  case_dir=$(make_case sibling-run-unreadable)
+  pr_head=$(make_trial_project "$case_dir")
+  add_gh_mocks "$case_dir" "$pr_head"
+  add_sibling "$case_dir" task-y2 CHANGELOG.md >/dev/null
+  expect_conflict_refusal "$case_dir" sibling-run-unreadable \
+    'task task-y2 (branch fm/task-y2): its validation run state could not be read'
+
+  case_dir=$(make_case sibling-head-missing)
+  pr_head=$(make_trial_project "$case_dir")
+  add_gh_mocks "$case_dir" "$pr_head"
+  add_sibling "$case_dir" task-y2 CHANGELOG.md >/dev/null
+  write_sibling_in_ci "$case_dir" task-y2 https://github.com/example/repo/pull/301 "$missing"
+  expect_conflict_refusal "$case_dir" sibling-head-missing \
+    "a conflict cannot be ruled out because its run head $missing is in neither the project clone nor the validation gate repository"
+  pass "fm-pr-merge refuses, naming the sibling, when its run state or run head cannot be read"
+}
+
+# The incident's mutual hold: this PR is green and the conflicting sibling's PR
+# is green too, but its run is still monitoring CI and will not end on its own.
+# The refusal names both ways out, and aborting the sibling's run lets the
+# merge proceed.
+test_conflict_refusal_names_the_ways_out_of_a_mutual_hold() {
+  local case_dir pr_head sibling_head sibling_pr=https://github.com/example/repo/pull/341
+
+  case_dir=$(make_case sibling-mutual-hold)
+  pr_head=$(make_trial_project "$case_dir")
+  add_gh_mocks "$case_dir" "$pr_head"
+  sibling_head=$(add_sibling "$case_dir" task-y2 CHANGELOG.md)
+  write_sibling_in_ci "$case_dir" task-y2 "$sibling_pr" "$sibling_head"
+  expect_conflict_refusal "$case_dir" sibling-mutual-hold \
+    "task task-y2 ($sibling_pr) conflicts with it in CHANGELOG.md"
+  assert_grep 'abort it (no-mistakes axi abort in its worktree' "$case_dir/stderr" \
+    "sibling-mutual-hold: the refusal did not name aborting a green sibling's monitoring run"
+  assert_grep 'land together through combined-merge' "$case_dir/stderr" \
+    "sibling-mutual-hold: the refusal did not name combined-merge for two conflicting green PRs"
+
+  write_sibling_run "$case_dir" task-y2 cancelled "$sibling_pr" "$sibling_head" \
+    rebase,completed,0,0 push,completed,0,0 pr,completed,0,0 ci,cancelled,0,0 'outcome: cancelled'
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/300 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    || fail "sibling-mutual-hold: the merge must proceed once the sibling's run is aborted: $(cat "$case_dir/stderr")"
+  assert_logged_gh_merge "$case_dir" 300 example/repo --squash
+  pass "fm-pr-merge names aborting a green sibling's run and combined-merge as the ways out of a conflict hold"
+}
+
+# A task spawned without --base-branch records no base_branch and targets the
+# project's default branch, the same base as a sibling that names it.
+test_unrecorded_base_matches_a_sibling_on_the_default_branch() {
+  local case_dir pr_head sibling_head name sibling_pr=https://github.com/example/repo/pull/351
+  for name in sibling-names-default merger-names-default; do
+    case_dir=$(make_case "sibling-base-$name")
+    pr_head=$(make_trial_project "$case_dir")
+    add_gh_mocks "$case_dir" "$pr_head"
+    if [ "$name" = sibling-names-default ]; then
+      sibling_head=$(add_sibling "$case_dir" task-y2 CHANGELOG.md base_branch=main)
+    else
+      printf 'base_branch=main\n' >> "$case_dir/state/task-x1.meta"
+      sibling_head=$(add_sibling "$case_dir" task-y2 CHANGELOG.md)
+    fi
+    write_sibling_in_ci "$case_dir" task-y2 "$sibling_pr" "$sibling_head"
+    expect_conflict_refusal "$case_dir" "sibling-base-$name" \
+      "task task-y2 ($sibling_pr) conflicts with it in CHANGELOG.md"
+  done
+  pass "fm-pr-merge reads an unrecorded base as the project's default branch when matching siblings"
+}
+
+test_allow_in_flight_overrides_the_gate_only_when_attended() {
+  local case_dir rc pr_head sibling_head
+
+  case_dir=$(make_case allow-in-flight)
+  pr_head=$(make_trial_project "$case_dir")
+  add_gh_mocks "$case_dir" "$pr_head"
+  sibling_head=$(add_sibling "$case_dir" task-y2 CHANGELOG.md)
+  write_sibling_in_ci "$case_dir" task-y2 https://github.com/example/repo/pull/339 "$sibling_head"
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/330 --allow-in-flight \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    || fail "allow-in-flight: the attended override should merge: $(cat "$case_dir/stderr")"
+  assert_logged_gh_merge "$case_dir" 330 example/repo --squash
+
+  case_dir=$(make_case allow-in-flight-away)
+  pr_head=$(make_trial_project "$case_dir")
+  add_gh_mocks "$case_dir" "$pr_head"
+  sibling_head=$(add_sibling "$case_dir" task-y2 CHANGELOG.md)
+  write_sibling_in_ci "$case_dir" task-y2 https://github.com/example/repo/pull/339 "$sibling_head"
+  write_away_record "$case_dir" --words 'merge task-x1 when green'
+  set +e
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/331 --allow-in-flight \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  expect_code 2 "$rc" "allow-in-flight-away: the override must be refused while away"
+  assert_grep '--allow-in-flight is attended-only' "$case_dir/stderr" \
+    "allow-in-flight-away: the refusal did not name attended-only"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" \
+    "allow-in-flight-away: gh pr merge ran despite the away override"
+
+  case_dir=$(make_case allow-in-flight-value)
+  add_gh_mocks "$case_dir" d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4
+  set +e
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/332 --allow-in-flight=yes \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  expect_code 2 "$rc" "allow-in-flight-value: a value must be refused"
+  assert_grep '--allow-in-flight takes no value' "$case_dir/stderr" \
+    "allow-in-flight-value: the refusal did not name the flag"
+  pass "fm-pr-merge --allow-in-flight merges past a conflicting sibling only when attended"
+}
+
 test_gitlab_head_override_args_refuse_before_recording
 test_secondmate_merge_reports_upward_once
 test_secondmate_merge_reports_on_the_local_route
@@ -3886,3 +4186,9 @@ test_allow_missing_follows_the_allow_red_rules
 test_required_producer_identity
 test_app_bound_required_status_context_matches_by_name
 test_required_partial_reads_report_all_failures
+test_conflicting_in_flight_sibling_refuses_the_merge
+test_siblings_outside_the_gate_do_not_block
+test_unreadable_sibling_state_refuses
+test_allow_in_flight_overrides_the_gate_only_when_attended
+test_conflict_refusal_names_the_ways_out_of_a_mutual_hold
+test_unrecorded_base_matches_a_sibling_on_the_default_branch
