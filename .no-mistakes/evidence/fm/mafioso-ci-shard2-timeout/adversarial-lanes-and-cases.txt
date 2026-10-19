@@ -1,0 +1,22 @@
+## Stale nine-shard lane names are refused (a CI matrix cannot silently drop shard 10)
+$ bin/fm-test-run.sh --list --lane portable-serial-2of9
+fm-test-run: lane 'portable-serial-2of9' asks for 9 portable serial shards but this runner is configured for 10 (see --list-lanes)
+rc=2
+$ bin/fm-test-run.sh --list --lane portable-serial-11of10
+fm-test-run: lane 'portable-serial-11of10' shard index is outside 1..10 (see --list-lanes)
+rc=2
+$ bin/fm-test-run.sh --list --lane portable-serial-0of10
+fm-test-run: lane 'portable-serial-0of10' shard index is outside 1..10 (see --list-lanes)
+rc=2
+
+## --changed for the host source selects all three parts
+tests/fm-supervision-host-session.test.sh
+tests/fm-supervision-host-turns.test.sh
+tests/fm-supervision-host.test.sh
+
+## Test cases invoked: base single file vs union of the three head files
+tests/fm-supervision-host.test.sh: 45 cases
+tests/fm-supervision-host-turns.test.sh: 20 cases
+tests/fm-supervision-host-session.test.sh: 8 cases
+base: 73 invoked, head union: 73, head unique: 73
+identical case sets, each invoked exactly once

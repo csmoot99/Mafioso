@@ -1,0 +1,13 @@
+job 'tests-portable-serial': name='Behavior portable serial ${{ matrix.shard }}' timeout-minutes=30 matrix.shard=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+lane expression(s) in steps: ['portable-serial-${FM_SERIAL_SHARD}.json', 'portable-serial-${{']
+runner serial shards: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+MATCH
+Run portable serial shard ${{ matrix.shard }} | env: {'FM_SERIAL_LANE': 'portable-serial-${{ matrix.shard }}of${{ strategy.job-total }}', 'FM_SERIAL_SHARD': '${{ matrix.shard }}'} 
+ set -eu
+mkdir -p "$RUNNER_TEMP/fm-test"
+# The Pi package is installed above and CI provides npm and tsc, so
+# any missing typecheck prerequisite is a broken lane, not a valid skip.
+bin/fm-test-run.sh --lane "$FM_SERIAL_LANE" \
+  --fail-on-gate-skip 'Pi extension typecheck prerequisite not found' \
+  --json "$RUNNER_TEMP/fm-test/fm-test-timing-portable-serial-${FM_SERIAL_SHARD}.json"
+

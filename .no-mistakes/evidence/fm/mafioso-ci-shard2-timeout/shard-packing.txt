@@ -1,0 +1,19 @@
+## --check-coverage (head commit)
+FM_TEST_COVERAGE ok total=260 parallel=24 parallel_max_ms=665545 parallel_imbalance_ms=2 parallel_unhinted=0 serial=220 serial_shards=10 serial_unhinted=0 serial_max_ms=1096621 serial_budget_ms=1200000 herdr=16
+rc=0
+
+## Shard membership of the supervision-host parts and hinted shard sums
+shard  1:  11 scripts, hinted_ms=1096600 (18.3 min) 
+shard  2:  22 scripts, hinted_ms=1096583 (18.3 min) tests/fm-supervision-host.test.sh 
+shard  3:  23 scripts, hinted_ms=1096595 (18.3 min) tests/fm-supervision-host-session.test.sh 
+shard  4:  23 scripts, hinted_ms=1096621 (18.3 min) tests/fm-supervision-host-turns.test.sh 
+shard  5:  23 scripts, hinted_ms=1096619 (18.3 min) 
+shard  6:  24 scripts, hinted_ms=1096614 (18.3 min) 
+shard  7:  23 scripts, hinted_ms=1096581 (18.3 min) 
+shard  8:  23 scripts, hinted_ms=1096582 (18.3 min) 
+shard  9:  24 scripts, hinted_ms=1096603 (18.3 min) 
+shard 10:  24 scripts, hinted_ms=1096598 (18.3 min) 
+
+## Union of 10 shards vs --lane portable-serial
+serial lane members: 220; shard total: 220; unique: 220
+union == portable-serial, no duplicates
