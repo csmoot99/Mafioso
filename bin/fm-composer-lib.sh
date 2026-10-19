@@ -1702,7 +1702,31 @@ fm_composer_blocking_dialog() {  # <screen> -> dialog name
     printf '%s' 'Claude background-task exit picker'
     return 0
   fi
+  if fm_composer_qwen_loop_dialog "$screen"; then
+    printf '%s' 'qwen loop-detection dialog'
+    return 0
+  fi
   return 1
+}
+
+# fm_composer_qwen_loop_dialog: 0 when the screen ends in qwen's loop-detection
+# dialog, which halts the turn and waits for a keypress: Enter keeps detection
+# on and `2` turns it off for the session, so nothing firstmate types may reach
+# it. The structure is the heading row, then both option rows, inside the
+# box's left border, with the box's bottom border as the last non-blank row
+# (where qwen's composer sits whenever no dialog is open). The right border and
+# the wrapped note vary with pane width, so neither is read. Recorded
+# 2026-10-19 on qwen 0.25.2 under Herdr 0.8.0, at 40x120 and on a narrower
+# headless pane. bin/fm-busy-lib.sh reads the same match as a halted worker.
+fm_composer_qwen_loop_dialog() {  # <screen>
+  [ -n "${1-}" ] || return 1
+  printf '%s\n' "$1" | fm_composer_strip_ansi | LC_ALL=C awk '
+    /^[ \t]*│[ \t]*[?][ \t]+A potential loop was detected[ \t│\r]*$/ { heading = 1 }
+    heading && /^[ \t]*│[ \t]*(›[ \t]*)?1\. Keep loop detection enabled [(]esc[)][ \t│\r]*$/ { keep = 1 }
+    keep && /^[ \t]*│[ \t]*(›[ \t]*)?2\. Disable loop detection for this session[ \t│\r]*$/ { disable = 1 }
+    /[^ \t\r]/ { last = $0 }
+    END { exit !(disable && last ~ /^[ \t]*╰/) }
+  '
 }
 
 # A command substitution drops a shell variable, and every composer read runs

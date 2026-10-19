@@ -128,7 +128,13 @@
 # --done-command the one command that must exit 0; and turns reporting into
 # literal shell commands stamped with `$(date +%s)`, which the shell evaluates
 # when the worker runs them, instead of an <epoch> placeholder it would leave
-# unfilled. It tells the worker its branch already exists: bin/fm-spawn.sh
+# unfilled. The isolation check and the working line are one command under
+# the brief's last heading, Start, which qwen runs first; the done line is
+# chained after the PR command, carries the URL that command printed, so it
+# lands only after a real PR, and is echoed back so the worker sees it landed.
+# Its editing rule follows qwen's edit guard (re-read a file on refusal). The
+# harness reference owns which of these commands qwen actually runs. It tells
+# the worker its branch already exists: bin/fm-spawn.sh
 # reads the "Brief shape: qwen" line in the brief's header
 # (fm_brief_is_qwen_shape), creates that branch, and makes every untracked file
 # under a data/<subdir>/ that the brief names read-only.
@@ -751,7 +757,7 @@ PLAN_FENCE_LEN=$(printf '%s\n' "$PLAN_BODY" | awk '
 PLAN_FENCE=$(printf '%*s' "$PLAN_FENCE_LEN" '' | tr ' ' '`')
 DONE_COMMAND_BLOCK=$(printf '%s\n' "$DONE_COMMAND" | sed 's/^/    /')
 cat > "$BRIEF" <<EOF
-You are a worker agent run by firstmate. Work alone; do not wait for a human.
+Work alone; do not wait for a human.
 $QWEN_SETUP
 Stay on that branch. Never run \`git checkout\`, \`git switch\`, \`git stash\`, \`git reset\`, \`git clean\`, \`git worktree\` or \`treehouse\`.
 
@@ -762,41 +768,36 @@ Brief shape: qwen
 $TASK_SECTION
 
 # The plan
-This is the whole plan. You already have it, so never look for a plan file or read it again.
+This is the whole plan; never look for a plan file.
 $PLAN_FENCE
 $PLAN_BODY
 $PLAN_FENCE
 
-# Working rules
-1. First, run \`pwd -P && git rev-parse --show-toplevel && git branch --show-current\`.
-   The first two lines must be the same disposable worktree path, not the project's main checkout, and the third must be \`$BRANCH\`.
-   If they are not, run the blocked command under Reporting with \`launched in primary checkout, not an isolated worktree\` and stop.
-   Otherwise run \`echo "working [at=\$(date +%s)]: started" >> $STATUS_FILE\` before you read anything.
-2. Write only these files, by their paths relative to the current directory: $QWEN_FILES.
-   Every other path is read-only, including every path that starts with \`/\`; the reporting commands below are the only writes outside this directory.
-3. Read each file at most once.
-4. Never open a whole file that the plan calls large, minified or one line long: no \`cat\`, \`head\`, \`read_file\`, or \`grep\` without \`-o\` on it.
-   If you must look, run exactly \`grep -o '<short pattern>' <file> | head -5\`.
-5. Edit by re-reading the file and rewriting it whole with \`write_file\`.
-   Run any formatter the plan names, such as \`prettier --write\`, once, after your last edit; it changes the files, so re-read a file before editing it again.
-6. Copy every regular expression, string literal and expected value from the plan character for character. Do not improve them.
+# Rules
+1. Write only $QWEN_FILES in this directory; every other path is read-only.
+2. Copy every regular expression, string literal and expected value from the plan character for character, and never loosen a test to make it pass.
+3. Read a file with \`read_file\`, never \`cat\` or \`head\`, and only when you need it.
+4. Never open a file the plan calls large, minified or one line long; to look inside it, run \`grep -o '<short pattern>' <file> | head -5\`.
+5. Create a file with \`write_file\` and change it with \`edit\`. Both refuse a file that changed, or that qwen forgot when it compressed the chat, since you last read it: then \`read_file\` it once and retry.
+6. Run any formatter the plan names once, after your last edit.
 7. ${RULE1#1. }
 
 # Done means this command exits 0
 $DONE_COMMAND_BLOCK
-Run it. If it does not exit 0 you are not done: do not summarise; fix the first failure and run it again.
-Never write that tests or checks pass unless this command printed a passing result in this turn.
+Run it; until it exits 0, fix the first failure and run it again. Never say it passed unless it printed a pass.
 
 # Reporting
-When the done command exits 0, run:
-    git add --$QWEN_FILES_Q && git commit -m "<conventional commit title>" && git push -u origin $BRANCH_Q && gh-axi pr create$QWEN_PR_BASE --title "<the same title>" --body "<two or three sentences on what changed>"
-Then run \`gh-axi pr view <number>\` with the number from the PR URL; if it prints \`draft: yes\`, run \`gh-axi pr ready <number>\`.
-Then run this, and stop:
-    echo "done [at=\$(date +%s)]: PR <the full https URL gh-axi printed>" >> $STATUS_FILE
-If you are stuck after two attempts at the same thing, or the plan does not answer something you need, run this, and stop:
+When the done command exits 0, run this as one command, then reply with one line and call no more tools:
+    git add --$QWEN_FILES_Q && git commit -m "<conventional commit title>" && git push -u origin $BRANCH_Q && url=\$(gh-axi pr create$QWEN_PR_BASE --title "<the same title>" --body "<two or three sentences on what changed>" | grep -m1 -o 'https://[^ ]*/pull/[0-9]*') && echo "done [at=\$(date +%s)]: PR \$url" | tee -a $STATUS_FILE
+If that fails, if you are stuck after two attempts at the same thing, or if the plan does not answer something you need, run this, and stop:
     echo "blocked [at=\$(date +%s)]: <one line>" >> $STATUS_FILE
-Firstmate answers through message files in $INBOX_DIR; when your terminal announces one, read it, act on it, then move it with \`mv $INBOX_DIR/NNN.msg $INBOX_DIR/handled/\`.
-Never open a draft PR. Whenever you mention the PR, write its full https URL exactly as gh-axi printed it.
+Write status lines only with the commands in this brief.
+Firstmate answers through message files in $INBOX_DIR; when your terminal announces one, read it, act on it, then move it into its \`handled/\` folder.
+
+# Start
+Before you look at any file, run this command:
+    [ "\$(pwd -P)" = "\$(git rev-parse --show-toplevel)" ] && [ "\$(git branch --show-current)" = $BRANCH_Q ] && echo "working [at=\$(date +%s)]: started" >> $STATUS_FILE && echo OK || echo STOP
+If it printed STOP, run the blocked command above with \`launched in primary checkout, not an isolated worktree\`, and stop.
 EOF
 append_brief_include
 echo "scaffolded: $BRIEF (ship, mode=$MODE, qwen shape; replace {TASK} and {FIRSTMATE_SPEC})"

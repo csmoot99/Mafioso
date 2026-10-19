@@ -54,7 +54,8 @@
 # Classifier-only sources (never written into a record):
 #   endpoint-gone, herdr-native, grok-regex, rovo-regex, agy-regex, muse-session-log,
 #   cursor-transcript, missing, malformed, gen-mismatch, source-mismatch,
-#   kimi-unverified, codex-unverified, capture-failed, no-target, launch-prompt
+#   kimi-unverified, codex-unverified, capture-failed, no-target, launch-prompt,
+#   halt-prompt
 #
 # Classification (fm_busy_classify): busy | idle | unknown | dead, always
 # with the producing source as the second token. Precedence:
@@ -72,7 +73,9 @@
 #      advanced past fm-spawn (any real hook event) is NEVER reclassified
 #      this way, however its rendered tail looks, so a genuinely working turn
 #      keeps its ordinary busy verdict and the general BUSY_TURN_MAX_SECS
-#      bound is unchanged.
+#      bound is unchanged. A supplied tail showing that harness's own dialog
+#      that halts a running turn (fm_busy_halt_prompt) classifies unknown
+#      halt-prompt whatever the record says.
 #   4. no record at all: herdr's native busy verdict is trusted as busy
 #      (generation state is sufficient for busy, not for idle), then the
 #      muse session-log and cursor transcript pull sources, then the
@@ -1051,6 +1054,28 @@ fm_busy_launch_prompt_parked() {  # <harness>
   esac
 }
 
+# fm_busy_halt_prompt (the halt-prompt classifier-only source): 0 when <tail40>
+# shows <harness>'s own dialog that halts a running turn until a human answers
+# it. Only qwen has one: its loop detector ends the turn with no Stop hook, so
+# the record keeps reading busy while the pane waits on the loop-detection
+# dialog for a keypress (live on qwen 0.25.2: busy qwen-hook under the dialog,
+# docs/verification/runtime-backends.md). Any record state yields to it,
+# because a halted worker is neither working nor ready for input; it is never
+# answered, and loop detection stays on. bin/fm-composer-lib.sh owns the
+# dialog's structure, the same match that keeps fm-send from typing into it;
+# it is sourced here when the caller has not loaded it.
+fm_busy_halt_prompt() {  # <harness> <tail40>
+  case "${1:-}" in
+    qwen)
+      command -v fm_composer_qwen_loop_dialog >/dev/null 2>&1 \
+        || . "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-composer-lib.sh" \
+        || return 1
+      fm_composer_qwen_loop_dialog "$2"
+      ;;
+    *) return 1 ;;
+  esac
+}
+
 # fm_busy_classify: semantic classification for a task whose endpoint the
 # caller has already established as present. Prints "<verdict> <source>":
 # busy|idle|unknown plus the producing source (see header). Never probes
@@ -1104,6 +1129,8 @@ fm_busy_classify() {  # <backend> <target> <harness> <id> <state-dir> [tail40]
       if [ "$r_state" = busy ] && [ "$r_source" = fm-spawn ] && [ -n "$tail40" ] \
         && printf '%s' "$tail40" | fm_busy_launch_prompt_parked "$harness"; then
         printf 'unknown launch-prompt'
+      elif [ -n "$tail40" ] && fm_busy_halt_prompt "$harness" "$tail40"; then
+        printf 'unknown halt-prompt'
       else
         printf '%s %s' "$r_state" "$r_source"
       fi

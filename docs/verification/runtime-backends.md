@@ -1466,6 +1466,63 @@ ok - herdr 0.8.0, qwen 0.25.1: the task record and brief are intact after every 
 
 That command is the guard that refreshes this record; `tests/fm-composer-lib.test.sh` and `tests/fm-backend-herdr.test.sh` pin the dark-glyph row and the unregistered-qwen identity with no harness.
 
+### Loop-detection halt
+
+Verified on 2026-10-19 on Linux (WSL2) against Herdr 0.8.0 and Qwen Code 0.25.2 serving `qwen3-coder:30b` from the local Ollama, in an isolated `fm-lab-` session provisioned and torn down by `bin/fm-herdr-lab.sh`, with a real qwen worker launched by `bin/fm-control.sh relaunch` and its user settings capping `model.maxToolCallsPerTurn` at 3, loop detection left on.
+When the detector fired, no `Stop` hook ran, so the busy record stayed `state=busy source=qwen-hook event=user-prompt-submit`, and the pane ended in this dialog (a 40x120 viewer; the prose rows wrap with the pane width):
+
+```text
+   ╭─────────────────────────────────────────────────────────────────────────────────────
+   │ ?  A potential loop was detected
+   │
+   │ This can happen due to repetitive tool calls or other model behavior. Do you want to
+   │ keep loop detection enabled or disable it for this session?
+   │
+   │ › 1. Keep loop detection enabled (esc)
+   │   2. Disable loop detection for this session
+   │
+   │ Note: Setting "model.skipLoopDetection" to true in your settings.json disables only
+   │ the heuristic loop checks for future sessions; the always-on guards (consecutive
+   │ identical tool calls, repeated shell inspection commands, and the per-turn tool-call
+   │ cap) are not affected by it. The cap is tunable via "model.maxToolCallsPerTurn" (0
+   │ disables it). Disabling for this session above suppresses everything.
+   ╰─────────────────────────────────────────────────────────────────────────────────────
+```
+
+Without the halt check, `bin/fm-crew-state.sh` read that worker as `state: working · source: pane · harness busy (qwen-hook)`.
+With it, `fm_busy_classify` printed `unknown halt-prompt`, `fm_composer_blocking_dialog` printed `qwen loop-detection dialog`, crew state read `state: blocked · source: pane · halted on its harness's own dialog, which waits for a keypress (halt-prompt); never answer it - inspect the worker and relaunch it`, and `bin/fm-watch.sh` at `FM_POLL=5` exited with `stale: <target>` 12 seconds after it started.
+`bin/fm-send.sh` recorded the steer as `001.msg`, reported `doorbell did not reach`, and left the dialog on screen.
+
+```sh
+FM_QWEN_LOOP_DIALOG_LIVE=1 bash tests/fm-qwen-loop-dialog-live-e2e.test.sh
+```
+
+```text
+ok - herdr 0.8.0, qwen 0.25.2: a halted qwen classifies unknown halt-prompt while its record still reads busy
+ok - herdr 0.8.0, qwen 0.25.2: crew state reads the halted qwen as blocked
+ok - herdr 0.8.0, qwen 0.25.2: a steer is recorded and its doorbell is not typed into the dialog
+ok - herdr 0.8.0, qwen 0.25.2: relaunch replaces a halted qwen on the same endpoint
+ok - herdr 0.8.0, qwen 0.25.2: exit stops a halted qwen
+```
+
+That command is the guard that refreshes this record; `tests/fm-composer-lib.test.sh`, `tests/fm-busy-state.test.sh`, and `tests/fm-crew-state.test.sh` pin the dialog's structure, the halt verdict over a busy record, and the blocked state with no harness.
+
+### Edit guard and the compact brief
+
+Verified on 2026-10-19 against Qwen Code 0.25.2, which self-updated under `~/.qwen/updates/`; 0.25.1 carries the same refusal messages.
+In the bundle's `checkPriorRead`, `edit` and `write_file` on an existing file refuse with `has not been read in this session` when the session holds no read record for it and with `modified since you last read it` when its mtime or size changed.
+A `read_file` or `grep_search` result and a successful edit or write record a read, a shell `cat` does not, a new file needs none, and every chat compression calls `getFileReadCache().clear()`.
+In the production session that the qwen shape's editing rule replaced (read each file once, rewrite it whole), each of the 11 `has not been read in this session` refusals came after a chat compression since that file's last read or write.
+
+The qwen shape's commands were then run by real qwen workers in the same lab, launched by `bin/fm-spawn.sh --relaunch` onto an agent-free pane so the launch brief carried no progress note, on a disposable project with a local bare origin and a stub `gh-axi`, with a plan to create one file and change two and a done command that runs no tests.
+With the start command as the brief's first lines, the worker's first call was its own `ls -la`, and no working line was written.
+At the brief's end, a longer form that also wrote the blocked line was replaced by the worker's own `pwd && git branch --show-current`, and a check followed by a separate working echo lost the echo in one of three runs.
+The shipped form, one command at the end that writes the working line and prints `OK` or `STOP`, ran first and wrote the working line in all six runs.
+The runs took 17 to 23 seconds and 10 to 14 model requests, no `edit` or `write_file` was refused, and every first done line carried the URL the stub printed.
+While the chain only appended the done line, seven of eight runs then wrote more lines on their own, three with an invented URL and one after re-running `gh-axi pr create`; with the chain printing the line it wrote, two of three runs added only an exact copy of it.
+The first request carried about 15,710 input tokens, nearly all of them qwen's own system prompt and tool declarations.
+No reusable live guard covers the brief; re-run such a task after a qwen upgrade or a change to the qwen shape in `bin/fm-brief.sh`.
+
 ### Not verified
 
 Qwen Code as a PRIMARY or SECONDMATE runtime is unverified and refused by `bin/fm-spawn.sh`: no wake protocol exists under `docs/supervision-protocols/` and no turn-end guard adapter was built or exercised.
