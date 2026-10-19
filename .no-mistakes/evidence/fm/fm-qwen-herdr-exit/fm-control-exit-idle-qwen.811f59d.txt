@@ -1,0 +1,14 @@
+=== fm-control exit on an idle qwen worker on an isolated Herdr lab, code at 811f59d
+--- composer_state: unknown
+--- agent_state before exit: alive
+--- $ fm-control.sh qwen-herdr-live-3107549 exit
+rc=1 error: task qwen-herdr-live-3107549's composer state is 'unknown', not proven empty; refusing to type the /quit exit command because it could concatenate onto existing text. Clear the composer, then retry 'exit'
+--- agent_state after exit: alive
+--- pane tail:
+*   Type your message or @path/to/file
+──────────────────────────────────────────────────────
+  ➜ wt · git:(fm/qwen-herdr-live-3107549) ·
+  qwen3-coder:30b · 65.5k Context 22.3% used
+  YOLO mode (shift + tab to cycle)
+  22.3% used
+driver rc=0

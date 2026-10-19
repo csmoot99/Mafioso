@@ -1,0 +1,7 @@
+ok - herdr 0.8.0, qwen 0.25.1: an idle unregistered qwen composer reads empty
+ok - herdr 0.8.0, qwen 0.25.1: a typed draft reads pending and exit refuses without touching it
+ok - herdr 0.8.0, qwen 0.25.1: exit stops an idle qwen
+ok - herdr 0.8.0, qwen 0.25.1: exit interrupts and stops a qwen in the middle of a long turn
+ok - herdr 0.8.0, qwen 0.25.1: relaunch replaces a running mid-turn qwen on the same endpoint
+ok - herdr 0.8.0, qwen 0.25.1: the task record and brief are intact after every exit and relaunch
+env -u NO_MISTAKES_GATE FM_QWEN_HERDR_CONTROL_LIVE=1 bash   17.94s user 7.27s system 35% cpu 1:11.11 total

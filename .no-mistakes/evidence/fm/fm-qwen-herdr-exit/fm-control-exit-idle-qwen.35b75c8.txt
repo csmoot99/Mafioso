@@ -1,0 +1,14 @@
+=== fm-control exit on an idle qwen worker on an isolated Herdr lab, code at 35b75c8
+--- composer_state: empty
+--- agent_state before exit: alive
+--- $ fm-control.sh qwen-herdr-live-3112237 exit
+rc=0 stopped qwen-herdr-live-3112237 harness=qwen backend=herdr endpoint=fm-lab-qwen-control-3112237-7147:w1:p2 worktree=/tmp/qhc.WaFbsj/wt
+--- agent_state after exit: dead
+--- pane tail:
+
+To continue this session, run
+qwen --resume 014042ea-b556-4d0d-b965-d42901a45ea6
+
+wt on  fm/qwen-herdr-live-3112237 took 7s
+❯
+driver rc=0
