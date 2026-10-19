@@ -29,6 +29,7 @@ Before choosing, trial-merge the group in this home's clone of the project after
 - When the clone lacks a head, such as a fork's, compare the PRs' changed-file lists from the forge instead and treat any shared file as a conflict.
 
 With no conflict and no shared file, merge the PRs one by one through ordinary landing and tell the captain why combining was not needed.
+`bin/fm-pr-merge.sh` still refuses any of them that conflicts with another validation in flight on that base, as `ship-landing` describes.
 Otherwise combine, and carry each conflicting or shared file into the integrator's steer with the intent to keep from each side.
 
 While a combined PR is being built or validated, hold every other merge on that base, because moving the base under it can force new conflicts and a fresh validation.
