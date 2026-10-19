@@ -1285,7 +1285,53 @@ test_quoted_exit_picker_text_is_not_a_dialog() {
   pass "picker text quoted above a normal composer is not read as a live picker"
 }
 
+# qwen 0.25.2's loop-detection dialog as Herdr captured it on a 40x120 pane.
+qwen_loop_dialog_screen() {
+  printf '%s\n' \
+    '  ◆ Now let us run the third date +%N command:' \
+    '   ╭─────────────────────────────────────────────────────────────────────────' \
+    '   │ ?  A potential loop was detected' \
+    '   │' \
+    '   │ This can happen due to repetitive tool calls or other model behavior. Do you want to' \
+    '   │ keep loop detection enabled or disable it for this session?' \
+    '   │' \
+    '   │ › 1. Keep loop detection enabled (esc)' \
+    '   │   2. Disable loop detection for this session' \
+    '   │' \
+    '   │ Note: Setting "model.skipLoopDetection" to true in your settings.json disables only' \
+    '   │ cap) are not affected by it. The cap is tunable via "model.maxToolCallsPerTurn" (0' \
+    '   ╰─────────────────────────────────────────────────────────────────────────'
+}
+
+test_qwen_loop_dialog_is_a_blocking_dialog() {
+  local screen out rc sink
+  screen=$(qwen_loop_dialog_screen)
+  out=$(fm_composer_blocking_dialog "$screen"); rc=$?
+  [ "$rc" -eq 0 ] && [ "$out" = 'qwen loop-detection dialog' ] \
+    || fail "the recorded qwen loop dialog should be named, got rc=$rc '$out'"
+  fm_composer_blocking_dialog "$(printf '%s\n' "$screen" '' '')" >/dev/null \
+    || fail "blank rows below the dialog should still match"
+  # A narrower pane runs the last note line into the bottom border.
+  fm_composer_blocking_dialog "$(printf '%s\n' "$screen" | sed '$d'; printf '%s\n' '   ╰─"model.maxToolCallsPerTurn" (0 disables it). ─')" >/dev/null \
+    || fail "a bottom border carrying the wrapped note should still match"
+  out=$(fm_composer_blocking_dialog "$(printf '%s\n' "$screen" | grep -v 'Keep loop detection')"); rc=$?
+  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "a dialog without its keep row must not match, got '$out'"
+  out=$(fm_composer_blocking_dialog "$(printf '%s\n' "$screen" '' '*  Type your message or @path/to/file')"); rc=$?
+  [ "$rc" -eq 1 ] || fail "the dialog's text above qwen's composer must not match"
+  out=$(fm_composer_blocking_dialog '  ● A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.'); rc=$?
+  [ "$rc" -eq 1 ] || fail "the notice qwen prints after the dialog closes must not match"
+  sink=$(mktemp)
+  FM_COMPOSER_DIALOG_SINK=$sink
+  out=$(fm_composer_classify_screen 'styled=1' "$screen")
+  [ "$out" != empty ] || fail "a pane showing the loop dialog must never read as an empty composer"
+  [ "$(cat "$sink")" = 'qwen loop-detection dialog' ] || fail "classify should note the loop dialog, got '$(cat "$sink")'"
+  unset FM_COMPOSER_DIALOG_SINK
+  rm -f "$sink"
+  pass "qwen's loop-detection dialog is a blocking dialog nothing may type into, and its look-alikes are not"
+}
+
 test_background_exit_picker_stays_pending_and_blocks_retry
 test_dialog_heading_and_footer_must_be_the_recorded_lines
 test_dialog_note_skips_the_match_when_no_sink_is_set
 test_quoted_exit_picker_text_is_not_a_dialog
+test_qwen_loop_dialog_is_a_blocking_dialog

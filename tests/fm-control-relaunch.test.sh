@@ -615,6 +615,52 @@ test_relaunch_appends_the_progress_note_to_the_instructions() {
   pass "fm-control relaunch: progress and the Firstmate-worktree worker identity reach the replacement"
 }
 
+# A qwen-shaped brief keeps Start as its last section across relaunches: each
+# note lands above Start, and the inbox check joins Start's one first step
+# instead of opening a second one.
+test_relaunch_note_keeps_a_qwen_brief_start_last() {
+  local dir out rc brief plan inbox n start_cmd
+  dir=$(new_case qwen-note rlq1)
+  add_ship_task "$dir" rlq1 claude
+  sed -i 's/^mode=no-mistakes$/mode=direct-PR/' "$dir/home/state/rlq1.meta"
+  plan="$dir/plan.md"
+  printf '%s\n' 'Change src/a.ts.' > "$plan"
+  brief="$dir/home/data/rlq1/brief.md"
+  rm -f "$brief"
+  FM_HOME="$dir/home" "$BRIEF" rlq1 some-proj --mode direct-PR --harness qwen --plan "$plan" \
+    --files 'src/a.ts' --done-command 'true' >/dev/null || fail "the qwen brief should scaffold"
+  sed -i -e 's/^{TASK}$/Build it./' -e 's/^{FIRSTMATE_SPEC}$/Follow the plan./' "$brief"
+  for n in 1 2; do
+    printf 'claude' > "$dir/fake/command"
+    out=$(run_control "$dir" rlq1 relaunch --note "qwen note $n"); rc=$?
+    expect_code 0 "$rc" "qwen relaunch $n should succeed"$'\n'"$out"
+    assert_grep "qwen note $n" "$brief" "qwen relaunch $n did not record its note"
+    [ "$(grep '^#' "$brief" | tail -n 1)" = '# Start' ] || fail "qwen relaunch $n left Start short of the brief's last section"
+    [ "$(grep -c '^## Progress note' "$brief")" = "$n" ] || fail "qwen relaunch $n did not keep one note per relaunch above Start"
+  done
+  grep -q '^First, ' "$brief" && fail "a qwen relaunch note opened a second first step"
+  inbox="$dir/home/state/rlq1.inbox"
+  [ "$(grep -c '^If it printed OK and then messages' "$brief")" = 1 ] \
+    || fail "the qwen relaunch did not fold one inbox check into the Start step"
+  # qwen runs Start's one command but skips a separate inbox listing, so that
+  # command must print a waiting steer without moving it, and print OK alone
+  # when the inbox is empty; the next line gives the literal mv to run after.
+  start_cmd=$(awk '/^# Start$/ { s = 1 } s && /^    / { sub(/^    /, ""); print; exit }' "$brief")
+  git init -q -b "$(sed -n 's/^Ship branch: //p' "$brief")" "$dir/qwen-wt" || fail "could not create the qwen worktree"
+  mkdir -p "$inbox/handled"
+  out=$(cd "$dir/qwen-wt" && bash -c "$start_cmd")
+  [ "$out" = OK ] || fail "Start's command should print only OK with an empty inbox, got: $out"
+  printf 'use title fix: steer\n' > "$inbox/001.msg"
+  out=$(cd "$dir/qwen-wt" && bash -c "$start_cmd")
+  [ "$out" = "OK"$'\n'"message 001.msg:"$'\n'"use title fix: steer" ] \
+    || fail "Start's command did not print the waiting steer, got: $out"
+  [ -f "$inbox/001.msg" ] && [ ! -e "$inbox/handled/001.msg" ] \
+    || fail "Start's command moved the printed steer before the worker acted on it"
+  assert_grep "then run mv $inbox/NNN.msg $inbox/handled/ for each" "$brief" \
+    "the qwen relaunch did not give the literal mv command after Start's command"
+  pass "fm-control relaunch: a qwen brief keeps Start last with one first step across relaunch notes"
+}
+
 test_relaunch_requires_a_note_for_a_ship_task() {
   local dir out rc before
   dir=$(new_case nonote rl3)
@@ -2542,6 +2588,7 @@ test_relaunch_preserves_durable_task_metadata
 test_relaunch_serializes_concurrent_durable_metadata_publication
 test_disabled_relaunch_clears_prior_trace_context
 test_relaunch_appends_the_progress_note_to_the_instructions
+test_relaunch_note_keeps_a_qwen_brief_start_last
 test_relaunch_requires_a_note_for_a_ship_task
 test_harness_switch_moves_the_record_and_clears_prior_wiring
 test_harness_switch_does_not_carry_the_old_profile_axes

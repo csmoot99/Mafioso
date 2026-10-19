@@ -2502,6 +2502,36 @@ Enter to confirm . Esc to cancel'
   pass "a launch parked on a recognized interactive prompt never reads working, closing the absorb path a stale watcher poll depends on"
 }
 
+# A qwen worker halted on its loop-detection dialog reads blocked, never
+# working: the halt ends the turn with no Stop hook, so the record still says
+# busy, and only this read keeps a stale watcher poll from absorbing the pane.
+test_no_run_qwen_loop_dialog_is_blocked() {
+  reset_fakes
+  local d; d=$(new_case qwen-halt)
+  make_repo_on_branch "$d/wt" fm/feat-qh
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/feat-qh.meta" "window=fm:fm-feat-qh" "worktree=$d/wt" "kind=ship" "harness=qwen"
+  FM_FAKE_AXI_STATUS=""
+  FM_FAKE_RUNS_LIST=""
+  FM_FAKE_BUSY=1
+  FM_FAKE_BUSY_TEXT='   ╭──────────────────────────────────────
+   │ ?  A potential loop was detected
+   │
+   │ › 1. Keep loop detection enabled (esc)
+   │   2. Disable loop detection for this session
+   │
+   ╰──────────────────────────────────────'
+  export FM_FAKE_BUSY_TEXT
+  local gen; gen=$("$ROOT/bin/fm-busy-event.sh" arm "$d/state" feat-qh)
+  "$ROOT/bin/fm-busy-event.sh" apply "$d/state" feat-qh busy --gen "$gen" \
+    --source qwen-hook --event user-prompt-submit
+  local out; out=$(run_crew_state "$d" feat-qh)
+  assert_contains "$out" "state: blocked" "a qwen worker halted on its loop dialog must read blocked"
+  assert_contains "$out" "source: pane" "the blocked verdict comes from the pane"
+  assert_contains "$out" "halt-prompt" "the blocked verdict names the halt-prompt source"
+  pass "a qwen worker halted on its loop-detection dialog reads blocked, not working"
+}
+
 # A converted adapter must NOT read working from rendered footer text: the
 # redesign removed that dependency, so a pane painting "esc to interrupt" with
 # no semantic record is unknown, never working and never silently idle.
@@ -5581,6 +5611,7 @@ test_no_mistakes_prevalidation_done_stays_done
 test_moved_remote_branch_without_named_head_is_blocked
 test_no_run_busy_pane
 test_no_run_launch_prompt_parked_is_not_working
+test_no_run_qwen_loop_dialog_is_blocked
 test_no_run_footer_text_alone_is_not_working
 test_no_run_grok_uses_isolated_fallback
 test_no_run_herdr_unknown_uses_backend_capture

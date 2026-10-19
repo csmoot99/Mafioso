@@ -1289,12 +1289,18 @@ fi
 # Only an exact busy verdict reports working here, and only an exact idle
 # verdict permits the status-log fallback below. Missing, malformed, stale, or
 # unverified semantic state remains unknown.
+# A worker halted on its harness's own dialog (fm_busy_halt_prompt) is blocked
+# until firstmate acts: nothing answers the dialog for it.
 if [ "$KIND" != secondmate ]; then
   BUSY_VERDICT=$(crew_busy_verdict "$BACKEND_TARGET")
   case "${BUSY_VERDICT%% *}" in
     busy) emit working pane "harness busy (${BUSY_VERDICT#* })" ;;
     idle) ;;
-    *) emit unknown pane "harness state unavailable ($BUSY_VERDICT)" ;;
+    *)
+      [ "$BUSY_VERDICT" != 'unknown halt-prompt' ] \
+        || emit blocked pane "halted on its harness's own dialog, which waits for a keypress (halt-prompt); never answer it - inspect the worker and relaunch it"
+      emit unknown pane "harness state unavailable ($BUSY_VERDICT)"
+      ;;
   esac
 fi
 

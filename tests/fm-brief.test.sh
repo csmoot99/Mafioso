@@ -1307,7 +1307,7 @@ qwen_scaffold() { # <home> <id> <plan> [extra fm-brief args...]
 }
 
 test_qwen_shape_inlines_the_plan_and_keeps_the_contract() {
-  local home plan brief id=brief-qwen-q1 standard cmd before after epoch n=0
+  local home plan brief id=brief-qwen-q1 standard before after epoch status wt fakebin start report blocked out line ack inbox
   home="$TMP_ROOT/qwen-home"
   mkdir -p "$home/data"
   plan="$TMP_ROOT/qwen-plan.md"
@@ -1322,7 +1322,7 @@ test_qwen_shape_inlines_the_plan_and_keeps_the_contract() {
   assert_grep 'PLAN-END-MARKER' "$brief" "the qwen brief cut the plan short"
   assert_no_grep "$plan" "$brief" "the qwen brief names the plan file it inlined"
   # shellcheck disable=SC2016 # Literal backticks are the fence being checked.
-  [ "$(awk 'f { print; exit } /^This is the whole plan\./ { f = 1 }' "$brief")" = '````' ] \
+  [ "$(awk 'f { print; exit } /^This is the whole plan; never look for a plan file\.$/ { f = 1 }' "$brief")" = '````' ] \
     && [ "$(awk 'f { print; exit } /^PLAN-END-MARKER$/ { f = 1 }' "$brief")" = '````' ] \
     || fail "the plan is not enclosed in a fence longer than its own"
   fm_brief_task_placeholders_present "$brief" || fail "the plan's decoy headings hid the scaffold placeholders"
@@ -1333,7 +1333,7 @@ test_qwen_shape_inlines_the_plan_and_keeps_the_contract() {
   grep -qxF "Ship branch: fm/$id" "$brief" || fail "the qwen brief lost its ship branch line"
   grep -qxF 'Brief shape: qwen' "$brief" || fail "the qwen brief does not tell the spawn to create its branch"
   # shellcheck disable=SC2016 # Literal backticks in rendered prose must stay unexpanded.
-  assert_grep 'Write only these files, by their paths relative to the current directory: `src/a.ts`, `src/a.test.ts`.' "$brief" \
+  assert_grep 'Write only `src/a.ts`, `src/a.test.ts` in this directory' "$brief" \
     "the qwen brief does not list the files the worker may write"
   assert_grep 'git add -- src/a.ts src/a.test.ts && git commit' "$brief" "the qwen commit does not add exactly the listed files"
   assert_grep "gh-axi pr create --base feature/hub " "$brief" "the qwen PR does not target the base branch"
@@ -1347,24 +1347,84 @@ test_qwen_shape_inlines_the_plan_and_keeps_the_contract() {
     assert_no_grep "$absent" "$brief" "the qwen brief still carries '$absent', which a direct-PR qwen task cannot use"
   done
 
-  # Each reporting command runs as written and records the time it ran.
+  # The start, report, and blocked commands run as written in a real copy and
+  # record the time they ran: the start check writes working only at the top of
+  # the task branch, and the report writes done only after the PR command
+  # printed a URL, carrying that URL, and prints the line it wrote.
   mkdir -p "$home/state"
+  status="$home/state/$id.status"
+  wt="$TMP_ROOT/qwen-wt"
+  fm_git_worktree "$TMP_ROOT/qwen-repo" "$wt" "fm/$id" >/dev/null 2>&1 || fail "could not create the qwen copy"
+  fakebin=$(fm_fakebin "$TMP_ROOT/qwen")
+  start=$(awk 'f { sub(/^    /, ""); print; exit } /^Before you look at any file, run this command:$/ { f = 1 }' "$brief")
+  report=$(awk 'f { sub(/^    /, ""); print; exit } /^When the done command exits 0, run this as one command,/ { f = 1 }' "$brief")
+  blocked=$(awk 'f { sub(/^    /, ""); print; exit } /^If that fails, if you are stuck/ { f = 1 }' "$brief")
+  report=${report//<conventional commit title>/feat: a}
+  report=${report//<the same title>/feat: a}
+  report=${report//<two or three sentences on what changed>/Adds a.}
+  blocked=${blocked//<one line>/stuck}
   before=$(date +%s)
-  # shellcheck disable=SC2016 # The literal substitution is what is matched.
-  while IFS= read -r cmd; do
-    cmd=${cmd//<the full https URL gh-axi printed>/https://example.invalid/pull/1}
-    cmd=${cmd//<one line>/stuck}
-    bash -c "$cmd" || fail "a qwen reporting command failed: $cmd"
-    n=$((n + 1))
-  done < <(grep -o 'echo "[a-z]* \[at=\$(date +%s)\]: [^`]*' "$brief")
+  out=$(cd "$wt" && bash -c "$start") || fail "the qwen start command failed in its copy: $start"
+  [ "$out" = OK ] || fail "the qwen start command printed '$out' in its own copy"
+  grep -q '^working \[at=[0-9]*\]: started$' "$status" || fail "the qwen start command did not write working in its copy"
+  mkdir -p "$wt/src"
+  out=$(cd "$wt/src" && bash -c "$start")
+  [ "$out" = STOP ] || fail "the qwen start command did not stop below the copy's top level"
+  git -C "$wt" checkout -q -b other
+  out=$(cd "$wt" && bash -c "$start")
+  [ "$out" = STOP ] || fail "the qwen start command did not stop off its task branch"
+  git -C "$wt" checkout -q "fm/$id"
+  [ "$(grep -c '^working ' "$status")" -eq 1 ] || fail "a failed qwen start check still wrote working"
+  printf 'a\n' > "$wt/src/a.ts"
+  printf 'b\n' > "$wt/src/a.test.ts"
+  printf 'c\n' > "$wt/src/other.ts"
+  printf '#!/usr/bin/env bash\necho "error: no remote here"\nexit 1\n' > "$fakebin/gh-axi"
+  chmod +x "$fakebin/gh-axi"
+  (cd "$wt" && fm_git_identity && PATH="$fakebin:$PATH" bash -c "$report" >/dev/null 2>&1) && fail "the qwen report succeeded when the PR command printed no URL"
+  git -C "$TMP_ROOT/qwen-repo.origin.git" rev-parse -q --verify "refs/heads/fm/$id" >/dev/null \
+    || fail "the qwen report stopped before its PR command"
+  ! grep -q '^done ' "$status" || fail "the qwen report wrote done although no PR was created"
+  printf 'a2\n' > "$wt/src/a.ts"
+  printf '#!/usr/bin/env bash\nprintf "created:\\n  number: 7\\n  url: https://github.com/o/r/pull/7\\nhelp[1]:\\n  Run gh-axi pr view 7\\n"\n' > "$fakebin/gh-axi"
+  out=$(cd "$wt" && fm_git_identity && PATH="$fakebin:$PATH" bash -c "$report" 2>/dev/null) || fail "the qwen report failed: $report"
+  [[ $(printf '%s\n' "$out" | tail -1) == 'done ['*']: PR https://github.com/o/r/pull/7' ]] \
+    || fail "the qwen report did not show the worker the done line it wrote: $out"
+  [ "$(git -C "$wt" diff --name-only main HEAD | sort | tr '\n' ' ')" = 'src/a.test.ts src/a.ts ' ] \
+    || fail "the qwen commits do not hold exactly the listed files"
+  [ "$(git -C "$TMP_ROOT/qwen-repo.origin.git" rev-parse "refs/heads/fm/$id")" = "$(git -C "$wt" rev-parse HEAD)" ] \
+    || fail "the qwen report did not push the task branch"
+  (cd "$wt" && bash -c "$blocked") || fail "the qwen blocked command failed: $blocked"
   after=$(date +%s)
-  [ "$n" -eq 3 ] || fail "the qwen brief carries $n stamped reporting commands, not working, done and blocked"
+  [ "$(grep -c '^done \[at=[0-9]*\]: PR https://github.com/o/r/pull/7$' "$status")" -eq 1 ] \
+    || fail "the qwen done line does not carry the URL the PR command printed"
+  grep -q '^blocked \[at=[0-9]*\]: stuck$' "$status" || fail "the qwen blocked command did not write its line"
   while IFS= read -r line; do
     epoch=$(bash -c '. "$1"; status_line_at_epoch "$2"' _ "$ROOT/bin/fm-classify-lib.sh" "$line")
     [ "$epoch" -ge "$before" ] && [ "$epoch" -le "$after" ] || fail "a qwen status line carries no run-time stamp: $line"
-  done < "$home/state/$id.status"
-  grep -q '^done \[at=[0-9]*\]: PR https://example.invalid/pull/1$' "$home/state/$id.status" \
-    || fail "the qwen done line does not carry the PR URL"
+  done < "$status"
+
+  # The inbox acknowledgement is a literal command that moves a steer out of
+  # the unhandled set.
+  inbox="$home/state/$id.inbox"
+  mkdir -p "$inbox/handled"
+  printf 'steer\n' > "$inbox/001.msg"
+  # shellcheck disable=SC2016 # Literal backticks delimit the command in the brief.
+  ack=$(grep '^Firstmate answers through message files' "$brief" | grep -o 'mv [^`]*')
+  [ -n "$ack" ] || fail "the qwen brief does not give a literal inbox acknowledgement command"
+  ack=${ack//NNN/001}
+  bash -c "$ack" || fail "the qwen inbox acknowledgement failed: $ack"
+  [ ! -e "$inbox/001.msg" ] && [ -f "$inbox/handled/001.msg" ] \
+    || fail "the qwen inbox acknowledgement did not move the steer into handled/"
+
+  # Start stays the brief's last section, with or without a home include.
+  [ "$(grep '^# ' "$brief" | tail -n 1)" = '# Start' ] || fail "the qwen brief does not end with its Start section"
+  mkdir -p "$home/config"
+  printf '%s\n' 'Prefer small commits.' > "$home/config/brief-include.md"
+  qwen_scaffold "$home" brief-qwen-include "$plan" >/dev/null 2>&1 || fail "the qwen shape should scaffold with a home include"
+  rm -f "$home/config/brief-include.md"
+  assert_grep 'Prefer small commits.' "$home/data/brief-qwen-include/brief.md" "the qwen brief dropped the home include"
+  [ "$(grep '^# ' "$home/data/brief-qwen-include/brief.md" | tail -n 2 | tr '\n' '|')" = '# Home brief additions|# Start|' ] \
+    || fail "the home include did not land just above the qwen brief's closing Start section"
 
   FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-qwen-standard some-proj --mode direct-PR >/dev/null 2>&1
   standard=$(wc -c < "$home/data/brief-qwen-standard/brief.md")
@@ -1373,7 +1433,7 @@ test_qwen_shape_inlines_the_plan_and_keeps_the_contract() {
 
   sed -i.bak -e 's/^{TASK}$/Build it./' -e 's/^{FIRSTMATE_SPEC}$/Follow the plan./' "$brief"
   fm_brief_task_content_valid "$brief" || fail "a filled qwen brief does not pass the spawn's Task check"
-  pass "fm-brief.sh --harness qwen: plan inlined, machine lines and safety contract kept, runnable reporting, under half the size"
+  pass "fm-brief.sh --harness qwen: plan inlined, machine lines and safety contract kept, runnable reporting and inbox ack, Start last, under half the size"
 }
 
 test_qwen_shape_is_refused_outside_its_shape() {
