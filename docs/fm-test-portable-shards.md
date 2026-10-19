@@ -9,22 +9,22 @@ Balance hints come from serial runs of the real lanes on `ubuntu-latest`.
 The concurrent isolation proof in [fm-test-isolation-proof.md](fm-test-isolation-proof.md) establishes concurrency safety, not serial CI duration.
 Local timings are not interchangeable with CI timings: platform and machine load can affect each script differently and change their relative weights.
 
-Both hint tables were refreshed on 2026-09-30 from five Ubuntu CI runs: [36583881812](https://github.com/kunchenguid/firstmate/actions/runs/36583881812), [36658498535](https://github.com/kunchenguid/firstmate/actions/runs/36658498535), [36663947738](https://github.com/kunchenguid/firstmate/actions/runs/36663947738), [36664663190](https://github.com/kunchenguid/firstmate/actions/runs/36664663190), and [36669175457](https://github.com/kunchenguid/firstmate/actions/runs/36669175457).
-Use the slowest successful `duration_ms` per script across their uploaded portable timing artifacts and completed `FM_TEST_END` log markers, with the two version/platform exceptions below.
-All artifact records were cross-checked against the corresponding job's markers.
-This covers all 24 parallel and 201 serial members; an existing live-capability skip is a portable-runner measurement, not a timing claim for the unavailable live integration.
+The parallel hint table was refreshed on 2026-09-30 from five Ubuntu CI runs: [36583881812](https://github.com/kunchenguid/firstmate/actions/runs/36583881812), [36658498535](https://github.com/kunchenguid/firstmate/actions/runs/36658498535), [36663947738](https://github.com/kunchenguid/firstmate/actions/runs/36663947738), [36664663190](https://github.com/kunchenguid/firstmate/actions/runs/36664663190), and [36669175457](https://github.com/kunchenguid/firstmate/actions/runs/36669175457).
+The serial hint table was refreshed on 2026-10-19 from fourteen Ubuntu CI runs of this repository's workflow: [38731300165](https://github.com/csmoot99/Mafioso/actions/runs/38731300165), [38745031369](https://github.com/csmoot99/Mafioso/actions/runs/38745031369), [38765867142](https://github.com/csmoot99/Mafioso/actions/runs/38765867142), [38774077300](https://github.com/csmoot99/Mafioso/actions/runs/38774077300), [39178465137](https://github.com/csmoot99/Mafioso/actions/runs/39178465137), [39184321039](https://github.com/csmoot99/Mafioso/actions/runs/39184321039), [39185183061](https://github.com/csmoot99/Mafioso/actions/runs/39185183061), [39188091815](https://github.com/csmoot99/Mafioso/actions/runs/39188091815), [39193629287](https://github.com/csmoot99/Mafioso/actions/runs/39193629287), [39197229834](https://github.com/csmoot99/Mafioso/actions/runs/39197229834), [39208528766](https://github.com/csmoot99/Mafioso/actions/runs/39208528766), [39210206215](https://github.com/csmoot99/Mafioso/actions/runs/39210206215), [39217513387](https://github.com/csmoot99/Mafioso/actions/runs/39217513387), and [39232355362](https://github.com/csmoot99/Mafioso/actions/runs/39232355362).
+Each uses the slowest successful `duration_ms` per script across its runs' uploaded portable timing artifacts and completed `FM_TEST_END` log markers, with the two exceptions below.
+The parallel table's artifact records were cross-checked against the corresponding job's markers.
+This covers all 24 parallel and 220 serial members; an existing live-capability skip is a portable-runner measurement, not a timing claim for the unavailable live integration.
 Observed maxima provide conservative packing weights, not an upper bound on future durations.
 
-Two serial-5 jobs were cancelled at their 30-minute cap and uploaded no artifact.
+Fourteen serial job attempts in the serial baseline, counting re-runs, were cancelled at their 30-minute cap and uploaded no artifact.
 Their completed log markers supplement the complete runs, but a cancelled job's wall time is only a lower bound and its unfinished or never-started scripts have no completed sample.
-A failed script's duration is excluded even when its lane uploaded an artifact.
-In particular, run 36664663190's serial 5 finished in 22m15s with an assertion failure, not a timeout; treating that as a healthy whole-lane sample would hide the failure.
+A failed script's duration is excluded even when its lane uploaded an artifact, and a lane that finished with an assertion failure is not a healthy whole-lane sample either, however far inside the cap it finished.
 Collect successful per-script measurements for every member before calculating a split.
 
-`tests/fm-supervision-host.test.sh` uses 789123 ms from run 36669175457, after the merged [host runtime fix](https://github.com/kunchenguid/firstmate/pull/6179), rather than its pre-fix maximum of 1065298 ms.
-That post-fix value has only one sample in this baseline, so further green runs must establish its variance.
+`tests/fm-supervision-host.test.sh` completed in 859697 to 1211223 ms in the serial jobs that passed but in 1623209 to 1762974 ms in all fourteen cancelled ones, with the slowdown spread across its cases rather than concentrated in one, so on those runners the suite alone came within a minute of the cap.
+It is therefore split into `tests/fm-supervision-host.test.sh`, `tests/fm-supervision-host-turns.test.sh`, and `tests/fm-supervision-host-session.test.sh`, which share `tests/supervision-host-helpers.sh` and can run on separate shards.
+Until CI measures the three files, their hints apportion the suite's slowest completed sample, 1762974 ms from run 39188091815, by each file's share of the per-case durations of one of those slow runs (about 35, 32, and 33 percent); replace them with measured maxima once green runs upload them.
 The native-Windows-only `tests/fm-pi-windows-shell-invocation.test.sh` retains its separate 5121 ms measurement from 2026-09-06T21:02Z instead of a portable capability skip.
-The session-start hint retains its pre-optimization maximum until CI measures the shorter fixture-only home-summary bound; do not discount a local speedup from CI packing weights.
 
 ## Parallel lanes
 
@@ -69,8 +69,8 @@ Its header and `--help` own the modeled-budget check and output fields; read the
 [`tests/fm-test-run.test.sh`](../tests/fm-test-run.test.sh), in `test_portable_serial_packing_budget_boundary`, verifies acceptance exactly at the budget and refusal one millisecond above it through the executable runner.
 The longest script, `tests/fm-watch-triage.test.sh`, is the indivisible floor for this layout.
 The estimates use per-file maxima from different runs, not measured rebalanced jobs or an end-to-end latency guarantee.
-The baseline watch-triage samples range from 944375 to 1074843 ms, while each observed completed portable job adds at most 30 seconds beyond its summed scripts in these runs.
-Even so, maxima from five runs do not establish a P95 or guarantee future headroom.
+The baseline watch-triage samples range from 911687 to 1077989 ms, while each completed serial job in that baseline ran 17 to 50 seconds beyond its summed scripts.
+Even so, maxima from fourteen runs do not establish a P95 or guarantee future headroom.
 Job timeouts remain hang tripwires under the policy in [Timeouts](#timeouts) below; they are not the desired healthy duration.
 `tests/fm-ci-workflow.test.sh` compares the parsed CI matrix to the executable runner lanes, and the runner rejects parallel `--jobs` on a serial lane even when that shard has only one member.
 
@@ -78,7 +78,7 @@ Refresh the CI-derived hints by downloading the per-shard timing artifacts from 
 
 ```sh
 for run in <run-id> <run-id> <run-id>; do
-  gh-axi run download "$run" -R kunchenguid/firstmate --dir "/tmp/fm-serial/$run"
+  gh-axi run download "$run" -R <owner>/<repo> --dir "/tmp/fm-serial/$run"
 done
 jq -r '.scripts[] | select(.exit == 0) | [.path, .duration_ms] | @tsv' /tmp/fm-serial/*/fm-test-timing-portable-serial-*/*.json \
   | awk -F'\t' '$2 > m[$1] { m[$1] = $2 } END { for (p in m) print p, m[p] }' \
@@ -113,7 +113,7 @@ No fast mode, path skips, or paid runner provisioning is part of this layout.
 
 The longer-term performance objective remains a complete green run under fifteen minutes including start delay, but the current watch-triage floor alone exceeds that objective.
 The immediate packing target is the runner's modeled script budget, not a claim that more shards alone can make an indivisible script faster.
-The layout uses fourteen long-lived Linux jobs (nine serial, two parallel, Herdr, two lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
+The layout uses fifteen long-lived Linux jobs (ten serial, two parallel, Herdr, two lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
 Compare complete before/after runs, preserve cancelled and partial-run evidence, and measure a representative normal-run sample before claiming a P95 improvement.
 The workflow retains per-PR supersession without cancelling main pushes or changing the compliance workflow's event semantics.
 

@@ -1480,7 +1480,8 @@ test_qwen_shape_looks_up_through_the_project_kg_and_map() {
     esac
     qwen_scaffold "$home" "$id" "$plan" >/dev/null 2>&1 || fail "the qwen shape should scaffold for $id"
     rule3=$(awk '/^3\. /{on=1} /^4\. /{on=0} on' "$home/data/$id/brief.md")
-    assert_contains "$rule3" "Read each file at most once." "$id lost rule 3"
+    # shellcheck disable=SC2016 # Backticks are literal generated Markdown.
+    assert_contains "$rule3" 'Read a file with `read_file`, never `cat` or `head`, and only when you need it.' "$id lost rule 3"
     case "$id" in
       brief-qwen-k1 | brief-qwen-k2)
         # shellcheck disable=SC2016 # Backticks are literal generated Markdown.
