@@ -1507,6 +1507,41 @@ ok - herdr 0.8.0, qwen 0.25.1: the task record and brief are intact after every 
 
 That command is the guard that refreshes this record; `tests/fm-composer-lib.test.sh` and `tests/fm-backend-herdr.test.sh` pin the dark-glyph row and the unregistered-qwen identity with no harness.
 
+### Project kg on qwen
+
+Verified on 2026-10-19 on Linux (WSL2) with Qwen Code 0.25.2, Herdr 0.8.0, and Ollama 0.40.3 serving `qwen3-coder:30b`, in a disposable clone of 420soflo whose `.mcp.json` declares `kg` as `node scripts/kg-mcp-bootstrap.mjs` and which ships `scripts/kg-query.mjs`, under an isolated user home holding only the three-line `.qwen/.env`.
+In that clone `qwen mcp list` printed `kg: node scripts/kg-mcp-bootstrap.mjs (stdio) - Pending approval`.
+Three system settings files, each the per-task file's non-hook keys, differed only in their MCP keys: none, `mcpServers.kg` re-declared, and that plus `"mcp":{"excluded":["kg"]}`.
+Each ran headless:
+
+```sh
+QWEN_CODE_SYSTEM_SETTINGS_PATH=<settings> qwen -y -m qwen3-coder:30b -o json 'Reply with the single word OK. Do not call any tool.'
+```
+
+```text
+none:        mcp_servers=[kg connected]    tools=38  input_tokens=13206
+re-declared: mcp_servers=[kg connected]    tools=38  input_tokens=13206
+excluded:    mcp_servers=[kg disconnected] tools=30  input_tokens=12740
+```
+
+So under `-y` the project's own server connects despite `Pending approval`, and its deferred listing costs 466 tokens per request.
+One lookup each way, twice, with the prompt naming the tool or the command:
+
+```text
+mcp__kg__kg_symbol: num_turns=4 input_tokens=53670; num_turns=3 input_tokens=40136
+kg-query.mjs symbol: num_turns=2 input_tokens=25664; num_turns=2 input_tokens=25646
+```
+
+The MCP runs went through `tool_search` and `tool_call`; a direct first call was refused with `[tool_call bridge refused] Deferred tool "mcp__kg__kg_symbol" has no verified schema review in the current context. Run tool_search with select:mcp__kg__kg_symbol`.
+Both routes returned `[3674] function:allows  420mia/src/modules/identity/access.ts:96-108`.
+
+Real workers then ran through `bin/fm-control.sh relaunch` onto a pane of an `fm-lab-` Herdr session provisioned and torn down by `bin/fm-herdr-lab.sh`, with a local bare origin and a stub `gh-axi`.
+A raw `qwen --approval-mode auto` in the kg clone, with no re-declared server, opened `Untrusted MCP server in .mcp.json` with `1. Approve this server`, `2. Approve all pending servers in this work…`, `3. Reject (esc)` at startup.
+With `config/qwen-approval-mode` set to `auto` and a standard brief asking for one kg lookup, the spawned settings re-declared `kg`, no dialog appeared, and the worker called `tool_search` then `mcp__kg__kg_symbol` and answered with that result line.
+With a `bin/fm-brief.sh --harness qwen` brief whose plan named no source file, the spawned settings re-declared and excluded `kg`, no dialog appeared, and the worker's calls were the isolation check, `node scripts/kg-query.mjs symbol allows`, the write, the done command (passing), commit and push, the PR, and the done line, with no source file read.
+The same brief shape on a project without a kg rendered no lookup lines, and the spawned settings carried no MCP keys.
+`tests/fm-busy-adapter-wiring.test.sh` and `tests/fm-brief.test.sh` pin the settings and the brief lines with no harness; no reusable live guard covers the gate, so re-run such a session after a qwen upgrade.
+
 ### Not verified
 
 Qwen Code as a PRIMARY or SECONDMATE runtime is unverified and refused by `bin/fm-spawn.sh`: no wake protocol exists under `docs/supervision-protocols/` and no turn-end guard adapter was built or exercised.

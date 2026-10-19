@@ -72,7 +72,7 @@ The same rule backs pane liveness in `bin/backends/tmux.sh` and the composer ide
 ## Worker busy state and the per-task settings file
 
 `../../../../../bin/fm-spawn.sh` writes a firstmate-owned per-task settings file at `state/<id>.qwen-settings.json` and the launch reaches it through `QWEN_CODE_SYSTEM_SETTINGS_PATH`.
-It carries the three busy hooks bound to the minted busy generation, `"$version": 4`, `security.folderTrust.enabled=false`, `ui.enableFollowupSuggestions=false`, `ui.enableUserFeedback=false`, `memory.enableManagedAutoMemory=false`, and the two context-window pins described below.
+It carries the three busy hooks bound to the minted busy generation, `"$version": 4`, `security.folderTrust.enabled=false`, `ui.enableFollowupSuggestions=false`, `ui.enableUserFeedback=false`, `memory.enableManagedAutoMemory=false`, the two context-window pins described below, and on a project with a kg server the entries described under [Project kg](#project-kg).
 Hook arrays merge across qwen's settings layers, so a project's own hooks still run alongside firstmate's.
 This wiring belongs only to the canonical exact `qwen` adapter template; a raw qwen-shaped launch receives no busy-state wiring and has no trusted busy state.
 It is deliberately NOT the worktree's `.qwen/settings.json`, which is the project's own file.
@@ -97,6 +97,22 @@ A live session of sequential reads verified on 2026-10-18 that qwen compacts the
 The pin does not cover growth inside one request, because qwen checks its trigger only between turns and estimates tokens from characters, which undercounts token-dense content.
 Later sessions that day still reached the shift that way, from one turn of six large, token-dense reads batched together and from one long response on a prompt already near the trigger.
 Changing the served window is the captain's call, sized to the card's memory, and firstmate never changes the service or the models; when it changes, the pin in `../../../../../bin/fm-spawn.sh` must change with it.
+
+## Project kg
+
+A project's kg is its code knowledge graph, served to agents by a `kg` MCP server in its `.mcp.json` and by the shell command `scripts/kg-query.mjs`.
+qwen 0.25.2 reads `.mcp.json`, but holds each of its servers behind a per-path approval recorded in `~/.qwen/mcpApprovals.json`, so a disposable worktree's server is never approved: `qwen mcp list` reads `Pending approval`, and outside `-y` an interactive launch opens an approval dialog at startup.
+Under `-y` qwen skips that gate and connects the server.
+A server declared in the system settings layer is never gated and replaces a `.mcp.json` server of the same name, so the per-task settings file re-declares the project's `kg` entry there, without its `type` as qwen's own `.mcp.json` reader drops it, and no approval mode prompts for it.
+qwen defers MCP tools: a first `mcp__kg__kg_symbol` call is refused until the model loads its schema with `tool_search`, so one lookup through the server takes three or four turns against two through `kg-query`, which prints the same result line, and the deferred listing adds 466 tokens to every request ([`runtime-backends.md`](../../../../../docs/verification/runtime-backends.md#project-kg-on-qwen)).
+So when the project ships `scripts/kg-query.mjs`, `../../../../../bin/fm-brief.sh --harness qwen` gives rule 3 the `kg-query` and `ai-map/master_map.md` lookups, and while the launch brief keeps the `kg-query` line the settings file also lists `kg` in `mcp.excluded`.
+Any other launch through the canonical `qwen` adapter keeps the kg server connected.
+Both routes answer only from a graph built in the copy: a fresh copy has none, and one a pooled slot kept from an earlier task can be stale.
+So before every launch through the canonical `qwen` adapter whose worktree ships `scripts/kg-query.mjs`, once the Treehouse project lock is released so slot allocation and return for other spawns never wait on it, the spawn runs `pnpm install --frozen-lockfile --prefer-offline` when the worktree has `pnpm-lock.yaml` and no `node_modules`, then the incremental `node scripts/kg-ingest.mjs --no-embed`, which builds a missing graph and refreshes a kept one.
+The ingest runs under `flock /tmp/kg-ingest.lock` where `flock` is installed (not on macOS, where it runs unlocked) so one ingest runs on the machine at a time; the install, the lock wait and the ingest share one 120-second bound, and their output goes to `state/<id>.kg-ingest.log`.
+The project's own `node scripts/kg-query.mjs stats`, which exits 0 only on a built graph, then confirms the graph answers.
+A graph built that way has no embeddings, so the `kg-query` line names only `symbol` and `callers`, which answer without them; `search` does not.
+When the install or the ingest fails or `stats` reports no graph, the spawn prints why and drops the `kg-query` line from the launch brief, so the worker is never told to run a lookup that cannot answer.
 
 ## Hazards seen in production launches
 
