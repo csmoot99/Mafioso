@@ -105,9 +105,10 @@ qwen 0.25.2 reads `.mcp.json`, but holds each of its servers behind a per-path a
 Under `-y` qwen skips that gate and connects the server.
 A server declared in the system settings layer is never gated and replaces a `.mcp.json` server of the same name, so the per-task settings file re-declares the project's `kg` entry there, without its `type` as qwen's own `.mcp.json` reader drops it, and no approval mode prompts for it.
 qwen defers MCP tools: a first `mcp__kg__kg_symbol` call is refused until the model loads its schema with `tool_search`, so one lookup through the server takes three or four turns against two through `kg-query`, which prints the same result line, and the deferred listing adds 466 tokens to every request ([`runtime-backends.md`](../../../../../docs/verification/runtime-backends.md#project-kg-on-qwen)).
-So when the brief is qwen-shaped and the project ships `scripts/kg-query.mjs`, the settings file also lists `kg` in `mcp.excluded`, and `../../../../../bin/fm-brief.sh --harness qwen` gives rule 3 the `kg-query` and `ai-map/master_map.md` lookups.
+So when the project ships `scripts/kg-query.mjs`, `../../../../../bin/fm-brief.sh --harness qwen` gives rule 3 the `kg-query` and `ai-map/master_map.md` lookups, and while the launch brief keeps the `kg-query` line the settings file also lists `kg` in `mcp.excluded`.
 Any other qwen launch keeps the kg server connected.
-The kg answers only once its database is built in the copy (`pnpm kg:ingest` in the projects that ship one); the command's own error says so.
+Both routes answer only from `ai-map/kg.db`, which is gitignored and so missing from a fresh copy, so before every qwen launch whose worktree ships `scripts/kg-query.mjs` without it, the spawn runs `node scripts/kg-ingest.mjs --rebuild --no-embed` in the worktree under a 120-second bound, with its output in `state/<id>.kg-ingest.log`.
+When the graph still cannot be had, the spawn prints why and drops the `kg-query` line from the launch brief, so the worker is never told to run a lookup that cannot answer.
 
 ## Hazards seen in production launches
 

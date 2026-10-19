@@ -3989,6 +3989,28 @@ protect_qwen_brief_named_files() { # <brief> <worktree>
   done < <(grep -oE "/[^[:space:]\`'\"<>()]+" "$brief" | sort -u)
 }
 
+# A project kg answers only from ai-map/kg.db, which is gitignored and so
+# missing from a fresh copy. A qwen worker's copy gets it built here, without
+# embeddings (symbol and caller lookups need none) and under a bound; when it
+# cannot be had, the reason is printed and the status is nonzero.
+ensure_qwen_kg_graph() { # <worktree> <log>
+  local worktree=$1 log=$2 bound=120 status=0
+  [ -f "$worktree/scripts/kg-query.mjs" ] || { echo "the worktree has no scripts/kg-query.mjs"; return 1; }
+  [ ! -f "$worktree/ai-map/kg.db" ] || return 0
+  [ -f "$worktree/scripts/kg-ingest.mjs" ] || { echo "the worktree has no ai-map/kg.db and no scripts/kg-ingest.mjs to build it"; return 1; }
+  (cd "$worktree" && fm_run_timed "$bound" node scripts/kg-ingest.mjs --rebuild --no-embed) </dev/null >"$log" 2>&1 || status=$?
+  [ "$status" -ne 0 ] || [ ! -f "$worktree/ai-map/kg.db" ] || return 0
+  rm -f -- "$worktree/ai-map/kg.db"
+  if fm_timed_out "$status"; then
+    echo "building ai-map/kg.db timed out after ${bound}s (log: $log)"
+  elif [ "$status" -ne 0 ]; then
+    echo "node scripts/kg-ingest.mjs --rebuild --no-embed exited $status (log: $log)"
+  else
+    echo "node scripts/kg-ingest.mjs --rebuild --no-embed left no ai-map/kg.db (log: $log)"
+  fi
+  return 1
+}
+
 herdr_projection_meta_field_exact() { # <meta> <key>
   local meta=$1 key=$2 count
   [ -f "$meta" ] && [ ! -L "$meta" ] || return 1
@@ -5235,18 +5257,33 @@ EOF
       # (`qwen mcp list` reads "Pending approval", and outside -y the TUI
       # opens an approval dialog at startup), while a server in this system
       # layer is never gated and replaces the project's entry by name (qwen
-      # 0.25.2). The copy drops `type` as qwen's .mcp.json reader does. A
-      # qwen-shaped brief on a project that ships scripts/kg-query.mjs tells
-      # the worker to query the kg through that command (bin/fm-brief.sh), so
-      # its server is also excluded: qwen defers MCP tools, so one lookup
+      # 0.25.2). The copy drops `type` as qwen's .mcp.json reader does. Both
+      # routes read the worktree's ai-map/kg.db, built first when missing
+      # (ensure_qwen_kg_graph). A qwen-shaped brief tells the worker to query
+      # the kg through scripts/kg-query.mjs (bin/fm-brief.sh); when the graph
+      # cannot be had, that line is dropped from the launch brief, and while
+      # it stays the server is excluded: qwen defers MCP tools, so one lookup
       # through the server takes a tool_search turn more than the command, and
       # its tool listing adds 466 tokens to every request
       # (docs/verification/runtime-backends.md).
       q_mcp=
+      q_lookup=$(fm_qwen_kg_lookup_line)
+      if { [ -f "$WT/scripts/kg-query.mjs" ] || grep -qxF -- "$q_lookup" "$BRIEF"; } &&
+        ! q_why=$(ensure_qwen_kg_graph "$WT" "$STATE_REAL/$ID.kg-ingest.log"); then
+        if grep -qxF -- "$q_lookup" "$BRIEF"; then
+          { grep -vxF -- "$q_lookup" "$BRIEF" || :; } >"$BRIEF.kg.tmp" && mv -- "$BRIEF.kg.tmp" "$BRIEF" || {
+            rm -f -- "$BRIEF.kg.tmp"
+            echo "error: could not drop the kg-query lookup from $BRIEF; inspect window $T" >&2
+            exit 1
+          }
+          q_why="$q_why; the kg-query lookup is dropped from its brief"
+        fi
+        echo "warning: $ID's kg graph is unavailable: $q_why" >&2
+      fi
       q_kg=$(jq -c '.mcpServers.kg | objects | select(has("command")) | del(.type)' "$WT/.mcp.json" 2>/dev/null) || q_kg=
       if [ -n "$q_kg" ]; then
         q_mcp="\"mcpServers\":{\"kg\":$q_kg},"
-        if [ -f "$WT/scripts/kg-query.mjs" ] && fm_brief_is_qwen_shape "$SOURCE_BRIEF"; then
+        if grep -qxF -- "$q_lookup" "$BRIEF"; then
           q_mcp="$q_mcp\"mcp\":{\"excluded\":[\"kg\"]},"
         fi
       fi

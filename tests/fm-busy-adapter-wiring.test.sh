@@ -547,10 +547,13 @@ test_qwen_hooks_stale_incarnation_harmless() {
 
 # A project kg server rides the same settings file: re-declared in its system
 # layer, which qwen never holds behind its .mcp.json approval, and excluded for
-# a qwen-shaped brief, which queries the kg through scripts/kg-query.mjs.
+# a qwen-shaped brief, which queries the kg through scripts/kg-query.mjs. The
+# graph is gitignored, so the spawn builds a missing one and, when the build
+# fails, drops the brief's kg-query lookup and keeps the server connected.
 test_qwen_settings_carry_the_project_kg_server() {
-  local rec id out status settings shape
-  for shape in standard qwen-shape no-kg; do
+  local rec id out status settings launch shape lookup
+  lookup=$(. "$ROOT/bin/fm-dod-lib.sh" && fm_qwen_kg_lookup_line)
+  for shape in standard qwen-present qwen-built qwen-unbuilt no-kg; do
     id=busy-qw-kg-$shape
     rec=$(make_spawn_case "qwen-kg-$shape" qwen "$id")
     read_case_record "$rec"
@@ -558,42 +561,83 @@ test_qwen_settings_carry_the_project_kg_server() {
       # The spawn starts the copy from origin, so the kg ships in the project.
       mkdir -p "$PROJ_DIR/scripts"
       : > "$PROJ_DIR/scripts/kg-query.mjs"
+      if [ "$shape" = qwen-unbuilt ]; then
+        printf '%s\n' 'console.error("unknown option --no-embed"); process.exit(2);' > "$PROJ_DIR/scripts/kg-ingest.mjs"
+      else
+        printf '%s\n' 'import fs from "node:fs";' 'fs.mkdirSync("ai-map", { recursive: true });' \
+          'fs.writeFileSync("ai-map/ingest-args", process.argv.slice(2).join(" "));' \
+          'if (process.argv.includes("--rebuild") && process.argv.includes("--no-embed")) fs.writeFileSync("ai-map/kg.db", "");' \
+          > "$PROJ_DIR/scripts/kg-ingest.mjs"
+      fi
+      printf '%s\n' 'ai-map/' > "$PROJ_DIR/.gitignore"
       printf '%s\n' '{"mcpServers":{"kg":{"type":"stdio","command":"node","args":["scripts/kg-mcp-bootstrap.mjs"],"env":{}},"other":{"command":"other-server"}}}' > "$PROJ_DIR/.mcp.json"
-      git -C "$PROJ_DIR" add .mcp.json scripts/kg-query.mjs
+      git -C "$PROJ_DIR" add .gitignore .mcp.json scripts
       git -C "$PROJ_DIR" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit --quiet -m 'add the kg'
       git -C "$PROJ_DIR" push --quiet origin HEAD
+      git -C "$WT_DIR" reset --quiet --hard "$(git -C "$PROJ_DIR" rev-parse HEAD)"
     fi
-    if [ "$shape" = qwen-shape ]; then
-      rm -f "$HOME_DIR/data/$id/brief.md"
-      printf 'Write x.txt.\n' > "$CASE_DIR/plan.md"
-      FM_HOME="$HOME_DIR" "$ROOT/bin/fm-brief.sh" "$id" project --mode direct-PR --harness qwen \
-        --plan "$CASE_DIR/plan.md" --files x.txt --done-command 'test -s x.txt' >/dev/null \
-        || fail "could not scaffold the qwen-shaped brief for $id"
-      sed -i.bak -e 's/^{TASK}$/Write x.txt./' -e 's/^{FIRSTMATE_SPEC}$/Nothing else./' "$HOME_DIR/data/$id/brief.md"
-      out=$(fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --mode direct-PR --yolo off)
-    else
-      out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR")
+    if [ "$shape" = qwen-present ]; then
+      mkdir -p "$WT_DIR/ai-map"
+      : > "$WT_DIR/ai-map/kg.db"
     fi
+    case "$shape" in
+      qwen-*)
+        # The brief reads the project's clone, which ships the kg command.
+        mkdir -p "$HOME_DIR/projects/project/scripts"
+        : > "$HOME_DIR/projects/project/scripts/kg-query.mjs"
+        rm -f "$HOME_DIR/data/$id/brief.md"
+        printf 'Write x.txt.\n' > "$CASE_DIR/plan.md"
+        FM_HOME="$HOME_DIR" "$ROOT/bin/fm-brief.sh" "$id" project --mode direct-PR --harness qwen \
+          --plan "$CASE_DIR/plan.md" --files x.txt --done-command 'test -s x.txt' >/dev/null \
+          || fail "could not scaffold the qwen-shaped brief for $id"
+        grep -qxF -- "$lookup" "$HOME_DIR/data/$id/brief.md" || fail "the qwen-shaped brief for $id should carry the kg-query lookup"
+        sed -i.bak -e 's/^{TASK}$/Write x.txt./' -e 's/^{FIRSTMATE_SPEC}$/Nothing else./' "$HOME_DIR/data/$id/brief.md"
+        out=$(fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --mode direct-PR --yolo off) ;;
+      *)
+        out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR") ;;
+    esac
     status=$?
     expect_code 0 "$status" "qwen $shape spawn should succeed: $out"
     settings="$HOME_DIR/state/$id.qwen-settings.json"
+    launch="$HOME_DIR/data/$id/launch-brief.md"
     jq -e . "$settings" >/dev/null || fail "qwen $shape settings are not valid JSON"
     case "$shape" in
       no-kg)
         [ "$(jq -c '[.mcpServers, .mcp]' "$settings")" = '[null,null]' ] \
           || fail "a project without a kg server must leave qwen's MCP settings alone"
+        assert_not_contains "$out" "kg graph" "a project without a kg must not report on its graph"
         continue ;;
     esac
     [ "$(jq -c '.mcpServers' "$settings")" = '{"kg":{"command":"node","args":["scripts/kg-mcp-bootstrap.mjs"],"env":{}}}' ] \
       || fail "qwen $shape settings must re-declare exactly the project's kg server, without its type"
-    if [ "$shape" = qwen-shape ]; then
-      [ "$(jq -c '.mcp.excluded' "$settings")" = '["kg"]' ] \
-        || fail "a qwen-shaped brief must keep the kg server's tool definitions out of every request"
-    else
-      [ "$(jq -c '.mcp' "$settings")" = null ] || fail "a standard brief must keep the kg server connected"
-    fi
+    case "$shape" in
+      qwen-present)
+        [ ! -e "$WT_DIR/ai-map/ingest-args" ] || fail "a worktree whose graph is built must not be re-ingested" ;;
+      standard | qwen-built)
+        [ "$(cat "$WT_DIR/ai-map/ingest-args" 2>/dev/null)" = '--rebuild --no-embed' ] \
+          || fail "qwen $shape spawn must build the missing graph without embeddings"
+        [ -f "$WT_DIR/ai-map/kg.db" ] || fail "qwen $shape spawn must leave the built graph in the worktree" ;;
+    esac
+    case "$shape" in
+      qwen-present | qwen-built)
+        grep -qxF -- "$lookup" "$launch" || fail "qwen $shape: a worker whose graph is built must keep the kg-query lookup"
+        [ "$(jq -c '.mcp.excluded' "$settings")" = '["kg"]' ] \
+          || fail "qwen $shape: a qwen-shaped brief must keep the kg server's tool definitions out of every request"
+        assert_not_contains "$out" "kg graph is unavailable" "qwen $shape must not report an unavailable graph" ;;
+      qwen-unbuilt)
+        assert_not_contains "$(cat "$launch")" "kg-query" "a worker whose graph could not be built must not be told to query it"
+        [ "$(jq -c '.mcp' "$settings")" = null ] || fail "a worker without the kg-query lookup must keep the kg server connected"
+        [ ! -e "$WT_DIR/ai-map/kg.db" ] || fail "a failed build must not leave a graph behind"
+        assert_contains "$out" "kg graph is unavailable: node scripts/kg-ingest.mjs --rebuild --no-embed exited 2" \
+          "the spawn must say why the graph is unavailable"
+        assert_contains "$out" "the kg-query lookup is dropped from its brief" "the spawn must say the lookup was dropped"
+        assert_contains "$(cat "$HOME_DIR/state/$id.kg-ingest.log")" "unknown option --no-embed" \
+          "the failed build's output must be kept" ;;
+      standard)
+        [ "$(jq -c '.mcp' "$settings")" = null ] || fail "a standard brief must keep the kg server connected" ;;
+    esac
   done
-  pass "qwen settings re-declare a project kg server so it is never held for approval, and exclude it for a qwen-shaped brief"
+  pass "qwen settings re-declare a project kg server, the spawn builds a missing graph, and the kg-query lookup and kg exclusion stay only while the graph exists"
 }
 
 test_raw_qwen_launch_has_no_semantic_wiring() {

@@ -135,8 +135,10 @@
 # When the project's clone (projects/<repo-name>) ships scripts/kg-query.mjs,
 # the shell command for its kg code graph, or ai-map/master_map.md, rule 3
 # gains a line telling the worker to look up through it any file the plan
-# does not name before reading one; bin/fm-spawn.sh then keeps that kg's MCP
-# server out of the worker's requests, because a lookup through it costs more.
+# does not name before reading one; bin/fm-spawn.sh builds the kg's graph in
+# the worktree when it is missing, drops the kg line when the graph cannot be
+# built, and while the line stays keeps that kg's MCP server out of the
+# worker's requests, because a lookup through it costs more.
 # It keeps the isolation check, fm_ship_rule_one's push and merge rule, the
 # working, done and blocked status lines, the inbox acknowledgement, and the
 # machine-read Delivery contract, Ship branch, and Base branch lines; it drops
@@ -761,7 +763,7 @@ QWEN_PROJECT="${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}/$REPO"
 QWEN_LOOKUP=
 if [ -f "$QWEN_PROJECT/scripts/kg-query.mjs" ]; then
   QWEN_LOOKUP="
-   Before you read a file the plan does not name, look it up with \`node scripts/kg-query.mjs symbol <name>\` or \`node scripts/kg-query.mjs search \"<what it does>\"\`; each result names \`<repo>/<path>:<start>-<end>\`, so read only those lines of \`<path>\`."
+$(fm_qwen_kg_lookup_line)"
 fi
 if [ -f "$QWEN_PROJECT/ai-map/master_map.md" ]; then
   QWEN_LOOKUP="$QWEN_LOOKUP
