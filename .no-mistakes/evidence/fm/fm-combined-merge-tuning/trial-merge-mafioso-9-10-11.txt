@@ -1,0 +1,49 @@
+## Scenario: read-only trial merge of Mafioso #9/#10/#11 per combined-merge "Before choosing" (git version 2.53.0)
+before: HEAD=5c30a8772a6cc376fc430e92e46550d2e77fafd3 refs-digest=6fe6f07078c61a0500c3bba1481e0be95dc722c0  - status=[]
+
+$ git merge-tree --write-tree --name-only origin/main 2a507545d29e644541692c2fbbce6565a54cb72a   # #9 vs base
+14736292723519cf476bf6e4ed30736507133bb3
+exit=0
+
+$ git merge-tree --write-tree --name-only origin/main 391f1b7a1a2e2871eb70826b977462067b1e443f   # #10 vs base
+87687c7e0ba39848736780a411846598be7852e3
+exit=0
+
+$ git merge-tree --write-tree --name-only origin/main 0018158cbe2abd2672a7bf0bd65cdc5f811bfdcb   # #11 vs base
+30dabd062c92bb7601e65cf33445e52817ca5f50
+exit=0
+
+$ git merge-tree --write-tree --name-only 2a507545d29e644541692c2fbbce6565a54cb72a 391f1b7a1a2e2871eb70826b977462067b1e443f   # #9 vs #10
+350eb6b0cdddbbc75bc34dec72ffc1a2cd944f67
+exit=0
+
+$ git merge-tree --write-tree --name-only 2a507545d29e644541692c2fbbce6565a54cb72a 0018158cbe2abd2672a7bf0bd65cdc5f811bfdcb   # #9 vs #11
+8f502709e8b7890fa988bf826801c67929487de4
+exit=0
+
+$ git merge-tree --write-tree --name-only 391f1b7a1a2e2871eb70826b977462067b1e443f 0018158cbe2abd2672a7bf0bd65cdc5f811bfdcb   # #10 vs #11
+0dd1c1a4ab54a4fd495c943cfbc2f7a41bc650b9
+bin/fm-brief.sh
+docs/verification/runtime-backends.md
+
+Auto-merging .agents/skills/harness-adapters/references/harness/qwen.md
+Auto-merging bin/fm-brief.sh
+CONFLICT (content): Merge conflict in bin/fm-brief.sh
+Auto-merging docs/verification/runtime-backends.md
+CONFLICT (content): Merge conflict in docs/verification/runtime-backends.md
+Auto-merging tests/fm-brief.test.sh
+exit=1
+
+## Files more than one PR changes (git diff --name-only origin/main...<head>)
+.agents/skills/harness-adapters/references/harness/qwen.md: #10 #11
+bin/fm-brief.sh: #10 #11
+bin/fm-spawn.sh: #9 #10
+docs/verification/runtime-backends.md: #9 #10 #11
+tests/fm-brief.test.sh: #10 #11
+tests/fm-control-relaunch.test.sh: #9 #11
+
+after:
+  HEAD unchanged
+  worktree+index clean
+  refs unchanged
+  index file byte-identical

@@ -1,0 +1,52 @@
+## Integrator steps 1-3 on folded PRs #A, #B, #C (A and B share bookkeeping files)
+$ git checkout -b ship-combined origin/main
+$ git merge --no-ff -m "Merge #A from pr-A at f481ea000cbfe6c09cf10c4e3b7e7e3b6cdb206b" f481ea000cbfe6c09cf10c4e3b7e7e3b6cdb206b
+  merged cleanly
+$ git merge --no-ff -m "Merge #B from pr-B at 1e1c292634e93778d77583f500cc3cc6cd43ce29" 1e1c292634e93778d77583f500cc3cc6cd43ce29
+Auto-merging ai-map/CHANGELOG.md
+CONFLICT (content): Merge conflict in ai-map/CHANGELOG.md
+Auto-merging ai-map/NOW.md
+CONFLICT (content): Merge conflict in ai-map/NOW.md
+Automatic merge failed; fix conflicts and then commit the result.
+  conflicted: ai-map/CHANGELOG.md ai-map/NOW.md 
+  resolve bookkeeping by keeping the combined branch's side: git checkout --ours ai-map/CHANGELOG.md ai-map/NOW.md
+  merge committed
+$ git merge --no-ff -m "Merge #C from pr-C at 17668745cc5c8b29d0ccef6b61b7dd169cb6668c" 17668745cc5c8b29d0ccef6b61b7dd169cb6668c
+  merged cleanly
+
+-- bookkeeping after last fold, before the replacement commit:
+# Changelog
+- base entry
+- #A entry
+# Now
+Recent: #A work
+   (#A's entry came in cleanly on the first fold; #B's was dropped by keeping ours: per-PR entries remain, mismatched)
+
+-- after the one replacement commit:
+# Changelog
+- base entry
+- Combined #A, #B, #C: A change, B change, C change
+# Now
+Recent: combined #A, #B, #C
+
+grep -c '#A' CHANGELOG.md = 1 (one combined entry, no duplicate)
+
+## Every folded head intact in the combined branch (what GitHub needs to mark each PR merged)
+  #A head f481ea000cbfe6c09cf10c4e3b7e7e3b6cdb206b is an ancestor of ship-combined
+  #B head 1e1c292634e93778d77583f500cc3cc6cd43ce29 is an ancestor of ship-combined
+  #C head 17668745cc5c8b29d0ccef6b61b7dd169cb6668c is an ancestor of ship-combined
+
+* 1cc9748 Combined bookkeeping entry for #A, #B and #C
+*   3e0c02f Merge #C from pr-C at 17668745cc5c8b29d0ccef6b61b7dd169cb6668c
+|\  
+| * 1766874 pr-C
+*   239337b Merge #B from pr-B at 1e1c292634e93778d77583f500cc3cc6cd43ce29
+|\  
+| * 1e1c292 pr-B
+* 37c0e0f Merge #A from pr-A at f481ea000cbfe6c09cf10c4e3b7e7e3b6cdb206b
+* f481ea0 pr-A
+
+-- code from every PR present:
+a line 3 CHANGED-A
+b line 3 CHANGED-B
+c line 2 C

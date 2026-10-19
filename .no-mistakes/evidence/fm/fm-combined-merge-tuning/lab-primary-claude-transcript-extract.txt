@@ -1,0 +1,53 @@
+TOOL_USE Bash {"command":"ls .agents/skills/combined-merge/ && wc -l .agents/skills/combined-merge/* && cat .agents/skills/combined-merge/SKILL.md","description":"List and read the combined-merge skill"}
+TOOL_USE Bash {"command":"sed -n '1,80p' bin/fm-pr-merge.sh | grep -n -i -E 'allow-red|waiv|attended|captain' ","description":"Check merge script header for waiver rules"}
+TOOL_USE Bash {"command":"sed -n '40,62p' bin/fm-pr-merge.sh","description":"Read the allow-red waiver section of the merge header"}
+TEXT:
+Captain, the skill that governs this is **`combined-merge`**. `ship-landing` still handles registering each PR, watching for merges and cleanup. `validation-supervision` handles the one validation run on the combined PR. I only read the skill and the merge script's header. I also skipped the usual session-start run, since you asked for no actions.
+
+**(a) Checks before choosing**
+- Refresh the clone with `bin/fm-fleet-sync.sh acme`. Then use the head commit GitHub reports for each PR.
+- Check each PR against main: `git merge-tree --write-tree --name-only origin/main <head>`.
+- Check each of the 6 pairs: `git merge-tree --write-tree --name-only <head-a> <head-b>`. Exit status 1 means a conflict, and the conflicted files follow the tree id.
+- Find files more than one PR changes: `git diff --name-only origin/main...<head>` for each PR.
+- None of these touch any ref, index or files in the clone.
+- Confirm each PR is green at the head being folded. Confirm no task has a decision waiting on you, with `bin/fm-captain-hold.sh open <id>`. This matters because the merge script only checks the combined PR and the integrator's task.
+- Also rule out:
+  - A real ordering dependency between #3 and #4. If there is one, they land in sequence instead.
+  - acme refusing merge commits on main. If it does, I ask you rather than combine.
+
+**(b) How each PR lands**
+- **#1 and #2:** no conflict and no shared file, so each lands on its own with `bin/fm-pr-merge.sh <task> <url>`. I'd land them before the combined PR is started, because every other merge on main waits once it is. I'd tell you why they didn't need combining.
+- **#3 and #4:** they go into one combined PR.
+  - The integrator is one live worker of #3 or #4 that has context to spare and the stricter of the two tasks' delivery modes. If neither fits, I start a fresh worker in that mode.
+  - It cuts `<ship-branch>-combined` from current main.
+  - It folds in each PR's head with `git merge --no-ff -m "Merge #N from <branch> at <head>" <head>`, never squashing, rebasing or force-pushing.
+  - It resolves `src/x.ts` once, keeping both PRs' intent.
+  - For `ai-map/CHANGELOG.md`, it keeps the combined branch's side at each fold. Then one final commit replaces #3's and #4's own entries with one combined entry naming both.
+  - It runs both PRs' tests plus the repo's own checks, then gets one validation run, or just a push and PR if the stricter mode is direct-PR.
+  - The PR body lists each folded PR's full URL and the exact head commit folded from it.
+
+**(c) Steer contents and merge command**
+- Your merge words are quoted word for word next to the integrator's merge and publish steps, so its own permission check sees your approval. They are also added to its instructions along with the substance of what #3 and #4 were for.
+- The steer names `slow-e2e` as a waived check only if the waiver carries over. It only does if your approval covered merging #3 and #4 together over that check. Your words named #4 alone, so before folding #4 I'd ask you one question: does the waiver also cover the combined PR?
+- Register first: `bin/fm-pr-check.sh <integrator-task> <combined-url>`.
+- Merge: `bin/fm-pr-merge.sh <integrator-task> <combined-url> --allow-red slow-e2e -- --merge`.
+  - Include `--allow-red slow-e2e` only if you say yes and `slow-e2e` is actually red on the combined PR.
+  - That flag is refused while away mode is on.
+- Before merging, I check that neither PR's head has moved since it was folded. After merging, I confirm GitHub shows #3 and #4 as merged, then send you all three full URLs.
+
+**(d) #5 approved mid-validation**
+- #5 waits. Every other merge on main is on hold while the combined PR is built or validated.
+- It goes into the next combined PR or lands after this one, unless you say otherwise. I note that wait on its backlog item so a restart doesn't lose it.
+
+**(e) Integrator reports a refused `git merge`**
+- It must stop and report the exact refused command, never retrying it in another form.
+- I give you that exact command to type as `! <command>` in the integrator's session.
+- After you run it, I tell the integrator to continue. I never run it myself or offer a way around the check.
+
+**(f) #3's worker while waiting**
+- I tell it not to push to its PR branch or start a validation, and to declare a wait until the combined PR lands. It takes no new work after that.
+- When that wait comes up again, I confirm the combined PR is still moving without messaging the worker, since every message costs it a turn.
+- Once its head is folded, I can stop it with `bin/fm-control.sh <id> exit`. That stops only the agent and keeps its local copy, branch, records and merge watch.
+- **If it hits a context handoff:** no replacement. I stop it as above, then close the handoff with `bin/fm-send.sh <id> --resolve-key context-handoff-<n> "no replacement needed"`.
+- If #3 later has to land on its own, `bin/fm-control.sh <id> relaunch --note "<why>"` resumes it in the same copy.
+- Cleanup after the combined merge is `bin/fm-teardown.sh <id>`, never `--force`.

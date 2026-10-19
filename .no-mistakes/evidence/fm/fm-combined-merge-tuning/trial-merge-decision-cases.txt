@@ -1,0 +1,35 @@
+## Case 1: PRs C and D touch disjoint files (setback 4)
+$ git merge-tree --write-tree --name-only origin/main pr-C
+b0d312a53f917f264ba4b73ac8ea51da9ad3076a
+exit=0
+$ git merge-tree --write-tree --name-only origin/main pr-D
+38a41e07cb5e7e26fbc0bf5404c26ecfdc4193c9
+exit=0
+$ git merge-tree --write-tree --name-only pr-C pr-D
+5434f68c3808983e7645080eebe54df1ba4b398c
+exit=0
+shared files: []
+=> no conflict and no shared file: the skill says merge them one by one and tell the captain why
+
+## Case 2 (adversarial): PRs C and E edit the same file in distant hunks
+$ git merge-tree --write-tree --name-only pr-C pr-E
+b15b38da08729b16c4893536a4cff5d1d99a27db
+exit=0
+shared files: [src/c.txt ]
+=> merge-tree alone reads clean, but the shared-file list catches src/c.txt, so the skill says combine
+
+## Case 3: PRs A and B both add rolling bookkeeping entries (setback 3)
+$ git merge-tree --write-tree --name-only origin/main pr-A
+d51e5f127a60b6987038a1fef2f72964c697f895
+exit=0
+$ git merge-tree --write-tree --name-only pr-A pr-B
+0704170d76243ece0b90f5dc7838c9663fa0626e
+ai-map/CHANGELOG.md
+ai-map/NOW.md
+
+Auto-merging ai-map/CHANGELOG.md
+CONFLICT (content): Merge conflict in ai-map/CHANGELOG.md
+Auto-merging ai-map/NOW.md
+CONFLICT (content): Merge conflict in ai-map/NOW.md
+exit=1
+shared files: [ai-map/CHANGELOG.md ai-map/NOW.md ]
