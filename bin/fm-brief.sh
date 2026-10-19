@@ -129,8 +129,9 @@
 # literal shell commands stamped with `$(date +%s)`, which the shell evaluates
 # when the worker runs them, instead of an <epoch> placeholder it would leave
 # unfilled. It tells the worker its branch already exists: bin/fm-spawn.sh
-# reads the brief's "Brief shape: qwen" line, creates that branch, and makes
-# every untracked file under a data/<subdir>/ that the brief names read-only.
+# reads the "Brief shape: qwen" line in the brief's header
+# (fm_brief_is_qwen_shape), creates that branch, and makes every untracked file
+# under a data/<subdir>/ that the brief names read-only.
 # It keeps the isolation check, fm_ship_rule_one's push and merge rule, the
 # working, done and blocked status lines, the inbox acknowledgement, and the
 # machine-read Delivery contract, Ship branch, and Base branch lines; it drops

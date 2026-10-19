@@ -196,6 +196,19 @@ fm_brief_base_branches() {  # <brief>
   ' "$1"
 }
 
+# Return 0 when the brief is the qwen shape bin/fm-brief.sh --harness qwen
+# writes: its "Brief shape: qwen" line directly follows the "Ship branch:" line
+# under "Delivery contract: mode=direct-PR", before the brief's first heading.
+# Any other "Brief shape: qwen" line is prose and ignored.
+fm_brief_is_qwen_shape() {  # <brief>
+  awk '
+    /^#+ / { exit }
+    ship && $0 == "Brief shape: qwen" { found = 1; exit }
+    { ship = contract && /^Ship branch: /; contract = $0 == "Delivery contract: mode=direct-PR" }
+    END { exit !found }
+  ' "$1"
+}
+
 fm_ship_rule_one() {  # <no-mistakes|direct-PR|local-only> <task-id> [branch] [<forge>] [<base>]
   local mode=$1 id=$2 forge=${4:-none} base=${5:-}
   local branch=${3:-fm/$id} target='the default branch'

@@ -298,7 +298,7 @@
 #   containment test reads local refs only and never fetches, so this gate stays
 #   usable offline; a stale remote-tracking ref can therefore make an unpushed
 #   commit look contained, which is exactly why no remedy command is printed.
-#   A ship brief carrying the "Brief shape: qwen" line (bin/fm-brief.sh
+#   A ship brief whose header carries the "Brief shape: qwen" line (bin/fm-brief.sh
 #   --harness qwen) tells the worker its branch already exists, so a fresh
 #   launch then creates the ship branch at the refreshed base and refuses one
 #   that already exists, and every launch of it makes each regular file in a
@@ -4941,7 +4941,7 @@ fi
 if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then
   freshen_spawn_worktree_base "$WT" "$BASE_BRANCH" || exit 1
 fi
-if [ "$KIND" = ship ] && grep -qx 'Brief shape: qwen' "$SOURCE_BRIEF"; then
+if [ "$KIND" = ship ] && fm_brief_is_qwen_shape "$SOURCE_BRIEF"; then
   if [ "$RELAUNCH" -eq 0 ] && ! create_qwen_brief_branch "$WT" "$BRANCH"; then
     echo "error: could not create branch $BRANCH in $WT, which the qwen-shaped brief tells the worker already exists; inspect window $T" >&2
     exit 1

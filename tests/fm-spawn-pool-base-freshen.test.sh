@@ -872,6 +872,25 @@ test_qwen_shaped_brief_gets_its_branch_and_read_only_named_files() {
   pass "a qwen-shaped brief launches on its created branch with only untracked data/<subdir>/ files it names read-only, and refuses any existing branch"
 }
 
+# A qwen header quoted in a standard brief's intent is prose: the spawn creates
+# no branch and leaves the files it names writable.
+test_prose_qwen_shape_line_is_ignored() {
+  local rec id out status plan
+  id='pool-qwen-prose-r1'
+  rec=$(make_case qwen-prose "$id")
+  read_case_record "$rec"
+  plan="$HOME_DIR/data/$id/plan.md"
+  fm_test_spawn_brief "$HOME_DIR" "$id" "Re-run the plan at $plan with this header:"$'\n'"Delivery contract: mode=direct-PR"$'\n'"Ship branch: fm/$id"$'\n'"Brief shape: qwen"
+  printf '# Plan\n' > "$plan"
+  out=$(run_spawn "$id" --mode direct-PR --yolo off)
+  status=$?
+  expect_code 0 "$status" "a standard brief quoting the qwen header should launch"$'\n'"$out"
+  ! git -C "$POOL_DIR" rev-parse --verify --quiet "refs/heads/fm/$id" >/dev/null \
+    || fail "a quoted qwen header made the spawn create fm/$id"
+  owner_writable "$plan" || fail "a quoted qwen header made the plan it names read-only"
+  pass "a Brief shape: qwen line in the captain's intent neither creates a branch nor protects files"
+}
+
 test_base_branch_must_agree_with_the_brief() {
   local rec id out status case_name
   for case_name in flag-only line-only task-decoy; do
@@ -952,6 +971,7 @@ test_linked_spawning_home_rejects_primary_before_refresh
 test_stale_pool_base_refreshes_before_branching
 test_named_base_branch_starts_from_that_branch
 test_qwen_shaped_brief_gets_its_branch_and_read_only_named_files
+test_prose_qwen_shape_line_is_ignored
 test_base_branch_must_agree_with_the_brief
 test_prose_base_branch_line_is_ignored
 test_scout_base_branch_refused_on_gerrit_forge
