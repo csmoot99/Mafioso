@@ -1,0 +1,60 @@
+
+ ▐▛███▛█   Claude Code v2.1.303
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+ ▝▝   ▝▝   ~/.no-mistakes/worktrees/5f69104d19ce/01M5AQ3CM0NXA7A7P8F28TGHT8 · /rc
+
+
+❯ Captain here, this is a dry run: do NOT run any fm-* lifecycle script, spawn, send, merge, push, or edit any file. Load your combined-merge skill and read the AGENTS.md of the project at
+  /tmp/fm-lab.Ra8pjm/projects/gen. Suppose I approved folding its open PRs #11 (branch fm/a, head aaa111) and #12 (branch fm/b, head bbb222) into one combined PR, with worker fm-a as integrator. Print, as plain text
+  only, the exact numbered Integrator steps you would put in fm-a's steer for this project, specialized to its ai-map/CHANGELOG.md and ai-map/NOW.md rules. Then stop.
+
+● Skill(combined-merge)
+  ⎿  Successfully loaded skill
+
+  Listed 1 directory, ran 1 shell command
+
+● Captain, this is a dry run. I didn't run any lifecycle script, refresh the copy, trial-merge, send anything or edit any file. That means I have no conflict list for #11 and #12. Some details are filled in by
+  assumption:
+
+  - Base branch: main. It's the clone's only branch.
+  - Validation: fm-a runs the full validation path. The project has no registry entry, and an unregistered project defaults to that path with no standing merge authority.
+  - Placeholders: the PR URLs and your approval quote are placeholders, because the clone has no remote and your approval here was hypothetical.
+
+  Integrator steps (fm-a):
+
+  1. Cut a new branch from the current base:
+     git fetch origin main fm/b
+     git switch -c fm/a-combined origin/main
+
+  2. Merge each folded PR's current head, #11 then #12 (no dependency between them; number order):
+     git merge --no-ff -m "Merge #11 from fm/a at aaa111" aaa111
+     git merge --no-ff -m "Merge #12 from fm/b at bbb222" bbb222
+     Never squash, rebase, cherry-pick, or force-push; GitHub marks #11 and #12 merged only when aaa111 and bbb222 themselves land.
+
+  3. Resolve each conflict once, keeping both PRs' intents as described below; a conflict that cannot keep both intents is a needs-decision, not your choice.
+     This project's ordinary PRs write no entries into ai-map/CHANGELOG.md or ai-map/NOW.md, so there is nothing to fold in either file.
+     If either fold changes or conflicts in either file, stop and report needs-decision instead of resolving it.
+     After the last fold, make exactly one commit that only overwrites ai-map/NOW.md, replacing the whole file with the project's current state after both folds, 40 lines max:
+     git add ai-map/NOW.md && git commit -m "Refresh ai-map/NOW.md for combined #11 and #12"
+     Do not touch ai-map/CHANGELOG.md in any way: no hand-written entry and no run of scripts/gen-changelog.sh. It is generated from git history, and the two merge commits above are its record.
+
+  4. Run the union of #11's and #12's tests plus the repository's own gates.
+
+  5. Merge approval (verbatim): "<the exact words approving folding #11 and #12 into one combined PR>"
+     Publish fm/a-combined as one combined PR into main through one ordinary no-mistakes run on this branch, with --intent covering both #11 and #12. Start no second run and skip no part of it.
+
+  6. In the combined PR body, list each folded PR's full URL and the exact head folded from it:
+     https://github.com/<owner>/<repo>/pull/11 at aaa111
+     https://github.com/<owner>/<repo>/pull/12 at bbb222
+
+  7. Report the ordinary ready line naming the combined PR.
+
+  If your own permission check refuses a merge, push, or validation start, report blocked: with the exact refused command and stop. Do not retry it in another form or route around the check.
+
+✻ Worked for 47s · done 2:37 PM
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 | ctx: 6% used
+  ⏵⏵ bypass permissions on (shift+tab to cycle)

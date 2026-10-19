@@ -1,0 +1,60 @@
+
+❯ /clear
+
+❯ Captain here, this is a dry run: do NOT run any fm-* lifecycle script, spawn, send, merge, push, or edit any file. Load your combined-merge skill and read the AGENTS.md of the project at
+  /tmp/fm-lab.Ra8pjm/projects/genonly. Suppose I approved folding its open PRs #31 (branch fm/e, head eee555) and #32 (branch fm/f, head fff666) into one combined PR, with worker fm-e as integrator. Print, as plain text
+  only, the exact numbered Integrator steps you would put in fm-e's steer for this project, specialized to its ai-map/CHANGELOG.md rules. Then stop.
+
+● Skill(combined-merge)
+  ⎿  Successfully loaded skill
+
+  Listed 1 directory, ran 1 shell command
+
+● Captain, here are the integrator steps I would put in fm-e's instructions for genonly. This was a dry run: I only read the combining procedure and the project's rules, and I ran or changed nothing.
+
+  The project's rules say no PR, including a combined one, ever edits ai-map/CHANGELOG.md, because the release job regenerates it from git history. They also say the project keeps no status file. So there are no
+  changelog entries to fold together, and no update is reserved for a combined PR. The steps keep that file untouched from start to finish.
+
+  1. Cut a new branch `fm/e-combined` from the current `main` (you are reusing your own copy for PR #31).
+
+  2. Merge each folded PR's current head, in this order, with a no-fast-forward merge commit:
+       git merge --no-ff -m "Merge #31 from fm/e at eee555" eee555
+       git merge --no-ff -m "Merge #32 from fm/f at fff666" fff666
+     Never squash, rebase, cherry-pick, or force-push: GitHub marks #31 and #32 merged only when their exact head commits land.
+
+  3. Resolve each conflict once, keeping the intent of both #31 and #32.
+     If a conflict cannot keep both intents, report `needs-decision` and stop; do not choose a side yourself.
+     This project's PRs write no bookkeeping entries: `ai-map/CHANGELOG.md` is regenerated from git history by the release job, and the project keeps no status file.
+     So there is nothing to fold. Do not edit, add, or merge entries in `ai-map/CHANGELOG.md` at any point, either during a conflict or after the last fold.
+     The project's rules reserve no update for an integration PR, so make no extra bookkeeping commit after the last fold.
+     If either fold changes `ai-map/CHANGELOG.md` anyway, restore that file to its `main` version rather than carrying the edit.
+
+  4. Run the union of #31's and #32's tests, plus the repository's own gates.
+
+  5. Publish one combined PR from `fm/e-combined` into `main` according to your delivery mode:
+     with no-mistakes, run exactly one validation on the combined branch;
+     with direct-PR, push the branch and open the PR yourself.
+
+  6. In the combined PR body, list each folded PR's full URL and the exact head commit folded from it:
+       #31 <full URL of #31> at eee555
+       #32 <full URL of #32> at fff666
+
+  7. Report the ordinary ready line naming the combined PR.
+
+  If your own permission check refuses a merge, push, or validation start, report `blocked:` with the exact refused command and stop. Do not retry it in another form or work around the check.
+
+  To turn this into a real steer, I would still need these:
+  - Your approval, word for word: I would quote it next to steps 2 and 5.
+  - The full PR links: I would copy both URLs from the records.
+  - fm-e's delivery mode: this picks which branch of step 5 applies.
+  - A trial merge: this would confirm which files actually conflict, so I can add the intent to keep from each side for each one.
+
+  I would also need to confirm that both PRs pass their checks at those commits and have no open holds before folding them.
+
+✻ Crunched for 21s · done 2:38 PM
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 | ctx: 6% used
+  ⏵⏵ bypass permissions on (shift+tab to cycle)

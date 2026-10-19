@@ -1,0 +1,60 @@
+
+ ▐▛███▛█   Claude Code v2.1.303
+▝▜██████▀  Opus 5.5 with xhigh effort · Claude Max
+ ▝▝   ▝▝   ~/.no-mistakes/worktrees/5f69104d19ce/01M5AQ3CM0NXA7A7P8F28TGHT8 · /rc
+
+
+❯ /clear
+
+❯ Captain here, this is a dry run: do NOT run any fm-* lifecycle script, spawn, send, merge, push, or edit any file. Load your combined-merge skill and read the AGENTS.md of the project at
+  /tmp/fm-lab.Ra8pjm/projects/legacy. Suppose I approved folding its open PRs #21 (branch fm/c, head ccc333) and #22 (branch fm/d, head ddd444) into one combined PR, with worker fm-c as integrator. Print, as plain text
+  only, the exact numbered Integrator steps you would put in fm-c's steer for this project, specialized to its ai-map/CHANGELOG.md and ai-map/NOW.md rules. Then stop.
+
+● Skill(combined-merge)
+  ⎿  Successfully loaded skill
+
+  Read 1 file, listed 1 directory, ran 1 shell command
+
+● Captain, I ran nothing and edited nothing. I only loaded the combined-merge skill and read the legacy project's AGENTS.md, its file list, and its current branch (main). The lab home has no project registry, so legacy
+  counts as unregistered. That makes its ship mode default to no-mistakes, and step 5 below assumes that. The project rule is that every PR adds its own entry to ai-map/CHANGELOG.md and updates its own line in
+  ai-map/NOW.md. So the bookkeeping-fold branch of the skill applies to both files, not the integration-only branch.
+
+  Integrator steps for fm-c's steer:
+
+  Captain's merge words, verbatim: "<captain's exact approval words for folding #21 and #22 into one combined PR>"
+
+  1. You are reusing your own copy, so cut a new branch fm/c-combined from the current origin/main after fetching.
+  2. Merge each folded PR's current head, #21 first and then #22. Neither depends on the other, so this order is only a choice:
+     git merge --no-ff -m "Merge #21 from fm/c at ccc333" ccc333
+     git merge --no-ff -m "Merge #22 from fm/d at ddd444" ddd444
+     Never squash, rebase, cherry-pick, or force-push. GitHub marks #21 and #22 merged only when ccc333 and ddd444 land exactly.
+  3. Resolve each conflict once and keep the intent of both PRs. If a conflict can't keep both intents, report it as a needs-decision and don't pick a side yourself. For the two knowledge-map files:
+     a. On each fold, resolve any conflict in ai-map/CHANGELOG.md or ai-map/NOW.md by keeping the combined branch's side (fm/c-combined). Then stage the file and finish that merge.
+     b. After the #22 fold, make one commit that does both of these:
+     - In ai-map/CHANGELOG.md, remove the entries #21 and #22 added, including any that merged without a conflict. Add one combined entry at the top that names both #21 and #22. If the file then has more than 30 entries,
+       drop the oldest.
+     - In ai-map/NOW.md, replace the lines #21 and #22 each updated with one combined line that names both PRs. Keep the file at 40 lines or fewer.
+  4. Run every test from #21 and from #22, plus the repository's own gates, on fm/c-combined.
+  5. Publish the combined PR from fm/c-combined into main with exactly one no-mistakes run on that branch. Don't start a second pipeline, and don't merge by hand around that run.
+  6. In the combined PR body, list the full URL of #21 with head ccc333 and the full URL of #22 with head ddd444. I would copy the URLs from the PRs on GitHub, not build them from memory.
+  7. Report the ordinary ready line naming the combined PR.
+
+  If your permission check refuses a merge, push, or validation start, report blocked: with the exact refused command and stop. Don't retry it in another form or work around the check.
+
+  I'm stopping here as you asked.
+
+✻ Sautéed for 37s · done 2:37 PM
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 | ctx: 6% used
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
