@@ -60,6 +60,14 @@ Styled capture stays internal to the boolean detector; `fm-peek` and model-facin
 The spawn disables Claude's `/bug` and `/feedback` model-drafted feedback flow for every Claude worker and secondmate, preventing a fleet-launched agent from queuing or submitting a bug report on the captain's behalf.
 The controls are scoped to the launched process and never modify the captain's global Claude settings; `launch_template()` in `../../../../../bin/fm-spawn.sh` owns their exact mechanics and defense-in-depth rationale.
 
+## MCP servers
+
+A Claude ship or scout starts with the MCP servers its project declares in the worktree's `.mcp.json`, and none when there is none.
+Its launch settings turn off the captain's claude.ai connectors, which no worker uses but which otherwise add their tool definitions to every API call, and approve the project's own servers so they connect without the "New MCP server found" dialog.
+User-scope servers still load, and a `disabledMcpjsonServers` entry still rejects a server.
+A secondmate keeps the captain's full MCP surface, and the captain's own sessions are unaffected.
+`launch_template()` in `../../../../../bin/fm-spawn.sh` owns the settings, and [`../../../../../docs/verification/runtime-backends.md`](../../../../../docs/verification/runtime-backends.md#claude-worker-mcp-servers) records the measured effect.
+
 ## Task control channel
 
 A Claude task worker's launch brief and Firstmate steering-inbox messages arrive as file-shaped content that is otherwise indistinguishable from indirect prompt injection.

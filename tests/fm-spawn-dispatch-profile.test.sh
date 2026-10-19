@@ -1625,7 +1625,7 @@ test_claude_forwards_firstmate_config_dir_when_set() {
   status=$?
   expect_code 0 "$status" "claude spawn with CLAUDE_CONFIG_DIR set should succeed"
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "CLAUDE_CONFIG_DIR='$CASE_DIR/claude-work' env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI -u QWEN_CODE_CLI CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude --dangerously-skip-permissions $(claude_worker_add_dirs "$HOME_DIR" "$id")--settings '{\"feedbackDrafts\":\"off\",\"attribution\":{\"commit\":\"\",\"pr\":\"\",\"sessionUrl\":false}}'" \
+  assert_contains "$launch" "CLAUDE_CONFIG_DIR='$CASE_DIR/claude-work' env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI -u QWEN_CODE_CLI CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude --dangerously-skip-permissions $(claude_worker_add_dirs "$HOME_DIR" "$id")--settings '{\"feedbackDrafts\":\"off\",\"disableClaudeAiConnectors\":true,\"enableAllProjectMcpServers\":true,\"attribution\":{\"commit\":\"\",\"pr\":\"\",\"sessionUrl\":false}}'" \
     "claude launch did not forward firstmate's CLAUDE_CONFIG_DIR to the crewmate pane"
   pass "claude forwards firstmate's CLAUDE_CONFIG_DIR so the crewmate uses the same credential store"
 }
@@ -1722,6 +1722,42 @@ assert_attribution_policy_absent() {  # <launch-command> <what>
   settings=$(claude_settings_json_arg "$launch")
   printf '%s' "$settings" | jq -e '.feedbackDrafts == "off" and (has("attribution") | not)' >/dev/null \
     || fail "$what launch settings JSON still disables Claude attribution: $settings"
+}
+
+# A Claude ship or scout starts with only the MCP servers its project declares:
+# the captain's claude.ai connectors off, and the worktree's own .mcp.json
+# servers approved so they load without the "New MCP server found" dialog. A
+# secondmate keeps the captain's full MCP surface.
+test_claude_worker_mcp_surface_is_the_project_servers_only() {
+  local rec id out status settings kindflag
+  for kindflag in --ship --scout; do
+    id="profile-claude-mcp-${kindflag#--}-z28"
+    rec=$(make_spawn_case "profile-claude-mcp-${kindflag#--}" claude "$id")
+    read_case_record "$rec"
+    if [ "$kindflag" = --scout ]; then
+      out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --scout)
+    else
+      out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+    fi
+    status=$?
+    expect_code 0 "$status" "claude $kindflag spawn should succeed"$'\n'"$out"
+    settings=$(claude_settings_json_arg "$(cat "$LAUNCH_LOG")")
+    printf '%s' "$settings" | jq -e '.disableClaudeAiConnectors == true and .enableAllProjectMcpServers == true' >/dev/null \
+      || fail "claude $kindflag launch settings do not limit MCP to the project's servers: $settings"
+  done
+
+  id=profile-claude-mcp-secondmate-z28
+  rec=$(make_spawn_case profile-claude-mcp-secondmate claude "$id")
+  read_case_record "$rec"
+  make_seeded_secondmate_home "$CASE_DIR/secondmate-home" "$id"
+  out=$(FM_TEST_CLAUDE_CONFIG_DIR="$CASE_DIR/claude-work" \
+    run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$CASE_DIR/secondmate-home" --secondmate)
+  status=$?
+  expect_code 0 "$status" "secondmate claude spawn should succeed"$'\n'"$out"
+  settings=$(claude_settings_json_arg "$(cat "$LAUNCH_LOG")")
+  printf '%s' "$settings" | jq -e '(has("disableClaudeAiConnectors") or has("enableAllProjectMcpServers")) | not' >/dev/null \
+    || fail "secondmate launch settings changed the captain's MCP surface: $settings"
+  pass "a claude ship or scout starts with only its project's MCP servers, while a secondmate keeps the captain's"
 }
 
 test_claude_task_launch_carries_control_channel_authority() {
@@ -2236,7 +2272,7 @@ claude_expected_launch() {  # <launch> <home> <id> <permission-flag>
   [ "$(printf '%s' "$doorbell" | "$ROOT/bin/fm-operational-input.sh" doorbell-kind)" = launch-brief ] \
     || doorbell="not a launch-brief doorbell"
   quoted="'$(printf '%s' "$doorbell" | sed "s/'/'\\\\''/g")'"
-  printf '%s' "export COMPACT_ADVISER_DISABLE=1; $(task_inbox_export "$2" "$3")$(ai_trailer_hooks_prefix "$2" "$3")env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI -u QWEN_CODE_CLI CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude $4 $(claude_worker_add_dirs "$2" "$3")--settings '{\"feedbackDrafts\":\"off\",\"attribution\":{\"commit\":\"\",\"pr\":\"\",\"sessionUrl\":false}}' $CLAUDE_CONTROL_CHANNEL_FLAG $quoted"
+  printf '%s' "export COMPACT_ADVISER_DISABLE=1; $(task_inbox_export "$2" "$3")$(ai_trailer_hooks_prefix "$2" "$3")env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI -u QWEN_CODE_CLI CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude $4 $(claude_worker_add_dirs "$2" "$3")--settings '{\"feedbackDrafts\":\"off\",\"disableClaudeAiConnectors\":true,\"enableAllProjectMcpServers\":true,\"attribution\":{\"commit\":\"\",\"pr\":\"\",\"sessionUrl\":false}}' $CLAUDE_CONTROL_CHANNEL_FLAG $quoted"
 }
 
 test_claude_permission_mode_bypass_matches_absent_launch() {
@@ -2431,6 +2467,7 @@ test_claude_worker_launch_covers_task_channel_dirs
 test_claude_permission_mode_invalid_refuses_before_endpoint_or_metadata
 test_non_claude_harness_ignores_claude_permission_mode
 test_non_claude_harness_ignores_config_dir
+test_claude_worker_mcp_surface_is_the_project_servers_only
 test_claude_task_launch_carries_control_channel_authority
 test_claude_secondmate_launch_omits_task_control_channel_authority
 test_claude_long_launch_is_delivered_intact

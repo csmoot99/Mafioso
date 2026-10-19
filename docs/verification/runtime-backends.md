@@ -529,6 +529,47 @@ What the run established on this version:
 - A PostToolUse hook's `hookSpecificOutput.additionalContext` reaches the model: the blocking run ended with the reply the prompt reserved for having seen the notice, without running the command the notice told it not to start.
 - The compaction fired after the first assistant response, so with a lowering override the hook runs before the model's next call rather than at the full window.
 
+## Claude worker MCP servers
+
+Verified 2026-10-19 on Claude Code 2.1.303, on an account with five claude.ai connectors and no user-scope MCP servers.
+`BASE` is the ship and scout `--settings` JSON without the two MCP keys and `NEW` is the one `bin/fm-spawn.sh` emits:
+
+```sh
+BASE='{"feedbackDrafts":"off","attribution":{"commit":"","pr":"","sessionUrl":false}}'
+NEW='{"feedbackDrafts":"off","disableClaudeAiConnectors":true,"enableAllProjectMcpServers":true,"attribution":{"commit":"","pr":"","sessionUrl":false}}'
+```
+
+In a linked worktree of a project whose `.mcp.json` declares a `kg` stdio server and whose committed settings do not approve it, the token-free server listing shows both halves:
+
+```sh
+claude --settings "$BASE" mcp list
+claude --settings "$NEW" mcp list
+```
+
+```text
+claude.ai Claude Docs: https://api.anthropic.com/v1/pages/mcp - ✔ Connected
+claude.ai Google Sheets: https://sheetsmcp.googleapis.com/mcp/v1 - ✔ Connected
+claude.ai Adobe for creativity: https://adobe-creativity.adobe.io/mcp - ✔ Connected
+claude.ai Google Drive: https://drivemcp.googleapis.com/mcp/v1 - ✔ Connected
+claude.ai Ideogram: https://mcp.ideogram.ai/mcp - ✔ Connected
+kg: node scripts/kg-mcp-bootstrap.mjs - ⏸ Pending approval (run `claude` to approve)
+
+kg: node scripts/kg-mcp-bootstrap.mjs - ✔ Connected
+```
+
+A no-op `claude -p 'Reply with exactly the word OK and nothing else. Do not use any tools.' --model sonnet --effort high --permission-mode auto --settings "$X" --output-format stream-json --verbose` in a repository with no `.mcp.json` measured input plus cache-creation plus cache-read tokens of 33,584 and 33,579 with `BASE` (153 connector tools) and 22,871 and 22,875 with `NEW` (no MCP tools).
+
+Interactive launches in tmux with `NEW` and the worker's other launch flags reached the composer and answered the prompt in all six runs, with no MCP or trust dialog:
+
+- Three runs in the unapproved project and two in the same project with its committed `enabledMcpjsonServers: ["kg"]` each logged `MCP server "kg": Successfully connected` before the first model response, and the claude.ai connectors were never fetched (`[claudeai-mcp] Disabled via disableClaudeAiConnectors setting`).
+- One run in a repository with no `.mcp.json` connected no MCP server.
+- The `BASE` control in the unapproved project stopped at `New MCP server found in this project: kg` with the selection on "Continue without using this MCP server".
+
+Two alternatives were rejected on the same version:
+
+- `--strict-mcp-config` also drops user-scope servers.
+- `--mcp-config <worktree>/.mcp.json` alone still raised the dialog for the project-scope copy of the same server, and exits at launch with `Error: Invalid MCP configuration` when the file is not valid JSON or has no `mcpServers` object.
+
 ## Pi seeded-secondmate project trust
 
 [`fm-spawn.sh --help`](../../bin/fm-spawn.sh) owns the seeded-secondmate project-trust approval contract and compatibility fallback.
