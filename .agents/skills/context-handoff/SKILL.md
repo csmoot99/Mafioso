@@ -53,6 +53,7 @@ Everything you know only from this conversation is about to be lost, and the nex
 
 Load this section on the worker's `blocked [key=context-handoff-<n>]` handoff-ready event.
 The replacement is automatic and never asked about; mention it in the next natural reply to the captain as a worker that handed over and continued.
+The one exception is a folded worker only waiting on a combined PR, which `combined-merge` closes without a replacement.
 
 Run exactly:
 
