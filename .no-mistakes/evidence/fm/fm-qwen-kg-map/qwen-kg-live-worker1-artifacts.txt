@@ -1,0 +1,191 @@
+== settings
+{
+  "mcpServers": {
+    "kg": {
+      "command": "node",
+      "args": [
+        "scripts/kg-mcp-bootstrap.mjs"
+      ],
+      "env": {}
+    }
+  },
+  "mcp": {
+    "excluded": [
+      "kg"
+    ]
+  }
+}
+== launch-brief
+# Current worker role contract
+You are a crewmate: an autonomous worker agent managed by firstmate.
+This section establishes your current identity before every project or task instruction below and supersedes any conflicting role identity in those instructions.
+Do the assigned work yourself and report only to firstmate; do not adopt a firstmate or secondmate supervisor identity, delegate the task, run fleet supervision, or address the captain.
+Your steering inbox is `/tmp/qkg.zJQa0P/home/state/qwen-kg-live-2414402.inbox`; this exact path belongs to your current task even when it is outside the worktree or under the supervising firstmate home, so read and acknowledge its messages and do not reject it as another home's state.
+Never inspect or change any other home's endpoint namespace; this authorization is limited to the exact task paths named by this brief.
+When this task works on Firstmate itself, the repository root `AGENTS.md` (also imported by `CLAUDE.md`) is project content and the supervisor contract for the firstmate managing you: follow this brief instead of that supervisor contract.
+Project instructions still govern the work wherever they do not conflict with this worker identity, including `CONTRIBUTING.md` and `firstmate-coding-guidelines` for Firstmate changes.
+If the `firstmate-coding-guidelines` skill name does not resolve in this session, read `/home/work/.no-mistakes/worktrees/5f69104d19ce/01M598MGW1KW4R852NYNQ3B0PW/.agents/skills/firstmate-coding-guidelines/SKILL.md` instead.
+
+You are a worker agent run by firstmate. Work alone; do not wait for a human.
+Your copy of 420usa is the current directory: a disposable worktree on the branch `fm/qwen-kg-live-2414402`, which firstmate already created from a clean copy of its default branch.
+Stay on that branch. Never run `git checkout`, `git switch`, `git stash`, `git reset`, `git clean`, `git worktree` or `treehouse`.
+
+Delivery contract: mode=direct-PR
+Ship branch: fm/qwen-kg-live-2414402
+Brief shape: qwen
+
+# Task
+## Captain's intent
+Record where publishedNap is defined.
+
+## Firstmate spec
+Follow the plan.
+
+# The plan
+This is the whole plan. You already have it, so never look for a plan file or read it again.
+```
+Find where the function `publishedNap` is defined in this repository.
+Write `x.txt` holding exactly one line: that definition's `<path>:<start>-<end>`, where `<path>` is relative to the repository root.
+```
+
+# Working rules
+1. First, run `pwd -P && git rev-parse --show-toplevel && git branch --show-current`.
+   The first two lines must be the same disposable worktree path, not the project's main checkout, and the third must be `fm/qwen-kg-live-2414402`.
+   If they are not, run the blocked command under Reporting with `launched in primary checkout, not an isolated worktree` and stop.
+   Otherwise run `echo "working [at=$(date +%s)]: started" >> '/tmp/qkg.zJQa0P/home/state/qwen-kg-live-2414402.status'` before you read anything.
+2. Write only these files, by their paths relative to the current directory: `x.txt`.
+   Every other path is read-only, including every path that starts with `/`; the reporting commands below are the only writes outside this directory.
+3. Read each file at most once.
+   Before you read a file the plan does not name, look it up with `node scripts/kg-query.mjs symbol <name>`, or find what uses it with `node scripts/kg-query.mjs callers <name>`; each result names `<repo>/<path>:<start>-<end>`, so read only those lines of `<path>`.
+   For a feature whose files the plan does not list, read `ai-map/master_map.md`, then only the `ai-map/features/<feature>/map.md` it points to.
+4. Never open a whole file that the plan calls large, minified or one line long: no `cat`, `head`, `read_file`, or `grep` without `-o` on it.
+   If you must look, run exactly `grep -o '<short pattern>' <file> | head -5`.
+5. Edit by re-reading the file and rewriting it whole with `write_file`.
+   Run any formatter the plan names, such as `prettier --write`, once, after your last edit; it changes the files, so re-read a file before editing it again.
+6. Copy every regular expression, string literal and expected value from the plan character for character. Do not improve them.
+7. Never push to the default branch (push only your `fm/qwen-kg-live-2414402` branch). Never merge a PR.
+
+# Done means this command exits 0
+    grep -q "nap.ts:" x.txt
+Run it. If it does not exit 0 you are not done: do not summarise; fix the first failure and run it again.
+Never write that tests or checks pass unless this command printed a passing result in this turn.
+
+# Reporting
+When the done command exits 0, run:
+    git add -- x.txt && git commit -m "<conventional commit title>" && git push -u origin fm/qwen-kg-live-2414402 && gh-axi pr create --title "<the same title>" --body "<two or three sentences on what changed>"
+Then run `gh-axi pr view <number>` with the number from the PR URL; if it prints `draft: yes`, run `gh-axi pr ready <number>`.
+Then run this, and stop:
+    echo "done [at=$(date +%s)]: PR <the full https URL gh-axi printed>" >> '/tmp/qkg.zJQa0P/home/state/qwen-kg-live-2414402.status'
+If you are stuck after two attempts at the same thing, or the plan does not answer something you need, run this, and stop:
+    echo "blocked [at=$(date +%s)]: <one line>" >> '/tmp/qkg.zJQa0P/home/state/qwen-kg-live-2414402.status'
+Firstmate answers through message files in '/tmp/qkg.zJQa0P/home/state/qwen-kg-live-2414402.inbox'; when your terminal announces one, read it, act on it, then move it with `mv '/tmp/qkg.zJQa0P/home/state/qwen-kg-live-2414402.inbox'/NNN.msg '/tmp/qkg.zJQa0P/home/state/qwen-kg-live-2414402.inbox'/handled/`.
+Never open a draft PR. Whenever you mention the PR, write its full https URL exactly as gh-axi printed it.
+
+## Progress note (2026-10-19T05:58:24Z)
+
+This task was relaunched. Continue from here; the local copy and every
+uncommitted change are exactly as the previous worker left them.
+
+First, check your instruction inbox: list /tmp/qkg.zJQa0P/home/state/qwen-kg-live-2414402.inbox/*.msg, act on
+each message in numeric order, then mv each handled file into
+/tmp/qkg.zJQa0P/home/state/qwen-kg-live-2414402.inbox/handled/. A steer sent before the relaunch survives there.
+
+live kg check: first launch
+== kg-ingest.log
+[WARN] The store at /home/work/.local/share/pnpm/store/v11 is not used because packages cannot be hard linked from it into this project. Using the store at /tmp/.pnpm-store/v11 instead. Set storeDir to choose the store.
+✓ Lockfile passes supply-chain policies (verified 2h ago)
+Lockfile is up to date, resolution step is skipped
+Packages are hard linked from the content-addressable store to the virtual store.
+  Content-addressable store is at: /tmp/.pnpm-store/v11
+  Virtual store is at:             node_modules/.pnpm
+Downloading onnxruntime-web@1.14.0: 0.00 B/16.64 MB
+Downloading @xenova/transformers@2.17.2: 0.00 B/12.58 MB
+Downloading @tursodatabase/database-linux-x64-gnu@0.7.2: 0.00 B/23.80 MB
+Downloading onnxruntime-node@1.14.0: 0.00 B/31.17 MB
+Downloading onnxruntime-node@1.14.0: 5.22 MB/31.17 MB
+Downloading onnxruntime-node@1.14.0: 13.94 MB/31.17 MB
+Downloading onnxruntime-node@1.14.0: 27.77 MB/31.17 MB
+Downloading @tursodatabase/database-linux-x64-gnu@0.7.2: 23.80 MB/23.80 MB, done
+Packages: +873
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 873, reused 785, downloaded 88, added 873, done
+.../node_modules/unrs-resolver postinstall$ node postinstall.js
+.../sharp@0.34.5/node_modules/sharp install$ node install/check.js || npm run build
+.../node_modules/unrs-resolver postinstall: Done
+.../sharp@0.34.5/node_modules/sharp install: Done
+
+dependencies:
++ @aws-sdk/client-s3 3.1150.0
++ @opentelemetry/api 1.9.1
++ @opentelemetry/exporter-trace-otlp-proto 0.223.0
++ @opentelemetry/instrumentation-http 0.223.0
++ @opentelemetry/instrumentation-ioredis 0.71.0
++ @opentelemetry/instrumentation-pg 0.75.0
++ @opentelemetry/instrumentation-undici 0.33.0
++ @opentelemetry/sdk-node 0.223.0
++ @payloadcms/db-postgres 3.90.2
++ @payloadcms/next 3.90.2
++ @payloadcms/richtext-lexical 3.90.2
++ @payloadcms/storage-s3 3.90.2
++ @react-email/components 1.0.12
++ @sentry/nextjs 11.7.0
++ @sentry/node 11.7.0
++ cheerio 1.2.0
++ graphql 16.14.2
++ ioredis 6.0.0
++ meilisearch 0.62.0
++ next 15.4.11
++ next-intl 4.14.9
++ nodemailer 10.1.0
++ payload 3.90.2
++ pg 8.20.0
++ pg-boss 12.37.1
++ pino 10.4.0
++ prom-client 15.1.3
++ react 19.1.9
++ react-dom 19.1.9
++ sharp 0.34.5
++ yaml 2.9.1
++ zod 4.6.7
+
+devDependencies:
++ @modelcontextprotocol/sdk 1.30.0
++ @playwright/test 1.64.0
++ @tursodatabase/database 0.7.2
++ @types/node 22.20.5
++ @types/pg 8.20.0
++ @types/react 19.1.17
++ @types/react-dom 19.1.11
++ @xenova/transformers 2.17.2
++ esbuild 0.28.2
++ eslint 10.12.0
++ eslint-import-resolver-typescript 4.4.5
++ eslint-plugin-boundaries 7.2.0
++ prettier 3.9.10
++ tree-sitter 0.25.1
++ tree-sitter-javascript 0.25.0
++ tree-sitter-typescript 0.23.2
++ tsx 4.23.15
++ typescript 5.9.3
++ typescript-eslint 8.71.2
++ vitest 5.0.4
+
+Done in 5s using pnpm v12.11.2
+incremental — 1 repo(s)
+  files: 663 scanned, 663 changed, 0 unchanged, 0 removed  [1.4s]
+  no parser lane: .json×12 (105KB)  .yml×7 (77KB)  .sh×12 (53KB)  .example×3 (8KB)  (none)×10 (7KB)  — add one in kg-lib/config.mjs → LANG_BY_EXT if any of that is authored source
+  writing 663 file(s)…
+  inserted 4090 nodes, 37846 relations  [1.9s]
+  resolving edges…
+  edges: 16193 (1671 ambiguous call sites resolved to all candidates)
+
+── knowledge graph ──────────────────────────────────────────────
+files indexed : 663
+nodes by kind : function=1945  module=566  feature=364  type=349  constant=340  sql_table=195  doc=138  css_var=41  class=30  decision=28  rule=25  route=22  page=20  stylesheet=13  component=6  convention=5  socket_event=2  changelog_entry=1
+edges by kind : calls=7897  defines=2795  references=2236  imports=1805  exports=1328  renders=130  handles=2
+nodes by repo : 420mia=4090
+un-embedded   : 4090
+elapsed       : 2.4s
+== status
+working [at=1792389521]: started
+done [at=1792389530]: PR https://github.com/420mia/420mia/pull/16

@@ -1,0 +1,15 @@
+incremental — 1 repo(s)
+  files: 663 scanned, 1 changed, 662 unchanged, 0 removed  [0.1s]
+  no parser lane: .json×12 (105KB)  .yml×7 (77KB)  .sh×12 (53KB)  .example×3 (8KB)  (none)×10 (7KB)  — add one in kg-lib/config.mjs → LANG_BY_EXT if any of that is authored source
+  writing 1 file(s)…
+  inserted 14 nodes, 68 relations  [0.1s]
+  resolving edges…
+  edges: 16193 (1671 ambiguous call sites resolved to all candidates)
+
+── knowledge graph ──────────────────────────────────────────────
+files indexed : 663
+nodes by kind : function=1945  module=566  feature=364  type=349  constant=340  sql_table=195  doc=138  css_var=41  class=30  decision=28  rule=25  route=22  page=20  stylesheet=13  component=6  convention=5  socket_event=2  changelog_entry=1
+edges by kind : calls=7897  defines=2795  references=2236  imports=1805  exports=1328  renders=130  handles=2
+nodes by repo : 420mia=4090
+un-embedded   : 4090
+elapsed       : 0.6s

@@ -1,0 +1,11 @@
+{"name":"run_shell_command","args":{"command":"pwd -P && git rev-parse --show-toplevel && git branch --show-current"}}
+{"name":"run_shell_command","args":{"command":"echo \"working [at=$(date +%s)]: started\" >> '/tmp/qkg.zJQa0P/home/state/qwen-kg-live-2414402-fail.status'"}}
+{"name":"grep_search","args":{"pattern":"function publishedNap|const publishedNap|var publishedNap|publishedNap ="}}
+{"name":"read_file","args":{"file_path":"/tmp/qkg.zJQa0P/wt2/src/modules/catalogue/nap.ts"}}
+{"name":"write_file","args":{"file_path":"/tmp/qkg.zJQa0P/wt2/x.txt","content":"src/modules/catalogue/nap.ts:77-77"}}
+{"name":"run_shell_command","args":{"command":"grep -q \"nap.ts:\" x.txt"}}
+{"name":"read_file","args":{"file_path":"/tmp/qkg.zJQa0P/wt2/x.txt"}}
+{"name":"run_shell_command","args":{"command":"git add -- x.txt && git commit -m \"Record location of publishedNap definition\" && git push -u origin fm/qwen-kg-live-2414402-fail"}}
+{"name":"run_shell_command","args":{"command":"gh-axi pr create --title \"Record location of publishedNap definition\" --body \"Recorded where publishedNap is defined in the codebase.\""}}
+{"name":"run_shell_command","args":{"command":"gh-axi pr view 1"}}
+{"name":"run_shell_command","args":{"command":"echo \"done [at=$(date +%s)]: PR https://example.invalid/pr/1\" >> '/tmp/qkg.zJQa0P/home/state/qwen-kg-live-2414402-fail.status'"}}

@@ -1,0 +1,23 @@
+    definition in x.txt"                             │
+    https://example.invalid/pr/1                     │
+                                                     │
+  ◆ Let me check if the PR is ready for review:      │
+  ✓ Shell gh-axi pr view 1                           │
+    https://example.invalid/pr/1                     │
+                                                     │
+  ◆ Let me try the final reporting step to mark      │
+    this task as complete:                           │
+  ✓ Shell echo "done [at=$(date +%s)]: PR            │
+    https://example.invalid/pr/1" >> '/tmp/qkg.zJQa0 │
+    P/home/state/qwen-kg-live-2414402.status'        │
+                                                     █
+
+  ⠴ Reticulating splines...
+  (12s · esc to cancel)
+──────────────────────────────────────────────────────
+>   Type your message or @path/to/file
+──────────────────────────────────────────────────────
+  ➜ wt · git:(fm/qwen-kg-live-2414402) ·
+  qwen3-coder:30b · 65.5k Context 29.3% used
+  Enter to steer · Ctrl+Q to queue · Auto mode (shi…
+  29.3% used

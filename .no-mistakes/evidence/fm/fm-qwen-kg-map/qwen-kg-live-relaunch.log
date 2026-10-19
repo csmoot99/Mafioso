@@ -1,0 +1,8 @@
+scaffolded: /tmp/qkg.zJQa0P/home/data/qwen-kg-live-2414402/brief.md (ship, mode=direct-PR, qwen shape; replace {TASK} and {FIRSTMATE_SPEC})
+setup ok: session=fm-lab-qwen-kg-2414402-6257 id=qwen-kg-live-2414402 lab=/tmp/qkg.zJQa0P
+pre-launch: node_modules=no kg.db=no
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/qkg.zJQa0P/home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/qkg.zJQa0P/home
+notice: qwen-kg-live-2414402 ships mode=direct-PR while the standing posture for 420usa is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+relaunched qwen-kg-live-2414402 harness=qwen from=qwen model=qwen3-coder:30b effort=default backend=herdr endpoint=fm-lab-qwen-kg-2414402-6257:w1:p2 worktree=/tmp/qkg.zJQa0P/wt
+relaunch exit=0 after 11s

@@ -1,0 +1,20 @@
+scaffolded brief rule 3 (before spawn):
+3. Read each file at most once.
+   Before you read a file the plan does not name, look it up with `node scripts/kg-query.mjs symbol <name>`, or find what uses it with `node scripts/kg-query.mjs callers <name>`; each result names `<repo>/<path>:<start>-<end>`, so read only those lines of `<path>`.
+   For a feature whose files the plan does not list, read `ai-map/master_map.md`, then only the `ai-map/features/<feature>/map.md` it points to.
+pre-launch: node_modules=no
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/qkg.zJQa0P/home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/qkg.zJQa0P/home
+notice: qwen-kg-live-2414402-fail ships mode=direct-PR while the standing posture for 420usa is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+warning: qwen-kg-live-2414402-fail's kg graph is unavailable: pnpm install --frozen-lockfile --prefer-offline exited 1 (log: /tmp/qkg.zJQa0P/home/state/qwen-kg-live-2414402-fail.kg-ingest.log); the kg-query lookup is dropped from its brief
+relaunched qwen-kg-live-2414402-fail harness=qwen from=qwen model=qwen3-coder:30b effort=default backend=herdr endpoint=fm-lab-qwen-kg-2414402-6257:w1:p3 worktree=/tmp/qkg.zJQa0P/wt2
+relaunch exit=0
+--- launch-brief rule 3 (after spawn):
+3. Read each file at most once.
+   For a feature whose files the plan does not list, read `ai-map/master_map.md`, then only the `ai-map/features/<feature>/map.md` it points to.
+--- settings MCP keys:
+{"mcpServers":{"kg":{"command":"node","args":["scripts/kg-mcp-bootstrap.mjs"],"env":{}}},"mcp":null}
+--- kg-ingest.log:
+ERR_PNPM_NO_OFFLINE_TARBALL simulated install failure
+--- no-kg project brief rule 3:
+3. Read each file at most once.
