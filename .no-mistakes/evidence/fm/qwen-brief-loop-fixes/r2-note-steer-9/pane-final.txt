@@ -1,0 +1,23 @@
+        a comma and first name, and exported it
+        alongside fullName
+     3. Updated src/index.js to require and use
+        both new functions
+
+    The implementation has been tested and verified
+     to work correctly with the expected output:
+     - "Ada Lovelace" (from fullName)
+     - "A.L." (from initials)
+     - "Lovelace, Ada" (from reversed)
+
+    All changes have been committed and pushed to
+    the branch fm/qwen-brief-note-1001076, and a
+    pull request has been created with the title
+    "feat: add name helpers".
+
+──────────────────────────────────────────────────────
+*   Type your message or @path/to/file
+──────────────────────────────────────────────────────
+  ➜ wt · git:(fm/qwen-brief-note-1001076) ·
+  qwen3-coder:30b · 65.5k Context 27.2% used
+  YOLO mode (shift + tab to cycle)
+  27.2% used

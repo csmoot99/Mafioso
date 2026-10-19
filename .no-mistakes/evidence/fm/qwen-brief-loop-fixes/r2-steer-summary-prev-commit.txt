@@ -1,0 +1,6 @@
+1: working=1 handled=1 title=Add initials and reversed name helpers
+2: working=1 handled=0 title=Add initials and reversed name helpers
+3: working=1 handled=0 title=feat: Add initials and reversed name helpers
+4: working=1 handled=1 title=feat: add name helpers
+5: working=1 handled=0 title=feat: add name helpers
+6: working=1 handled=1 title=feat: add initials and reversed helpers

@@ -1,0 +1,23 @@
+     1    function fullName(first, last) {           │
+     2      return first + ' ' + last;               │
+     3    }                                          │
+     4                                               │
+     5    function reversed(first, last) {           │
+     6      return last + ', ' + first;              │
+     7    }                                          │
+     8                                               │
+                                                     │
+     9    module.exports = { fullName, reversed };   │
+                                                     │
+     3. Modified `src/index.js`                      █
+
+  ⠦ It's not a bug, it's a feature... of this loading
+s…
+  (24s · esc to cancel)
+──────────────────────────────────────────────────────
+*   Type your message or @path/to/file
+──────────────────────────────────────────────────────
+  ➜ wt · git:(fm/qwen-brief-note-484228) ·
+  qwen3-coder:30b · 65.5k Context 29.5% used
+  Enter to steer · Ctrl+Q to queue · YOLO mode (shi…
+  29.5% used

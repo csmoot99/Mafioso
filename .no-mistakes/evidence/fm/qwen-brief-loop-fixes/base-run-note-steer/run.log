@@ -1,0 +1,40 @@
+session=fm-lab-qwen-brief-623380-22396 id=qwen-brief-note-623380 how=note include=no
+scaffolded: /tmp/qbr.LtMjaY/home/data/qwen-brief-note-623380/brief.md (ship, mode=direct-PR, qwen shape; replace {TASK} and {FIRSTMATE_SPEC})
+scaffolded brief: 4533 chars; last heading: # Reporting
+pre-seeded steer 001.msg
+launch (note) rc=0: notice: qwen-brief-note-623380 ships mode=direct-PR while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+relaunched qwen-brief-note-623380 harness=qwen from=qwen model=qwen3-coder:30b effort=default backend=herdr endpoint=fm-lab-qwen-brief-623380-22396:w1:p2 worktree=/tmp/qbr.LtMjaY/wt
+launched brief: 5082 chars; last heading: # Reporting; '## Progress note' line: 76, '# Start' line: 
+elapsed: 28s
+--- status file
+done [at=1792393306]: PR https://github.com/o/r/pull/7
+--- crew state
+state: done · source: status-log · PR https://github.com/o/r/pull/7
+--- origin branch diff vs main
+ src/index.js    | 4 ++++
+ src/initials.js | 5 +++++
+ src/names.js    | 6 +++++-
+ 3 files changed, 14 insertions(+), 1 deletion(-)
+--- done command in worktree
+done command exit 0
+--- gh-axi calls
+pr create --title Add initials and reversed helpers --body This PR adds an initials helper that returns the first letter of first and last name separated by periods, and a reversed helper that returns the name in last, first format. Both are printed from index.js.
+pr view 7
+pr view 7
+pr view 7 --json title,number,draft,url
+pr list
+--- qwen edit-guard refusals in session logs
+(none above means zero refusals)
+--- qwen requests (api request events)
+0
+--- inbox
+/tmp/qbr.LtMjaY/home/state/qwen-brief-note-623380.inbox:
+001.msg
+handled
+
+/tmp/qbr.LtMjaY/home/state/qwen-brief-note-623380.inbox/handled:
+--- commit titles on origin branch
+Add initials and reversed helpers
+pane capture saved
+qwen chat logs: 1 file(s)
+teardown: fm-lab-qwen-brief-623380-22396 stopped and deleted

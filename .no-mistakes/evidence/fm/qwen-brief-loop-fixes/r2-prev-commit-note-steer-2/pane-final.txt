@@ -1,0 +1,23 @@
+        module (which now includes reversed), then
+        called all three functions
+
+    The implementation correctly produces the
+    expected output:
+     1 Ada Lovelace
+     2 A.L.
+     3 Lovelace, Ada
+
+    All changes have been committed and pushed to
+    the branch fm/qwen-brief-note-880830, and a
+    pull request has been created. The test command
+     node src/index.js | diff - <(printf 'Ada
+    Lovelace\nA.L.\nLovelace, Ada\n') passes
+    successfully.<tool_call>
+
+──────────────────────────────────────────────────────
+*   Type your message or @path/to/file
+──────────────────────────────────────────────────────
+  ➜ wt · git:(fm/qwen-brief-note-880830) ·
+  qwen3-coder:30b · 65.5k Context 27.5% used
+  YOLO mode (shift + tab to cycle)
+  27.5% used

@@ -1,0 +1,23 @@
+    matches exactly what was expected. The task is
+    complete and a pull request has been created.
+
+    The changes include:
+     1. Created src/initials.js with the initials
+        helper function
+     2. Added a reversed helper function to
+        src/names.js
+     3. Updated src/index.js to require and use
+        both new helpers
+
+    All tests pass and the output matches exactly:
+     1 Ada Lovelace
+     2 A.L.
+     3 Lovelace, Ada
+
+──────────────────────────────────────────────────────
+*   Type your message or @path/to/file
+──────────────────────────────────────────────────────
+  ➜ wt · git:(fm/qwen-brief-note-783115) ·
+  qwen3-coder:30b · 65.5k Context 27.2% used
+  YOLO mode (shift + tab to cycle)
+  27.2% used

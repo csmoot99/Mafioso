@@ -1,0 +1,38 @@
+session=fm-lab-qwen-brief-802827-17508 id=qwen-brief-note-802827 how=note include=no
+scaffolded: /tmp/qbr.St1LtD/home/data/qwen-brief-note-802827/brief.md (ship, mode=direct-PR, qwen shape; replace {TASK} and {FIRSTMATE_SPEC})
+scaffolded brief: 4038 chars; last heading: # Start
+pre-seeded steer 001.msg
+launch (note) rc=0: notice: qwen-brief-note-802827 ships mode=direct-PR while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+relaunched qwen-brief-note-802827 harness=qwen from=qwen model=qwen3-coder:30b effort=default backend=herdr endpoint=fm-lab-qwen-brief-802827-17508:w1:p2 worktree=/tmp/qbr.St1LtD/wt
+launched brief: 4693 chars; last heading: # Start; '## Progress note' line: 66, '# Start' line: 73
+working line after 9s
+elapsed: 29s
+--- status file
+working [at=1792393896]: started
+done [at=1792393905]: PR https://github.com/o/r/pull/7
+--- crew state
+state: done · source: status-log · PR https://github.com/o/r/pull/7
+--- origin branch diff vs main
+ src/index.js    | 4 ++++
+ src/initials.js | 5 +++++
+ src/names.js    | 6 +++++-
+ 3 files changed, 14 insertions(+), 1 deletion(-)
+--- done command in worktree
+done command exit 0
+--- gh-axi calls
+pr create --title feat: add name helpers --body Added initials helper and reversed-name helper functions. The initials function returns first initial and last initial separated by periods. The reversed function returns the name in last, first format.
+--- qwen edit-guard refusals in session logs
+(none above means zero refusals)
+--- qwen requests (api request events)
+0
+--- inbox
+/tmp/qbr.St1LtD/home/state/qwen-brief-note-802827.inbox:
+handled
+
+/tmp/qbr.St1LtD/home/state/qwen-brief-note-802827.inbox/handled:
+001.msg
+--- commit titles on origin branch
+feat: add name helpers
+pane capture saved
+qwen chat logs: 1 file(s)
+teardown: fm-lab-qwen-brief-802827-17508 stopped and deleted

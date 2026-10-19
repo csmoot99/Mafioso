@@ -1,0 +1,23 @@
+        - "Ada Lovelace"
+        - "A.L."
+        - "Lovelace, Ada"
+     5. Committing the changes with the message
+        "feat: add name helpers"
+     6. Pushing to the branch and creating a pull
+        request
+
+    The implementation follows all requirements
+    from the plan exactly, including proper exports
+     and function signatures. The verification
+    command passed successfully, confirming the
+    expected output is produced.
+
+    PR URL: https://github.com/o/r/pull/7
+
+──────────────────────────────────────────────────────
+*   Type your message or @path/to/file
+──────────────────────────────────────────────────────
+  ➜ wt · git:(fm/qwen-brief-note-1006995) ·
+  qwen3-coder:30b · 65.5k Context 27.5% used
+  YOLO mode (shift + tab to cycle)
+  27.5% used

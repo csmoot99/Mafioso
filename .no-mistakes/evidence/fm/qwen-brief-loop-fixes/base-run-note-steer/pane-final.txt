@@ -1,0 +1,23 @@
+        both new helpers alongside the existing
+        fullName helper
+
+    The implementation was verified with:
+     - node src/index.js which correctly outputs:
+     1   Ada Lovelace
+     2   A.L.
+     3   Lovelace, Ada
+
+    All changes have been committed and pushed to
+    the branch fm/qwen-brief-note-623380, and a
+    pull request has been created at
+    https://github.com/o/r/pull/7
+
+    The task is complete.
+
+──────────────────────────────────────────────────────
+*   Type your message or @path/to/file
+──────────────────────────────────────────────────────
+  ➜ wt · git:(fm/qwen-brief-note-623380) ·
+  qwen3-coder:30b · 65.5k Context 27.7% used
+  YOLO mode (shift + tab to cycle)
+  27.7% used

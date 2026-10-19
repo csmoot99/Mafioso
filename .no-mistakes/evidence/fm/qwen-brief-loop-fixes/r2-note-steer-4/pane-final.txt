@@ -1,0 +1,23 @@
+
+    实现正确输出：
+     - "Ada Lovelace" (全名)
+     - "A.L." (首字母缩写)
+     - "Lovelace, Ada" (倒序姓名)
+
+    所有要求都已严格按照计划执行，done 命令退出码为
+     0，PR 已成功创建。
+  ✓ Shell exit 0
+
+
+  ◆ Done. All required changes have been
+    implemented successfully according to the plan.
+     The task is complete and the Pull Request has
+    been created.
+
+──────────────────────────────────────────────────────
+*   Type your message or @path/to/file
+──────────────────────────────────────────────────────
+  ➜ wt · git:(fm/qwen-brief-note-802827) ·
+  qwen3-coder:30b · 65.5k Context 28.9% used
+  YOLO mode (shift + tab to cycle)
+  28.9% used

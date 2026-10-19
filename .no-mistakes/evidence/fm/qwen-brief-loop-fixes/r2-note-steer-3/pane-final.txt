@@ -1,0 +1,23 @@
+    functions. Updated index.js to print both the
+    full name, initials, and reversed name." | grep
+    -m1 -o 'https://[^ ]*/pull/[0-9]*') && echo
+    "done [at=$(date +%s)]: PR $url" | tee -a
+    '/tmp/qbr.wbbhcP/home/state/qwen-brief-note-7976
+    50.status'
+    ... first 15 lines hidden ...
+    > fm/qwen-brief-note-797650
+    branch 'fm/qwen-brief-note-797650' set up to tra
+    ck 'origin/fm/qwen-brief-note-797650'.
+    done [at=1792393873]: PR https://github.com/o/r/
+    pull/7
+
+  ◆ done [at=1792393873]: PR
+    https://github.com/o/r/pull/7
+
+──────────────────────────────────────────────────────
+*   Type your message or @path/to/file
+──────────────────────────────────────────────────────
+  ➜ wt · git:(fm/qwen-brief-note-797650) ·
+  qwen3-coder:30b · 65.5k Context 26.9% used
+  YOLO mode (shift + tab to cycle)
+  26.9% used

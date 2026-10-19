@@ -1,0 +1,23 @@
+       Lovelace\nA.L.\nLovelace, Ada\n')
+
+    This produced no output (exit code 0),
+    confirming that it works correctly.
+
+    The changes have been committed to the
+    fm/qwen-brief-spawn-844404 branch and a pull
+    request has been created at:
+    https://github.com/o/r/pull/7
+
+    The PR adds an initials helper function that
+    returns the first letter of first and last
+    names, and a reversed name helper that returns
+    the last name followed by a comma and the first
+     name.<tool_call>
+
+──────────────────────────────────────────────────────
+*   Type your message or @path/to/file
+──────────────────────────────────────────────────────
+  ➜ wt · git:(fm/qwen-brief-spawn-844404) ·
+  qwen3-coder:30b · 65.5k Context 27.2% used
+  YOLO mode (shift + tab to cycle)
+  27.2% used

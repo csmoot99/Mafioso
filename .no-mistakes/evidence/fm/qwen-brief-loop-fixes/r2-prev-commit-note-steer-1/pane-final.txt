@@ -1,0 +1,23 @@
+        both helpers
+
+    The implementation produces exactly the
+    expected output:
+     1 Ada Lovelace
+     2 A.L.
+     3 Lovelace, Ada
+
+    All changes have been committed to the branch
+    fm/qwen-brief-note-850669 and a pull request
+    has been created. The test node src/index.js |
+    diff - <(printf 'Ada Lovelace\nA.L.\nLovelace,
+    Ada\n') passes successfully.
+
+    The task is now complete.
+
+──────────────────────────────────────────────────────
+*   Type your message or @path/to/file
+──────────────────────────────────────────────────────
+  ➜ wt · git:(fm/qwen-brief-note-850669) ·
+  qwen3-coder:30b · 65.5k Context 30.1% used
+  YOLO mode (shift + tab to cycle)
+  30.1% used

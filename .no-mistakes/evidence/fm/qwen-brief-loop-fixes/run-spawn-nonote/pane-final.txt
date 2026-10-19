@@ -1,0 +1,23 @@
+        - "A.L." (from initials)
+        - "Lovelace, Ada" (from reversed)
+
+    All tests pass, the changes are committed and
+    pushed to the branch
+    fm/qwen-brief-spawn-602995, and a PR has been
+    created with the URL:
+    https://github.com/o/r/pull/7
+
+    The implementation matches exactly what was
+    specified in the plan, and the output of node
+    src/index.js now correctly produces:
+     1 Ada Lovelace
+     2 A.L.
+     3 Lovelace, Ada
+
+──────────────────────────────────────────────────────
+*   Type your message or @path/to/file
+──────────────────────────────────────────────────────
+  ➜ wt · git:(fm/qwen-brief-spawn-602995) ·
+  qwen3-coder:30b · 65.5k Context 28% used
+  YOLO mode (shift + tab to cycle)
+  28.0% used

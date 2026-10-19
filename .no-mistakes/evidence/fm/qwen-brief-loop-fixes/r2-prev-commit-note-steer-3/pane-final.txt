@@ -1,0 +1,23 @@
+        and exported it alongside fullName
+     3. Updated src/index.js to require and use
+        both new functions
+     4. Verified the implementation works correctly
+        by running node src/index.js which outputs:
+     1    Ada Lovelace
+     2    A.L.
+     3    Lovelace, Ada
+     5. Committed the changes and created a pull
+        request
+
+    All requirements from the plan have been met
+    exactly as specified. The pull request has been
+     created successfully at
+    https://github.com/o/r/pull/7
+
+──────────────────────────────────────────────────────
+*   Type your message or @path/to/file
+──────────────────────────────────────────────────────
+  ➜ wt · git:(fm/qwen-brief-note-906418) ·
+  qwen3-coder:30b · 65.5k Context 26.9% used
+  YOLO mode (shift + tab to cycle)
+  26.9% used

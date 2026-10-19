@@ -1,0 +1,23 @@
+        both new helpers
+
+    The implementation produces the exact output:
+     1 Ada Lovelace
+     2 A.L.
+     3 Lovelace, Ada
+
+    All changes have been committed to the branch
+    fm/qwen-brief-note-974004 and a pull request
+    has been created successfully.
+
+    There were no additional messages in the inbox
+    to process.
+
+    The task is now complete.<tool_call>
+
+──────────────────────────────────────────────────────
+*   Type your message or @path/to/file
+──────────────────────────────────────────────────────
+  ➜ wt · git:(fm/qwen-brief-note-974004) ·
+  qwen3-coder:30b · 65.5k Context 29.4% used
+  YOLO mode (shift + tab to cycle)
+  29.4% used

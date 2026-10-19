@@ -1,0 +1,32 @@
+session=fm-lab-qwen-brief-484228-3537 id=qwen-brief-note-484228 how=note include=include
+scaffolded: /tmp/qbr.dHP5Br/home/data/qwen-brief-note-484228/brief.md (ship, mode=direct-PR, qwen shape; replace {TASK} and {FIRSTMATE_SPEC})
+scaffolded brief: 4237 chars; last heading: # Start
+launch (note) rc=0: notice: qwen-brief-note-484228 ships mode=direct-PR while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+relaunched qwen-brief-note-484228 harness=qwen from=qwen model=qwen3-coder:30b effort=default backend=herdr endpoint=fm-lab-qwen-brief-484228-3537:w1:p2 worktree=/tmp/qbr.dHP5Br/wt
+launched brief: 4826 chars; last heading: # Start; '## Progress note' line: 70, '# Start' line: 77
+working line after 9s
+elapsed: 29s
+--- status file
+working [at=1792393095]: started
+done [at=1792393104]: PR https://github.com/o/r/pull/7
+done [at=1792393106]: PR https://github.com/o/r/pull/7
+done [at=1792393110]: PR https://github.com/o/r/pull/7
+done [at=1792393112]: PR https://github.com/o/r/pull/7
+done [at=1792393115]: PR https://github.com/o/r/pull/7
+--- crew state
+state: working · source: pane · harness busy (qwen-hook)
+--- origin branch diff vs main
+ src/index.js    | 4 ++++
+ src/initials.js | 5 +++++
+ src/names.js    | 6 +++++-
+ 3 files changed, 14 insertions(+), 1 deletion(-)
+--- done command in worktree
+done command exit 0
+--- gh-axi calls
+pr create --title feat: add initials and reversed helpers --body Added an initials helper function that returns first initial and last initial separated by dots. Also added a reversed-name helper function that returns the name in last, first format.
+--- qwen edit-guard refusals in session logs
+(none above means zero refusals)
+--- qwen requests (api request events)
+0
+pane capture saved
+teardown: fm-lab-qwen-brief-484228-3537 stopped and deleted

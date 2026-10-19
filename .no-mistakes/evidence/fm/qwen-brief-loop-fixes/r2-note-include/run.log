@@ -1,0 +1,33 @@
+session=fm-lab-qwen-brief-832470-14164 id=qwen-brief-note-832470 how=note include=include
+scaffolded: /tmp/qbr.wPf3Rd/home/data/qwen-brief-note-832470/brief.md (ship, mode=direct-PR, qwen shape; replace {TASK} and {FIRSTMATE_SPEC})
+scaffolded brief: 4237 chars; last heading: # Start
+launch (note) rc=0: notice: qwen-brief-note-832470 ships mode=direct-PR while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+relaunched qwen-brief-note-832470 harness=qwen from=qwen model=qwen3-coder:30b effort=default backend=herdr endpoint=fm-lab-qwen-brief-832470-14164:w1:p2 worktree=/tmp/qbr.wPf3Rd/wt
+launched brief: 4892 chars; last heading: # Start; '## Progress note' line: 70, '# Start' line: 77
+working line after 9s
+elapsed: 29s
+--- status file
+working [at=1792394041]: started
+done [at=1792394052]: PR https://github.com/o/r/pull/7
+--- crew state
+state: done · source: status-log · PR https://github.com/o/r/pull/7
+--- origin branch diff vs main
+ src/index.js    | 4 ++++
+ src/initials.js | 5 +++++
+ src/names.js    | 6 +++++-
+ 3 files changed, 14 insertions(+), 1 deletion(-)
+--- done command in worktree
+done command exit 0
+--- gh-axi calls
+pr create --title feat: add initials and reversed helpers --body This PR adds an initials helper function and a reversed-name helper function. The initials function takes first and last names and returns them in abbreviated form (e.g., 'Ada Lovelace' becomes 'A.L.'). The reversed function takes first and last names and returns them in reverse order (e.g., 'Ada Lovelace' becomes 'Lovelace, Ada').
+--- qwen edit-guard refusals in session logs
+(none above means zero refusals)
+--- qwen requests (api request events)
+0
+--- inbox
+ls: cannot access '/tmp/qbr.wPf3Rd/home/state/qwen-brief-note-832470.inbox': No such file or directory
+--- commit titles on origin branch
+feat: add initials and reversed helpers
+pane capture saved
+qwen chat logs: 1 file(s)
+teardown: fm-lab-qwen-brief-832470-14164 stopped and deleted

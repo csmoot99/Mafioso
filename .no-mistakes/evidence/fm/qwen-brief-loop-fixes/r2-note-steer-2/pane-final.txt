@@ -1,0 +1,23 @@
+        by running the test command
+     5. Committed the changes with the specified
+        commit message "feat: add name helpers"
+     6. Created a pull request with the changes
+
+    The output shows that when running node
+    src/index.js, we get:
+     1 Ada Lovelace
+     2 A.L.
+     3 Lovelace, Ada
+
+    This matches exactly what was expected in the
+    task requirements. The PR has been created
+    successfully at
+    https://github.com/o/r/pull/7<tool_call>
+
+──────────────────────────────────────────────────────
+*   Type your message or @path/to/file
+──────────────────────────────────────────────────────
+  ➜ wt · git:(fm/qwen-brief-note-788483) ·
+  qwen3-coder:30b · 65.5k Context 27.7% used
+  YOLO mode (shift + tab to cycle)
+  27.7% used

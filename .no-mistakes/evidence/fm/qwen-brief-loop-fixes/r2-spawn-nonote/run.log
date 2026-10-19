@@ -1,0 +1,33 @@
+session=fm-lab-qwen-brief-844404-4785 id=qwen-brief-spawn-844404 how=spawn include=no
+scaffolded: /tmp/qbr.hMDW9B/home/data/qwen-brief-spawn-844404/brief.md (ship, mode=direct-PR, qwen shape; replace {TASK} and {FIRSTMATE_SPEC})
+scaffolded brief: 4049 chars; last heading: # Start
+launch (spawn) rc=0: notice: qwen-brief-spawn-844404 ships mode=direct-PR while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+spawned qwen-brief-spawn-844404 harness=qwen kind=ship mode=direct-PR yolo=off window=fm-lab-qwen-brief-844404-4785:w1:p2 worktree=/tmp/qbr.hMDW9B/wt
+launched brief: 4049 chars; last heading: # Start; '## Progress note' line: , '# Start' line: 66
+working line after 8s
+elapsed: 28s
+--- status file
+working [at=1792394073]: started
+done [at=1792394083]: PR https://github.com/o/r/pull/7
+--- crew state
+state: done · source: status-log · PR https://github.com/o/r/pull/7
+--- origin branch diff vs main
+ src/index.js    | 5 ++++-
+ src/initials.js | 5 +++++
+ src/names.js    | 6 +++++-
+ 3 files changed, 14 insertions(+), 2 deletions(-)
+--- done command in worktree
+done command exit 0
+--- gh-axi calls
+pr create --title Add initials and reversed name helpers --body This PR adds an initials helper function that returns the first letter of first and last names, and a reversed name helper that returns the last name followed by a comma and the first name.
+--- qwen edit-guard refusals in session logs
+(none above means zero refusals)
+--- qwen requests (api request events)
+0
+--- inbox
+ls: cannot access '/tmp/qbr.hMDW9B/home/state/qwen-brief-spawn-844404.inbox': No such file or directory
+--- commit titles on origin branch
+Add initials and reversed name helpers
+pane capture saved
+qwen chat logs: 1 file(s)
+teardown: fm-lab-qwen-brief-844404-4785 stopped and deleted

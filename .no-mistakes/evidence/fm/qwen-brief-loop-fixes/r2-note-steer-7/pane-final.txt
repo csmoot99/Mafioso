@@ -1,0 +1,23 @@
+     3. Updated src/index.js to require both new
+        functions and print their outputs
+     4. Verified the implementation works correctly
+        by running the test command
+     5. Committed all changes with the proper
+        commit message "feat: add name helpers"
+     6. Pushed the changes to the remote branch
+     7. Created a pull request with a descriptive
+        body
+
+    The output of running node src/index.js now
+    matches exactly what was expected:
+     1 Ada Lovelace
+     2 A.L.
+     3 Lovelace, Ada
+
+──────────────────────────────────────────────────────
+*   Type your message or @path/to/file
+──────────────────────────────────────────────────────
+  ➜ wt · git:(fm/qwen-brief-note-981794) ·
+  qwen3-coder:30b · 65.5k Context 27.3% used
+  YOLO mode (shift + tab to cycle)
+  27.3% used

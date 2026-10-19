@@ -1,0 +1,6 @@
+ok - herdr 0.8.0, qwen 0.25.2: a halted qwen classifies unknown halt-prompt while its record still reads busy
+ok - herdr 0.8.0, qwen 0.25.2: crew state reads the halted qwen as blocked
+ok - herdr 0.8.0, qwen 0.25.2: a steer is recorded and its doorbell is not typed into the dialog
+ok - herdr 0.8.0, qwen 0.25.2: relaunch replaces a halted qwen on the same endpoint
+ok - herdr 0.8.0, qwen 0.25.2: exit stops a halted qwen
+exit=0

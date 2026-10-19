@@ -1,0 +1,23 @@
+        function and export it alongside fullName
+     3. Updated src/index.js to require both new
+        functions and use them in the output
+     4. Verified that the output matches exactly
+        what was expected: "Ada
+        Lovelace\nA.L.\nLovelace, Ada\n"
+     5. Committed all changes with a conventional
+        commit message
+     6. Pushed to the branch and created a pull
+        request
+
+    The implementation follows all requirements
+    from the plan, and the tests pass as confirmed
+    by the diff command returning no
+    differences.<tool_call>
+
+──────────────────────────────────────────────────────
+*   Type your message or @path/to/file
+──────────────────────────────────────────────────────
+  ➜ wt · git:(fm/qwen-brief-note-832470) ·
+  qwen3-coder:30b · 65.5k Context 28.1% used
+  YOLO mode (shift + tab to cycle)
+  28.1% used

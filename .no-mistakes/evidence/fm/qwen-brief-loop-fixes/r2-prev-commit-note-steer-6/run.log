@@ -1,0 +1,38 @@
+session=fm-lab-qwen-brief-974004-10422 id=qwen-brief-note-974004 how=note include=no
+scaffolded: /tmp/qbr.8F1x8W/home/data/qwen-brief-note-974004/brief.md (ship, mode=direct-PR, qwen shape; replace {TASK} and {FIRSTMATE_SPEC})
+scaffolded brief: 4038 chars; last heading: # Start
+pre-seeded steer 001.msg
+launch (note) rc=0: notice: qwen-brief-note-974004 ships mode=direct-PR while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+relaunched qwen-brief-note-974004 harness=qwen from=qwen model=qwen3-coder:30b effort=default backend=herdr endpoint=fm-lab-qwen-brief-974004-10422:w1:p2 worktree=/tmp/qbr.8F1x8W/wt
+launched brief: 4627 chars; last heading: # Start; '## Progress note' line: 66, '# Start' line: 73
+working line after 9s
+elapsed: 29s
+--- status file
+working [at=1792394276]: started
+done [at=1792394287]: PR https://github.com/o/r/pull/7
+--- crew state
+state: done · source: status-log · PR https://github.com/o/r/pull/7
+--- origin branch diff vs main
+ src/index.js    | 4 ++++
+ src/initials.js | 5 +++++
+ src/names.js    | 6 +++++-
+ 3 files changed, 14 insertions(+), 1 deletion(-)
+--- done command in worktree
+done command exit 0
+--- gh-axi calls
+pr create --title Add initials and reversed helpers --body Added initials helper that returns first initial and last initial. Added reversed helper that returns last name, first name. Updated index.js to print both helpers.
+--- qwen edit-guard refusals in session logs
+(none above means zero refusals)
+--- qwen requests (api request events)
+0
+--- inbox
+/tmp/qbr.8F1x8W/home/state/qwen-brief-note-974004.inbox:
+handled
+
+/tmp/qbr.8F1x8W/home/state/qwen-brief-note-974004.inbox/handled:
+001.msg
+--- commit titles on origin branch
+feat: add initials and reversed helpers
+pane capture saved
+qwen chat logs: 1 file(s)
+teardown: fm-lab-qwen-brief-974004-10422 stopped and deleted

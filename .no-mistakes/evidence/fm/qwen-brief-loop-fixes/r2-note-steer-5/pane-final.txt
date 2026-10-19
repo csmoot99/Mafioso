@@ -1,0 +1,23 @@
+     4. Verified the implementation produces the
+        expected output:
+
+     1    Ada Lovelace
+     2    A.L.
+     3    Lovelace, Ada
+     5. Committed the changes with the conventional
+        commit title "feat: add name helpers"
+     6. Pushed to the branch
+        fm/qwen-brief-note-809131
+     7. Created a pull request with a descriptive
+        body
+
+    The implementation fully satisfies the
+    requirements specified in the plan.<tool_call>
+
+──────────────────────────────────────────────────────
+*   Type your message or @path/to/file
+──────────────────────────────────────────────────────
+  ➜ wt · git:(fm/qwen-brief-note-809131) ·
+  qwen3-coder:30b · 65.5k Context 29.8% used
+  YOLO mode (shift + tab to cycle)
+  29.8% used

@@ -1,0 +1,23 @@
+        last initial
+     2. Updated src/names.js to add the reversed
+        function and export it alongside fullName
+     3. Updated src/index.js to require and use
+        both new functions
+
+    The implementation works correctly:
+     - It prints "Ada Lovelace" (fullName)
+     - It prints "A.L." (initials)
+     - It prints "Lovelace, Ada" (reversed)
+
+    I've committed the changes with the exact
+    commit message requested: "feat: add name
+    helpers" and pushed to the branch. The PR was
+    created successfully.<tool_call>
+
+──────────────────────────────────────────────────────
+*   Type your message or @path/to/file
+──────────────────────────────────────────────────────
+  ➜ wt · git:(fm/qwen-brief-note-960633) ·
+  qwen3-coder:30b · 65.5k Context 28.5% used
+  YOLO mode (shift + tab to cycle)
+  28.5% used
