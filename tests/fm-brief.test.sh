@@ -1406,6 +1406,39 @@ EOF
   pass "fm-brief.sh --harness qwen is refused outside a direct-PR ship with its plan, files and done command"
 }
 
+test_qwen_shape_looks_up_through_the_project_kg_and_map() {
+  local home plan rule3 id
+  plan="$TMP_ROOT/qwen-lookup-plan.md"
+  printf 'plan\n' > "$plan"
+  for id in brief-qwen-k1 brief-qwen-k2 brief-qwen-k3; do
+    home="$TMP_ROOT/qwen-lookup-$id"
+    mkdir -p "$home/data" "$home/projects/some-proj"
+    case "$id" in
+      brief-qwen-k1) mkdir -p "$home/projects/some-proj/scripts" "$home/projects/some-proj/ai-map"
+        : > "$home/projects/some-proj/scripts/kg-query.mjs"; : > "$home/projects/some-proj/ai-map/master_map.md" ;;
+      brief-qwen-k2) mkdir -p "$home/projects/some-proj/scripts"; : > "$home/projects/some-proj/scripts/kg-query.mjs" ;;
+    esac
+    qwen_scaffold "$home" "$id" "$plan" >/dev/null 2>&1 || fail "the qwen shape should scaffold for $id"
+    rule3=$(awk '/^3\. /{on=1} /^4\. /{on=0} on' "$home/data/$id/brief.md")
+    assert_contains "$rule3" "Read each file at most once." "$id lost rule 3"
+    case "$id" in
+      brief-qwen-k1 | brief-qwen-k2)
+        # shellcheck disable=SC2016 # Backticks are literal generated Markdown.
+        assert_contains "$rule3" 'look it up with `node scripts/kg-query.mjs symbol <name>` or `node scripts/kg-query.mjs search' \
+          "$id: a project with the kg command does not get the kg lookup in rule 3" ;;
+      *) assert_not_contains "$rule3" "kg-query" "$id: a project without the kg command got the kg lookup" ;;
+    esac
+    case "$id" in
+      brief-qwen-k1)
+        # shellcheck disable=SC2016 # Backticks are literal generated Markdown.
+        assert_contains "$rule3" 'read `ai-map/master_map.md`, then only the `ai-map/features/<feature>/map.md`' \
+          "$id: a project with the ai-map master map does not get the map lookup in rule 3" ;;
+      *) assert_not_contains "$rule3" "master_map" "$id: a project without the ai-map master map got the map lookup" ;;
+    esac
+  done
+  pass "fm-brief.sh --harness qwen: rule 3 names the kg command and the ai-map master map only when the project's clone ships them"
+}
+
 # (a) An unregistered/default project - no --branch-prefix passed at all - must
 # keep every generated ship mode's branch on the legacy "fm/<task-id>" name, byte
 # for byte, so every existing firstmate installation is unaffected.
@@ -1665,3 +1698,4 @@ test_branch_prefix_command_is_shell_safe
 test_crewmate_scaffolds_forbid_pool_administration
 test_qwen_shape_inlines_the_plan_and_keeps_the_contract
 test_qwen_shape_is_refused_outside_its_shape
+test_qwen_shape_looks_up_through_the_project_kg_and_map

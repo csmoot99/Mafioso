@@ -132,6 +132,11 @@
 # reads the "Brief shape: qwen" line in the brief's header
 # (fm_brief_is_qwen_shape), creates that branch, and makes every untracked file
 # under a data/<subdir>/ that the brief names read-only.
+# When the project's clone (projects/<repo-name>) ships scripts/kg-query.mjs,
+# the shell command for its kg code graph, or ai-map/master_map.md, rule 3
+# gains a line telling the worker to look up through it any file the plan
+# does not name before reading one; bin/fm-spawn.sh then keeps that kg's MCP
+# server out of the worker's requests, because a lookup through it costs more.
 # It keeps the isolation check, fm_ship_rule_one's push and merge rule, the
 # working, done and blocked status lines, the inbox acknowledgement, and the
 # machine-read Delivery contract, Ship branch, and Base branch lines; it drops
@@ -750,6 +755,18 @@ PLAN_FENCE_LEN=$(printf '%s\n' "$PLAN_BODY" | awk '
   END { print (max >= 3 ? max + 1 : 3) }')
 PLAN_FENCE=$(printf '%*s' "$PLAN_FENCE_LEN" '' | tr ' ' '`')
 DONE_COMMAND_BLOCK=$(printf '%s\n' "$DONE_COMMAND" | sed 's/^/    /')
+# Rule 3's lookup lines (header above), present only when the project's clone
+# ships the kg command or the ai-map master map.
+QWEN_PROJECT="${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}/$REPO"
+QWEN_LOOKUP=
+if [ -f "$QWEN_PROJECT/scripts/kg-query.mjs" ]; then
+  QWEN_LOOKUP="
+   Before you read a file the plan does not name, look it up with \`node scripts/kg-query.mjs symbol <name>\` or \`node scripts/kg-query.mjs search \"<what it does>\"\`; each result names \`<repo>/<path>:<start>-<end>\`, so read only those lines of \`<path>\`."
+fi
+if [ -f "$QWEN_PROJECT/ai-map/master_map.md" ]; then
+  QWEN_LOOKUP="$QWEN_LOOKUP
+   For a feature whose files the plan does not list, read \`ai-map/master_map.md\`, then only the \`ai-map/features/<feature>/map.md\` it points to."
+fi
 cat > "$BRIEF" <<EOF
 You are a worker agent run by firstmate. Work alone; do not wait for a human.
 $QWEN_SETUP
@@ -774,7 +791,7 @@ $PLAN_FENCE
    Otherwise run \`echo "working [at=\$(date +%s)]: started" >> $STATUS_FILE\` before you read anything.
 2. Write only these files, by their paths relative to the current directory: $QWEN_FILES.
    Every other path is read-only, including every path that starts with \`/\`; the reporting commands below are the only writes outside this directory.
-3. Read each file at most once.
+3. Read each file at most once.$QWEN_LOOKUP
 4. Never open a whole file that the plan calls large, minified or one line long: no \`cat\`, \`head\`, \`read_file\`, or \`grep\` without \`-o\` on it.
    If you must look, run exactly \`grep -o '<short pattern>' <file> | head -5\`.
 5. Edit by re-reading the file and rewriting it whole with \`write_file\`.

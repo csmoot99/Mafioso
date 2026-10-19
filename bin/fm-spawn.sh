@@ -5230,8 +5230,28 @@ EOF
       q_submit=$(json_escape "$busy_cmd_prefix busy $busy_suffix --event user-prompt-submit >/dev/null 2>&1 || true")
       q_stop=$(json_escape "touch $(shell_quote "$TURNEND"); $busy_cmd_prefix idle $busy_suffix --event stop >/dev/null 2>&1 || true")
       q_sessionend=$(json_escape "$busy_cmd_prefix idle $busy_suffix --event session-end >/dev/null 2>&1 || true")
+      # A project kg server (`kg` in the worktree's .mcp.json) is re-declared
+      # here: qwen gates every .mcp.json server behind a per-path approval
+      # (`qwen mcp list` reads "Pending approval", and outside -y the TUI
+      # opens an approval dialog at startup), while a server in this system
+      # layer is never gated and replaces the project's entry by name (qwen
+      # 0.25.2). The copy drops `type` as qwen's .mcp.json reader does. A
+      # qwen-shaped brief on a project that ships scripts/kg-query.mjs tells
+      # the worker to query the kg through that command (bin/fm-brief.sh), so
+      # its server is also excluded: qwen defers MCP tools, so one lookup
+      # through the server takes a tool_search turn more than the command, and
+      # its tool listing adds 466 tokens to every request
+      # (docs/verification/runtime-backends.md).
+      q_mcp=
+      q_kg=$(jq -c '.mcpServers.kg | objects | select(has("command")) | del(.type)' "$WT/.mcp.json" 2>/dev/null) || q_kg=
+      if [ -n "$q_kg" ]; then
+        q_mcp="\"mcpServers\":{\"kg\":$q_kg},"
+        if [ -f "$WT/scripts/kg-query.mjs" ] && fm_brief_is_qwen_shape "$SOURCE_BRIEF"; then
+          q_mcp="$q_mcp\"mcp\":{\"excluded\":[\"kg\"]},"
+        fi
+      fi
       cat >"$STATE_REAL/$ID.qwen-settings.json" <<EOF
-{"\$version":4,"security":{"folderTrust":{"enabled":false}},"ui":{"enableFollowupSuggestions":false,"enableUserFeedback":false},"memory":{"enableManagedAutoMemory":false},"model":{"generationConfig":{"contextWindowSize":65536}},"context":{"autoCompactThreshold":0.6},"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"$q_submit"}]}],"Stop":[{"hooks":[{"type":"command","command":"$q_stop"}]}],"SessionEnd":[{"hooks":[{"type":"command","command":"$q_sessionend"}]}]}}
+{"\$version":4,"security":{"folderTrust":{"enabled":false}},"ui":{"enableFollowupSuggestions":false,"enableUserFeedback":false},"memory":{"enableManagedAutoMemory":false},"model":{"generationConfig":{"contextWindowSize":65536}},"context":{"autoCompactThreshold":0.6},${q_mcp}"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"$q_submit"}]}],"Stop":[{"hooks":[{"type":"command","command":"$q_stop"}]}],"SessionEnd":[{"hooks":[{"type":"command","command":"$q_sessionend"}]}]}}
 EOF
     fi
     ;;

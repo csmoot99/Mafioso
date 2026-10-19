@@ -545,6 +545,57 @@ test_qwen_hooks_stale_incarnation_harmless() {
   pass "qwen hook events from a superseded incarnation are rejected without breaking the hook"
 }
 
+# A project kg server rides the same settings file: re-declared in its system
+# layer, which qwen never holds behind its .mcp.json approval, and excluded for
+# a qwen-shaped brief, which queries the kg through scripts/kg-query.mjs.
+test_qwen_settings_carry_the_project_kg_server() {
+  local rec id out status settings shape
+  for shape in standard qwen-shape no-kg; do
+    id=busy-qw-kg-$shape
+    rec=$(make_spawn_case "qwen-kg-$shape" qwen "$id")
+    read_case_record "$rec"
+    if [ "$shape" != no-kg ]; then
+      # The spawn starts the copy from origin, so the kg ships in the project.
+      mkdir -p "$PROJ_DIR/scripts"
+      : > "$PROJ_DIR/scripts/kg-query.mjs"
+      printf '%s\n' '{"mcpServers":{"kg":{"type":"stdio","command":"node","args":["scripts/kg-mcp-bootstrap.mjs"],"env":{}},"other":{"command":"other-server"}}}' > "$PROJ_DIR/.mcp.json"
+      git -C "$PROJ_DIR" add .mcp.json scripts/kg-query.mjs
+      git -C "$PROJ_DIR" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit --quiet -m 'add the kg'
+      git -C "$PROJ_DIR" push --quiet origin HEAD
+    fi
+    if [ "$shape" = qwen-shape ]; then
+      rm -f "$HOME_DIR/data/$id/brief.md"
+      printf 'Write x.txt.\n' > "$CASE_DIR/plan.md"
+      FM_HOME="$HOME_DIR" "$ROOT/bin/fm-brief.sh" "$id" project --mode direct-PR --harness qwen \
+        --plan "$CASE_DIR/plan.md" --files x.txt --done-command 'test -s x.txt' >/dev/null \
+        || fail "could not scaffold the qwen-shaped brief for $id"
+      sed -i.bak -e 's/^{TASK}$/Write x.txt./' -e 's/^{FIRSTMATE_SPEC}$/Nothing else./' "$HOME_DIR/data/$id/brief.md"
+      out=$(fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --mode direct-PR --yolo off)
+    else
+      out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR")
+    fi
+    status=$?
+    expect_code 0 "$status" "qwen $shape spawn should succeed: $out"
+    settings="$HOME_DIR/state/$id.qwen-settings.json"
+    jq -e . "$settings" >/dev/null || fail "qwen $shape settings are not valid JSON"
+    case "$shape" in
+      no-kg)
+        [ "$(jq -c '[.mcpServers, .mcp]' "$settings")" = '[null,null]' ] \
+          || fail "a project without a kg server must leave qwen's MCP settings alone"
+        continue ;;
+    esac
+    [ "$(jq -c '.mcpServers' "$settings")" = '{"kg":{"command":"node","args":["scripts/kg-mcp-bootstrap.mjs"],"env":{}}}' ] \
+      || fail "qwen $shape settings must re-declare exactly the project's kg server, without its type"
+    if [ "$shape" = qwen-shape ]; then
+      [ "$(jq -c '.mcp.excluded' "$settings")" = '["kg"]' ] \
+        || fail "a qwen-shaped brief must keep the kg server's tool definitions out of every request"
+    else
+      [ "$(jq -c '.mcp' "$settings")" = null ] || fail "a standard brief must keep the kg server connected"
+    fi
+  done
+  pass "qwen settings re-declare a project kg server so it is never held for approval, and exclude it for a qwen-shaped brief"
+}
+
 test_raw_qwen_launch_has_no_semantic_wiring() {
   local rec id=busy-qw-raw out state
   rec=$(make_spawn_case qwen-raw qwen "$id")
@@ -600,6 +651,7 @@ test_raw_gemini_launch_has_no_semantic_wiring
 test_gemini_is_refused_as_a_secondmate
 test_qwen_hooks_semantic_lifecycle
 test_qwen_hooks_stale_incarnation_harmless
+test_qwen_settings_carry_the_project_kg_server
 test_raw_qwen_launch_has_no_semantic_wiring
 test_qwen_is_refused_as_a_secondmate
 test_codex_hooks_semantic_lifecycle
