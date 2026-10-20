@@ -1747,7 +1747,9 @@ test_qwen_combine_renders_the_trial_merge() {
     --combine "$file" --done-command 'make test' --base-branch feature/hub) || fail "fm-brief.sh --combine refused a valid combine: $out"
   brief="$home/data/$id/brief.md"
   [ -f "$home/data/$id/combine.sh" ] || fail "the combine scaffold did not write its combine.sh"
-  ! (. "$ROOT/bin/fm-dod-lib.sh" && fm_brief_is_qwen_task_kind "$brief") || fail "a qwen combine brief reads as a task-kind brief, so its launch would be closed"
+  # shellcheck source=bin/fm-dod-lib.sh
+  . "$ROOT/bin/fm-dod-lib.sh"
+  ! fm_brief_is_qwen_task_kind "$brief" || fail "a qwen combine brief reads as a task-kind brief, so its launch would be closed"
   for line in 'Brief shape: qwen' 'Delivery contract: mode=direct-PR' "Ship branch: fm/$id" 'Base branch: feature/hub' '{TASK}' '{FIRSTMATE_SPEC}' \
     '1. Fold https://github.com/o/r/pull/11 (head `1111111`). Run:' \
     "       bash '$home/data/$id/combine.sh' fold 1" '   It merges cleanly.' \
@@ -1839,7 +1841,9 @@ test_qwen_kind_points_at_the_setup_file_and_renders_the_edits() {
     --kind text-edit --edits "$file" --done-command 'npm run check:docs' --base-branch feature/hub) || fail "fm-brief.sh --kind refused a valid edits file: $out"
   brief="$home/data/$id/brief.md" es="$home/data/$id/edit.sh"
   [ -f "$es" ] || fail "the kind scaffold did not write its edit.sh"
-  (. "$ROOT/bin/fm-dod-lib.sh" && fm_brief_is_qwen_shape "$brief" && fm_brief_is_qwen_task_kind "$brief") \
+  # shellcheck source=bin/fm-dod-lib.sh
+  . "$ROOT/bin/fm-dod-lib.sh"
+  { fm_brief_is_qwen_shape "$brief" && fm_brief_is_qwen_task_kind "$brief"; } \
     || fail "the qwen kind brief does not read as a qwen task-kind brief, so its launch would not be closed"
   # shellcheck disable=SC2016 # single quotes are deliberate: the backticks must stay literal
   for line in 'Brief shape: qwen' 'Delivery contract: mode=direct-PR' "Ship branch: fm/$id" 'Base branch: feature/hub' '{TASK}' '{FIRSTMATE_SPEC}' \
