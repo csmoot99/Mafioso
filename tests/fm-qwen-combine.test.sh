@@ -25,6 +25,7 @@
 #      blocked line and waits.
 set -u
 
+# shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 TMP_ROOT=$(fm_test_tmproot fm-qwen-combine)
@@ -128,7 +129,7 @@ test_a_combine_folds_resolves_and_publishes() {
   out=$(step commit 3); [ "$?" -eq 1 ] || fail "commit 3 concluded a merge with a line neither side nor the step has"
   assert_contains "$out" "a.txt has a line that neither side has and step 3 does not give: two-99" "commit 3 did not name the invented line"
   for lost in 'two-12\ntwo-13\nthree' 'one\ntwo-12\ntwo-13' 'one\nNotes on a\ntwo-12\ntwo-13\nthree\none'; do
-    printf "$lost\n" > "$WT/a.txt"
+    printf '%b\n' "$lost" > "$WT/a.txt"
     out=$(step commit 3); [ "$?" -eq 1 ] || fail "commit 3 concluded a merge that changed the lines outside its conflict block: $lost"
     assert_contains "$out" "a.txt changed a line outside its conflict blocks" "commit 3 did not name the lost context"
   done
