@@ -10,8 +10,9 @@
 #                working line
 #   commit <n>   conclude step n's stopped merge once no conflict marker is left
 #                in its conflicted files, every line the resolution wrote that
-#                neither side has is one step n's note gives, and nothing
-#                outside those files changed
+#                neither side has is one step n's note gives, every line outside
+#                the conflict blocks fold saved is kept whole and in order, and
+#                nothing outside those files changed
 #   publish      check every fold, run the gate, push, open the PR or find the
 #                one already open for BRANCH, and write the done line with the
 #                URL gh-axi printed
@@ -69,6 +70,28 @@ sides() {
     m("<<<<<<<") { b = s = 1; next } b && m("|||||||") { s = 0; next } b && m("=======") { s = 1; next }
     b && m(">>>>>>>") { b = s = 0; next } s' "$1" | trim
 }
+# kept <saved> <file>: fail, printing the first line outside the conflict blocks
+# of <saved>, the conflicted file as git left it, that <file> no longer keeps; the
+# lines before, between and after the blocks must stay whole and in order, and
+# only the blocks may be replaced.
+kept() {
+  awk 'function m(c) { return substr($0, 1, 7) == c && (length($0) == 7 || substr($0, 8, 1) ~ /[ \t]/) }
+    function miss(l) { print l; exit 1 }
+    BEGIN { k = 0 }
+    NR == FNR { if (m("<<<<<<<")) { b = 1; k++ } else if (b) { if (m(">>>>>>>")) b = 0 } else seg[k, ++len[k]] = $0; next }
+    { r[++nr] = $0 }
+    END {
+      for (j = 1; j <= len[0]; j++) if (j > nr || r[j] != seg[0, j]) miss(seg[0, j])
+      if (k == 0) { if (nr > len[0]) miss(r[len[0] + 1]); exit }
+      p = len[0]; e = nr - len[k]
+      for (j = 1; j <= len[k]; j++) if (e < p || r[e + j] != seg[k, j]) miss(seg[k, j])
+      for (s = 1; s < k; s++) {
+        for (q = p; q + len[s] <= e; q++) { for (j = 1; j <= len[s] && r[q + j] == seg[s, j]; j++); if (j > len[s]) break }
+        if (q + len[s] > e) miss(seg[s, 1])
+        p = q + len[s]
+      }
+    }' "$1" "$2"
+}
 trim() { sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep .; }
 # unsaid: the first input line step n's note never names.
 unsaid() {
@@ -87,7 +110,8 @@ case $cmd in
     case $n in '' | *[!0-9]*) refuse "usage: $cmd <step number>" ;; esac
     [ "$n" -ge 1 ] && [ "$n" -le "$N" ] || refuse "there is no step $n"
     read -r -a files <<<"${EXPECT[$n]}"
-    want=$(printf '%s\n' ${files[@]+"${files[@]}"} | sort -u | tr '\n' ' ' | sed 's/ $//') ;;
+    want=$(printf '%s\n' ${files[@]+"${files[@]}"} | sort -u | tr '\n' ' ' | sed 's/ $//')
+    saved=$(git rev-parse --git-path "fm-combine/$n") ;;
   publish) ;;
   *) refuse "usage: fold <n> | commit <n> | publish" ;;
 esac
@@ -110,6 +134,9 @@ case $cmd in
       for f in "${files[@]}"; do
         [ ! -f "$f" ] || { odd=$(sides "$f" | unsaid); [ -z "$odd" ]; } || stop "a conflict side in $f is not what this step says: $odd"
       done
+      for f in "${files[@]}"; do
+        [ ! -f "$f" ] || { mkdir -p "$(dirname "$saved/$f")" && cp -- "$f" "$saved/$f"; }
+      done
       printf 'Step %s stopped on a conflict in %s, as the step says. Resolve it as the step says, then run: bash %q commit %s\n' "$n" "$got" "$0" "$n"
     elif git merge-base --is-ancestor "${HEADS[$n]}" HEAD 2>/dev/null; then
       [ -z "$want" ] || stop "it merged cleanly, but this step expects a conflict in $want"
@@ -125,6 +152,8 @@ case $cmd in
     for f in "${files[@]}"; do
       [ ! -f "$f" ] || { odd=$(grep -vxF -f <({ git show ":2:$f"; git show ":3:$f"; } 2>/dev/null) -- "$f" | trim | unsaid); [ -z "$odd" ]; } \
         || refuse "$f has a line that neither side has and step $n does not give: $odd"
+      [ ! -f "$f" ] || [ ! -f "$saved/$f" ] || lost=$(kept "$saved/$f" "$f") \
+        || refuse "$f changed a line outside its conflict blocks; keep every line outside them as git left it: $lost"
     done
     other=$({ git diff --name-only; git ls-files --others --exclude-standard; } | grep -vxF -f <(printf '%s\n' "${files[@]}") | sort -u | tr '\n' ' ')
     [ -z "$other" ] || refuse "files outside this step's conflict changed: $other"

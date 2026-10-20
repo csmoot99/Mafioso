@@ -8,7 +8,8 @@
 #   1. A fold merges the exact head with its merge message, the first fold
 #      writes the working line, and a conflicted step commits only once no
 #      git conflict-marker line is left, a longer setext underline not being
-#      one, no resolved line is in neither side nor the step's note, and
+#      one, no resolved line is in neither side nor the step's note, every
+#      line outside the conflict blocks is kept whole and in order, and
 #      nothing outside its conflicted files changed; a deleted conflicted file
 #      hides no marker left in another.
 #   2. Only publish writes the done line, after the gate passed, the branch
@@ -125,7 +126,12 @@ test_a_combine_folds_resolves_and_publishes() {
   printf 'one\ntwo-12\ntwo-99\nthree\n' > "$WT/a.txt"
   out=$(step commit 3); [ "$?" -eq 1 ] || fail "commit 3 concluded a merge with a line neither side nor the step has"
   assert_contains "$out" "a.txt has a line that neither side has and step 3 does not give: two-99" "commit 3 did not name the invented line"
-  printf 'Notes on a\n==========\none\ntwo-12\ntwo-13\nthree\n' > "$WT/a.txt"
+  for lost in 'two-12\ntwo-13\nthree' 'one\ntwo-12\ntwo-13' 'one\nNotes on a\ntwo-12\ntwo-13\nthree\none'; do
+    printf "$lost\n" > "$WT/a.txt"
+    out=$(step commit 3); [ "$?" -eq 1 ] || fail "commit 3 concluded a merge that changed the lines outside its conflict block: $lost"
+    assert_contains "$out" "a.txt changed a line outside its conflict blocks" "commit 3 did not name the lost context"
+  done
+  printf 'one\nNotes on a\n==========\ntwo-12\ntwo-13\nthree\n' > "$WT/a.txt"
   printf 'stray\n' > "$WT/c.txt"
   out=$(step commit 3); [ "$?" -eq 1 ] || fail "commit 3 committed a file outside its conflict"
   assert_contains "$out" "files outside this step's conflict changed: c.txt" "commit 3 did not name the outside file"
@@ -162,7 +168,7 @@ test_a_combine_folds_resolves_and_publishes() {
   [ "$(grep -c '^done \[at=[0-9]*\]: PR https://github.com/o/r/pull/20$' "$STATUS")" -eq 2 ] \
     || fail "a repeated publish did not report the PR already open"
   ! grep -q '^needs-decision\|^blocked' "$STATUS" || fail "a clean combine wrote a decision or blocker"
-  pass "fm-qwen-combine.sh: folds each exact head, commits a resolved conflict past a setext underline, writes done only after a real PR, and publishes once"
+  pass "fm-qwen-combine.sh: folds each exact head, commits a resolved conflict past a setext underline only with its context kept, writes done only after a real PR, and publishes once"
 }
 
 test_an_unexpected_conflict_stops_and_waits() {
