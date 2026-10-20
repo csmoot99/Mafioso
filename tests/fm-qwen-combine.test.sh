@@ -8,11 +8,13 @@
 #   1. A fold merges the exact head with its merge message, the first fold
 #      writes the working line, and a conflicted step commits only once no
 #      git conflict-marker line is left, a longer setext underline not being
-#      one, and nothing outside its conflicted files changed.
+#      one, and nothing outside its conflicted files changed; a deleted
+#      conflicted file hides no marker left in another.
 #   2. Only publish writes the done line, after the gate passed, the branch
 #      was pushed, and gh-axi printed a PR URL, which the line carries; a
 #      repeated publish finds the PR already open for the branch instead of
-#      opening another.
+#      opening another. A tracked change blocks publish; an untracked gate
+#      artifact or a conflicted file a later fold deleted does not.
 #   3. A conflict the step did not expect, a moved base, and the worker's own
 #      stop append needs-decision, reset the copy to the base, and leave every
 #      later call printing only WAIT; nothing is published after a stop.
@@ -25,28 +27,30 @@ set -u
 TMP_ROOT=$(fm_test_tmproot fm-qwen-combine)
 fm_git_identity
 
+# combine_repo <name>: a project whose PR heads fork from one base, as the
+# header describes. Sets REPO, WT, HOME_DIR, ID, BASE, H11, H12 and H13.
+combine_repo() {
+  local name=$1
+  REPO="$TMP_ROOT/$name-repo" WT="$TMP_ROOT/$name-wt" HOME_DIR="$TMP_ROOT/$name-home" ID="qc-$name"
+  fm_git_init_commit "$REPO"
+  printf 'one\ntwo\nthree\n' > "$REPO/a.txt"
+  git -C "$REPO" add a.txt && git -C "$REPO" commit -qm base
+  BASE=$(git -C "$REPO" rev-parse HEAD)
+  git -C "$REPO" checkout -qb pr11 && printf 'b\n' > "$REPO/b.txt" && git -C "$REPO" add b.txt && git -C "$REPO" commit -qm b
+  H11=$(git -C "$REPO" rev-parse HEAD)
+  git -C "$REPO" checkout -qb pr12 main && printf 'one\ntwo-12\nthree\n' > "$REPO/a.txt" && git -C "$REPO" commit -qam 12
+  H12=$(git -C "$REPO" rev-parse HEAD)
+  git -C "$REPO" checkout -qb pr13 main && printf 'one\ntwo-13\nthree\n' > "$REPO/a.txt" && git -C "$REPO" commit -qam 13
+  H13=$(git -C "$REPO" rev-parse HEAD)
+  git -C "$REPO" checkout -q main
+}
+
 # combine_fixture <name> <step 2 conflicts> <step 3 conflicts> [fm-brief args...]:
-# a home, a project copy on its task branch, and a combine of #11, #12 and #13
-# whose steps 2 and 3 expect the given conflicted files ("-" for a clean step).
-# Sets HOME_DIR, ID, WT, CS, STATUS, BASE, H11, H12, H13, FAKEBIN, GH_ARGS and
-# GATE_FLAG.
+# combine_repo, then a combine of #11, #12 and #13 whose steps 2 and 3 expect
+# the given conflicted files ("-" for a clean step), set up by combine_brief.
 combine_fixture() {
-  local name=$1 repo file k paths note
-  repo="$TMP_ROOT/$name-repo" WT="$TMP_ROOT/$name-wt" HOME_DIR="$TMP_ROOT/$name-home" ID="qc-$name"
-  fm_git_init_commit "$repo"
-  printf 'one\ntwo\nthree\n' > "$repo/a.txt"
-  git -C "$repo" add a.txt && git -C "$repo" commit -qm base
-  BASE=$(git -C "$repo" rev-parse HEAD)
-  git -C "$repo" checkout -qb pr11 && printf 'b\n' > "$repo/b.txt" && git -C "$repo" add b.txt && git -C "$repo" commit -qm b
-  H11=$(git -C "$repo" rev-parse HEAD)
-  git -C "$repo" checkout -qb pr12 main && printf 'one\ntwo-12\nthree\n' > "$repo/a.txt" && git -C "$repo" commit -qam 12
-  H12=$(git -C "$repo" rev-parse HEAD)
-  git -C "$repo" checkout -qb pr13 main && printf 'one\ntwo-13\nthree\n' > "$repo/a.txt" && git -C "$repo" commit -qam 13
-  H13=$(git -C "$repo" rev-parse HEAD)
-  git -C "$repo" checkout -q main
-  fm_git_add_origin "$repo" "$repo.origin.git"
-  git -C "$repo" worktree add --quiet -b "fm/$ID" "$WT" main
-  mkdir -p "$HOME_DIR/data" "$HOME_DIR/state"
+  local name=$1 file k paths note
+  combine_repo "$name"
   file="$TMP_ROOT/$name.combine"
   {
     printf 'title Combine #11, #12 and #13\nbase %s\n' "$BASE"
@@ -60,9 +64,20 @@ combine_fixture() {
       fi
     done
   } > "$file"
+  combine_brief "$name" "$file" "${@:4}"
+}
+
+# combine_brief <name> <combine file> [fm-brief args...]: after combine_repo,
+# the copy on its task branch, the combine's brief and combine.sh, and a fake
+# forge. Sets CS, STATUS, FAKEBIN, GH_ARGS and GATE_FLAG.
+combine_brief() {
+  local name=$1 file=$2
+  fm_git_add_origin "$REPO" "$REPO.origin.git"
+  git -C "$REPO" worktree add --quiet -b "fm/$ID" "$WT" main
+  mkdir -p "$HOME_DIR/data" "$HOME_DIR/state"
   GATE_FLAG="$TMP_ROOT/$name-gate-fails"
   FM_HOME="$HOME_DIR" "$ROOT/bin/fm-brief.sh" "$ID" r --mode direct-PR --harness qwen \
-    --combine "$file" --done-command "test ! -e '$GATE_FLAG'" "${@:4}" >/dev/null || fail "fm-brief.sh --combine refused the $name fixture"
+    --combine "$file" --done-command "test ! -e '$GATE_FLAG'" "${@:3}" >/dev/null || fail "fm-brief.sh --combine refused the $name fixture"
   CS="$HOME_DIR/data/$ID/combine.sh" STATUS="$HOME_DIR/state/$ID.status"
   FAKEBIN=$(fm_fakebin "$TMP_ROOT/$name") GH_ARGS="$TMP_ROOT/$name-gh.args"
   # A forge holding one PR at most: pr create opens #20 once, and pr list finds
@@ -199,6 +214,50 @@ test_a_call_outside_its_copy_is_blocked() {
   pass "fm-qwen-combine.sh: a call outside its copy writes the blocked line and waits, and the helper never runs directly"
 }
 
+test_a_deleted_conflicted_file_holds_no_markers() {
+  local out file
+  combine_repo gone
+  # #12 and #13 also add d.txt with different lines, so #13 stops on a conflict
+  # in a.txt and d.txt; #14, cut from #13, deletes d.txt.
+  git -C "$REPO" checkout -q pr12 && printf 'd-12\n' > "$REPO/d.txt" && git -C "$REPO" add d.txt && git -C "$REPO" commit -qm d12
+  H12=$(git -C "$REPO" rev-parse HEAD)
+  git -C "$REPO" checkout -q pr13 && printf 'd-13\n' > "$REPO/d.txt" && git -C "$REPO" add d.txt && git -C "$REPO" commit -qm d13
+  H13=$(git -C "$REPO" rev-parse HEAD)
+  git -C "$REPO" checkout -qb pr14 && git -C "$REPO" rm -q d.txt && git -C "$REPO" commit -qm 14
+  H14=$(git -C "$REPO" rev-parse HEAD)
+  git -C "$REPO" checkout -q main
+  file="$TMP_ROOT/gone.combine"
+  {
+    printf 'title Combine #11 to #14\nbase %s\n' "$BASE"
+    printf 'fold https://github.com/o/r/pull/11 pr11 %s\n' "$H11"
+    printf 'fold https://github.com/o/r/pull/12 pr12 %s\n' "$H12"
+    printf 'fold https://github.com/o/r/pull/13 pr13 %s a.txt d.txt\n   - Keep both lines of a.txt and the d.txt of #13.\n' "$H13"
+    printf 'fold https://github.com/o/r/pull/14 pr14 %s\n' "$H14"
+  } > "$file"
+  combine_brief gone "$file"
+  { step fold 1 >/dev/null && step fold 2 >/dev/null; } || fail "the clean folds failed"
+  out=$(step fold 3) || fail "fold 3 failed: $out"
+  assert_contains "$out" "Step 3 stopped on a conflict in a.txt d.txt, as the step says" "fold 3 did not report its expected conflicts"
+  rm "$WT/d.txt"
+  out=$(step commit 3); [ "$?" -eq 1 ] || fail "commit 3 concluded a merge with markers left in a.txt beside a deleted d.txt"
+  assert_contains "$out" "a.txt:" "commit 3 did not show the marker lines left in a.txt"
+  printf 'one\ntwo-12\ntwo-13\nthree\n' > "$WT/a.txt"
+  printf 'd-13\n' > "$WT/d.txt"
+  out=$(step commit 3) || fail "commit 3 failed once resolved: $out"
+  out=$(step fold 4) || fail "fold 4 failed: $out"
+  assert_contains "$out" "Step 4 merged cleanly" "fold 4 did not merge cleanly"
+  [ ! -e "$WT/d.txt" ] || fail "fold 4 did not delete d.txt"
+  printf 'one\n' > "$WT/a.txt"
+  out=$(step publish); [ "$?" -eq 1 ] || fail "publish ran with a tracked file changed"
+  assert_contains "$out" "uncommitted changes: " "publish did not name the tracked change"
+  git -C "$WT" checkout -q -- a.txt
+  printf 'artifact\n' > "$WT/gate.out"
+  out=$(step publish) || fail "publish refused after a later fold deleted a conflicted file, or beside an untracked gate artifact: $out"
+  grep -q '^done \[at=[0-9]*\]: PR https://github.com/o/r/pull/20$' "$STATUS" || fail "publish did not write the done line"
+  pass "fm-qwen-combine.sh: a deleted conflicted file hides no markers left in another, and neither a later fold deleting one nor an untracked gate artifact blocks publish"
+}
+
 test_a_combine_folds_resolves_and_publishes
+test_a_deleted_conflicted_file_holds_no_markers
 test_an_unexpected_conflict_stops_and_waits
 test_a_call_outside_its_copy_is_blocked

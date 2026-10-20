@@ -51,8 +51,15 @@ stop() {
 }
 unmerged() { git diff --name-only --diff-filter=U | sort -u | tr '\n' ' ' | sed 's/ $//'; }
 # A marker line is git's: seven marker characters, then whitespace or the line's
-# end, so a longer setext or reStructuredText underline is not one.
-markers() { [ "$#" -eq 0 ] || ! grep -nE '^(<<<<<<<|=======|>>>>>>>|[|]{7})([[:space:]]|$)' -- "$@"; }
+# end, so a longer setext or reStructuredText underline is not one. A file the
+# resolution or a later fold deleted holds none.
+markers() {
+  local f left=0
+  for f in "$@"; do
+    [ ! -f "$f" ] || ! grep -HnE '^(<<<<<<<|=======|>>>>>>>|[|]{7})([[:space:]]|$)' -- "$f" || left=1
+  done
+  return "$left"
+}
 
 [ ! -f "$MARK" ] || finished "$(cat "$MARK")"
 if [ "$(pwd -P)" != "$(git rev-parse --show-toplevel 2>/dev/null)" ] || [ "$(git branch --show-current)" != "$BRANCH" ]; then
@@ -108,7 +115,7 @@ case $cmd in
     git commit -q --no-edit && echo "Step $n committed. Go on with the next step." ;;
   publish)
     ! merging || refuse "a merge is still stopped: resolve it and run its step's commit command"
-    [ -z "$(git status --porcelain)" ] || refuse "uncommitted changes: $(git status --porcelain | tr '\n' ' ')"
+    [ -z "$(git status --porcelain --untracked-files=no)" ] || refuse "uncommitted changes: $(git status --porcelain --untracked-files=no | tr '\n' ' ')"
     all=
     for ((i = 1; i <= N; i++)); do
       git merge-base --is-ancestor "${HEADS[$i]}" HEAD || refuse "step $i is not done: run its fold command"
