@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+# The steps of a qwen combine: a qwen worker folding approved PRs into one
+# combined PR (.agents/skills/combined-merge/SKILL.md). bin/fm-brief.sh
+# --harness qwen --combine writes data/<task-id>/combine.sh, which assigns this
+# combine's values and then sources this file; the worker runs only that file,
+# with one of:
+#   fold <n>     merge step n's exact head with `git merge --no-ff` and its
+#                merge message; the first fold also checks the copy starts at
+#                the base commit firstmate's trial merge used and writes the
+#                working line
+#   commit <n>   conclude step n's stopped merge once no conflict marker is left
+#                in its conflicted files and nothing outside them changed
+#   stop <n> <what each side wants>
+#                the worker's own stop, when a conflict block's sides are not
+#                what its step says
+#   publish      check every fold, run the gate, push, open the PR, and write
+#                the done line with the URL gh-axi printed
+# A fold whose conflicted files differ from the set firstmate expected (a clean
+# step that stops, a conflicted step that merges cleanly, any other file), a
+# merge that fails without a conflict, a base that moved, and the worker's own
+# stop all stop the combine: the needs-decision line is appended, the copy is
+# reset to the base commit so it holds no unlanded commit, the stop is recorded
+# in MARK, and every later call only repeats the WAIT text, which a qwen worker
+# reads as waiting for firstmate rather than as an error to fix. Only publish
+# writes the done line, and only after gh-axi printed a PR URL. Every call first
+# checks the copy is the top of its own worktree on BRANCH, else it appends the
+# blocked line and waits. A refusal exits 1 and names what to fix.
+# Inputs, assigned by combine.sh: STATUS (the task's status file), BRANCH, BASE
+# (full commit), PR_BASE (the PR's base branch, empty for the default), MARK
+# (the stop record, beside combine.sh), GATE (the command that must exit 0),
+# TITLE, BODY, and the arrays HEADS, MSGS and EXPECT, indexed from 1 by step,
+# holding each step's full head, merge message, and space-separated expected
+# conflicted files (empty for a clean step).
+# Never run this file directly.
+# shellcheck disable=SC2154 # combine.sh assigns every input before sourcing this file.
+set -u
+
+[ "${BASH_SOURCE[0]}" != "$0" ] || { echo "error: $0 is sourced by a data/<task-id>/combine.sh that bin/fm-brief.sh --combine writes; never run it directly" >&2; exit 2; }
+
+N=$((${#HEADS[@]} - 1))
+refuse() { printf 'refused: %s\n' "$*"; exit 1; }
+halt() { printf 'WAIT: %s, and firstmate has been told. Reply with exactly: waiting for firstmate. Then call no more tools; the answer arrives in your terminal.\n' "$1"; exit 0; }
+finished() { halt "step $1 needs firstmate's answer before anything else can run"; }
+merging() { git rev-parse -q --verify MERGE_HEAD >/dev/null; }
+stop() {
+  echo "needs-decision [at=$(date +%s)]: combine step $n stopped: $1; the copy is reset to ${BASE:0:7}" >> "$STATUS"
+  git reset -q --hard "$BASE" 2>/dev/null || ! merging || git merge --abort
+  echo "$n" > "$MARK"
+  finished "$n"
+}
+unmerged() { git diff --name-only --diff-filter=U | sort -u | tr '\n' ' ' | sed 's/ $//'; }
+markers() { [ "$#" -eq 0 ] || ! grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- "$@"; }
+
+[ ! -f "$MARK" ] || finished "$(cat "$MARK")"
+if [ "$(pwd -P)" != "$(git rev-parse --show-toplevel 2>/dev/null)" ] || [ "$(git branch --show-current)" != "$BRANCH" ]; then
+  echo "blocked [at=$(date +%s)]: launched in primary checkout, not an isolated worktree" >> "$STATUS"
+  halt "this is not your own copy on the branch $BRANCH"
+fi
+cmd=${1:-} n=${2:-}
+case $cmd in
+  fold | commit | stop)
+    case $n in '' | *[!0-9]*) refuse "usage: $cmd <step number>" ;; esac
+    [ "$n" -ge 1 ] && [ "$n" -le "$N" ] || refuse "there is no step $n"
+    read -r -a files <<<"${EXPECT[$n]}"
+    want=$(printf '%s\n' ${files[@]+"${files[@]}"} | sort -u | tr '\n' ' ' | sed 's/ $//') ;;
+  publish) ;;
+  *) refuse "usage: fold <n> | commit <n> | stop <n> <what each side wants> | publish" ;;
+esac
+case $cmd in
+  fold)
+    for ((i = 1; i < n; i++)); do
+      git merge-base --is-ancestor "${HEADS[$i]}" HEAD || refuse "step $i is not done yet"
+    done
+    ! merging || refuse "a merge is still stopped: finish its step with its commit command"
+    if git merge-base --is-ancestor "${HEADS[$n]}" HEAD 2>/dev/null; then echo "Step $n is already folded. Go on with the next step."; exit 0; fi
+    if [ "$n" = 1 ]; then
+      [ "$(git rev-parse HEAD)" = "$BASE" ] || stop "the copy starts at $(git rev-parse --short HEAD), not at ${BASE:0:7}, the base firstmate's trial merge used"
+      echo "working [at=$(date +%s)]: started" >> "$STATUS"
+    fi
+    out=$(git merge --no-ff -m "${MSGS[$n]}" "${HEADS[$n]}" 2>&1)
+    got=$(unmerged)
+    if merging && [ -n "$got" ]; then
+      [ -n "$want" ] || stop "git stopped on a conflict in $got, but this step was to merge cleanly"
+      [ "$got" = "$want" ] || stop "git stopped on a conflict in $got, but this step expects one in $want"
+      printf 'Step %s stopped on a conflict in %s, as the step says. Resolve it as the step says, then run: bash %q commit %s\n' "$n" "$got" "$0" "$n"
+    elif git merge-base --is-ancestor "${HEADS[$n]}" HEAD 2>/dev/null; then
+      [ -z "$want" ] || stop "it merged cleanly, but this step expects a conflict in $want"
+      echo "Step $n merged cleanly. Go on with the next step."
+    else
+      stop "git merge failed without a conflict: $(printf '%s\n' "$out" | grep -m1 .)"
+    fi ;;
+  stop)
+    shift 2
+    [ -n "$*" ] || refuse "usage: stop <n> <what each side wants>"
+    stop "$*" ;;
+  commit)
+    merging || refuse "no merge is stopped: run this step's fold command first"
+    [ "$(git rev-parse MERGE_HEAD)" = "${HEADS[$n]}" ] || refuse "the stopped merge is not step $n's"
+    [ -n "$want" ] || refuse "step $n has no conflict to commit"
+    markers "${files[@]}" || refuse "conflict markers are left in the lines above"
+    other=$({ git diff --name-only; git ls-files --others --exclude-standard; } | grep -vxF -f <(printf '%s\n' "${files[@]}") | sort -u | tr '\n' ' ')
+    [ -z "$other" ] || refuse "files outside this step's conflict changed: $other"
+    git add -A -- "${files[@]}"
+    [ -z "$(unmerged)" ] || refuse "still unmerged: $(unmerged)"
+    git commit -q --no-edit && echo "Step $n committed. Go on with the next step." ;;
+  publish)
+    ! merging || refuse "a merge is still stopped: resolve it and run its step's commit command"
+    [ -z "$(git status --porcelain)" ] || refuse "uncommitted changes: $(git status --porcelain | tr '\n' ' ')"
+    all=
+    for ((i = 1; i <= N; i++)); do
+      git merge-base --is-ancestor "${HEADS[$i]}" HEAD || refuse "step $i is not done: run its fold command"
+      all="$all ${EXPECT[$i]}"
+    done
+    read -r -a files <<<"$all"
+    markers ${files[@]+"${files[@]}"} || refuse "conflict markers are left in the lines above"
+    out=$( (eval "$GATE") 2>&1) || { printf '%s\n' "$out" | tail -20; refuse "the gate failed: fix the first failure above"; }
+    git push -q -u origin "$BRANCH" || refuse "git push failed"
+    out=$(gh-axi pr create ${PR_BASE:+--base "$PR_BASE"} --title "$TITLE" --body "$BODY") || refuse "gh-axi pr create failed"
+    url=$(printf '%s\n' "$out" | grep -m1 -o 'https://[^ ]*/pull/[0-9]*') || refuse "gh-axi printed no PR URL: $out"
+    echo "done [at=$(date +%s)]: PR $url" | tee -a "$STATUS"
+    echo "Published. Reply with one line and call no more tools." ;;
+esac

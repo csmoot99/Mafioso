@@ -16,6 +16,7 @@
 # PR instead of shipping a new one).
 # Usage: fm-brief.sh <task-id> <repo-name> --mode <no-mistakes|direct-PR|local-only> [--branch-prefix <prefix>] [--base-branch <branch>] [--forge <none|gerrit> [--shape squash]] [--herdr-lab]
 #        fm-brief.sh <task-id> <repo-name> --mode direct-PR --harness qwen --plan <file> --files '<path>...' --done-command '<command>' [--branch-prefix <prefix>] [--base-branch <branch>]
+#        fm-brief.sh <task-id> <repo-name> --mode direct-PR --harness qwen --combine <file> --done-command '<command>' [--branch-prefix <prefix>] [--base-branch <branch>]
 #        fm-brief.sh <task-id> <repo-name> --scout [--base-branch <branch>] [--herdr-lab]
 #        fm-brief.sh <task-id> --secondmate {<project>...|--no-projects}
 #   --scout writes the scout contract instead: the deliverable is a report at
@@ -152,8 +153,32 @@
 # (--herdr-lab is refused), the no-mistakes daemon rule (its worktree-pool half
 # shrinks to the git and treehouse commands the worker may never run), the
 # waiting and paused protocols, and the coding-discipline and project-memory
-# sections. --plan, --files, and
-# --done-command are refused without it.
+# sections. --plan, --files, --combine and --done-command are refused without
+# it.
+# --combine <file> renders the qwen combine variant in place of --plan and
+# --files: a qwen worker folding approved PRs into one combined PR
+# (.agents/skills/combined-merge/SKILL.md), with --done-command as the gate the
+# combined branch must pass. The file holds firstmate's trial merge, one
+# directive per unindented line:
+#   title <text>     the combined PR's title
+#   base <commit>    the full base commit the trial merge used
+#   fold <PR URL> <branch> <head> [<path>...]
+#                    one per folded PR in merge order, at least two: its full
+#                    head commit and the files the trial merge left conflicted
+#                    at that step
+#   finally          an optional last step, such as the combined bookkeeping
+#                    commit
+#   body             optional PR body text after the folded-PR list
+# Indented and blank lines belong to the directive above them. Under a fold
+# that lists paths they are required and give, for each conflict block, its
+# two sides and the exact lines that replace it; a fold without paths takes
+# none. Fold and finally text renders verbatim in that step, body text without
+# its indentation. The brief names no merge command: the variant also writes
+# data/<task-id>/combine.sh, which assigns every value and sources
+# bin/fm-qwen-combine.sh, and the brief gives the worker only that file's fold,
+# commit, stop and publish calls. That helper owns the isolation check, the
+# working line, every stop, and the done line, so the variant has no Start
+# section and writes the home include last.
 # Scaffolds carry no role scope: fm-spawn.sh supplies fm_brief_worker_role from
 # fm-dod-lib.sh to every ship/scout launch brief, so this file never becomes a
 # second owner of a contract that must stay current across relaunches.
@@ -161,7 +186,8 @@
 # script: when config/brief-include.md exists under the active home, ship and
 # scout scaffolds append its text verbatim as their last section, "# Home brief
 # additions", which defers to every other section of the brief; the qwen shape
-# writes it just above its closing Start section instead. It goes after # Task
+# writes it just above its closing Start section instead, and its combine
+# variant last. It goes after # Task
 # because the machine-read `# Task` heading resolves to its first match, so
 # appended text can never shadow it; a later scout promotion appends its ship
 # contract below it, which that position-free deference already covers. An
@@ -248,6 +274,7 @@ HARNESS_SET=0
 PLAN_FILE=
 WRITE_FILES=
 DONE_COMMAND=
+COMBINE_FILE=
 POS=()
 want_value=
 for a in "$@"; do
@@ -265,6 +292,7 @@ for a in "$@"; do
       plan) PLAN_FILE=$a ;;
       files) WRITE_FILES=$a ;;
       done-command) DONE_COMMAND=$a ;;
+      combine) COMBINE_FILE=$a ;;
       *) echo "error: internal parser state for --$want_value" >&2; exit 1 ;;
     esac
     want_value=
@@ -293,6 +321,8 @@ for a in "$@"; do
     --files=*) WRITE_FILES=${a#--files=} ;;
     --done-command) want_value="done-command" ;;
     --done-command=*) DONE_COMMAND=${a#--done-command=} ;;
+    --combine) want_value=combine ;;
+    --combine=*) COMBINE_FILE=${a#--combine=} ;;
     # yolo never reaches the worker: it is firstmate's merge authority, not a
     # brief input. Refuse it loudly so it is never silently dropped here and then
     # believed to have been recorded.
@@ -369,22 +399,80 @@ if [ "$HARNESS_SET" -eq 1 ]; then
     exit 1
   fi
   [ "$HERDR_LAB" -eq 0 ] || { echo "error: --harness qwen cannot carry --herdr-lab: Herdr lifecycle work never fits the qwen shape" >&2; exit 1; }
-  if [ -z "$PLAN_FILE" ] || [ -z "$(printf '%s' "$WRITE_FILES" | tr -d '[:space:]')" ] || [ -z "$(printf '%s' "$DONE_COMMAND" | tr -d '[:space:]')" ]; then
-    echo "error: --harness qwen requires --plan <file>, --files '<path>...' and --done-command '<command>'" >&2
-    exit 1
+  if [ -n "$COMBINE_FILE" ]; then
+    if [ -n "$PLAN_FILE$WRITE_FILES" ] || [ -z "$(printf '%s' "$DONE_COMMAND" | tr -d '[:space:]')" ]; then
+      echo "error: --combine takes --done-command '<command>' and replaces --plan and --files" >&2
+      exit 1
+    fi
+    { [ -f "$COMBINE_FILE" ] && [ -r "$COMBINE_FILE" ]; } || { echo "error: --combine must name a readable regular file (got '$COMBINE_FILE')" >&2; exit 1; }
+    # The combine file's format is in the header above.
+    combine_error() { echo "error: --combine $COMBINE_FILE${line_no:+ line $line_no}: $*" >&2; exit 1; }
+    full_commit() { case $1 in *[!0-9a-f]*) return 1 ;; esac; [ "${#1}" -eq 40 ] || [ "${#1}" -eq 64 ]; }
+    COMBINE_TITLE='' COMBINE_BASE='' COMBINE_FINALLY='' COMBINE_BODY='' block='' line_no=0
+    FOLD_URL=() FOLD_NUM=() FOLD_BRANCH=() FOLD_HEAD=() FOLD_PATHS=() FOLD_NOTE=()
+    while IFS= read -r line || [ -n "$line" ]; do
+      line_no=$((line_no + 1))
+      case $line in
+        '' | [[:space:]]*)
+          [ -n "${line//[[:space:]]/}" ] || line=
+          case $block in
+            fold) FOLD_NOTE[${#FOLD_NOTE[@]}-1]+="$line"$'\n' ;;
+            finally) COMBINE_FINALLY+="$line"$'\n' ;;
+            body) COMBINE_BODY+="${line#"${line%%[![:space:]]*}"}"$'\n' ;;
+            *) [ -z "$line" ] || combine_error "an indented line belongs under a fold, finally or body line" ;;
+          esac ;;
+        'title '*) COMBINE_TITLE=${line#title }; block= ;;
+        'base '*) COMBINE_BASE=${line#base }; block= ;;
+        'fold '*)
+          read -r -a f <<<"${line#fold }"
+          [ "${#f[@]}" -ge 3 ] || combine_error "a fold line is: fold <PR URL> <branch> <head> [<path>...]"
+          case ${f[0]} in https://*/pull/*) n=${f[0]##*/pull/} ;; *) n= ;; esac
+          case $n in '' | *[!0-9]*) combine_error "'${f[0]}' is not a PR URL ending in /pull/<number>" ;; esac
+          git check-ref-format --branch "${f[1]}" >/dev/null 2>&1 || combine_error "'${f[1]}' is not a branch name"
+          full_commit "${f[2]}" || combine_error "the head '${f[2]}' is not a full commit id"
+          for h in ${FOLD_HEAD[@]+"${FOLD_HEAD[@]}"}; do
+            [ "$h" != "${f[2]}" ] || combine_error "the head ${f[2]} is folded twice"
+          done
+          for p in "${f[@]:3}"; do
+            case $p in /*) combine_error "conflicted paths are relative to the worktree (got '$p')" ;; esac
+          done
+          FOLD_URL+=("${f[0]}") FOLD_NUM+=("$n") FOLD_BRANCH+=("${f[1]}") FOLD_HEAD+=("${f[2]}") FOLD_PATHS+=("${f[*]:3}") FOLD_NOTE+=("")
+          block='fold' ;;
+        finally) block=finally ;;
+        body) block=body ;;
+        *) combine_error "expected title, base, fold, finally, body, or an indented line" ;;
+      esac
+    done < "$COMBINE_FILE"
+    line_no=
+    [ -n "${COMBINE_TITLE//[[:space:]]/}" ] || combine_error "the title line is missing"
+    full_commit "$COMBINE_BASE" || combine_error "the base line must give the full base commit"
+    [ "${#FOLD_HEAD[@]}" -ge 2 ] || combine_error "a combine folds at least two PRs"
+    for ((i = 0; i < ${#FOLD_HEAD[@]}; i++)); do
+      FOLD_NOTE[i]=$(printf '%s' "${FOLD_NOTE[i]}" | sed '/./,$!d')
+      if [ -n "${FOLD_PATHS[i]}" ] && [ -z "${FOLD_NOTE[i]}" ]; then
+        combine_error "the fold of ${FOLD_URL[i]} lists conflicted paths but no resolution lines under it"
+      elif [ -z "${FOLD_PATHS[i]}" ] && [ -n "${FOLD_NOTE[i]}" ]; then
+        combine_error "the fold of ${FOLD_URL[i]} lists no conflicted path, so it takes no lines under it"
+      fi
+    done
+  else
+    if [ -z "$PLAN_FILE" ] || [ -z "$(printf '%s' "$WRITE_FILES" | tr -d '[:space:]')" ] || [ -z "$(printf '%s' "$DONE_COMMAND" | tr -d '[:space:]')" ]; then
+      echo "error: --harness qwen requires --plan <file>, --files '<path>...' and --done-command '<command>', or --combine <file> and --done-command '<command>'" >&2
+      exit 1
+    fi
+    { [ -f "$PLAN_FILE" ] && PLAN_BODY=$(cat "$PLAN_FILE" 2>/dev/null) && [ -n "$(printf '%s' "$PLAN_BODY" | tr -d '[:space:]')" ]; } || {
+      echo "error: --plan must name a readable, nonempty regular file (got '$PLAN_FILE')" >&2
+      exit 1
+    }
+    read -r -d '' -a WRITE_FILE_LIST <<<"$WRITE_FILES" || true
+    for f in "${WRITE_FILE_LIST[@]}"; do
+      case "$f" in
+        /*) echo "error: --files takes paths relative to the worktree, never an absolute path (got '$f')" >&2; exit 1 ;;
+      esac
+    done
   fi
-  { [ -f "$PLAN_FILE" ] && PLAN_BODY=$(cat "$PLAN_FILE" 2>/dev/null) && [ -n "$(printf '%s' "$PLAN_BODY" | tr -d '[:space:]')" ]; } || {
-    echo "error: --plan must name a readable, nonempty regular file (got '$PLAN_FILE')" >&2
-    exit 1
-  }
-  read -r -d '' -a WRITE_FILE_LIST <<<"$WRITE_FILES" || true
-  for f in "${WRITE_FILE_LIST[@]}"; do
-    case "$f" in
-      /*) echo "error: --files takes paths relative to the worktree, never an absolute path (got '$f')" >&2; exit 1 ;;
-    esac
-  done
-elif [ -n "$PLAN_FILE$WRITE_FILES$DONE_COMMAND" ]; then
-  echo "error: --plan, --files and --done-command apply only with --harness qwen" >&2
+elif [ -n "$PLAN_FILE$WRITE_FILES$DONE_COMMAND$COMBINE_FILE" ]; then
+  echo "error: --plan, --files, --combine and --done-command apply only with --harness qwen" >&2
   exit 1
 fi
 ID=${POS[0]}
@@ -745,6 +833,99 @@ Base branch: $BASE_BRANCH"
 else
   QWEN_SETUP="Your copy of $REPO is the current directory: a disposable worktree on the branch \`$BRANCH\`, which firstmate already created from a clean copy of its default branch."
   QWEN_PR_BASE=
+fi
+if [ -n "$COMBINE_FILE" ]; then
+COMBINE_SCRIPT="$DATA/$ID/combine.sh"
+[ ! -e "$COMBINE_SCRIPT" ] || { echo "error: $COMBINE_SCRIPT already exists" >&2; exit 1; }
+CS=$(shell_quote "$COMBINE_SCRIPT")
+COMBINE_STEPS='' COMBINE_LIST='' COMBINE_MSGS=()
+for ((i = 0; i < ${#FOLD_HEAD[@]}; i++)); do
+  s=$((i + 1))
+  COMBINE_LIST="$COMBINE_LIST- ${FOLD_URL[i]} at ${FOLD_HEAD[i]}"$'\n'
+  COMBINE_MSGS+=("Merge #${FOLD_NUM[i]} from ${FOLD_BRANCH[i]} at ${FOLD_HEAD[i]}")
+  COMBINE_STEPS="$COMBINE_STEPS
+$s. Fold ${FOLD_URL[i]} (head \`${FOLD_HEAD[i]:0:7}\`). Run:
+       bash $CS fold $s
+   If it prints \`WAIT:\`, do what it says and call no more tools.
+"
+  if [ -n "${FOLD_PATHS[i]}" ]; then
+    conflicted=''
+    for p in ${FOLD_PATHS[i]}; do conflicted="$conflicted${conflicted:+, }\`$p\`"; done
+    COMBINE_STEPS="$COMBINE_STEPS   It stops with a conflict in $conflicted.
+${FOLD_NOTE[i]}
+   When every conflict in this step is resolved, run:
+       bash $CS commit $s
+   If it prints \`WAIT:\`, do what it says and call no more tools.
+"
+  else
+    COMBINE_STEPS="$COMBINE_STEPS   It merges cleanly.
+"
+  fi
+done
+if [ -n "$COMBINE_FINALLY" ]; then
+  COMBINE_STEPS="$COMBINE_STEPS
+$((i + 1)). $(printf '%s' "$COMBINE_FINALLY" | sed '/./,$!d; 1s/^[[:space:]]*//')
+"
+fi
+COMBINE_BODY=$(printf '%s' "$COMBINE_BODY" | sed '/./,$!d')
+COMBINE_PR_BODY="Combines these approved PRs, each folded at its exact head with a merge commit:
+
+$COMBINE_LIST"
+[ -z "$COMBINE_BODY" ] || COMBINE_PR_BODY="$COMBINE_PR_BODY
+$COMBINE_BODY"
+{
+  printf '%s\n' '#!/usr/bin/env bash' \
+    "# bin/fm-brief.sh --combine wrote this for one qwen combine; the worker runs it as" \
+    '#   bash <this file> fold <n> | commit <n> | stop <n> <what each side wants> | publish'
+  printf '%s=%q\n' STATUS "$STATE/$ID.status" BRANCH "$BRANCH" BASE "$COMBINE_BASE" PR_BASE "$BASE_BRANCH" \
+    MARK "$DATA/$ID/combine-stopped" GATE "$DONE_COMMAND" TITLE "$COMBINE_TITLE" BODY "$COMBINE_PR_BODY"
+  printf 'HEADS=(%s)\n' "$(printf '%q ' '' "${FOLD_HEAD[@]}")"
+  printf 'MSGS=(%s)\n' "$(printf '%q ' '' "${COMBINE_MSGS[@]}")"
+  printf 'EXPECT=(%s)\n' "$(printf '%q ' '' "${FOLD_PATHS[@]}")"
+  printf '. %q\n' "$FM_ROOT/bin/fm-qwen-combine.sh"
+} > "$COMBINE_SCRIPT"
+cat > "$BRIEF" <<EOF
+Work alone; do not wait for a human.
+$QWEN_SETUP
+Stay on that branch. Never run \`git checkout\`, \`git switch\`, \`git stash\`, \`git reset\`, \`git clean\`, \`git rebase\`, \`git cherry-pick\`, \`git worktree\` or \`treehouse\`.
+
+Delivery contract: mode=direct-PR
+Ship branch: $BRANCH
+Brief shape: qwen
+
+$TASK_SECTION
+
+# The combine
+This is the whole plan; never look for a plan file.
+Run the steps in order, one at a time, copying each command exactly.
+A command that prints \`WAIT:\` ends your work until firstmate answers: reply with the one line it gives and call no more tools.
+$COMBINE_STEPS
+# Rules
+1. Write only the files a step names, only as it says; every other path is read-only.
+2. A conflict block runs from a \`<<<<<<<\` line through its \`>>>>>>>\` line. Find the blocks with \`grep -nE '^(<<<<<<<|=======|>>>>>>>)' <file>\`, read the file with \`read_file\`, and resolve each block with one \`edit\` whose old_string starts at its \`<<<<<<<\` line and ends at its \`>>>>>>>\` line. If \`edit\` refuses, \`read_file\` the file once and retry.
+3. Resolve a conflict only as its step says; never choose between two sides yourself. If a block's two sides are not what its step says, run the stop command under Reporting.
+4. Run only the commands this brief gives and \`grep\`. Never run \`git merge\`, \`git add\`, \`git rm\`, \`git status\`, \`git fetch\`, \`git branch\`, \`git show\`, \`rm\`, \`ls\`, \`cat\` or \`find\`.
+5. ${RULE1#1. }
+   Never use \`--force\`, \`--squash\` or \`--amend\`.
+
+# Finish
+After the last step, run this command:
+    bash $CS publish
+It checks every fold and the tests, pushes, opens the combined PR and writes your done line.
+If it prints \`refused:\`, fix only what it names, in a file a step names; commit a fix with \`git commit -m "fix: <what>" -- <that file>\`; run it again. Only this script writes the done line; never write one yourself.
+
+# Reporting
+When a command prints \`Published.\` or \`WAIT:\`, reply with one line and call no more tools.
+If a block's sides are not what its step says (rule 3), run this with the step number, the file and what each side wants:
+    bash $CS stop <step number> "<file>: <what each side wants>"
+If a command still refuses after two fixes, or anything else fails twice, run this, and stop:
+    echo "blocked [at=\$(date +%s)]: <one line>" >> $STATUS_FILE
+Write status lines only with the commands in this brief.
+Firstmate answers through message files in $INBOX_DIR; when your terminal announces one, read it, act on it, then move it with \`mv $INBOX_DIR/NNN.msg $INBOX_DIR/handled/\`.
+EOF
+append_brief_include
+echo "scaffolded: $BRIEF and $COMBINE_SCRIPT (ship, mode=$MODE, qwen combine shape; replace {TASK} and {FIRSTMATE_SPEC})"
+exit 0
 fi
 QWEN_FILES=
 QWEN_FILES_Q=

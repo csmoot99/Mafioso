@@ -1046,9 +1046,10 @@ safe_checkpoint() {
 # actually reads. A secondmate's charter is a durable standing document and is
 # never rewritten: a secondmate reconciles its own home's records at startup,
 # so the note stays parent-side audit evidence.
-# A qwen-shaped brief must keep its Start section last (bin/fm-brief.sh header),
-# so there the note goes just above Start and the inbox check joins Start's one
-# first step.
+# A qwen-shaped brief with a Start section must keep it last (bin/fm-brief.sh
+# header), so there the note goes just above Start and the inbox check joins
+# Start's one first step; its combine variant has none and takes the generic
+# note.
 record_note() {
   local stamp start inbox ack
   [ -n "$NOTE" ] || return 0

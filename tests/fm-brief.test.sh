@@ -1720,6 +1720,102 @@ test_crewmate_scaffolds_forbid_pool_administration() {
   pass "fm-brief.sh: every crewmate scaffold forbids administering the shared worktree pool"
 }
 
+# qwen_combine_file <file> <base> [<line>...]: a combine of #11 (clean) and
+# #12 (conflicted in a.txt), plus any extra lines.
+# shellcheck disable=SC2016 # backticks are literal Markdown
+qwen_combine_file() {
+  local file=$1 base=$2
+  shift 2
+  printf '%s\n' "title Combine #11 and #12" "base $base" \
+    "fold https://github.com/o/r/pull/11 pr11 $(printf '1%.0s' {1..40})" \
+    "fold https://github.com/o/r/pull/12 pr12 $(printf '2%.0s' {1..40}) a.txt" \
+    '   - `a.txt`, 1 conflict block. Replace it with both lines:' \
+    '         two-11' '         two-12' "$@" > "$file"
+}
+
+# shellcheck disable=SC2016 # backticks are literal Markdown
+test_qwen_combine_renders_the_trial_merge() {
+  local home id=brief-qwen-c1 brief file base out
+  home="$TMP_ROOT/qwen-combine-home"
+  mkdir -p "$home/data" "$home/config"
+  printf 'House rule.\n' > "$home/config/brief-include.md"
+  base=$(printf 'b%.0s' {1..40})
+  file="$TMP_ROOT/qwen-combine.txt"
+  qwen_combine_file "$file" "$base" finally '   Write the combined entry. Then run:' '       git commit -m "docs: one entry" -- CHANGELOG.md' body '  Extra.'
+  out=$(FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" some-proj --mode direct-PR --harness qwen \
+    --combine "$file" --done-command 'make test' --base-branch feature/hub) || fail "fm-brief.sh --combine refused a valid combine: $out"
+  brief="$home/data/$id/brief.md"
+  [ -f "$home/data/$id/combine.sh" ] || fail "the combine scaffold did not write its combine.sh"
+  for line in 'Brief shape: qwen' 'Delivery contract: mode=direct-PR' "Ship branch: fm/$id" 'Base branch: feature/hub' '{TASK}' '{FIRSTMATE_SPEC}' \
+    '1. Fold https://github.com/o/r/pull/11 (head `1111111`). Run:' \
+    "       bash '$home/data/$id/combine.sh' fold 1" '   It merges cleanly.' \
+    '   It stops with a conflict in `a.txt`.' '   - `a.txt`, 1 conflict block. Replace it with both lines:' '         two-12' \
+    "       bash '$home/data/$id/combine.sh' commit 2" \
+    '3. Write the combined entry. Then run:' '       git commit -m "docs: one entry" -- CHANGELOG.md' \
+    "    bash '$home/data/$id/combine.sh' publish" \
+    "    bash '$home/data/$id/combine.sh' stop <step number> \"<file>: <what each side wants>\"" \
+    "$home/state/$id.inbox"; do
+    assert_grep "$line" "$brief" "the qwen combine brief lacks: $line"
+  done
+  for absent in '# Start' '# The plan' "$base" 'Extra.' 'git merge --no-ff'; do
+    assert_no_grep "$absent" "$brief" "the qwen combine brief carries '$absent'"
+  done
+  [ "$(tail -1 "$brief")" = 'House rule.' ] || fail "the qwen combine brief does not end with the home include"
+  pass "fm-brief.sh --combine renders each fold, conflict note and last step, with the home include last and no Start"
+}
+
+test_qwen_combine_is_refused_outside_its_shape() {
+  local home dir good out rc i=0 args argv base h1 h2
+  home="$TMP_ROOT/qwen-combine-refuse-home"
+  dir="$TMP_ROOT/qwen-combine-refuse"
+  mkdir -p "$home/data" "$dir"
+  base=$(printf 'b%.0s' {1..40}) h1=$(printf '1%.0s' {1..40}) h2=$(printf '2%.0s' {1..40})
+  good="$dir/good"
+  qwen_combine_file "$good" "$base"
+  printf 'plan\n' > "$dir/plan"
+  printf '%s\n' 'title t' "base $base" "fold https://github.com/o/r/pull/11 pr11 $h1" > "$dir/one-fold"
+  qwen_combine_file "$dir/bad-url" "$base" "fold https://github.com/o/r/issues/13 pr13 $(printf '3%.0s' {1..40})"
+  qwen_combine_file "$dir/short-head" "$base" 'fold https://github.com/o/r/pull/13 pr13 3333333'
+  qwen_combine_file "$dir/twice" "$base" "fold https://github.com/o/r/pull/13 pr13 $h1"
+  qwen_combine_file "$dir/absolute" "$base" "fold https://github.com/o/r/pull/13 pr13 $(printf '3%.0s' {1..40}) /etc/passwd" '   - keep both'
+  qwen_combine_file "$dir/no-note" "$base" "fold https://github.com/o/r/pull/13 pr13 $(printf '3%.0s' {1..40}) b.txt"
+  printf '%s\n' 'title t' "base $base" "fold https://github.com/o/r/pull/11 pr11 $h1" '   - a note' "fold https://github.com/o/r/pull/12 pr12 $h2" > "$dir/stray-note"
+  qwen_combine_file "$dir/unknown" "$base" 'merge everything'
+  printf '%s\n' '   - before any fold' > "$dir/indent-first"
+  grep -v '^title' "$good" > "$dir/no-title"
+  grep -v '^base' "$good" > "$dir/no-base"
+  qwen_combine_file "$dir/short-base" 1234567
+  while IFS= read -r args; do
+    i=$((i + 1))
+    read -r -a argv <<<"$args"
+    out=$(FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "brief-qwen-cr$i" some-proj "${argv[@]}" 2>&1); rc=$?
+    [ "$rc" -ne 0 ] || fail "fm-brief.sh must refuse: $args"
+    [ ! -e "$home/data/brief-qwen-cr$i/brief.md" ] && [ ! -e "$home/data/brief-qwen-cr$i/combine.sh" ] \
+      || fail "a refused qwen combine wrote a brief or its combine.sh: $args"
+    assert_contains "$out" "error:" "the refusal did not explain itself: $args"
+  done <<EOF
+--mode direct-PR --harness qwen --combine $good
+--mode direct-PR --harness qwen --combine $good --plan $dir/plan --done-command make
+--mode direct-PR --harness qwen --combine $good --files a --done-command make
+--mode direct-PR --harness qwen --combine $dir/missing --done-command make
+--mode direct-PR --combine $good --done-command make
+--mode no-mistakes --harness qwen --combine $good --done-command make
+--mode direct-PR --harness qwen --combine $dir/one-fold --done-command make
+--mode direct-PR --harness qwen --combine $dir/bad-url --done-command make
+--mode direct-PR --harness qwen --combine $dir/short-head --done-command make
+--mode direct-PR --harness qwen --combine $dir/twice --done-command make
+--mode direct-PR --harness qwen --combine $dir/absolute --done-command make
+--mode direct-PR --harness qwen --combine $dir/no-note --done-command make
+--mode direct-PR --harness qwen --combine $dir/stray-note --done-command make
+--mode direct-PR --harness qwen --combine $dir/unknown --done-command make
+--mode direct-PR --harness qwen --combine $dir/indent-first --done-command make
+--mode direct-PR --harness qwen --combine $dir/no-title --done-command make
+--mode direct-PR --harness qwen --combine $dir/no-base --done-command make
+--mode direct-PR --harness qwen --combine $dir/short-base --done-command make
+EOF
+  pass "fm-brief.sh --combine is refused without its done command, beside a plan, or on a malformed combine file"
+}
+
 test_script_parses
 test_no_heredoc_in_command_substitution
 test_help_includes_entire_header
@@ -1761,3 +1857,5 @@ test_crewmate_scaffolds_forbid_pool_administration
 test_qwen_shape_inlines_the_plan_and_keeps_the_contract
 test_qwen_shape_is_refused_outside_its_shape
 test_qwen_shape_looks_up_through_the_project_kg_and_map
+test_qwen_combine_renders_the_trial_merge
+test_qwen_combine_is_refused_outside_its_shape
