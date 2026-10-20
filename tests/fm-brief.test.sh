@@ -1815,6 +1815,100 @@ EOF
   pass "fm-brief.sh --combine is refused without its done command, beside a plan, or on a malformed combine file"
 }
 
+# qwen_kind_home <home>: a home whose some-proj clone carries the text-edit setup file.
+qwen_kind_home() {
+  mkdir -p "$1/data" "$1/config" "$1/projects/some-proj/ai-map/qwen"
+  printf 'How this project words its docs.\n' > "$1/projects/some-proj/ai-map/qwen/text-edit.md"
+  printf 'map\n' > "$1/projects/some-proj/ai-map/master_map.md"
+  mkdir -p "$1/projects/some-proj/scripts" && : > "$1/projects/some-proj/scripts/kg-query.mjs"
+}
+
+test_qwen_kind_points_at_the_setup_file_and_renders_the_edits() {
+  local home id=brief-qwen-k1 brief file es out
+  home="$TMP_ROOT/qwen-kind-home"
+  qwen_kind_home "$home"
+  printf 'House rule.\n' > "$home/config/brief-include.md"
+  file="$TMP_ROOT/qwen-kind.edits"
+  # shellcheck disable=SC2016 # single quotes are deliberate: the backticks must stay literal
+  printf '%s\n' 'title docs: fix the stale port' 'file docs/run.md 1' \
+    '   In the line starting `Port:`, replace `8080` with `9090`.' 'file docs/new.md 0' '   Create it with the one line `# New`.' \
+    'has docs/run.md Port: 9090' 'lacks docs/run.md Port: 8080' > "$file"
+  out=$(FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" some-proj --mode direct-PR --harness qwen \
+    --kind text-edit --edits "$file" --done-command 'npm run check:docs' --base-branch feature/hub) || fail "fm-brief.sh --kind refused a valid edits file: $out"
+  brief="$home/data/$id/brief.md" es="$home/data/$id/edit.sh"
+  [ -f "$es" ] || fail "the kind scaffold did not write its edit.sh"
+  # shellcheck disable=SC2016 # single quotes are deliberate: the backticks must stay literal
+  for line in 'Brief shape: qwen' 'Delivery contract: mode=direct-PR' "Ship branch: fm/$id" 'Base branch: feature/hub' '{TASK}' '{FIRSTMATE_SPEC}' \
+    'Before your first edit, read `ai-map/qwen/text-edit.md` with `read_file`: it is this project'"'"'s guide to this kind of task.' \
+    '1. `docs/run.md`: change or remove at most 1 of its existing lines.' '   In the line starting `Port:`, replace `8080` with `9090`.' \
+    '2. `docs/new.md`: add lines only, or create it; change or remove none of its existing lines.' \
+    "    bash '$es' publish" "    bash '$es' start" "$home/state/$id.inbox"; do
+    assert_grep "$line" "$brief" "the qwen kind brief lacks: $line"
+  done
+  for absent in '# The plan' 'npm run check:docs' 'Port: 9090' 'master_map' 'kg-query' 'git add --'; do
+    assert_no_grep "$absent" "$brief" "the qwen kind brief carries '$absent'"
+  done
+  [ "$(grep -n '^House rule.$' "$brief" | cut -d: -f1)" -lt "$(grep -n '^# Start$' "$brief" | cut -d: -f1)" ] \
+    || fail "the qwen kind brief does not keep its Start section below the home include"
+  [ "$(tail -1 "$es")" = ". $ROOT/bin/fm-qwen-edit.sh" ] || fail "edit.sh does not end by sourcing the helper"
+  # shellcheck disable=SC2016 # expanded inside the subshell that sources edit.sh's values
+  out=$(sed '$d' "$es" | bash -c '. /dev/stdin; printf "%s|" "$BRANCH" "$PR_BASE" "$GATE" "$TITLE" "${FILES[@]}" "${MAXDEL[@]}" "${CHECK[@]}" "${CPATH[@]}" "${CTEXT[@]}"')
+  [ "$out" = "fm/$id|feature/hub|npm run check:docs|docs: fix the stale port|docs/run.md|docs/new.md|1|0|has|lacks|docs/run.md|docs/run.md|Port: 9090|Port: 8080|" ] \
+    || fail "edit.sh does not assign the edits file's values: $out"
+  pass "fm-brief.sh --kind points at the project's setup file, renders each edit with its line bound, and writes edit.sh"
+}
+
+test_qwen_kind_is_refused_outside_its_shape() {
+  local home dir out rc i=0 args argv
+  home="$TMP_ROOT/qwen-kind-refuse-home"
+  dir="$TMP_ROOT/qwen-kind-refuse"
+  qwen_kind_home "$home"
+  mkdir -p "$dir"
+  printf '%s\n' 'title t' 'file a.md 1' '   - change it' 'has a.md x' > "$dir/good"
+  printf 'plan\n' > "$dir/plan"
+  grep -v '^title' "$dir/good" > "$dir/no-title"
+  printf '%s\n' 'title t' 'has a.md x' > "$dir/no-file"
+  grep -v '^has' "$dir/good" > "$dir/no-check"
+  printf '%s\n' 'title t' 'file a.md 1' 'has a.md x' > "$dir/no-note"
+  printf '%s\n' 'title t' 'file a.md 1' '   - change it' 'has b.md x' > "$dir/unlisted-check"
+  printf '%s\n' 'title t' 'file ../a.md 1' '   - change it' 'has ../a.md x' > "$dir/escape"
+  printf '%s\n' 'title t' 'file a.md some' '   - change it' 'has a.md x' > "$dir/bad-bound"
+  printf '%s\n' 'title t' 'file a.md 1' '   - change it' 'file a.md 2' '   - again' 'has a.md x' > "$dir/twice"
+  printf '%s\n' 'title t' 'file a.md 1' '   - change it' 'has a.md' > "$dir/no-text"
+  printf '%s\n' '   - first' 'title t' 'file a.md 1' '   - change it' 'has a.md x' > "$dir/indent-first"
+  printf '%s\n' 'title t' 'file a.md 1' '   - change it' 'rewrite a.md' > "$dir/unknown"
+  while IFS= read -r args; do
+    i=$((i + 1))
+    read -r -a argv <<<"$args"
+    out=$(FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "brief-qwen-kr$i" some-proj "${argv[@]}" 2>&1); rc=$?
+    [ "$rc" -ne 0 ] || fail "fm-brief.sh must refuse: $args"
+    [ ! -e "$home/data/brief-qwen-kr$i" ] || fail "a refused qwen kind brief wrote into its data directory: $args"
+    assert_contains "$out" "error:" "the refusal did not explain itself: $args"
+  done <<EOF
+--mode direct-PR --harness qwen --kind text-edit --edits $dir/good
+--mode direct-PR --harness qwen --kind text-edit --done-command make
+--mode direct-PR --harness qwen --edits $dir/good --done-command make
+--mode direct-PR --harness qwen --kind data-edit --edits $dir/good --done-command make
+--mode direct-PR --harness qwen --kind ../text-edit --edits $dir/good --done-command make
+--mode direct-PR --harness qwen --kind text-edit --edits $dir/good --plan $dir/plan --done-command make
+--mode direct-PR --harness qwen --kind text-edit --edits $dir/good --files a.md --done-command make
+--mode direct-PR --kind text-edit --edits $dir/good --done-command make
+--mode direct-PR --harness qwen --kind text-edit --edits $dir/missing --done-command make
+--mode direct-PR --harness qwen --kind text-edit --edits $dir/no-title --done-command make
+--mode direct-PR --harness qwen --kind text-edit --edits $dir/no-file --done-command make
+--mode direct-PR --harness qwen --kind text-edit --edits $dir/no-check --done-command make
+--mode direct-PR --harness qwen --kind text-edit --edits $dir/no-note --done-command make
+--mode direct-PR --harness qwen --kind text-edit --edits $dir/unlisted-check --done-command make
+--mode direct-PR --harness qwen --kind text-edit --edits $dir/escape --done-command make
+--mode direct-PR --harness qwen --kind text-edit --edits $dir/bad-bound --done-command make
+--mode direct-PR --harness qwen --kind text-edit --edits $dir/twice --done-command make
+--mode direct-PR --harness qwen --kind text-edit --edits $dir/no-text --done-command make
+--mode direct-PR --harness qwen --kind text-edit --edits $dir/indent-first --done-command make
+--mode direct-PR --harness qwen --kind text-edit --edits $dir/unknown --done-command make
+EOF
+  pass "fm-brief.sh --kind is refused without its edits or done command, beside a plan, without the project's setup file, or on a malformed edits file"
+}
+
 test_script_parses
 test_no_heredoc_in_command_substitution
 test_help_includes_entire_header
@@ -1858,3 +1952,5 @@ test_qwen_shape_is_refused_outside_its_shape
 test_qwen_shape_looks_up_through_the_project_kg_and_map
 test_qwen_combine_renders_the_trial_merge
 test_qwen_combine_is_refused_outside_its_shape
+test_qwen_kind_points_at_the_setup_file_and_renders_the_edits
+test_qwen_kind_is_refused_outside_its_shape

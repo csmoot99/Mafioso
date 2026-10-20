@@ -17,6 +17,7 @@
 # Usage: fm-brief.sh <task-id> <repo-name> --mode <no-mistakes|direct-PR|local-only> [--branch-prefix <prefix>] [--base-branch <branch>] [--forge <none|gerrit> [--shape squash]] [--herdr-lab]
 #        fm-brief.sh <task-id> <repo-name> --mode direct-PR --harness qwen --plan <file> --files '<path>...' --done-command '<command>' [--branch-prefix <prefix>] [--base-branch <branch>]
 #        fm-brief.sh <task-id> <repo-name> --mode direct-PR --harness qwen --combine <file> --done-command '<command>' [--branch-prefix <prefix>] [--base-branch <branch>]
+#        fm-brief.sh <task-id> <repo-name> --mode direct-PR --harness qwen --kind <kind> --edits <file> --done-command '<command>' [--branch-prefix <prefix>] [--base-branch <branch>]
 #        fm-brief.sh <task-id> <repo-name> --scout [--base-branch <branch>] [--herdr-lab]
 #        fm-brief.sh <task-id> --secondmate {<project>...|--no-projects}
 #   --scout writes the scout contract instead: the deliverable is a report at
@@ -153,8 +154,8 @@
 # (--herdr-lab is refused), the no-mistakes daemon rule (its worktree-pool half
 # shrinks to the git and treehouse commands the worker may never run), the
 # waiting and paused protocols, and the coding-discipline and project-memory
-# sections. --plan, --files, --combine and --done-command are refused without
-# it.
+# sections. --plan, --files, --combine, --kind, --edits and --done-command are
+# refused without it.
 # --combine <file> renders the qwen combine variant in place of --plan and
 # --files: a qwen worker folding approved PRs into one combined PR
 # (.agents/skills/combined-merge/SKILL.md), with --done-command as the gate the
@@ -179,6 +180,26 @@
 # commit and publish calls. That helper owns the isolation check, the working
 # line, every stop, and the done line, so the variant has no Start section and
 # writes the home include last.
+# --kind <kind> --edits <file> renders the qwen task-kind variant in place of
+# --plan and --files: a qwen worker making a few exactly specified edits of one
+# task kind (.agents/skills/qwen-task-kinds/SKILL.md), with --done-command as
+# the project's check for that kind. <kind> names the project's own setup file
+# for it, ai-map/qwen/<kind>.md, which must exist in the project's clone; the
+# brief points the worker at that file and at no other context. The edits file
+# holds one directive per unindented line:
+#   title <text>          the commit and PR title
+#   file <path> <n>       a worktree-relative file the worker may write, and the
+#                         most existing lines of it the edits may remove or
+#                         rewrite (0 to only add lines or create the file)
+#   has <path> <text>     a listed file must contain this exact text
+#   lacks <path> <text>   a listed file must not contain it
+# Indented and blank lines under a file line are required, give its exact
+# edits, and render verbatim; at least one has or lacks line is required. The
+# variant also writes data/<task-id>/edit.sh, which assigns every value and
+# sources bin/fm-qwen-edit.sh; the brief gives the worker only that file's
+# start and publish calls, and that helper owns the line bounds, the checks,
+# every stop, the commit, the PR and the done line. Its Start section runs the
+# helper's start, below the home include.
 # Scaffolds carry no role scope: fm-spawn.sh supplies fm_brief_worker_role from
 # fm-dod-lib.sh to every ship/scout launch brief, so this file never becomes a
 # second owner of a contract that must stay current across relaunches.
@@ -275,6 +296,8 @@ PLAN_FILE=
 WRITE_FILES=
 DONE_COMMAND=
 COMBINE_FILE=
+QWEN_KIND=
+EDITS_FILE=
 POS=()
 want_value=
 for a in "$@"; do
@@ -293,6 +316,8 @@ for a in "$@"; do
       files) WRITE_FILES=$a ;;
       done-command) DONE_COMMAND=$a ;;
       combine) COMBINE_FILE=$a ;;
+      kind) QWEN_KIND=$a ;;
+      edits) EDITS_FILE=$a ;;
       *) echo "error: internal parser state for --$want_value" >&2; exit 1 ;;
     esac
     want_value=
@@ -323,6 +348,10 @@ for a in "$@"; do
     --done-command=*) DONE_COMMAND=${a#--done-command=} ;;
     --combine) want_value=combine ;;
     --combine=*) COMBINE_FILE=${a#--combine=} ;;
+    --kind) want_value=kind ;;
+    --kind=*) QWEN_KIND=${a#--kind=} ;;
+    --edits) want_value=edits ;;
+    --edits=*) EDITS_FILE=${a#--edits=} ;;
     # yolo never reaches the worker: it is firstmate's merge authority, not a
     # brief input. Refuse it loudly so it is never silently dropped here and then
     # believed to have been recorded.
@@ -400,8 +429,8 @@ if [ "$HARNESS_SET" -eq 1 ]; then
   fi
   [ "$HERDR_LAB" -eq 0 ] || { echo "error: --harness qwen cannot carry --herdr-lab: Herdr lifecycle work never fits the qwen shape" >&2; exit 1; }
   if [ -n "$COMBINE_FILE" ]; then
-    if [ -n "$PLAN_FILE$WRITE_FILES" ] || [ -z "$(printf '%s' "$DONE_COMMAND" | tr -d '[:space:]')" ]; then
-      echo "error: --combine takes --done-command '<command>' and replaces --plan and --files" >&2
+    if [ -n "$PLAN_FILE$WRITE_FILES$QWEN_KIND$EDITS_FILE" ] || [ -z "$(printf '%s' "$DONE_COMMAND" | tr -d '[:space:]')" ]; then
+      echo "error: --combine takes --done-command '<command>' and replaces --plan, --files, --kind and --edits" >&2
       exit 1
     fi
     { [ -f "$COMBINE_FILE" ] && [ -r "$COMBINE_FILE" ]; } || { echo "error: --combine must name a readable regular file (got '$COMBINE_FILE')" >&2; exit 1; }
@@ -453,9 +482,57 @@ if [ "$HARNESS_SET" -eq 1 ]; then
         combine_error "the fold of ${FOLD_URL[i]} lists no conflicted path, so it takes no lines under it"
       fi
     done
+  elif [ -n "$QWEN_KIND$EDITS_FILE" ]; then
+    if [ -n "$PLAN_FILE$WRITE_FILES" ] || [ -z "$QWEN_KIND" ] || [ -z "$EDITS_FILE" ] || [ -z "$(printf '%s' "$DONE_COMMAND" | tr -d '[:space:]')" ]; then
+      echo "error: --kind <kind> takes --edits <file> and --done-command '<command>' and replaces --plan and --files" >&2
+      exit 1
+    fi
+    case $QWEN_KIND in *[!a-z0-9-]* | -*) echo "error: --kind takes a lowercase task-kind name such as text-edit (got '$QWEN_KIND')" >&2; exit 1 ;; esac
+    QWEN_SETUP_FILE="ai-map/qwen/$QWEN_KIND.md"
+    [ -f "${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}/${POS[1]:-}/$QWEN_SETUP_FILE" ] || {
+      echo "error: --kind $QWEN_KIND needs the project's setup file $QWEN_SETUP_FILE, which its clone does not have; land it in the project first (.agents/skills/qwen-task-kinds/SKILL.md)" >&2
+      exit 1
+    }
+    { [ -f "$EDITS_FILE" ] && [ -r "$EDITS_FILE" ]; } || { echo "error: --edits must name a readable regular file (got '$EDITS_FILE')" >&2; exit 1; }
+    # The edits file's format is in the header above.
+    edits_error() { echo "error: --edits $EDITS_FILE${line_no:+ line $line_no}: $*" >&2; exit 1; }
+    EDIT_TITLE='' block='' line_no=0
+    EDIT_FILES=() EDIT_MAXDEL=() EDIT_NOTES=() EDIT_CHECK=() EDIT_CPATH=() EDIT_CTEXT=()
+    while IFS= read -r line || [ -n "$line" ]; do
+      line_no=$((line_no + 1))
+      case $line in
+        '' | [[:space:]]*)
+          [ -n "${line//[[:space:]]/}" ] || line=
+          if [ -n "$block" ]; then EDIT_NOTES[${#EDIT_NOTES[@]}-1]+="$line"$'\n'; else [ -z "$line" ] || edits_error "an indented line belongs under a file line"; fi ;;
+        'title '*) EDIT_TITLE=${line#title } block= ;;
+        'file '*)
+          read -r -a f <<<"${line#file }"
+          [ "${#f[@]}" -eq 2 ] || edits_error "a file line is: file <path> <lines it may change>"
+          case ${f[0]} in /* | ../* | */../* | */.. | ..) edits_error "file paths are relative to the worktree and stay inside it (got '${f[0]}')" ;; esac
+          case ${f[1]} in '' | *[!0-9]*) edits_error "'${f[1]}' is not a number of lines" ;; esac
+          for p in ${EDIT_FILES[@]+"${EDIT_FILES[@]}"}; do [ "$p" != "${f[0]}" ] || edits_error "${f[0]} is listed twice"; done
+          EDIT_FILES+=("${f[0]}") EDIT_MAXDEL+=("${f[1]}") EDIT_NOTES+=("") block=file ;;
+        'has '* | 'lacks '*)
+          rest=${line#* } p=${rest%% *} text=${rest#* }
+          [ "$p" != "$rest" ] && [ -n "${text//[[:space:]]/}" ] || edits_error "a check line is: ${line%% *} <listed path> <text>"
+          EDIT_CHECK+=("${line%% *}") EDIT_CPATH+=("$p") EDIT_CTEXT+=("$text") block= ;;
+        *) edits_error "expected title, file, has, lacks, or an indented line under a file line" ;;
+      esac
+    done < "$EDITS_FILE"
+    line_no=
+    [ -n "${EDIT_TITLE//[[:space:]]/}" ] || edits_error "the title line is missing"
+    [ "${#EDIT_FILES[@]}" -gt 0 ] || edits_error "no file line lists a file to edit"
+    [ "${#EDIT_CHECK[@]}" -gt 0 ] || edits_error "no has or lacks line checks the result"
+    for ((i = 0; i < ${#EDIT_FILES[@]}; i++)); do
+      EDIT_NOTES[i]=$(printf '%s' "${EDIT_NOTES[i]}" | sed '/./,$!d')
+      [ -n "${EDIT_NOTES[i]}" ] || edits_error "the file line for ${EDIT_FILES[i]} has no edit lines under it"
+    done
+    for p in "${EDIT_CPATH[@]}"; do
+      printf '%s\n' "${EDIT_FILES[@]}" | grep -qxF -- "$p" || edits_error "the check on $p names a file no file line lists"
+    done
   else
     if [ -z "$PLAN_FILE" ] || [ -z "$(printf '%s' "$WRITE_FILES" | tr -d '[:space:]')" ] || [ -z "$(printf '%s' "$DONE_COMMAND" | tr -d '[:space:]')" ]; then
-      echo "error: --harness qwen requires --plan <file>, --files '<path>...' and --done-command '<command>', or --combine <file> and --done-command '<command>'" >&2
+      echo "error: --harness qwen requires --plan <file>, --files '<path>...' and --done-command '<command>', --combine <file> and --done-command '<command>', or --kind <kind>, --edits <file> and --done-command '<command>'" >&2
       exit 1
     fi
     { [ -f "$PLAN_FILE" ] && PLAN_BODY=$(cat "$PLAN_FILE" 2>/dev/null) && [ -n "$(printf '%s' "$PLAN_BODY" | tr -d '[:space:]')" ]; } || {
@@ -469,8 +546,8 @@ if [ "$HARNESS_SET" -eq 1 ]; then
       esac
     done
   fi
-elif [ -n "$PLAN_FILE$WRITE_FILES$DONE_COMMAND$COMBINE_FILE" ]; then
-  echo "error: --plan, --files, --combine and --done-command apply only with --harness qwen" >&2
+elif [ -n "$PLAN_FILE$WRITE_FILES$DONE_COMMAND$COMBINE_FILE$QWEN_KIND$EDITS_FILE" ]; then
+  echo "error: --plan, --files, --combine, --kind, --edits and --done-command apply only with --harness qwen" >&2
   exit 1
 fi
 ID=${POS[0]}
@@ -920,6 +997,93 @@ Firstmate answers through message files in $INBOX_DIR; when your terminal announ
 EOF
 append_brief_include
 echo "scaffolded: $BRIEF and $COMBINE_SCRIPT (ship, mode=$MODE, qwen combine shape; replace {TASK} and {FIRSTMATE_SPEC})"
+exit 0
+fi
+if [ -n "$QWEN_KIND" ]; then
+EDIT_SCRIPT="$DATA/$ID/edit.sh"
+[ ! -e "$EDIT_SCRIPT" ] || { echo "error: $EDIT_SCRIPT already exists" >&2; exit 1; }
+ES=$(shell_quote "$EDIT_SCRIPT")
+EDIT_STEPS='' EDIT_LIST='' EDIT_CHECKS=''
+for ((i = 0; i < ${#EDIT_FILES[@]}; i++)); do
+  if [ "${EDIT_MAXDEL[i]}" = 0 ]; then
+    bound="add lines only, or create it; change or remove none of its existing lines"
+  else
+    bound="change or remove at most ${EDIT_MAXDEL[i]} of its existing lines"
+  fi
+  EDIT_LIST="$EDIT_LIST${EDIT_LIST:+, }\`${EDIT_FILES[i]}\`"
+  EDIT_STEPS="$EDIT_STEPS
+$((i + 1)). \`${EDIT_FILES[i]}\`: $bound.
+${EDIT_NOTES[i]}
+"
+done
+for ((i = 0; i < ${#EDIT_CHECK[@]}; i++)); do
+  if [ "${EDIT_CHECK[i]}" = has ]; then w=contains; else w="no longer contains"; fi
+  EDIT_CHECKS="$EDIT_CHECKS- \`${EDIT_CPATH[i]}\` $w: ${EDIT_CTEXT[i]}"$'\n'
+done
+EDIT_PR_BODY="A qwen $QWEN_KIND task that edits only $EDIT_LIST. Checked before the commit:
+
+$EDIT_CHECKS- \`$DONE_COMMAND\` exits 0
+"
+{
+  printf '%s\n' '#!/usr/bin/env bash' \
+    "# bin/fm-brief.sh --kind wrote this for one qwen $QWEN_KIND task; the worker runs it as" \
+    '#   bash <this file> start | publish'
+  printf '%s=%q\n' STATUS "$STATE/$ID.status" BRANCH "$BRANCH" PR_BASE "$BASE_BRANCH" \
+    MARK "$DATA/$ID/edit-stopped" GATE "$DONE_COMMAND" TITLE "$EDIT_TITLE" BODY "$EDIT_PR_BODY"
+  printf 'FILES=(%s)\n' "$(printf '%q ' "${EDIT_FILES[@]}")"
+  printf 'MAXDEL=(%s)\n' "$(printf '%q ' "${EDIT_MAXDEL[@]}")"
+  printf 'CHECK=(%s)\n' "$(printf '%q ' "${EDIT_CHECK[@]}")"
+  printf 'CPATH=(%s)\n' "$(printf '%q ' "${EDIT_CPATH[@]}")"
+  printf 'CTEXT=(%s)\n' "$(printf '%q ' "${EDIT_CTEXT[@]}")"
+  printf '. %q\n' "$FM_ROOT/bin/fm-qwen-edit.sh"
+} > "$EDIT_SCRIPT"
+cat > "$BRIEF" <<EOF
+Work alone; do not wait for a human.
+$QWEN_SETUP
+Stay on that branch. Never run \`git checkout\`, \`git switch\`, \`git stash\`, \`git reset\`, \`git clean\`, \`git rebase\`, \`git cherry-pick\`, \`git worktree\` or \`treehouse\`.
+
+Delivery contract: mode=direct-PR
+Ship branch: $BRANCH
+Brief shape: qwen
+
+$TASK_SECTION
+
+# Setup
+Before your first edit, read \`$QWEN_SETUP_FILE\` with \`read_file\`: it is this project's guide to this kind of task.
+Read no other file except the ones listed under # The edits.
+
+# The edits
+This is the whole task; never look for a plan file.
+Make these edits one file at a time, copying every quoted string character for character.
+$EDIT_STEPS
+# Rules
+1. Write only the files listed under # The edits, only as they say; every other path is read-only.
+2. Read a file with \`read_file\`, only when an edit needs it. Change a file with \`edit\` and create a new one with \`write_file\`; never rewrite an existing file with \`write_file\`. If \`edit\` or \`write_file\` refuses, \`read_file\` the file once and retry.
+3. Run only the commands this brief gives and \`grep\`. Never run \`git add\`, \`git commit\`, \`git push\`, \`git status\`, \`git diff\`, \`rm\`, \`ls\`, \`cat\` or \`find\`.
+4. ${RULE1#1. }
+
+# Finish
+After the last edit, run this command:
+    bash $ES publish
+It checks every edit and the project's check, commits, pushes, opens the PR and writes your done line.
+If it prints \`refused:\`, fix only what it names, in a listed file, and run it again. Only this script commits or writes the done line; never do either yourself.
+
+# Reporting
+When a command prints \`Published.\` or \`WAIT:\`, reply with one line and call no more tools.
+If a command still refuses after two fixes, or anything else fails twice, run this, and stop:
+    echo "blocked [at=\$(date +%s)]: <one line>" >> $STATUS_FILE
+Write status lines only with the commands in this brief.
+Firstmate answers through message files in $INBOX_DIR; when your terminal announces one, read it, act on it, then move it with \`mv $INBOX_DIR/NNN.msg $INBOX_DIR/handled/\`.
+EOF
+append_brief_include
+cat >> "$BRIEF" <<EOF
+
+# Start
+Before you look at any file, run this command:
+    bash $ES start
+If it prints \`WAIT:\`, do what it says and call no more tools.
+EOF
+echo "scaffolded: $BRIEF and $EDIT_SCRIPT (ship, mode=$MODE, qwen $QWEN_KIND shape; replace {TASK} and {FIRSTMATE_SPEC})"
 exit 0
 fi
 QWEN_FILES=

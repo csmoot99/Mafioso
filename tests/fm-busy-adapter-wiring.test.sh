@@ -598,11 +598,23 @@ test_qwen_settings_carry_the_project_kg_server() {
         mkdir -p "$HOME_DIR/projects/project/scripts"
         : > "$HOME_DIR/projects/project/scripts/kg-query.mjs"
         rm -f "$HOME_DIR/data/$id/brief.md"
-        printf 'Write x.txt.\n' > "$CASE_DIR/plan.md"
-        FM_HOME="$HOME_DIR" "$ROOT/bin/fm-brief.sh" "$id" project --mode direct-PR --harness qwen \
-          --plan "$CASE_DIR/plan.md" --files x.txt --done-command 'test -s x.txt' >/dev/null \
-          || fail "could not scaffold the qwen-shaped brief for $id"
-        grep -qxF -- "$lookup" "$HOME_DIR/data/$id/brief.md" || fail "the qwen-shaped brief for $id should carry the kg-query lookup"
+        if [ "$shape" = qwen-edit ]; then
+          # A task-kind brief names its files and points at no kg.
+          mkdir -p "$HOME_DIR/projects/project/ai-map/qwen"
+          : > "$HOME_DIR/projects/project/ai-map/qwen/text-edit.md"
+          # shellcheck disable=SC2016 # single quotes are deliberate: the backticks must stay literal
+          printf '%s\n' 'title docs: x' 'file x.txt 0' '   Create it with the line `x`.' 'has x.txt x' > "$CASE_DIR/edits"
+          FM_HOME="$HOME_DIR" "$ROOT/bin/fm-brief.sh" "$id" project --mode direct-PR --harness qwen \
+            --kind text-edit --edits "$CASE_DIR/edits" --done-command 'test -s x.txt' >/dev/null \
+            || fail "could not scaffold the qwen task-kind brief for $id"
+          ! grep -qF -- kg-query "$HOME_DIR/data/$id/brief.md" || fail "the qwen task-kind brief for $id should carry no kg-query lookup"
+        else
+          printf 'Write x.txt.\n' > "$CASE_DIR/plan.md"
+          FM_HOME="$HOME_DIR" "$ROOT/bin/fm-brief.sh" "$id" project --mode direct-PR --harness qwen \
+            --plan "$CASE_DIR/plan.md" --files x.txt --done-command 'test -s x.txt' >/dev/null \
+            || fail "could not scaffold the qwen-shaped brief for $id"
+          grep -qxF -- "$lookup" "$HOME_DIR/data/$id/brief.md" || fail "the qwen-shaped brief for $id should carry the kg-query lookup"
+        fi
         sed -i.bak -e 's/^{TASK}$/Write x.txt./' -e 's/^{FIRSTMATE_SPEC}$/Nothing else./' "$HOME_DIR/data/$id/brief.md"
         out=$(fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --mode direct-PR --yolo off) ;;
       *)
@@ -626,6 +638,8 @@ test_qwen_settings_carry_the_project_kg_server() {
       qwen-present)
         [ "$(cat "$WT_DIR/ai-map/ingest" 2>/dev/null)" = 'refresh --no-embed' ] \
           || fail "a graph a pooled slot kept must be refreshed incrementally without embeddings" ;;
+      qwen-edit)
+        [ ! -e "$WT_DIR/ai-map/ingest" ] || fail "a qwen-shaped brief without the kg-query lookup must not build the graph" ;;
       standard | qwen-built | qwen-deps)
         [ "$(cat "$WT_DIR/ai-map/ingest" 2>/dev/null)" = 'build --no-embed' ] \
           || fail "qwen $shape spawn must build the missing graph incrementally without embeddings"
@@ -645,17 +659,23 @@ test_qwen_settings_carry_the_project_kg_server() {
         assert_not_contains "$out" "kg graph is unavailable" "qwen $shape must not report an unavailable graph" ;;
       qwen-unbuilt)
         assert_not_contains "$(cat "$launch")" "kg-query" "a worker whose graph could not be built must not be told to query it"
-        [ "$(jq -c '.mcp' "$settings")" = null ] || fail "a worker without the kg-query lookup must keep the kg server connected"
         assert_contains "$out" "kg graph is unavailable: node scripts/kg-ingest.mjs --no-embed exited 2" \
           "the spawn must say why the graph is unavailable"
         assert_contains "$out" "the kg-query lookup is dropped from its brief" "the spawn must say the lookup was dropped"
         assert_contains "$(cat "$HOME_DIR/state/$id.kg-ingest.log")" "unknown option --no-embed" \
           "the failed build's output must be kept" ;;
       standard)
-        [ "$(jq -c '.mcp' "$settings")" = null ] || fail "a standard brief must keep the kg server connected" ;;
+        [ "$(jq -c '[.mcp, .context.fileName, .skills]' "$settings")" = '[null,null,null]' ] \
+          || fail "a standard brief must keep the kg server connected and qwen's own context files and skills" ;;
+    esac
+    case "$shape" in
+      qwen-*)
+        [ "$(jq -c '[.mcp.excluded, .context.fileName, .skills.disabledLevels, .context.autoCompactThreshold]' "$settings")" \
+          = '[["kg"],"FM-QWEN-NO-CONTEXT.md",["project","user","extension","bundled"],0.6]' ] \
+          || fail "qwen $shape: a qwen-shaped brief must load no context file, skill or kg server: $(jq -c . "$settings")" ;;
     esac
   done
-  pass "qwen settings re-declare a project kg server, the spawn installs missing dependencies and builds or refreshes the graph, and the kg-query lookup and kg exclusion stay only while the graph answers"
+  pass "qwen settings re-declare a project kg server, the spawn installs missing dependencies and builds or refreshes the graph only for a kg-query lookup that answers, and a qwen-shaped brief loads no context file, skill or kg server"
 }
 
 test_raw_qwen_launch_has_no_semantic_wiring() {
