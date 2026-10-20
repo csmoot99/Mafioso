@@ -199,7 +199,10 @@
 # sources bin/fm-qwen-edit.sh; the brief gives the worker only that file's
 # start and publish calls, and that helper owns the line bounds, the checks,
 # every stop, the commit, the PR and the done line. Its Start section runs the
-# helper's start, below the home include.
+# helper's start, below the home include. Its header's "Task kind: <kind>" line,
+# directly under "Brief shape: qwen", is what bin/fm-spawn.sh reads
+# (fm_brief_is_qwen_task_kind) to launch the worker with no context file, skill
+# or kg server.
 # Scaffolds carry no role scope: fm-spawn.sh supplies fm_brief_worker_role from
 # fm-dod-lib.sh to every ship/scout launch brief, so this file never becomes a
 # second owner of a contract that must stay current across relaunches.
@@ -1045,6 +1048,7 @@ Stay on that branch. Never run \`git checkout\`, \`git switch\`, \`git stash\`, 
 Delivery contract: mode=direct-PR
 Ship branch: $BRANCH
 Brief shape: qwen
+Task kind: $QWEN_KIND
 
 $TASK_SECTION
 

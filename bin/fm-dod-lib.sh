@@ -209,6 +209,18 @@ fm_brief_is_qwen_shape() {  # <brief>
   ' "$1"
 }
 
+# Return 0 when the brief is the qwen task-kind shape bin/fm-brief.sh --kind
+# writes: the qwen shape with a "Task kind: <kind>" line directly under its
+# "Brief shape: qwen" line, before the brief's first heading.
+fm_brief_is_qwen_task_kind() {  # <brief>
+  fm_brief_is_qwen_shape "$1" && awk '
+    /^#+ / { exit }
+    shape && /^Task kind: [a-z0-9][a-z0-9-]*$/ { found = 1; exit }
+    { shape = $0 == "Brief shape: qwen" }
+    END { exit !found }
+  ' "$1"
+}
+
 # The qwen-shaped brief's rule 3 kg lookup line: bin/fm-brief.sh writes it, and
 # bin/fm-spawn.sh removes it from the launch brief when the worktree's graph
 # cannot be built and keeps the kg MCP server out of requests while it stays.

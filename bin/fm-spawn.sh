@@ -5849,15 +5849,16 @@ fi
 # lookup through the server takes a tool_search turn more than the command,
 # and its tool listing adds 466 tokens to every request
 # (docs/verification/runtime-backends.md).
-# A qwen-shaped brief is closed: it names every file the worker reads, so its
+# A qwen task-kind brief (bin/fm-brief.sh --kind) is closed: it names every
+# file the worker reads and its helper prints the project's setup file, so its
 # launch also loads no context file (AGENTS.md, QWEN.md, the user's QWEN.md)
-# and no skill listing, and never offers the kg server; its graph is built only
-# for a brief that keeps the lookup line.
+# and no skill listing, never offers the kg server, and builds no graph. Plan
+# and combine briefs keep qwen's own context files and skills.
 if [ "$HARNESS" = qwen ] && [ "$RAW_LAUNCH" -eq 0 ]; then
   q_lookup=$(fm_qwen_kg_lookup_line)
-  q_shaped=0
-  [ "$KIND" != ship ] || ! fm_brief_is_qwen_shape "$SOURCE_BRIEF" || q_shaped=1
-  if { { [ "$q_shaped" -eq 0 ] && [ -f "$WT/scripts/kg-query.mjs" ]; } || grep -qxF -- "$q_lookup" "$BRIEF"; } &&
+  q_closed=0
+  [ "$KIND" != ship ] || ! fm_brief_is_qwen_task_kind "$SOURCE_BRIEF" || q_closed=1
+  if { { [ "$q_closed" -eq 0 ] && [ -f "$WT/scripts/kg-query.mjs" ]; } || grep -qxF -- "$q_lookup" "$BRIEF"; } &&
     ! q_why=$(ensure_qwen_kg_graph "$WT" "$STATE_REAL/$ID.kg-ingest.log"); then
     if grep -qxF -- "$q_lookup" "$BRIEF"; then
       if ! { { grep -vxF -- "$q_lookup" "$BRIEF" || :; } >"$BRIEF.kg.tmp" && mv -- "$BRIEF.kg.tmp" "$BRIEF"; }; then
@@ -5871,13 +5872,13 @@ if [ "$HARNESS" = qwen ] && [ "$RAW_LAUNCH" -eq 0 ]; then
   fi
   q_settings="$STATE_REAL/$ID.qwen-settings.json"
   q_lean='.'
-  [ "$q_shaped" -eq 0 ] || q_lean='.context.fileName = "FM-QWEN-NO-CONTEXT.md" | .skills.disabledLevels = ["project", "user", "extension", "bundled"]'
-  if { [ "$q_shaped" -eq 1 ] || grep -qxF -- "$q_lookup" "$BRIEF"; } && jq -e '.mcpServers.kg' "$q_settings" >/dev/null 2>&1; then
+  [ "$q_closed" -eq 0 ] || q_lean='.context.fileName = "FM-QWEN-NO-CONTEXT.md" | .skills.disabledLevels = ["project", "user", "extension", "bundled"]'
+  if { [ "$q_closed" -eq 1 ] || grep -qxF -- "$q_lookup" "$BRIEF"; } && jq -e '.mcpServers.kg' "$q_settings" >/dev/null 2>&1; then
     q_lean="$q_lean | .mcp = {excluded: [\"kg\"]}"
   fi
   if [ "$q_lean" != . ] && ! { jq -c "$q_lean" "$q_settings" >"$q_settings.tmp" && mv -- "$q_settings.tmp" "$q_settings"; }; then
     rm -f -- "$q_settings.tmp"
-    echo "error: could not write the qwen-shaped launch settings in $q_settings; inspect window $T" >&2
+    echo "error: could not write the qwen launch settings in $q_settings; inspect window $T" >&2
     exit 1
   fi
 fi

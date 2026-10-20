@@ -1559,7 +1559,7 @@ plus the two:  first request 46,596 chars; no marker file, no skill listing; the
 
 Neither run sent `CLAUDE.md`, `GEMINI.md`, or any `sub/` file at launch.
 What the second request kept is qwen's own system prompt, its `~/.qwen/output-language.md` rule, a git snapshot, a listing of up to 20 entries of the working directory, and the deferred tool list.
-`bin/fm-spawn.sh` adds the two keys for every qwen-shaped ship brief, and `tests/fm-busy-adapter-wiring.test.sh` pins them with no harness.
+`bin/fm-spawn.sh` adds the two keys only for a qwen task-kind brief (`bin/fm-brief.sh --kind`), and `tests/fm-busy-adapter-wiring.test.sh` pins them with no harness.
 The interactive launch's first request was not captured: qwen's chat log does not record the system prompt, so re-run the fake-endpoint check after a qwen upgrade.
 
 ### Loop-detection halt
