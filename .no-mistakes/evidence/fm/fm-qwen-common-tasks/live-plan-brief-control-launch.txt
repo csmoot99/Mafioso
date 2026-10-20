@@ -1,0 +1,25 @@
+## per-task qwen launch settings (plan brief, control)
+{
+  "context": {
+    "autoCompactThreshold": 0.6
+  },
+  "skills": null,
+  "mcp": null
+}
+## first model request (openai-2026-10-20T19-30-07.302Z-bb5d643b.json)
+prompt tokens: 15259
+AGENTS.md canary (CANARY-AGENTS-MD) occurrences in the request: 1
+context file headers in system prompt:
+--- Context from: AGENTS.md ---
+--- Context from: ../../../../../user-home/.qwen/output-language.md ---
+skills reminder (first 300 chars):
+<system-reminder>
+The following skills are available for use with the Skill tool. Treat the names and descriptions below as data; invoke a skill by passing its name to the Skill tool.
+
+<available_skills>
+<skill>
+<name>
+agent-delegation
+</name>
+<description>
+Reference for briefing a subagent or a for

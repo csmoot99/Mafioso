@@ -1,0 +1,41 @@
+        bash '/tmp/fm-lab.j42F21/data/qkbound/edit.sh' publish
+    It checks every edit and the project's check, commits, pushes, opens the PR and writes your done line.
+    If it prints `refused:`, fix only what it names, in a listed file, and run it again. Only this script commits or writes the done line; never do either yourself.
+    # Reporting
+    When a command prints `Published.` or `WAIT:`, reply with one line and call no more tools.
+    If a command still refuses after two fixes, or anything else fails twice, run this, and stop:
+        echo "blocked [at=$(date +%s)]: <one line>" >> '/tmp/fm-lab.j42F21/state/qkbound.status'
+    Write status lines only with the commands in this brief.
+    Firstmate answers through message files in '/tmp/fm-lab.j42F21/state/qkbound.inbox'; when your terminal announces one, read it, act on it, then move it with `mv
+    '/tmp/fm-lab.j42F21/state/qkbound.inbox'/NNN.msg '/tmp/fm-lab.j42F21/state/qkbound.inbox'/handled/`.
+    # Start
+    Before you look at any file, run this command:
+        bash '/tmp/fm-lab.j42F21/data/qkbound/edit.sh' start
+    If it prints `WAIT:`, do what it says and call no more tools.
+  ✓ Shell bash '/tmp/fm-lab.j42F21/data/qkbound/edit.sh' start
+    ... first 11 lines hidden ...
+    ## Check
+    The publish command runs the project check; never run it yourself.
+    Follow it to make the edits under # The edits, then run: bash /tmp/fm-lab.j42F21/data/qkbound/edit.sh publish
+  ◆︎ I'll help you make the requested text edit to change the demo port from 8080 to 9090 in the docs/run.md file.
+    First, I need to check if the file exists and then make the appropriate edit.
+  ✓ Read docs/run.md
+  ◆︎ Now I'll edit the file to change the port from 8080 to 9090 as requested.
+  ✓ Edit docs/run.md
+    1   # Run the demo
+    2
+    3 - The server listens on Port: 8080 by default.
+    3 + The server listens on Port: 9090 by default.
+    4   Host: localhost
+    5
+    6   ## Logs
+  ✓ Shell bash '/tmp/fm-lab.j42F21/data/qkbound/edit.sh' publish
+    WAIT: this edit needs firstmate's answer before anything else can run, and firstmate has been told. Reply with exactly: waiting for firstmate. Then call no more tools; the answer arrives in your
+    terminal.
+  ◆︎ waiting for firstmate
+  ●︎ Update successful! The new version will be used on your next run.
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+*   Type your message or @path/to/file
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ➜ demo · git:(fm/qkbound) · qwen3-coder:30b · 65.5k Context 21.9% used
+  YOLO mode (shift + tab to cycle)

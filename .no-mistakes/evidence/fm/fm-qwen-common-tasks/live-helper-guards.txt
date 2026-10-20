@@ -1,0 +1,55 @@
+=== A: worker touches a file the brief does not list ===
+
+Follow it to make the edits under # The edits, then run: bash /tmp/fm-lab.j42F21/data/qkA/edit.sh publish
+exit=0
+$ bash edit.sh publish   (cwd copy)
+WAIT: this edit needs firstmate's answer before anything else can run, and firstmate has been told. Reply with exactly: waiting for firstmate. Then call no more tools; the answer arrives in your terminal.
+exit=0
+status:
+working [at=1792524646]: started
+needs-decision [at=1792524646]: edit stopped: a file the brief does not list changed: AGENTS.md docs/notes.md; the copy is reset to 8207a4d
+copy after stop: 0 changed paths; origin branches: fm/qkplan main
+$ bash edit.sh start   (cwd copy)
+WAIT: this edit needs firstmate's answer before anything else can run, and firstmate has been told. Reply with exactly: waiting for firstmate. Then call no more tools; the answer arrives in your terminal.
+exit=0
+
+=== B: a has-check keeps failing: three refusals, then the fourth stops ===
+$ bash edit.sh publish   (cwd copy)
+WAIT: this edit needs firstmate's answer before anything else can run, and firstmate has been told. Reply with exactly: waiting for firstmate. Then call no more tools; the answer arrives in your terminal.
+exit=0
+$ bash edit.sh publish   (cwd copy)
+WAIT: this edit needs firstmate's answer before anything else can run, and firstmate has been told. Reply with exactly: waiting for firstmate. Then call no more tools; the answer arrives in your terminal.
+exit=0
+$ bash edit.sh publish   (cwd copy)
+WAIT: this edit needs firstmate's answer before anything else can run, and firstmate has been told. Reply with exactly: waiting for firstmate. Then call no more tools; the answer arrives in your terminal.
+exit=0
+$ bash edit.sh publish   (cwd copy)
+WAIT: this edit needs firstmate's answer before anything else can run, and firstmate has been told. Reply with exactly: waiting for firstmate. Then call no more tools; the answer arrives in your terminal.
+exit=0
+status:
+working [at=1792524646]: started
+needs-decision [at=1792524646]: edit stopped: docs/run.md lost 1 existing lines, more than the 0 its edits change; the copy is reset to 8207a4d
+copy after stop: 0 changed paths
+
+=== C: publish before start prints the guide and refuses once, uncounted ===
+$ bash edit.sh publish   (cwd copy)
+WAIT: this edit needs firstmate's answer before anything else can run, and firstmate has been told. Reply with exactly: waiting for firstmate. Then call no more tools; the answer arrives in your terminal.
+exit=0
+$ bash edit.sh publish   (cwd copy)
+WAIT: this edit needs firstmate's answer before anything else can run, and firstmate has been told. Reply with exactly: waiting for firstmate. Then call no more tools; the answer arrives in your terminal.
+exit=0
+status:
+needs-decision [at=1792524646]: edit stopped: a file the brief does not list changed: docs/notes.md; the copy is reset to 8207a4d
+pushed:
+fatal: ambiguous argument 'fm/qkC': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'fm/qkC': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+
+=== D: called from outside its own copy ===
+$ bash edit.sh start   (cwd /tmp/fm-lab.j42F21/projects/demo)
+WAIT: this is not your own copy on the branch fm/qkD, and firstmate has been told. Reply with exactly: waiting for firstmate. Then call no more tools; the answer arrives in your terminal.
+exit=0
+blocked [at=1792524647]: launched in primary checkout, not an isolated worktree

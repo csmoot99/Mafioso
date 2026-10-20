@@ -1,0 +1,22 @@
+## edits file (bound 0 for a replaced line: firstmate's mistake)
+title docs: move the demo port to 9090
+file docs/run.md 0
+   - Replace this text:
+         The server listens on Port: 8080 by default.
+     with this text:
+         The server listens on Port: 9090 by default.
+has docs/run.md The server listens on Port: 9090 by default.
+lacks docs/run.md Port: 8080
+## status file
+working [at=1792524552]: started
+needs-decision [at=1792524555]: edit stopped: docs/run.md lost 1 existing lines, more than the 0 its edits change; the copy is reset to 8207a4d
+## origin branches (nothing pushed)
+* main
+## worker copy after stop: git status --short (empty = clean), HEAD
+8207a4d init
+3:The server listens on Port: 8080 by default.
+## stop record
+stopped
+## a later publish only repeats WAIT
+WAIT: this edit needs firstmate's answer before anything else can run, and firstmate has been told. Reply with exactly: waiting for firstmate. Then call no more tools; the answer arrives in your terminal.
+rc=0

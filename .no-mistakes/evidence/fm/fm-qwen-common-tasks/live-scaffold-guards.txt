@@ -1,0 +1,52 @@
+$ fm-brief.sh adv1 nosetup --mode direct-PR --harness qwen --kind text-edit --edits /tmp/fm-lab.j42F21/scratch/edits --done-command true
+error: --kind text-edit needs the project's setup file ai-map/qwen/text-edit.md, which its clone does not have; land it in the project first (.agents/skills/qwen-task-kinds/SKILL.md)
+exit=1
+
+$ fm-brief.sh adv2 demo --mode direct-PR --harness qwen --kind text-edit --edits /tmp/fm-lab.j42F21/scratch/e.2 --done-command true
+error: --edits /tmp/fm-lab.j42F21/scratch/e.2 line 2: file paths are relative to the worktree and stay inside it (got '/etc/passwd')
+exit=1
+
+$ fm-brief.sh adv3 demo --mode direct-PR --harness qwen --kind text-edit --edits /tmp/fm-lab.j42F21/scratch/e.3 --done-command true
+error: --edits /tmp/fm-lab.j42F21/scratch/e.3 line 2: file paths are relative to the worktree and stay inside it (got '../escape.md')
+exit=1
+
+$ fm-brief.sh adv4 demo --mode direct-PR --harness qwen --kind text-edit --edits /tmp/fm-lab.j42F21/scratch/e.4 --done-command true
+error: --edits /tmp/fm-lab.j42F21/scratch/e.4: no has or lacks line checks the result
+exit=1
+
+$ fm-brief.sh adv5 demo --mode direct-PR --harness qwen --kind text-edit --edits /tmp/fm-lab.j42F21/scratch/e.5 --done-command true
+error: --edits /tmp/fm-lab.j42F21/scratch/e.5: the check on README.md names a file no file line lists
+exit=1
+
+$ fm-brief.sh adv6 demo --mode direct-PR --harness qwen --kind text-edit --edits /tmp/fm-lab.j42F21/scratch/e.6 --done-command true
+error: --edits /tmp/fm-lab.j42F21/scratch/e.6: the file line for docs/run.md has no edit lines under it
+exit=1
+
+$ fm-brief.sh adv7 demo --mode direct-PR --harness qwen --kind text-edit --edits /tmp/fm-lab.j42F21/scratch/e.7 --done-command true
+error: --edits /tmp/fm-lab.j42F21/scratch/e.7: the title line is missing
+exit=1
+
+$ fm-brief.sh adv8 demo --mode direct-PR --harness qwen --kind text-edit --edits /tmp/fm-lab.j42F21/scratch/e.8 --done-command true
+error: --edits /tmp/fm-lab.j42F21/scratch/e.8 line 2: 'many' is not a number of lines
+exit=1
+
+$ fm-brief.sh adv9 demo --mode direct-PR --harness qwen --kind Text_Edit --edits /tmp/fm-lab.j42F21/scratch/edits --done-command true
+error: --kind takes a lowercase task-kind name such as text-edit (got 'Text_Edit')
+exit=1
+
+$ fm-brief.sh adv10 demo --mode direct-PR --harness qwen --kind text-edit --edits /tmp/fm-lab.j42F21/scratch/edits --plan /tmp/fm-lab.j42F21/scratch/plan.md --files docs/run.md --done-command true
+error: --kind <kind> takes --edits <file> and --done-command '<command>' and replaces --plan and --files
+exit=1
+
+$ fm-brief.sh adv11 demo --mode direct-PR --harness qwen --kind text-edit --edits /tmp/fm-lab.j42F21/scratch/edits
+error: --kind <kind> takes --edits <file> and --done-command '<command>' and replaces --plan and --files
+exit=1
+
+$ fm-brief.sh adv12 demo --mode direct-PR --kind text-edit --edits /tmp/fm-lab.j42F21/scratch/edits --done-command true
+error: --plan, --files, --combine, --kind, --edits and --done-command apply only with --harness qwen
+exit=1
+
+$ fm-brief.sh adv13 demo --mode direct-PR --harness qwen --kind data-edit --edits /tmp/fm-lab.j42F21/scratch/edits --done-command true
+error: --kind data-edit needs the project's setup file ai-map/qwen/data-edit.md, which its clone does not have; land it in the project first (.agents/skills/qwen-task-kinds/SKILL.md)
+exit=1
+

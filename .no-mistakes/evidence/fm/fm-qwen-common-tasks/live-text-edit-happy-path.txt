@@ -1,0 +1,73 @@
+## origin branches
+  fm/qkgood
+* main
+## pushed commit
+a3588cd docs: move the demo port to 9090
+
+## files changed vs main
+ docs/notes.md | 1 +
+ docs/run.md   | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+diff --git a/docs/notes.md b/docs/notes.md
+index e777f79..72d816a 100644
+--- a/docs/notes.md
++++ b/docs/notes.md
+@@ -1,3 +1,4 @@
+ # Notes
+ 
+ Nothing here yet.
++The demo port changed to 9090 on 2026-10-20.
+diff --git a/docs/run.md b/docs/run.md
+index 148967d..064ba00 100644
+--- a/docs/run.md
++++ b/docs/run.md
+@@ -1,6 +1,6 @@
+ # Run the demo
+ 
+-The server listens on Port: 8080 by default.
++The server listens on Port: 9090 by default.
+ Host: localhost
+ 
+ ## Logs
+## status file
+working [at=1792524484]: started
+done [at=1792524489]: PR https://github.com/lab/demo/pull/7
+## gh-axi args (stub forge)
+pr
+create
+--title
+docs: move the demo port to 9090
+--body
+A qwen text-edit task that edits only `docs/run.md`, `docs/notes.md`. Checked before the commit:
+
+- `docs/run.md` contains: The server listens on Port: 9090 by default.
+- `docs/run.md` no longer contains: Port: 8080
+- `docs/notes.md` contains: The demo port changed to 9090 on 2026-10-20.
+- `grep -q "Port: 9090" docs/run.md` exits 0
+
+## worker copy status
+AGENTS.md
+ai-map
+docs
+## canary agents-md-was-loaded.txt present?
+ls: cannot access '/tmp/fm-lab.prTt47/treehouse/.treehouse/demo-7241ba/1/demo/agents-md-was-loaded.txt': No such file or directory
+AGENTS.md
+ai-map/qwen/text-edit.md
+docs/notes.md
+docs/run.md
+## launch settings
+{
+  "context": {
+    "autoCompactThreshold": 0.6,
+    "fileName": "FM-QWEN-NO-CONTEXT.md"
+  },
+  "skills": {
+    "disabledLevels": [
+      "project",
+      "user",
+      "extension",
+      "bundled"
+    ]
+  },
+  "mcp": null
+}

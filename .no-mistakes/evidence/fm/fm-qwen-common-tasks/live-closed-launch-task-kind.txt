@@ -1,0 +1,24 @@
+## per-task qwen launch settings (task-kind brief)
+{
+  "context": {
+    "autoCompactThreshold": 0.6,
+    "fileName": "FM-QWEN-NO-CONTEXT.md"
+  },
+  "skills": {
+    "disabledLevels": [
+      "project",
+      "user",
+      "extension",
+      "bundled"
+    ]
+  },
+  "mcp": null
+}
+## first model request (openai-2026-10-20T19-29-12.173Z-f0039f12.json)
+prompt tokens: 13546
+AGENTS.md canary (CANARY-AGENTS-MD) occurrences in the request: 0
+setup-file / project context file headers in system prompt:
+--- Context from: ../../../../../user-home/.qwen/output-language.md ---
+skills reminder:
+No skills are currently available. Skills can be added by creating directories with SKILL.md files or by configuring MCP servers with model-invocable prompts.
+tools offered: artifact ask_user_question display_image edit enter_plan_mode exit_plan_mode glob grep_search notebook_edit read_file run_shell_command skill tool_call tool_search write_file
