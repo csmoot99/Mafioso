@@ -1741,7 +1741,7 @@ test_qwen_combine_renders_the_trial_merge() {
   printf 'House rule.\n' > "$home/config/brief-include.md"
   base=$(printf 'b%.0s' {1..40})
   file="$TMP_ROOT/qwen-combine.txt"
-  qwen_combine_file "$file" "$base" finally '   Write the combined entry. Then run:' '       git commit -m "docs: one entry" -- CHANGELOG.md' body '  Extra.'
+  qwen_combine_file "$file" "$base" finally '   Write the combined entry. Then run:' '       git commit -m "docs: one entry" -- CHANGELOG.md'
   out=$(FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" some-proj --mode direct-PR --harness qwen \
     --combine "$file" --done-command 'make test' --base-branch feature/hub) || fail "fm-brief.sh --combine refused a valid combine: $out"
   brief="$home/data/$id/brief.md"
@@ -1757,7 +1757,7 @@ test_qwen_combine_renders_the_trial_merge() {
     "$home/state/$id.inbox"; do
     assert_grep "$line" "$brief" "the qwen combine brief lacks: $line"
   done
-  for absent in '# Start' '# The plan' "$base" 'Extra.' 'git merge --no-ff'; do
+  for absent in '# Start' '# The plan' "$base" 'git merge --no-ff'; do
     assert_no_grep "$absent" "$brief" "the qwen combine brief carries '$absent'"
   done
   [ "$(tail -1 "$brief")" = 'House rule.' ] || fail "the qwen combine brief does not end with the home include"

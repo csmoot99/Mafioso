@@ -168,17 +168,15 @@
 #                    at that step
 #   finally          an optional last step, such as the combined bookkeeping
 #                    commit
-#   body             optional PR body text after the folded-PR list
 # Indented and blank lines belong to the directive above them. Under a fold
 # that lists paths they are required and give, for each conflict block, its
 # two sides and the exact lines that replace it; a fold without paths takes
-# none. Fold and finally text renders verbatim in that step, body text without
-# its indentation. The brief names no merge command: the variant also writes
-# data/<task-id>/combine.sh, which assigns every value and sources
-# bin/fm-qwen-combine.sh, and the brief gives the worker only that file's fold,
-# commit, stop and publish calls. That helper owns the isolation check, the
-# working line, every stop, and the done line, so the variant has no Start
-# section and writes the home include last.
+# none. Fold and finally text renders verbatim in that step. The brief names no
+# merge command: the variant also writes data/<task-id>/combine.sh, which
+# assigns every value and sources bin/fm-qwen-combine.sh, and the brief gives
+# the worker only that file's fold, commit, stop and publish calls. That helper
+# owns the isolation check, the working line, every stop, and the done line, so
+# the variant has no Start section and writes the home include last.
 # Scaffolds carry no role scope: fm-spawn.sh supplies fm_brief_worker_role from
 # fm-dod-lib.sh to every ship/scout launch brief, so this file never becomes a
 # second owner of a contract that must stay current across relaunches.
@@ -408,7 +406,7 @@ if [ "$HARNESS_SET" -eq 1 ]; then
     # The combine file's format is in the header above.
     combine_error() { echo "error: --combine $COMBINE_FILE${line_no:+ line $line_no}: $*" >&2; exit 1; }
     full_commit() { case $1 in *[!0-9a-f]*) return 1 ;; esac; [ "${#1}" -eq 40 ] || [ "${#1}" -eq 64 ]; }
-    COMBINE_TITLE='' COMBINE_BASE='' COMBINE_FINALLY='' COMBINE_BODY='' block='' line_no=0
+    COMBINE_TITLE='' COMBINE_BASE='' COMBINE_FINALLY='' block='' line_no=0
     FOLD_URL=() FOLD_NUM=() FOLD_BRANCH=() FOLD_HEAD=() FOLD_PATHS=() FOLD_NOTE=()
     while IFS= read -r line || [ -n "$line" ]; do
       line_no=$((line_no + 1))
@@ -418,8 +416,7 @@ if [ "$HARNESS_SET" -eq 1 ]; then
           case $block in
             fold) FOLD_NOTE[${#FOLD_NOTE[@]}-1]+="$line"$'\n' ;;
             finally) COMBINE_FINALLY+="$line"$'\n' ;;
-            body) COMBINE_BODY+="${line#"${line%%[![:space:]]*}"}"$'\n' ;;
-            *) [ -z "$line" ] || combine_error "an indented line belongs under a fold, finally or body line" ;;
+            *) [ -z "$line" ] || combine_error "an indented line belongs under a fold or finally line" ;;
           esac ;;
         'title '*) COMBINE_TITLE=${line#title }; block= ;;
         'base '*) COMBINE_BASE=${line#base }; block= ;;
@@ -439,8 +436,7 @@ if [ "$HARNESS_SET" -eq 1 ]; then
           FOLD_URL+=("${f[0]}") FOLD_NUM+=("$n") FOLD_BRANCH+=("${f[1]}") FOLD_HEAD+=("${f[2]}") FOLD_PATHS+=("${f[*]:3}") FOLD_NOTE+=("")
           block='fold' ;;
         finally) block=finally ;;
-        body) block=body ;;
-        *) combine_error "expected title, base, fold, finally, body, or an indented line" ;;
+        *) combine_error "expected title, base, fold, finally, or an indented line" ;;
       esac
     done < "$COMBINE_FILE"
     line_no=
@@ -867,12 +863,9 @@ if [ -n "$COMBINE_FINALLY" ]; then
 $((i + 1)). $(printf '%s' "$COMBINE_FINALLY" | sed '/./,$!d; 1s/^[[:space:]]*//')
 "
 fi
-COMBINE_BODY=$(printf '%s' "$COMBINE_BODY" | sed '/./,$!d')
 COMBINE_PR_BODY="Combines these approved PRs, each folded at its exact head with a merge commit:
 
 $COMBINE_LIST"
-[ -z "$COMBINE_BODY" ] || COMBINE_PR_BODY="$COMBINE_PR_BODY
-$COMBINE_BODY"
 {
   printf '%s\n' '#!/usr/bin/env bash' \
     "# bin/fm-brief.sh --combine wrote this for one qwen combine; the worker runs it as" \

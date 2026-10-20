@@ -56,7 +56,6 @@ combine_fixture() {
         printf '%s %s\n   - Keep both lines.\n' "$note" "$paths"
       fi
     done
-    printf 'body\n  Keeps both lines of a.txt.\n'
   } > "$file"
   GATE_FLAG="$TMP_ROOT/$name-gate-fails"
   FM_HOME="$HOME_DIR" "$ROOT/bin/fm-brief.sh" "$ID" r --mode direct-PR --harness qwen \
@@ -119,7 +118,6 @@ test_a_combine_folds_resolves_and_publishes() {
   done
   grep -qxF -- "- https://github.com/o/r/pull/13 at $H13" "$GH_ARGS" || fail "the PR body does not list each folded PR at its head"
   grep -qxF "Combine #11, #12 and #13" "$GH_ARGS" || fail "the PR does not carry the combine's title"
-  grep -qxF "Keeps both lines of a.txt." "$GH_ARGS" || fail "the PR body does not carry the combine's body text"
   [ "$(sed -n 1,4p "$GH_ARGS" | tr '\n' ' ')" = "pr create --base release " ] \
     || fail "the PR does not target the combine's base branch"
   ! grep -q '^needs-decision\|^blocked' "$STATUS" || fail "a clean combine wrote a decision or blocker"
