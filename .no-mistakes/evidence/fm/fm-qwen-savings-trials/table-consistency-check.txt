@@ -1,0 +1,8 @@
+doc table rows: 23 script table rows: 23
+rows identical in order: True
+over 2,000 worker events: rows sum 9,279 vs all 9,279 -> OK
+over 2,000 firstmate events: rows sum 1,131 vs all 1,131 -> OK
+over 2,000 pipeline events: rows sum 4,485 vs all 4,485 -> OK
+over 5,000 worker events: rows sum 3,153 vs all 3,153 -> OK
+over 5,000 firstmate events: rows sum 354 vs all 354 -> OK
+over 5,000 pipeline events: rows sum 1,552 vs all 1,552 -> OK

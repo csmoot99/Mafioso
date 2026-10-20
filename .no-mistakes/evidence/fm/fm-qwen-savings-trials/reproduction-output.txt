@@ -1,0 +1,35 @@
+transcript files with a request in the window: 1,778
+
+Results over 2,000 tokens
+| tests, lint, typecheck, build | 54 | $4 | $3 (0.3%) | 0 | $0 | $0 (0.0%) | 27 | $1 | $1 (0.4%) |
+| git and grep/find/ls | 1,821 | $157 | $126 (12.9%) | 151 | $24 | $19 (8.4%) | 1,972 | $85 | $71 (35.9%) |
+| other commands | 816 | $56 | $44 (4.5%) | 238 | $34 | $26 (11.7%) | 211 | $9 | $7 (3.3%) |
+| shell file views | 4,628 | $561 | $480 (49.1%) | 235 | $38 | $31 (13.8%) | 1,744 | $84 | $69 (34.9%) |
+| Read tool | 736 | $144 | $132 (13.5%) | 117 | $62 | $59 (26.2%) | 298 | $34 | $32 (16.4%) |
+| mixed batches | 1,041 | $187 | $171 (17.5%) | 263 | $86 | $77 (34.1%) | 199 | $19 | $17 (8.7%) |
+| other tools | 183 | $23 | $21 (2.1%) | 127 | $16 | $13 (5.8%) | 34 | $1 | $1 (0.3%) |
+| all | 9,279 | $1,132 | $976 | 1,131 | $260 | $226 | 4,485 | $232 | $197 |
+
+Results over 5,000 tokens
+| tests, lint, typecheck, build | 7 | $2 | $2 (0.3%) | 0 | $0 | $0 (0.0%) | 0 | $0 | $0 (0.0%) |
+| git and grep/find/ls | 398 | $69 | $62 (9.0%) | 33 | $11 | $10 (6.0%) | 738 | $49 | $45 (34.5%) |
+| other commands | 126 | $18 | $16 (2.3%) | 32 | $10 | $9 (5.3%) | 33 | $2 | $2 (1.7%) |
+| shell file views | 1,494 | $353 | $324 (47.0%) | 63 | $19 | $17 (10.7%) | 483 | $42 | $38 (29.2%) |
+| Read tool | 417 | $126 | $118 (17.1%) | 77 | $59 | $57 (35.0%) | 187 | $31 | $30 (23.3%) |
+| mixed batches | 582 | $159 | $149 (21.6%) | 115 | $66 | $62 (38.6%) | 111 | $16 | $15 (11.3%) |
+| other tools | 129 | $20 | $19 (2.7%) | 34 | $8 | $7 (4.4%) | 0 | $0 | $0 (0.0%) |
+| all | 3,153 | $746 | $690 | 354 | $173 | $162 | 1,552 | $141 | $129 |
+
+Bash results over 2,000 tokens by leading command, attributable cost
+worker: cat $392, sed $201, grep $77, ls $27, git diff $20, git rev-parse $18, wc $17, python3 <<EOF $9, git show $8, ]: $8, awk $7, git grep $4
+firstmate: sed $29, cat $17, grep $14, ls $7, fm-wake-drain.sh $6, fm-pr-check.sh $5, fm-tasks-axi.sh $5, git show $5, gh pr view $3, fm-brief.sh $2, wc $2, fm-captain-hold.sh $2
+pipeline: cat $59, git diff $48, sed $32, grep $16, git show $9, git log $8, ls $6, git status $1, git grep $1, python3 <<EOF $1, find $1, docker ps $1
+
+Single-command worker Bash results of every size
+| tests | 898 | 252 | 27 | 2 | 22 |
+| lint | 445 | 252 | 15 | 3 | 2 |
+| typecheck | 331 | 197 | 12 | 2 | 3 |
+| build | 146 | 234 | 0 | 0 | 22 |
+| git | 4,726 | 412 | 614 | 180 | 4 |
+| grep/find/ls | 11,023 | 541 | 1,154 | 192 | 10 |
+| shell file views | 13,796 | 1,181 | 4,384 | 1,308 | 10 |
