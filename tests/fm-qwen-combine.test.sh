@@ -8,15 +8,16 @@
 #   1. A fold merges the exact head with its merge message, the first fold
 #      writes the working line, and a conflicted step commits only once no
 #      git conflict-marker line is left, a longer setext underline not being
-#      one, and nothing outside its conflicted files changed; a deleted
-#      conflicted file hides no marker left in another.
+#      one, no resolved line is in neither side nor the step's note, and
+#      nothing outside its conflicted files changed; a deleted conflicted file
+#      hides no marker left in another.
 #   2. Only publish writes the done line, after the gate passed, the branch
 #      was pushed, and gh-axi printed a PR URL, which the line carries; a
 #      repeated publish finds the PR already open for the branch instead of
 #      opening another. A tracked change blocks publish; an untracked gate
 #      artifact or a conflicted file a later fold deleted does not.
-#   3. A conflict the step did not expect, a moved base, and the worker's own
-#      stop append needs-decision, reset the copy to the base, and leave every
+#   3. A conflict the step did not expect, a conflict side the step's note
+#      never names, and a moved base append needs-decision, reset the copy to the base, and leave every
 #      later call printing only WAIT; nothing is published after a stop.
 #   4. A call outside the copy's top level or off its branch writes the
 #      blocked line and waits.
@@ -47,7 +48,8 @@ combine_repo() {
 
 # combine_fixture <name> <step 2 conflicts> <step 3 conflicts> [fm-brief args...]:
 # combine_repo, then a combine of #11, #12 and #13 whose steps 2 and 3 expect
-# the given conflicted files ("-" for a clean step), set up by combine_brief.
+# the given conflicted files ("-" for a clean step), each with the note NOTE
+# (by default one naming both sides), set up by combine_brief.
 combine_fixture() {
   local name=$1 file k paths note
   combine_repo "$name"
@@ -60,7 +62,7 @@ combine_fixture() {
       if [ "$paths" = - ]; then
         printf '%s\n' "$note"
       else
-        printf '%s %s\n   - Keep both lines.\n' "$note" "$paths"
+        printf '%s %s\n%s\n' "$note" "$paths" "${NOTE:-   - Keep both lines, two-12 then two-13, under the heading Notes on a and its ========== underline.}"
       fi
     done
   } > "$file"
@@ -120,6 +122,9 @@ test_a_combine_folds_resolves_and_publishes() {
     printf 'one\ntwo-12\n%s\ntwo-13\nthree\n' "$left" > "$WT/a.txt"
     out=$(step commit 3); [ "$?" -eq 1 ] || fail "commit 3 concluded a merge with a '$left' line left"
   done
+  printf 'one\ntwo-12\ntwo-99\nthree\n' > "$WT/a.txt"
+  out=$(step commit 3); [ "$?" -eq 1 ] || fail "commit 3 concluded a merge with a line neither side nor the step has"
+  assert_contains "$out" "a.txt has a line that neither side has and step 3 does not give: two-99" "commit 3 did not name the invented line"
   printf 'Notes on a\n==========\none\ntwo-12\ntwo-13\nthree\n' > "$WT/a.txt"
   printf 'stray\n' > "$WT/c.txt"
   out=$(step commit 3); [ "$?" -eq 1 ] || fail "commit 3 committed a file outside its conflict"
@@ -180,13 +185,15 @@ test_an_unexpected_conflict_stops_and_waits() {
   [ "$(git -C "$WT" rev-parse HEAD)" = "$BASE" ] || fail "a call after a stop moved the copy"
   ! grep -q '^done ' "$STATUS" || fail "a stopped combine wrote done"
 
-  combine_fixture own - a.txt
-  { step fold 1 >/dev/null && step fold 2 >/dev/null && step fold 3 >/dev/null; } || fail "the folds before the worker's stop failed"
-  out=$(step stop 3 "a.txt: one value, two-12 or two-13") || fail "the worker's stop exited nonzero"
-  assert_contains "$out" "WAIT:" "the worker's stop did not print WAIT"
-  grep -q '^needs-decision \[at=[0-9]*\]: combine step 3 stopped: a.txt: one value, two-12 or two-13;' "$STATUS" \
-    || fail "the worker's stop did not carry what each side wants"
-  [ "$(git -C "$WT" rev-parse HEAD)" = "$BASE" ] || fail "the worker's stop did not reset the copy to the base"
+  NOTE='   - Keep both lines, two-csv then two-pdf.' combine_fixture sides - a.txt
+  { step fold 1 >/dev/null && step fold 2 >/dev/null; } || fail "the folds before the wrong sides failed"
+  out=$(step fold 3) || fail "a conflict with sides the step does not name exited nonzero"
+  assert_contains "$out" "WAIT: step 3" "a conflict with sides the step does not name did not print WAIT"
+  grep -q '^needs-decision \[at=[0-9]*\]: combine step 3 stopped: a conflict side in a.txt is not what this step says: two-12;' "$STATUS" \
+    || fail "a conflict with sides the step does not name did not append needs-decision naming the side"
+  [ "$(git -C "$WT" rev-parse HEAD)" = "$BASE" ] || fail "a conflict with sides the step does not name did not reset the copy to the base"
+  out=$(step commit 3) || fail "commit 3 after the wrong sides exited nonzero"
+  assert_contains "$out" "WAIT: step 3" "commit 3 after the wrong sides did not repeat the wait"
 
   combine_fixture moved - a.txt
   git -C "$WT" commit -q --allow-empty -m moved
@@ -194,7 +201,7 @@ test_an_unexpected_conflict_stops_and_waits() {
   assert_contains "$out" "WAIT: step 1" "a moved base did not stop at step 1"
   grep -q '^needs-decision .*: combine step 1 stopped: the copy starts at ' "$STATUS" || fail "a moved base did not append needs-decision"
   ! grep -q '^working ' "$STATUS" || fail "a moved base still wrote the working line"
-  pass "fm-qwen-combine.sh: an unexpected conflict, the worker's own stop, and a moved base reset the copy and wait"
+  pass "fm-qwen-combine.sh: an unexpected conflict, a conflict side the step does not name, and a moved base reset the copy and wait"
 }
 
 test_a_call_outside_its_copy_is_blocked() {
@@ -231,7 +238,7 @@ test_a_deleted_conflicted_file_holds_no_markers() {
     printf 'title Combine #11 to #14\nbase %s\n' "$BASE"
     printf 'fold https://github.com/o/r/pull/11 pr11 %s\n' "$H11"
     printf 'fold https://github.com/o/r/pull/12 pr12 %s\n' "$H12"
-    printf 'fold https://github.com/o/r/pull/13 pr13 %s a.txt d.txt\n   - Keep both lines of a.txt and the d.txt of #13.\n' "$H13"
+    printf 'fold https://github.com/o/r/pull/13 pr13 %s a.txt d.txt\n   - Keep both lines of a.txt, two-12 then two-13, and the d.txt line of #13, d-13, over d-12.\n' "$H13"
     printf 'fold https://github.com/o/r/pull/14 pr14 %s\n' "$H14"
   } > "$file"
   combine_brief gone "$file"

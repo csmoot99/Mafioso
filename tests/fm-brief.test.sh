@@ -1753,11 +1753,10 @@ test_qwen_combine_renders_the_trial_merge() {
     "       bash '$home/data/$id/combine.sh' commit 2" \
     '3. Write the combined entry. Then run:' '       git commit -m "docs: one entry" -- CHANGELOG.md' \
     "    bash '$home/data/$id/combine.sh' publish" \
-    "    bash '$home/data/$id/combine.sh' stop <step number> \"<file>: <what each side wants>\"" \
     "$home/state/$id.inbox"; do
     assert_grep "$line" "$brief" "the qwen combine brief lacks: $line"
   done
-  for absent in '# Start' '# The plan' "$base" 'git merge --no-ff'; do
+  for absent in '# Start' '# The plan' "$base" 'git merge --no-ff' "combine.sh' stop"; do
     assert_no_grep "$absent" "$brief" "the qwen combine brief carries '$absent'"
   done
   [ "$(tail -1 "$brief")" = 'House rule.' ] || fail "the qwen combine brief does not end with the home include"

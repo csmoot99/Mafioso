@@ -9,29 +9,31 @@
 #                the base commit firstmate's trial merge used and writes the
 #                working line
 #   commit <n>   conclude step n's stopped merge once no conflict marker is left
-#                in its conflicted files and nothing outside them changed
-#   stop <n> <what each side wants>
-#                the worker's own stop, when a conflict block's sides are not
-#                what its step says
+#                in its conflicted files, every line the resolution wrote that
+#                neither side has is one step n's note gives, and nothing
+#                outside those files changed
 #   publish      check every fold, run the gate, push, open the PR or find the
 #                one already open for BRANCH, and write the done line with the
 #                URL gh-axi printed
 # A fold whose conflicted files differ from the set firstmate expected (a clean
 # step that stops, a conflicted step that merges cleanly, any other file), a
-# merge that fails without a conflict, a base that moved, and the worker's own
-# stop all stop the combine: the needs-decision line is appended, the copy is
-# reset to the base commit so it holds no unlanded commit, the stop is recorded
-# in MARK, and every later call only repeats the WAIT text, which a qwen worker
-# reads as waiting for firstmate rather than as an error to fix. Only publish
-# writes the done line, and only after gh-axi printed a PR URL. Every call first
-# checks the copy is the top of its own worktree on BRANCH, else it appends the
-# blocked line and waits. A refusal exits 1 and names what to fix.
+# conflict side line the step's note never names, a merge that fails without a
+# conflict, and a base that moved all stop the combine, so the helper rather
+# than the worker judges whether a conflict is the one the step describes: the
+# needs-decision line is appended, the copy is reset to the base commit so it
+# holds no unlanded commit, the stop is recorded in MARK, and every later call
+# only repeats the WAIT text, which a qwen worker reads as waiting for firstmate
+# rather than as an error to fix. Only publish writes the done line, and only
+# after gh-axi printed a PR URL. Every call first checks the copy is the top of
+# its own worktree on BRANCH, else it appends the blocked line and waits. A
+# refusal exits 1 and names what to fix.
 # Inputs, assigned by combine.sh: STATUS (the task's status file), BRANCH, BASE
 # (full commit), PR_BASE (the PR's base branch, empty for the default), MARK
 # (the stop record, beside combine.sh), GATE (the command that must exit 0),
-# TITLE, BODY, and the arrays HEADS, MSGS and EXPECT, indexed from 1 by step,
-# holding each step's full head, merge message, and space-separated expected
-# conflicted files (empty for a clean step).
+# TITLE, BODY, and the arrays HEADS, MSGS, EXPECT and NOTES, indexed from 1 by
+# step, holding each step's full head, merge message, space-separated expected
+# conflicted files (empty for a clean step), and the resolution note firstmate
+# wrote under its fold.
 # Never run this file directly.
 # shellcheck disable=SC2154 # combine.sh assigns every input before sourcing this file.
 set -u
@@ -60,6 +62,19 @@ markers() {
   done
   return "$left"
 }
+# sides <file>: each line of either side of the file's conflict blocks, trimmed;
+# a diff3 base section is neither side.
+sides() {
+  awk 'function m(c) { return substr($0, 1, 7) == c && (length($0) == 7 || substr($0, 8, 1) ~ /[ \t]/) }
+    m("<<<<<<<") { b = s = 1; next } b && m("|||||||") { s = 0; next } b && m("=======") { s = 1; next }
+    b && m(">>>>>>>") { b = s = 0; next } s' "$1" | trim
+}
+trim() { sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep .; }
+# unsaid: the first input line step n's note never names.
+unsaid() {
+  local l
+  while IFS= read -r l; do [[ ${NOTES[$n]} == *"$l"* ]] || { printf '%s\n' "$l"; return; }; done
+}
 
 [ ! -f "$MARK" ] || finished "$(cat "$MARK")"
 if [ "$(pwd -P)" != "$(git rev-parse --show-toplevel 2>/dev/null)" ] || [ "$(git branch --show-current)" != "$BRANCH" ]; then
@@ -68,13 +83,13 @@ if [ "$(pwd -P)" != "$(git rev-parse --show-toplevel 2>/dev/null)" ] || [ "$(git
 fi
 cmd=${1:-} n=${2:-}
 case $cmd in
-  fold | commit | stop)
+  fold | commit)
     case $n in '' | *[!0-9]*) refuse "usage: $cmd <step number>" ;; esac
     [ "$n" -ge 1 ] && [ "$n" -le "$N" ] || refuse "there is no step $n"
     read -r -a files <<<"${EXPECT[$n]}"
     want=$(printf '%s\n' ${files[@]+"${files[@]}"} | sort -u | tr '\n' ' ' | sed 's/ $//') ;;
   publish) ;;
-  *) refuse "usage: fold <n> | commit <n> | stop <n> <what each side wants> | publish" ;;
+  *) refuse "usage: fold <n> | commit <n> | publish" ;;
 esac
 case $cmd in
   fold)
@@ -92,6 +107,9 @@ case $cmd in
     if merging && [ -n "$got" ]; then
       [ -n "$want" ] || stop "git stopped on a conflict in $got, but this step was to merge cleanly"
       [ "$got" = "$want" ] || stop "git stopped on a conflict in $got, but this step expects one in $want"
+      for f in "${files[@]}"; do
+        [ ! -f "$f" ] || { odd=$(sides "$f" | unsaid); [ -z "$odd" ]; } || stop "a conflict side in $f is not what this step says: $odd"
+      done
       printf 'Step %s stopped on a conflict in %s, as the step says. Resolve it as the step says, then run: bash %q commit %s\n' "$n" "$got" "$0" "$n"
     elif git merge-base --is-ancestor "${HEADS[$n]}" HEAD 2>/dev/null; then
       [ -z "$want" ] || stop "it merged cleanly, but this step expects a conflict in $want"
@@ -99,15 +117,15 @@ case $cmd in
     else
       stop "git merge failed without a conflict: $(printf '%s\n' "$out" | grep -m1 .)"
     fi ;;
-  stop)
-    shift 2
-    [ -n "$*" ] || refuse "usage: stop <n> <what each side wants>"
-    stop "$*" ;;
   commit)
     merging || refuse "no merge is stopped: run this step's fold command first"
     [ "$(git rev-parse MERGE_HEAD)" = "${HEADS[$n]}" ] || refuse "the stopped merge is not step $n's"
     [ -n "$want" ] || refuse "step $n has no conflict to commit"
     markers "${files[@]}" || refuse "conflict markers are left in the lines above"
+    for f in "${files[@]}"; do
+      [ ! -f "$f" ] || { odd=$(grep -vxF -f <({ git show ":2:$f"; git show ":3:$f"; } 2>/dev/null) -- "$f" | trim | unsaid); [ -z "$odd" ]; } \
+        || refuse "$f has a line that neither side has and step $n does not give: $odd"
+    done
     other=$({ git diff --name-only; git ls-files --others --exclude-standard; } | grep -vxF -f <(printf '%s\n' "${files[@]}") | sort -u | tr '\n' ' ')
     [ -z "$other" ] || refuse "files outside this step's conflict changed: $other"
     git add -A -- "${files[@]}"

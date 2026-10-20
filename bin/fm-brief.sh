@@ -168,15 +168,17 @@
 #                    at that step
 #   finally          an optional last step, such as the combined bookkeeping
 #                    commit
-# Indented and blank lines belong to the directive above them. Under a fold
-# that lists paths they are required and give, for each conflict block, its
-# two sides and the exact lines that replace it; a fold without paths takes
-# none. Fold and finally text renders verbatim in that step. The brief names no
-# merge command: the variant also writes data/<task-id>/combine.sh, which
-# assigns every value and sources bin/fm-qwen-combine.sh, and the brief gives
-# the worker only that file's fold, commit, stop and publish calls. That helper
-# owns the isolation check, the working line, every stop, and the done line, so
-# the variant has no Start section and writes the home include last.
+# Indented and blank lines belong to the directive above them. Under a fold that
+# lists paths they are required and give, for each conflict block, its two sides
+# and the exact lines that replace it, because bin/fm-qwen-combine.sh stops on a
+# side line the note never names and refuses a resolved line found in neither
+# side nor the note; a fold without paths takes none. Fold and finally text renders
+# verbatim in that step. The brief names no merge command: the variant also
+# writes data/<task-id>/combine.sh, which assigns every value and sources
+# bin/fm-qwen-combine.sh, and the brief gives the worker only that file's fold,
+# commit and publish calls. That helper owns the isolation check, the working
+# line, every stop, and the done line, so the variant has no Start section and
+# writes the home include last.
 # Scaffolds carry no role scope: fm-spawn.sh supplies fm_brief_worker_role from
 # fm-dod-lib.sh to every ship/scout launch brief, so this file never becomes a
 # second owner of a contract that must stay current across relaunches.
@@ -869,12 +871,13 @@ $COMBINE_LIST"
 {
   printf '%s\n' '#!/usr/bin/env bash' \
     "# bin/fm-brief.sh --combine wrote this for one qwen combine; the worker runs it as" \
-    '#   bash <this file> fold <n> | commit <n> | stop <n> <what each side wants> | publish'
+    '#   bash <this file> fold <n> | commit <n> | publish'
   printf '%s=%q\n' STATUS "$STATE/$ID.status" BRANCH "$BRANCH" BASE "$COMBINE_BASE" PR_BASE "$BASE_BRANCH" \
     MARK "$DATA/$ID/combine-stopped" GATE "$DONE_COMMAND" TITLE "$COMBINE_TITLE" BODY "$COMBINE_PR_BODY"
   printf 'HEADS=(%s)\n' "$(printf '%q ' '' "${FOLD_HEAD[@]}")"
   printf 'MSGS=(%s)\n' "$(printf '%q ' '' "${COMBINE_MSGS[@]}")"
   printf 'EXPECT=(%s)\n' "$(printf '%q ' '' "${FOLD_PATHS[@]}")"
+  printf 'NOTES=(%s)\n' "$(printf '%q ' '' "${FOLD_NOTE[@]}")"
   printf '. %q\n' "$FM_ROOT/bin/fm-qwen-combine.sh"
 } > "$COMBINE_SCRIPT"
 cat > "$BRIEF" <<EOF
@@ -896,7 +899,7 @@ $COMBINE_STEPS
 # Rules
 1. Write only the files a step names, only as it says; every other path is read-only.
 2. A conflict block runs from a \`<<<<<<<\` line through its \`>>>>>>>\` line. Find the blocks with \`grep -nE '^(<<<<<<<|=======|>>>>>>>|[|]{7})([[:space:]]|$)' <file>\`, read the file with \`read_file\`, and resolve each block with one \`edit\` whose old_string starts at its \`<<<<<<<\` line and ends at its \`>>>>>>>\` line. If \`edit\` refuses, \`read_file\` the file once and retry.
-3. Resolve a conflict only as its step says; never choose between two sides yourself. If a block's two sides are not what its step says, run the stop command under Reporting.
+3. Resolve a conflict only as its step says; never choose between two sides yourself. The fold command has already checked that each block's sides are the ones its step names.
 4. Run only the commands this brief gives and \`grep\`. Never run \`git merge\`, \`git add\`, \`git rm\`, \`git status\`, \`git fetch\`, \`git branch\`, \`git show\`, \`rm\`, \`ls\`, \`cat\` or \`find\`.
 5. ${RULE1#1. }
    Never use \`--force\`, \`--squash\` or \`--amend\`.
@@ -909,8 +912,6 @@ If it prints \`refused:\`, fix only what it names, in a file a step names; commi
 
 # Reporting
 When a command prints \`Published.\` or \`WAIT:\`, reply with one line and call no more tools.
-If a block's sides are not what its step says (rule 3), run this with the step number, the file and what each side wants:
-    bash $CS stop <step number> "<file>: <what each side wants>"
 If a command still refuses after two fixes, or anything else fails twice, run this, and stop:
     echo "blocked [at=\$(date +%s)]: <one line>" >> $STATUS_FILE
 Write status lines only with the commands in this brief.
