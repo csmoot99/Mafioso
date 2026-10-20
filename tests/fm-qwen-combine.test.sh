@@ -289,7 +289,23 @@ test_a_merge_concluded_outside_commit_stops_publish() {
   pass "fm-qwen-combine.sh: a conflicted merge concluded by a raw git commit after a refusal stops publish instead of shipping"
 }
 
+test_a_staged_resolution_is_judged_by_its_sides() {
+  local out
+  combine_fixture staged - a.txt
+  { step fold 1 >/dev/null && step fold 2 >/dev/null && step fold 3 >/dev/null; } || fail "the folds before the staged resolution failed"
+  printf 'one\ntwo-12\ntwo-99\nthree\n' > "$WT/a.txt"
+  git -C "$WT" add a.txt
+  out=$(step commit 3); [ "$?" -eq 1 ] || fail "commit 3 concluded a staged merge with a line neither side nor the step has"
+  assert_contains "$out" "a.txt has a line that neither side has and step 3 does not give: two-99" "commit 3 did not name the invented line in a staged resolution"
+  printf 'one\ntwo-12\ntwo-13\nthree\n' > "$WT/a.txt"
+  git -C "$WT" add a.txt
+  out=$(step commit 3) || fail "commit 3 refused a correct resolution the worker staged with git add: $out"
+  [ "$(git -C "$WT" log -1 --format=%s)" = "Merge #13 from pr13 at $H13" ] || fail "commit 3 did not keep the merge message of a staged resolution"
+  pass "fm-qwen-combine.sh: a resolution staged with git add commits when correct and is refused with its real reason when not"
+}
+
 test_a_combine_folds_resolves_and_publishes
+test_a_staged_resolution_is_judged_by_its_sides
 test_a_deleted_conflicted_file_holds_no_markers
 test_a_merge_concluded_outside_commit_stops_publish
 test_an_unexpected_conflict_stops_and_waits

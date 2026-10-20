@@ -153,7 +153,7 @@ case $cmd in
     [ -n "$want" ] || refuse "step $n has no conflict to commit"
     markers "${files[@]}" || refuse "conflict markers are left in the lines above"
     for f in "${files[@]}"; do
-      [ ! -f "$f" ] || { odd=$(grep -vxF -f <({ git show ":2:$f"; git show ":3:$f"; } 2>/dev/null) -- "$f" | trim | unsaid); [ -z "$odd" ]; } \
+      [ ! -f "$f" ] || { odd=$(grep -vxF -f <({ git show "HEAD:$f"; git show "MERGE_HEAD:$f"; } 2>/dev/null) -- "$f" | trim | unsaid); [ -z "$odd" ]; } \
         || refuse "$f has a line that neither side has and step $n does not give: $odd"
       [ ! -f "$f" ] || [ ! -f "$saved/$f" ] || lost=$(kept "$saved/$f" "$f") \
         || refuse "$f changed a line outside its conflict blocks; keep every line outside them as git left it: $lost"
