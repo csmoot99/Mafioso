@@ -12,14 +12,17 @@
 #                in its conflicted files, every line the resolution wrote that
 #                neither side has is one step n's note gives, every line outside
 #                the conflict blocks fold saved is kept whole and in order, and
-#                nothing outside those files changed
-#   publish      check every fold, run the gate, push, open the PR or find the
+#                nothing outside those files changed, then record the merge
+#                commit it made
+#   publish      check every fold, and that each conflicted step's merge is the
+#                one its commit recorded, run the gate, push, open the PR or find the
 #                one already open for BRANCH, and write the done line with the
 #                URL gh-axi printed
 # A fold whose conflicted files differ from the set firstmate expected (a clean
 # step that stops, a conflicted step that merges cleanly, any other file), a
 # conflict side line the step's note never names, a merge that fails without a
-# conflict, and a base that moved all stop the combine, so the helper rather
+# conflict, a base that moved, and a conflicted merge concluded outside its
+# commit command all stop the combine, so the helper rather
 # than the worker judges whether a conflict is the one the step describes: the
 # needs-decision line is appended, the copy is reset to the base commit so it
 # holds no unlanded commit, the stop is recorded in MARK, and every later call
@@ -159,13 +162,20 @@ case $cmd in
     [ -z "$other" ] || refuse "files outside this step's conflict changed: $other"
     git add -A -- "${files[@]}"
     [ -z "$(unmerged)" ] || refuse "still unmerged: $(unmerged)"
-    git commit -q --no-edit && echo "Step $n committed. Go on with the next step." ;;
+    git commit -q --no-edit && mkdir -p "$(dirname "$saved")" && git rev-parse HEAD > "$saved.commit" \
+      && echo "Step $n committed. Go on with the next step." ;;
   publish)
     ! merging || refuse "a merge is still stopped: resolve it and run its step's commit command"
     [ -z "$(git status --porcelain --untracked-files=no)" ] || refuse "uncommitted changes: $(git status --porcelain --untracked-files=no | tr '\n' ' ')"
     all=
     for ((i = 1; i <= N; i++)); do
       git merge-base --is-ancestor "${HEADS[$i]}" HEAD || refuse "step $i is not done: run its fold command"
+      # A conflicted step's merge must be the one its commit checked and recorded.
+      if [ -n "${EXPECT[$i]}" ]; then
+        rec=$(cat "$(git rev-parse --git-path "fm-combine/$i.commit")" 2>/dev/null)
+        [ -n "$rec" ] && [ "$(git rev-list --merges --parents HEAD | awk -v h="${HEADS[$i]}" '$3 == h { print $1; exit }')" = "$rec" ] \
+          || { n=$i; stop "its merge was concluded outside its commit command, so its resolution is unchecked"; }
+      fi
       all="$all ${EXPECT[$i]}"
     done
     read -r -a files <<<"$all"

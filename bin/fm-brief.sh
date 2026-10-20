@@ -900,7 +900,8 @@ $COMBINE_STEPS
 1. Write only the files a step names, only as it says; every other path is read-only.
 2. A conflict block runs from a \`<<<<<<<\` line through its \`>>>>>>>\` line. Find the blocks with \`grep -nE '^(<<<<<<<|=======|>>>>>>>|[|]{7})([[:space:]]|$)' <file>\`, read the file with \`read_file\`, and resolve each block with one \`edit\` whose old_string starts at its \`<<<<<<<\` line and ends at its \`>>>>>>>\` line. If \`edit\` refuses, \`read_file\` the file once and retry.
 3. Resolve a conflict only as its step says; never choose between two sides yourself. The fold command has already checked that each block's sides are the ones its step names.
-4. Run only the commands this brief gives and \`grep\`. Never run \`git merge\`, \`git add\`, \`git rm\`, \`git status\`, \`git fetch\`, \`git branch\`, \`git show\`, \`rm\`, \`ls\`, \`cat\` or \`find\`.
+4. Only a step's commit command concludes its merge: if it prints \`refused:\`, fix only what it names and run that commit command again; never run \`git commit\` until it prints \`committed\`.
+   Run only the commands this brief gives and \`grep\`. Never run \`git merge\`, \`git add\`, \`git rm\`, \`git status\`, \`git fetch\`, \`git branch\`, \`git show\`, \`rm\`, \`ls\`, \`cat\` or \`find\`.
 5. ${RULE1#1. }
    Never use \`--force\`, \`--squash\` or \`--amend\`.
 
@@ -908,7 +909,7 @@ $COMBINE_STEPS
 After the last step, run this command:
     bash $CS publish
 It checks every fold and the tests, pushes, opens the combined PR and writes your done line.
-If it prints \`refused:\`, fix only what it names, in a file a step names; commit a fix with \`git commit -m "fix: <what>" -- <that file>\`; run it again. Only this script writes the done line; never write one yourself.
+If publish prints \`refused:\`, fix only what it names, in a file a step names; commit a fix with \`git commit -m "fix: <what>" -- <that file>\`; run it again. Only this script writes the done line; never write one yourself.
 
 # Reporting
 When a command prints \`Published.\` or \`WAIT:\`, reply with one line and call no more tools.

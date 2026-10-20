@@ -18,7 +18,8 @@
 #      opening another. A tracked change blocks publish; an untracked gate
 #      artifact or a conflicted file a later fold deleted does not.
 #   3. A conflict the step did not expect, a conflict side the step's note
-#      never names, and a moved base append needs-decision, reset the copy to the base, and leave every
+#      never names, a moved base, and a conflicted merge concluded by a raw
+#      git commit rather than its commit command append needs-decision, reset the copy to the base, and leave every
 #      later call printing only WAIT; nothing is published after a stop.
 #   4. A call outside the copy's top level or off its branch writes the
 #      blocked line and waits.
@@ -270,7 +271,26 @@ test_a_deleted_conflicted_file_holds_no_markers() {
   pass "fm-qwen-combine.sh: a deleted conflicted file hides no markers left in another, and neither a later fold deleting one nor an untracked gate artifact blocks publish"
 }
 
+test_a_merge_concluded_outside_commit_stops_publish() {
+  local out
+  combine_fixture bypass - a.txt
+  { step fold 1 >/dev/null && step fold 2 >/dev/null && step fold 3 >/dev/null; } || fail "the folds before the bypass failed"
+  printf 'two-12\ntwo-13\nthree\n' > "$WT/a.txt"
+  out=$(step commit 3); [ "$?" -eq 1 ] || fail "commit 3 concluded a merge that dropped a line outside its conflict block"
+  git -C "$WT" commit -qam "resolve conflict in a.txt" || fail "the raw git commit failed"
+  out=$(step publish) || fail "publish after a raw git commit exited nonzero, which a qwen worker reads as an error to fix"
+  assert_contains "$out" "WAIT: step 3" "publish after a raw git commit did not stop at step 3"
+  grep -q '^needs-decision \[at=[0-9]*\]: combine step 3 stopped: its merge was concluded outside its commit command' "$STATUS" \
+    || fail "publish after a raw git commit did not append needs-decision naming the step"
+  [ "$(git -C "$WT" rev-parse HEAD)" = "$BASE" ] || fail "publish after a raw git commit did not reset the copy to the base"
+  git -C "$TMP_ROOT/bypass-repo.origin.git" rev-parse -q --verify "refs/heads/fm/$ID" >/dev/null && fail "publish pushed a merge concluded outside its commit command"
+  [ ! -e "$GH_ARGS" ] || fail "publish opened a PR for a merge concluded outside its commit command"
+  ! grep -q '^done ' "$STATUS" || fail "publish wrote done for a merge concluded outside its commit command"
+  pass "fm-qwen-combine.sh: a conflicted merge concluded by a raw git commit after a refusal stops publish instead of shipping"
+}
+
 test_a_combine_folds_resolves_and_publishes
 test_a_deleted_conflicted_file_holds_no_markers
+test_a_merge_concluded_outside_commit_stops_publish
 test_an_unexpected_conflict_stops_and_waits
 test_a_call_outside_its_copy_is_blocked
