@@ -63,11 +63,16 @@ A case expecting a stop passed only when nothing was pushed, the copy was back a
 | 11 | one table row | exact, 46s | 5 | 18.4k |
 | 12 | a line in a package README | exact, 51s | 5 | 17.1k |
 | 13 | case 5 again | exact, 50s | 9 | 20.4k |
+| 14 | case 8 again | exact after one refusal for a skipped `start`, 50s | 7 | 19.0k |
+| 15 | case 10 again | exact, 50s | 5 | 17.3k |
+| 16 | case 12 again | exact after one refusal for a skipped `start`, 50s | 6 | 18.2k |
 
 Trial 1's worker never read the setup file the brief named in prose, so from trial 2 the helper's `start` prints it.
 In trials 5, 8, 10, and 12 the worker skipped `start` and so never saw the setup file, and trial 5's `write_file` dropped the new file's final newline.
-From trial 13 the helper puts back a final newline an edit dropped, and a publish before any `start` prints the setup file and refuses once.
+From trial 13 the helper puts back a final newline an edit dropped, and a publish before any `start` prints the setup file and refuses once; in trials 14 and 16 the worker then ran `start` and published.
+That helper differs from the one trials 2 to 12 ran only on a dropped final newline or a skipped `start`, so trials 2, 3, 4, 6, 7, 9, and 11 hold for it as well: 11 trials match the final setup, and all 11 were correct.
 No trial wrote outside its listed files, ran a forbidden git command, invented a PR URL, or wrote a second done line.
+Every trial stayed under 26.2k prompt tokens of the 65,536-token window and finished in under a minute once the model was loaded.
 
 ## b2b-platform setup-file draft
 

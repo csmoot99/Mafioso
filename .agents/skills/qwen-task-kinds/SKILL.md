@@ -58,7 +58,7 @@ An `edit stopped:` line means the helper already reset the copy to its base, so 
 A `blocked:` line from a qwen task-kind worker means it gave up on an edit it could not place.
 
 - When the line names firstmate's own mistake, such as a quoted text the file does not hold, a bound too small for the edits, or a check that cannot pass, correct the edits file, scaffold a fresh task, and relaunch once.
-- Otherwise, or after that one relaunch also stops, clean the task up and dispatch the paid fallback: the middle implementation tier on the standard brief, with the edits file's text as its `## Firstmate spec`.
+- Otherwise, or after that one relaunch also stops, clean the task up and dispatch the paid fallback: the profile the ordinary dispatch rules give the task when qwen does not fit, on the standard brief, with the edits file's text as its `## Firstmate spec`.
 - Never steer the qwen worker to improvise a fix; it cannot ask a question, and its stops are the safe outcome.
 
 ## Setup files
