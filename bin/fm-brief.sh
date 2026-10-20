@@ -895,7 +895,7 @@ A command that prints \`WAIT:\` ends your work until firstmate answers: reply wi
 $COMBINE_STEPS
 # Rules
 1. Write only the files a step names, only as it says; every other path is read-only.
-2. A conflict block runs from a \`<<<<<<<\` line through its \`>>>>>>>\` line. Find the blocks with \`grep -nE '^(<<<<<<<|=======|>>>>>>>)' <file>\`, read the file with \`read_file\`, and resolve each block with one \`edit\` whose old_string starts at its \`<<<<<<<\` line and ends at its \`>>>>>>>\` line. If \`edit\` refuses, \`read_file\` the file once and retry.
+2. A conflict block runs from a \`<<<<<<<\` line through its \`>>>>>>>\` line. Find the blocks with \`grep -nE '^(<<<<<<<|=======|>>>>>>>|[|]{7})([[:space:]]|$)' <file>\`, read the file with \`read_file\`, and resolve each block with one \`edit\` whose old_string starts at its \`<<<<<<<\` line and ends at its \`>>>>>>>\` line. If \`edit\` refuses, \`read_file\` the file once and retry.
 3. Resolve a conflict only as its step says; never choose between two sides yourself. If a block's two sides are not what its step says, run the stop command under Reporting.
 4. Run only the commands this brief gives and \`grep\`. Never run \`git merge\`, \`git add\`, \`git rm\`, \`git status\`, \`git fetch\`, \`git branch\`, \`git show\`, \`rm\`, \`ls\`, \`cat\` or \`find\`.
 5. ${RULE1#1. }

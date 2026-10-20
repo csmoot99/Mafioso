@@ -13,8 +13,9 @@
 #   stop <n> <what each side wants>
 #                the worker's own stop, when a conflict block's sides are not
 #                what its step says
-#   publish      check every fold, run the gate, push, open the PR, and write
-#                the done line with the URL gh-axi printed
+#   publish      check every fold, run the gate, push, open the PR or find the
+#                one already open for BRANCH, and write the done line with the
+#                URL gh-axi printed
 # A fold whose conflicted files differ from the set firstmate expected (a clean
 # step that stops, a conflicted step that merges cleanly, any other file), a
 # merge that fails without a conflict, a base that moved, and the worker's own
@@ -49,7 +50,9 @@ stop() {
   finished "$n"
 }
 unmerged() { git diff --name-only --diff-filter=U | sort -u | tr '\n' ' ' | sed 's/ $//'; }
-markers() { [ "$#" -eq 0 ] || ! grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- "$@"; }
+# A marker line is git's: seven marker characters, then whitespace or the line's
+# end, so a longer setext or reStructuredText underline is not one.
+markers() { [ "$#" -eq 0 ] || ! grep -nE '^(<<<<<<<|=======|>>>>>>>|[|]{7})([[:space:]]|$)' -- "$@"; }
 
 [ ! -f "$MARK" ] || finished "$(cat "$MARK")"
 if [ "$(pwd -P)" != "$(git rev-parse --show-toplevel 2>/dev/null)" ] || [ "$(git branch --show-current)" != "$BRANCH" ]; then
@@ -115,8 +118,11 @@ case $cmd in
     markers ${files[@]+"${files[@]}"} || refuse "conflict markers are left in the lines above"
     out=$( (eval "$GATE") 2>&1) || { printf '%s\n' "$out" | tail -20; refuse "the gate failed: fix the first failure above"; }
     git push -q -u origin "$BRANCH" || refuse "git push failed"
-    out=$(gh-axi pr create ${PR_BASE:+--base "$PR_BASE"} --title "$TITLE" --body "$BODY") || refuse "gh-axi pr create failed"
-    url=$(printf '%s\n' "$out" | grep -m1 -o 'https://[^ ]*/pull/[0-9]*') || refuse "gh-axi printed no PR URL: $out"
+    # A repeated publish finds the PR the first one opened rather than opening another.
+    url=$(gh-axi pr list --state open --head "$BRANCH" --fields url 2>/dev/null | grep -m1 -o 'https://[^ "]*/pull/[0-9]*') || {
+      out=$(gh-axi pr create ${PR_BASE:+--base "$PR_BASE"} --title "$TITLE" --body "$BODY") || refuse "gh-axi pr create failed"
+      url=$(printf '%s\n' "$out" | grep -m1 -o 'https://[^ ]*/pull/[0-9]*') || refuse "gh-axi printed no PR URL: $out"
+    }
     echo "done [at=$(date +%s)]: PR $url" | tee -a "$STATUS"
     echo "Published. Reply with one line and call no more tools." ;;
 esac

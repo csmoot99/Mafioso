@@ -7,9 +7,12 @@
 # #12 stops on a conflict there. The contracts pinned here:
 #   1. A fold merges the exact head with its merge message, the first fold
 #      writes the working line, and a conflicted step commits only once no
-#      marker is left and nothing outside its conflicted files changed.
+#      git conflict-marker line is left, a longer setext underline not being
+#      one, and nothing outside its conflicted files changed.
 #   2. Only publish writes the done line, after the gate passed, the branch
-#      was pushed, and gh-axi printed a PR URL, which the line carries.
+#      was pushed, and gh-axi printed a PR URL, which the line carries; a
+#      repeated publish finds the PR already open for the branch instead of
+#      opening another.
 #   3. A conflict the step did not expect, a moved base, and the worker's own
 #      stop append needs-decision, reset the copy to the base, and leave every
 #      later call printing only WAIT; nothing is published after a stop.
@@ -62,7 +65,18 @@ combine_fixture() {
     --combine "$file" --done-command "test ! -e '$GATE_FLAG'" "${@:4}" >/dev/null || fail "fm-brief.sh --combine refused the $name fixture"
   CS="$HOME_DIR/data/$ID/combine.sh" STATUS="$HOME_DIR/state/$ID.status"
   FAKEBIN=$(fm_fakebin "$TMP_ROOT/$name") GH_ARGS="$TMP_ROOT/$name-gh.args"
-  printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$@" > %q\nprintf "created:\\n  url: https://github.com/o/r/pull/20\\n"\n' "$GH_ARGS" > "$FAKEBIN/gh-axi"
+  # A forge holding one PR at most: pr create opens #20 once, and pr list finds
+  # it open for the task branch.
+  cat > "$FAKEBIN/gh-axi" <<EOF
+#!/usr/bin/env bash
+if [ "\$2" = list ]; then
+  case " \$* " in *" --head fm/$ID "*) [ ! -e $(printf %q "$GH_ARGS") ] || printf 'pull_requests[1]{url}:\n  "https://github.com/o/r/pull/20"\n' ;; esac
+  exit 0
+fi
+[ ! -e $(printf %q "$GH_ARGS") ] || { echo "error: a pull request for fm/$ID already exists"; exit 1; }
+printf '%s\n' "\$@" > $(printf %q "$GH_ARGS")
+printf 'created:\n  url: https://github.com/o/r/pull/20\n'
+EOF
   chmod +x "$FAKEBIN/gh-axi"
 }
 
@@ -87,7 +101,11 @@ test_a_combine_folds_resolves_and_publishes() {
   out=$(step publish); [ "$?" -eq 1 ] || fail "publish ran with a merge still stopped"
   out=$(step commit 3); [ "$?" -eq 1 ] || fail "commit 3 concluded a merge with markers left"
   assert_contains "$out" "conflict markers are left" "commit 3 did not name the markers"
-  printf 'one\ntwo-12\ntwo-13\nthree\n' > "$WT/a.txt"
+  for left in '=======' '||||||| base'; do
+    printf 'one\ntwo-12\n%s\ntwo-13\nthree\n' "$left" > "$WT/a.txt"
+    out=$(step commit 3); [ "$?" -eq 1 ] || fail "commit 3 concluded a merge with a '$left' line left"
+  done
+  printf 'Notes on a\n==========\none\ntwo-12\ntwo-13\nthree\n' > "$WT/a.txt"
   printf 'stray\n' > "$WT/c.txt"
   out=$(step commit 3); [ "$?" -eq 1 ] || fail "commit 3 committed a file outside its conflict"
   assert_contains "$out" "files outside this step's conflict changed: c.txt" "commit 3 did not name the outside file"
@@ -120,8 +138,11 @@ test_a_combine_folds_resolves_and_publishes() {
   grep -qxF "Combine #11, #12 and #13" "$GH_ARGS" || fail "the PR does not carry the combine's title"
   [ "$(sed -n 1,4p "$GH_ARGS" | tr '\n' ' ')" = "pr create --base release " ] \
     || fail "the PR does not target the combine's base branch"
+  out=$(step publish) || fail "a repeated publish failed instead of finding its open PR: $out"
+  [ "$(grep -c '^done \[at=[0-9]*\]: PR https://github.com/o/r/pull/20$' "$STATUS")" -eq 2 ] \
+    || fail "a repeated publish did not report the PR already open"
   ! grep -q '^needs-decision\|^blocked' "$STATUS" || fail "a clean combine wrote a decision or blocker"
-  pass "fm-qwen-combine.sh: folds each exact head, commits a resolved conflict, and writes done only after a real PR"
+  pass "fm-qwen-combine.sh: folds each exact head, commits a resolved conflict past a setext underline, writes done only after a real PR, and publishes once"
 }
 
 test_an_unexpected_conflict_stops_and_waits() {
