@@ -1839,7 +1839,7 @@ test_qwen_kind_points_at_the_setup_file_and_renders_the_edits() {
   [ -f "$es" ] || fail "the kind scaffold did not write its edit.sh"
   # shellcheck disable=SC2016 # single quotes are deliberate: the backticks must stay literal
   for line in 'Brief shape: qwen' 'Delivery contract: mode=direct-PR' "Ship branch: fm/$id" 'Base branch: feature/hub' '{TASK}' '{FIRSTMATE_SPEC}' \
-    'Before your first edit, read `ai-map/qwen/text-edit.md` with `read_file`: it is this project'"'"'s guide to this kind of task.' \
+    'The command under # Start prints `ai-map/qwen/text-edit.md`, this project'"'"'s guide to this kind of task; follow it.' \
     '1. `docs/run.md`: change or remove at most 1 of its existing lines.' '   In the line starting `Port:`, replace `8080` with `9090`.' \
     '2. `docs/new.md`: add lines only, or create it; change or remove none of its existing lines.' \
     "    bash '$es' publish" "    bash '$es' start" "$home/state/$id.inbox"; do
@@ -1852,8 +1852,8 @@ test_qwen_kind_points_at_the_setup_file_and_renders_the_edits() {
     || fail "the qwen kind brief does not keep its Start section below the home include"
   [ "$(tail -1 "$es")" = ". $ROOT/bin/fm-qwen-edit.sh" ] || fail "edit.sh does not end by sourcing the helper"
   # shellcheck disable=SC2016 # expanded inside the subshell that sources edit.sh's values
-  out=$(sed '$d' "$es" | bash -c '. /dev/stdin; printf "%s|" "$BRANCH" "$PR_BASE" "$GATE" "$TITLE" "${FILES[@]}" "${MAXDEL[@]}" "${CHECK[@]}" "${CPATH[@]}" "${CTEXT[@]}"')
-  [ "$out" = "fm/$id|feature/hub|npm run check:docs|docs: fix the stale port|docs/run.md|docs/new.md|1|0|has|lacks|docs/run.md|docs/run.md|Port: 9090|Port: 8080|" ] \
+  out=$(sed '$d' "$es" | bash -c '. /dev/stdin; printf "%s|" "$SETUP" "$BRANCH" "$PR_BASE" "$GATE" "$TITLE" "${FILES[@]}" "${MAXDEL[@]}" "${CHECK[@]}" "${CPATH[@]}" "${CTEXT[@]}"')
+  [ "$out" = "ai-map/qwen/text-edit.md|fm/$id|feature/hub|npm run check:docs|docs: fix the stale port|docs/run.md|docs/new.md|1|0|has|lacks|docs/run.md|docs/run.md|Port: 9090|Port: 8080|" ] \
     || fail "edit.sh does not assign the edits file's values: $out"
   pass "fm-brief.sh --kind points at the project's setup file, renders each edit with its line bound, and writes edit.sh"
 }

@@ -185,7 +185,7 @@
 # task kind (.agents/skills/qwen-task-kinds/SKILL.md), with --done-command as
 # the project's check for that kind. <kind> names the project's own setup file
 # for it, ai-map/qwen/<kind>.md, which must exist in the project's clone; the
-# brief points the worker at that file and at no other context. The edits file
+# helper's start prints that file, and the brief names no other context. The edits file
 # holds one directive per unindented line:
 #   title <text>          the commit and PR title
 #   file <path> <n>       a worktree-relative file the worker may write, and the
@@ -1028,7 +1028,7 @@ $EDIT_CHECKS- \`$DONE_COMMAND\` exits 0
   printf '%s\n' '#!/usr/bin/env bash' \
     "# bin/fm-brief.sh --kind wrote this for one qwen $QWEN_KIND task; the worker runs it as" \
     '#   bash <this file> start | publish'
-  printf '%s=%q\n' STATUS "$STATE/$ID.status" BRANCH "$BRANCH" PR_BASE "$BASE_BRANCH" \
+  printf '%s=%q\n' STATUS "$STATE/$ID.status" SETUP "$QWEN_SETUP_FILE" BRANCH "$BRANCH" PR_BASE "$BASE_BRANCH" \
     MARK "$DATA/$ID/edit-stopped" GATE "$DONE_COMMAND" TITLE "$EDIT_TITLE" BODY "$EDIT_PR_BODY"
   printf 'FILES=(%s)\n' "$(printf '%q ' "${EDIT_FILES[@]}")"
   printf 'MAXDEL=(%s)\n' "$(printf '%q ' "${EDIT_MAXDEL[@]}")"
@@ -1049,8 +1049,8 @@ Brief shape: qwen
 $TASK_SECTION
 
 # Setup
-Before your first edit, read \`$QWEN_SETUP_FILE\` with \`read_file\`: it is this project's guide to this kind of task.
-Read no other file except the ones listed under # The edits.
+The command under # Start prints \`$QWEN_SETUP_FILE\`, this project's guide to this kind of task; follow it.
+Read no file except the ones listed under # The edits.
 
 # The edits
 This is the whole task; never look for a plan file.

@@ -1542,6 +1542,26 @@ With a `bin/fm-brief.sh --harness qwen` brief whose plan named no source file, t
 The same brief shape on a project without a kg rendered no lookup lines, and the spawned settings carried no MCP keys.
 `tests/fm-busy-adapter-wiring.test.sh` and `tests/fm-brief.test.sh` pin the settings and the brief lines with no harness; no reusable live guard covers the gate, so re-run such a session after a qwen upgrade.
 
+### Closed launch on qwen
+
+Verified on 2026-10-20 on Linux (WSL2) with Qwen Code 0.25.2, headless, against a fake OpenAI-compatible endpoint on localhost that logs every request body and answers `OK`.
+The working directory was a marker project holding `AGENTS.md`, `QWEN.md`, `CLAUDE.md`, `GEMINI.md`, copies of each under `sub/`, a skill under `.agents/skills/` and one under `.qwen/skills/`, under a user home holding its own marker `~/.qwen/QWEN.md`.
+Two system settings files differed only in two keys: the per-task file's non-hook keys as `bin/fm-spawn.sh` writes them, and those plus `"context":{"fileName":"FM-QWEN-NO-CONTEXT.md"}` and `"skills":{"disabledLevels":["project","user","extension","bundled"]}`.
+
+```sh
+QWEN_CODE_SYSTEM_SETTINGS_PATH=<settings> qwen -y -o json 'say OK'
+```
+
+```text
+per-task keys: first request 53,972 chars; root AGENTS.md, root QWEN.md, ~/.qwen/QWEN.md, both project skills' descriptions, the bundled skill listing
+plus the two:  first request 46,596 chars; no marker file, no skill listing; the first user message reads "No skills are currently available."
+```
+
+Neither run sent `CLAUDE.md`, `GEMINI.md`, or any `sub/` file at launch.
+What the second request kept is qwen's own system prompt, its `~/.qwen/output-language.md` rule, a git snapshot, a listing of up to 20 entries of the working directory, and the deferred tool list.
+`bin/fm-spawn.sh` adds the two keys for every qwen-shaped ship brief, and `tests/fm-busy-adapter-wiring.test.sh` pins them with no harness.
+The interactive launch's first request was not captured: qwen's chat log does not record the system prompt, so re-run the fake-endpoint check after a qwen upgrade.
+
 ### Loop-detection halt
 
 Verified on 2026-10-19 on Linux (WSL2) against Herdr 0.8.0 and Qwen Code 0.25.2 serving `qwen3-coder:30b` from the local Ollama, in an isolated `fm-lab-` session provisioned and torn down by `bin/fm-herdr-lab.sh`, with a real qwen worker launched by `bin/fm-control.sh relaunch` and its user settings capping `model.maxToolCallsPerTurn` at 3, loop detection left on.

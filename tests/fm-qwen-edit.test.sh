@@ -4,9 +4,12 @@
 # bin/fm-brief.sh --harness qwen --kind writes, in a real copy of a project
 # whose docs/run.md holds `Port: 8080` and whose edits file lets the worker
 # change one line of it and create docs/new.md. The contracts pinned here:
-#   1. start writes the working line once. publish refuses, naming what to fix,
+#   1. start writes the working line once and prints the project's setup file
+#      for the kind; a publish before start does the same and refuses once,
+#      uncounted. publish refuses, naming what to fix,
 #      while no listed file changed, a has or lacks check fails, or the gate
-#      fails; then it commits only the listed files with the task's title,
+#      fails; then it puts back a final newline the edit dropped, commits
+#      only the listed files with the task's title,
 #      pushes, opens the PR, and writes the done line carrying the URL gh-axi
 #      printed. An untracked file outside the list is never committed and never
 #      stops it, and a repeated publish finds the PR already open.
@@ -33,9 +36,10 @@ edit_fixture() {
   local name=$1 repo home id=qe-$1 edits
   repo="$TMP_ROOT/$name-repo" WT="$TMP_ROOT/$name-wt" home="$TMP_ROOT/$name-home"
   fm_git_init_commit "$repo"
-  mkdir -p "$repo/docs" "$TMP_ROOT/projects/r/ai-map/qwen"
+  mkdir -p "$repo/docs" "$repo/ai-map/qwen" "$TMP_ROOT/projects/r/ai-map/qwen"
   printf '# Run\nPort: 8080\nHost: local\n' > "$repo/docs/run.md"
-  git -C "$repo" add docs && git -C "$repo" commit -qm docs
+  printf 'Keep each port on its own line.\n' > "$repo/ai-map/qwen/text-edit.md"
+  git -C "$repo" add docs ai-map && git -C "$repo" commit -qm docs
   BASE=$(git -C "$repo" rev-parse HEAD) ORIGIN="$repo.origin.git"
   fm_git_add_origin "$repo" "$ORIGIN"
   git -C "$repo" fetch -q origin
@@ -97,7 +101,8 @@ test_an_edit_publishes_once_checked() {
   local out
   edit_fixture publish --base-branch release
   out=$(step start) || fail "start failed: $out"
-  assert_contains "$out" "Started. Make the edits under # The edits, then run: bash" "start did not say what comes next"
+  assert_contains "$out" "Keep each port on its own line." "start did not print the project's setup file"
+  assert_contains "$out" "Follow it to make the edits under # The edits, then run: bash" "start did not say what comes next"
   step start >/dev/null
   [ "$(grep -c '^working \[at=[0-9]*\]: started$' "$STATUS")" -eq 1 ] || fail "start did not write the working line exactly once"
   out=$(step publish); [ "$?" -eq 1 ] || fail "publish ran with nothing changed"
@@ -113,7 +118,11 @@ test_an_edit_publishes_once_checked() {
   assert_contains "$out" "refused: the project check failed" "a failed gate was not named"
   rm -f "$GATE_FLAG"
   printf 'scratch\n' > "$WT/gate-output.log"
+  printf '# New' > "$WT/docs/new.md"
+  truncate -s -1 "$WT/docs/run.md"
   out=$(step publish) || fail "a checked edit did not publish: $out"
+  git -C "$WT" show HEAD:docs/run.md | cmp -s - <(printf '# Run\nPort: 9090\nHost: local\n') || fail "publish did not put back the final newline an edit dropped"
+  git -C "$WT" show HEAD:docs/new.md | cmp -s - <(printf '# New\n') || fail "publish did not end a new file with a newline"
   assert_contains "$out" "done [at=" "publish did not print the done line"
   assert_contains "$out" "Published." "publish did not say it published"
   [ "$(git -C "$WT" log -1 --format=%s)" = "docs: move the port to 9090" ] || fail "the commit does not carry the task's title"
@@ -131,6 +140,7 @@ test_an_edit_publishes_once_checked() {
 }
 
 test_unexpected_states_stop_and_reset() {
+  local out
   edit_fixture outside
   step start >/dev/null
   good_edits
@@ -152,6 +162,10 @@ test_unexpected_states_stop_and_reset() {
 
   edit_fixture after
   good_edits
+  out=$(step publish); [ "$?" -eq 1 ] || fail "publish before start did not refuse"
+  assert_contains "$out" "Keep each port on its own line." "publish before start did not print the setup file"
+  assert_contains "$out" "refused: you skipped start" "publish before start did not say so"
+  grep -q '^working \[at=[0-9]*\]: started$' "$STATUS" || fail "publish before start did not write the working line"
   step publish >/dev/null || fail "the after fixture did not publish"
   rm -f "$GH_ARGS"
   printf 'later\n' >> "$WT/docs/run.md"
@@ -159,6 +173,7 @@ test_unexpected_states_stop_and_reset() {
   assert_stopped "files changed after publish committed: docs/run.md"
 
   edit_fixture refusals
+  step start >/dev/null
   for _ in 1 2 3; do step publish >/dev/null && fail "publish passed with nothing changed"; done
   [ ! -e "$MARK" ] || fail "three refusals stopped the edit"
   good_edits

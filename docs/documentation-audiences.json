@@ -509,6 +509,10 @@
       "audience": "maintainer-verification"
     },
     {
+      "path": "docs/verification/qwen-task-kinds.md",
+      "audience": "maintainer-verification"
+    },
+    {
       "path": "docs/verification/rovo.md",
       "audience": "maintainer-verification"
     },
@@ -570,6 +574,14 @@
     },
     {
       "path": ".agents/skills/combined-merge/SKILL.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/qwen-task-kinds/SKILL.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/qwen-task-kinds/references/setup-template.md",
       "audience": "agent-runtime"
     },
     {

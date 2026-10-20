@@ -4,9 +4,12 @@
 # bin/fm-brief.sh --harness qwen --kind <kind> --edits <file> writes
 # data/<task-id>/edit.sh, which assigns this task's values and then sources this
 # file; the worker runs only that file, with one of:
-#   start      write the working line once and say what comes next
-#   publish    check the edits, run the gate, commit the listed files with the
-#              task's title, push, open the PR or find the one already open for
+#   start      write the working line once, print the project's setup file for
+#              the kind, and say what comes next
+#   publish    put back a listed file's final newline when the edit dropped it
+#              (the committed file had one, or the file is new), check the
+#              edits, run the gate, commit the listed files with the task's
+#              title, push, open the PR or find the one already open for
 #              BRANCH, and write the done line with the URL gh-axi printed
 # publish stops the edit on anything the brief never allows: a merge, rebase,
 # cherry-pick or revert in progress, a commit publish did not make, a change
@@ -18,12 +21,14 @@
 # WAIT text, which a qwen worker reads as waiting for firstmate rather than as
 # an error to fix. publish refuses, naming what to fix, when no listed file
 # changed, a has or lacks check fails, the gate fails, or the commit or push
-# fails. Untracked files outside FILES, such as a gate's output, are never
+# fails. A publish before any start does what start does and refuses once,
+# uncounted, so the worker reads the setup file before anything is committed. Untracked files outside FILES, such as a gate's output, are never
 # committed and never stop it. Only publish writes the done line, and only after
 # gh-axi printed a PR URL. Every call first checks the copy is the top of its
 # own worktree on BRANCH, else it appends the blocked line and waits. A refusal
 # exits 1.
-# Inputs, assigned by edit.sh: STATUS (the task's status file), BRANCH, PR_BASE
+# Inputs, assigned by edit.sh: STATUS (the task's status file), SETUP (the
+# worktree-relative setup file, ai-map/qwen/<kind>.md), BRANCH, PR_BASE
 # (the PR's base branch, empty for the default), MARK (the stop record, beside
 # edit.sh), GATE (the command that must exit 0), TITLE, BODY, the arrays FILES
 # and MAXDEL (each listed worktree-relative path and the most existing lines its
@@ -67,14 +72,20 @@ if [ "$(pwd -P)" != "$(git rev-parse --show-toplevel 2>/dev/null)" ] || [ "$(git
   echo "blocked [at=$(date +%s)]: launched in primary checkout, not an isolated worktree" >> "$STATUS"
   halt "this is not your own copy on the branch $BRANCH"
 fi
+begin() {
+  local started
+  started=$(git_dir_file started)
+  if [ ! -f "$started" ]; then
+    mkdir -p "$(dirname "$started")" && : > "$started"
+    echo "working [at=$(date +%s)]: started" >> "$STATUS"
+  fi
+  printf "Started. This project's guide to this task, %s:\n\n" "$SETUP"
+  cat -- "$SETUP"
+}
 case ${1:-} in
   start)
-    started=$(git_dir_file started)
-    if [ ! -f "$started" ]; then
-      mkdir -p "$(dirname "$started")" && : > "$started"
-      echo "working [at=$(date +%s)]: started" >> "$STATUS"
-    fi
-    printf 'Started. Make the edits under # The edits, then run: bash %q publish\n' "$0" ;;
+    begin
+    printf '\nFollow it to make the edits under # The edits, then run: bash %q publish\n' "$0" ;;
   publish)
     for h in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD; do
       ! git rev-parse -q --verify "$h" >/dev/null || stop "a git operation is in progress ($h)"
@@ -91,11 +102,23 @@ case ${1:-} in
     else
       other=$(printf '%s\n' "$changed" | grep -vxF -f <(printf '%s\n' "${FILES[@]}"))
       [ -z "$other" ] || stop "a file the brief does not list changed: $(printf '%s\n' "$other" | words)"
+      # qwen's write_file drops a file's final newline; put it back where the
+      # committed file had one or the file is new, before the bound counts lines.
+      for f in "${FILES[@]}"; do
+        [ -s "$f" ] && [ -n "$(tail -c1 -- "$f")" ] || continue
+        ! git cat-file -e "HEAD:$f" 2>/dev/null || [ -z "$(git show "HEAD:$f" | tail -c1)" ] || continue
+        echo >> "$f"
+      done
       for i in "${!FILES[@]}"; do
         del=$(git diff --numstat HEAD -- "${FILES[i]}" | awk '{ print $2 }')
         [ "${del:-0}" = - ] || [ "${del:-0}" -le "${MAXDEL[i]}" ] \
           || stop "${FILES[i]} lost $del existing lines, more than the ${MAXDEL[i]} its edits change"
       done
+      if [ ! -f "$(git_dir_file started)" ]; then
+        begin
+        printf '\nrefused: you skipped start, so read its guide above; make your edits follow it, then run: bash %q publish\n' "$0"
+        exit 1
+      fi
       [ -n "$changed$(git ls-files --others --exclude-standard -- "${FILES[@]}")" ] || refuse "no listed file changed: make the edits under # The edits first"
       for i in "${!CHECK[@]}"; do
         if [ "${CHECK[i]}" = has ]; then
