@@ -7,8 +7,8 @@
 # The whole feature is off unless the home holds the presence flag
 # config/worker-context-handoff (docs/configuration.md "Worker context
 # handoff"). bin/fm-spawn.sh reads the flag at every claude or codex ship or
-# scout launch and relaunch, validates its one optional `fallback-pct=<N>`
-# line (blank and `#` lines ignored; see fm-spawn's header for the exact
+# scout launch and relaunch, validates its optional `fallback-pct=<N>` and
+# `codex-handoff-pct=<P>` lines (see fm-spawn's header for the exact
 # rule), and only then wires the two hook commands below beside the
 # busy-state hooks: into a claude worker's .claude/settings.local.json, and
 # as session-flag hooks on a codex worker's launch command. A secondmate, the
@@ -20,7 +20,10 @@
 # gets the same outcome another way. fm-spawn moves Codex's own compaction
 # to the fallback ceiling, PostToolUse watches the handoff threshold P itself
 # in Codex's session log, and PreCompact only records that the fallback
-# compaction arrived. Both always exit 0; the records, status events, notice,
+# compaction arrived. With codex-handoff-pct configured, P is above the
+# fallback ceiling instead: Codex compacts normally at the ceiling every time,
+# PreCompact leaves the handoff check armed, and PostToolUse requests a handoff
+# only if usage still reaches P. Both always exit 0; the records, status events, notice,
 # and replacement are exactly the Claude ones.
 #
 # Subcommands:
@@ -75,6 +78,8 @@
 #       does; with no marker for G yet (usage jumped past the threshold and
 #       the ceiling between two tool calls) it writes a `fallback` marker and
 #       the same note, so this incarnation hands off no later, as on Claude.
+#       When P is above N instead, it leaves the marker untouched on every
+#       compaction so the later handoff check remains armed.
 #
 #   posttooluse <state-dir> <id> --gen G --data-dir D --fm-root R [--ceiling-pct N] [--codex-threshold-pct P]
 #       Claude PostToolUse hook, every tool. With no marker for the task it is
@@ -279,12 +284,12 @@ hook_args() {
   case "$CEILING_PCT" in ''|*[!0-9]*) usage ;; esac
   [ "$CEILING_PCT" -ge 1 ] && [ "$CEILING_PCT" -le "$CEILING_PCT_DEFAULT" ] || usage
   MARKER_MAX_PCT=$((CEILING_PCT - 1))
-  # The same bound a claude worker's override must meet, checked by fm-spawn
-  # before it bakes the value in.
+  # Below the ceiling means handoff first; above it means compact first.
+  # fm-spawn validates the configured ordering before baking these values in.
   case "$CODEX_PCT" in
     '') ;;
     *[!0-9]*) usage ;;
-    *) [ "$CODEX_PCT" -ge 1 ] && [ "$CODEX_PCT" -le "$MARKER_MAX_PCT" ] || usage ;;
+    *) [ "$CODEX_PCT" -ge 1 ] && [ "$CODEX_PCT" -le "$CEILING_PCT_DEFAULT" ] && [ "$CODEX_PCT" -ne "$CEILING_PCT" ] || usage ;;
   esac
   id_ok "$ID" || usage
   STATUS="$STATE/$ID.status"
@@ -386,9 +391,11 @@ codex_mark_due_at_threshold() {
 }
 
 # Codex mode PreCompact: never blocks; records that the fallback compaction
-# arrived before a handoff did.
+# arrived before a handoff did. In compact-first mode it leaves the handoff
+# check armed, including a handoff already due.
 codex_precompact() {
   local marker='' state usage handoff epoch
+  [ "$CODEX_PCT" -lt "$CEILING_PCT" ] || return 0
   [ "$(payload_field trigger)" = auto ] || return 0
   incarnation_current || return 0
   [ -d "$STATE" ] || return 0

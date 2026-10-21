@@ -479,7 +479,7 @@
 # PreCompact and PostToolUse hook commands owned by bin/fm-context-handoff.sh: a claude
 # worker in the same settings file, a codex worker as session-flag hooks on its launch
 # with codex's own compaction moved to the fallback ceiling (codex_handoff_pct below).
-# That flag file may hold one optional `fallback-pct=<N>` line (blank lines and `#`
+# That flag file may hold an optional `fallback-pct=<N>` line (blank lines and `#`
 # comments ignored): the percentage of the window at which the hook lets compaction
 # through if the handoff never arrives, baked into the PreCompact command as
 # `--ceiling-pct N` so a running worker keeps its launch value and a relaunch reads the
@@ -487,6 +487,10 @@
 # most 80, and greater than the CLAUDE_AUTOCOMPACT_PCT_OVERRIDE config/launch-env sets,
 # when it sets one; anything else, an unknown key, or a repeated line refuses before
 # launch naming the file and the value.
+# An optional `codex-handoff-pct=<P>` line selects compact-first ordering only
+# for Codex: P must be a whole number above fallback-pct (default 80) and at
+# most 80. Codex compacts at fallback-pct every time and hands off only if usage
+# reaches P afterward. Without this line the existing handoff-first order stays.
 # Kimi uses one surgically installed Firstmate region in $HOME/.kimi-code/config.toml,
 # a firstmate-owned global hook and registry, and a gitignored per-task pointer.
 # Kimi 2.0.0 also gates a fresh worktree on an interactive folder-trust dialog.
@@ -1166,8 +1170,9 @@ if ! CONTEXT_HANDOFF_PRESENT=$(fm_config_source_present "$CONFIG/worker-context-
   exit 1
 fi
 CONTEXT_HANDOFF_CEILING_PCT=
+CONTEXT_HANDOFF_CODEX_PCT=
 spawn_context_handoff_load() { # <file>
-  local file=$1 line lineno=0 value threshold='' i=0
+  local file=$1 line lineno=0 key value previous threshold='' i=0
   if [ ! -f "$file" ] || [ ! -r "$file" ]; then
     echo "error: config/worker-context-handoff must be a readable regular file" >&2
     return 1
@@ -1180,26 +1185,35 @@ spawn_context_handoff_load() { # <file>
     lineno=$((lineno + 1))
     case "$line" in
     '' | '#'*) continue ;;
-    fallback-pct=*) ;;
+    fallback-pct=* | codex-handoff-pct=*) ;;
     *)
-      echo "error: config/worker-context-handoff line $lineno is not 'fallback-pct=<N>', a blank line, or a # comment: '$line'" >&2
+      echo "error: config/worker-context-handoff line $lineno is not 'fallback-pct=<N>', 'codex-handoff-pct=<N>', a blank line, or a # comment: '$line'" >&2
       return 1
       ;;
     esac
-    if [ -n "$CONTEXT_HANDOFF_CEILING_PCT" ]; then
-      echo "error: config/worker-context-handoff sets fallback-pct twice (line $lineno: '$line'); keep one line" >&2
+    key=${line%%=*}
+    case "$key" in
+      fallback-pct) previous=$CONTEXT_HANDOFF_CEILING_PCT ;;
+      codex-handoff-pct) previous=$CONTEXT_HANDOFF_CODEX_PCT ;;
+    esac
+    if [ -n "$previous" ]; then
+      echo "error: config/worker-context-handoff sets $key twice (line $lineno: '$line'); keep one line" >&2
       return 1
     fi
-    value=${line#fallback-pct=}
+    value=${line#*=}
     case "$value" in
     '' | *[!0-9]*)
-      echo "error: config/worker-context-handoff fallback-pct must be a whole number from 1 to 80, got '$value' (line $lineno)" >&2
+      echo "error: config/worker-context-handoff $key must be a whole number from 1 to 80, got '$value' (line $lineno)" >&2
       return 1
       ;;
     esac
-    if [ "$value" -lt 1 ] || [ "$value" -gt 80 ]; then
-      echo "error: config/worker-context-handoff fallback-pct must be a whole number from 1 to 80 (Claude keeps its own threshold near 83), got '$value' (line $lineno)" >&2
+    if ! { [ "$value" -ge 1 ] && [ "$value" -le 80 ]; }; then
+      echo "error: config/worker-context-handoff $key must be a whole number from 1 to 80 (Claude keeps its own threshold near 83), got '$value' (line $lineno)" >&2
       return 1
+    fi
+    if [ "$key" = codex-handoff-pct ]; then
+      CONTEXT_HANDOFF_CODEX_PCT=$((10#$value))
+      continue
     fi
     case "$threshold" in
     '' | *[!0-9]*) ;;
@@ -1212,6 +1226,10 @@ spawn_context_handoff_load() { # <file>
     esac
     CONTEXT_HANDOFF_CEILING_PCT=$value
   done <"$file"
+  if [ -n "$CONTEXT_HANDOFF_CODEX_PCT" ] && [ "$CONTEXT_HANDOFF_CODEX_PCT" -le "${CONTEXT_HANDOFF_CEILING_PCT:-80}" ]; then
+    echo "error: config/worker-context-handoff codex-handoff-pct must be greater than fallback-pct=${CONTEXT_HANDOFF_CEILING_PCT:-80}, got '$CONTEXT_HANDOFF_CODEX_PCT'" >&2
+    return 1
+  fi
   return 0
 }
 if [ "$CONTEXT_HANDOFF_PRESENT" = 1 ]; then
@@ -3279,19 +3297,17 @@ codex_writable_roots_flag() {  # <state-dir> <data-dir> <task-id>
 # selected model's effective window (context_window times
 # effective_context_window_percent) from codex's model catalog cache, counting
 # the full active context as claude's percentage does. When the context
-# handoff is wired (codex_handoff_pct below) the worker hands off at that share
-# instead and the point moves to the fallback ceiling. No override, a value
-# outside 1-99, no selected model, or a model the catalog does not list omits
-# the flags and leaves codex's own compaction point.
+# handoff is wired (codex_handoff_pct below) the compaction point is the
+# fallback ceiling, with handoff ordering chosen by that helper. Without a
+# handoff or a valid override from 1-99, a selected model, and a catalog entry
+# for that model, the flags are omitted, leaving Codex's own compaction point.
 codex_compact_limit_flag() {  # <model>
   local model=$1 pct limit
   pct=$(launch_env_autocompact_pct)
+  ! codex_handoff_pct >/dev/null || pct=$(context_handoff_ceiling_pct)
   case "$pct" in '' | *[!0-9]*) return 0 ;; esac
   pct=$((10#$pct))
   [ "$pct" -ge 1 ] && [ "$pct" -le 99 ] || return 0
-  # With the context handoff wired the worker hands off at that share, so
-  # codex compacts only at the fallback ceiling, as a held claude worker does.
-  ! codex_handoff_pct >/dev/null || pct=$(context_handoff_ceiling_pct)
   [ -n "$model" ] && [ "$model" != default ] && command -v jq >/dev/null 2>&1 || return 0
   limit=$(jq -r --arg m "$model" --argjson p "$pct" \
     'first(.models[]? | select(.slug == $m) | select((.context_window | type) == "number")) | (.context_window * (.effective_context_window_percent // 100) * $p / 10000 | floor)' \
@@ -3320,13 +3336,18 @@ context_handoff_ceiling_pct() {
 }
 
 # The share of the window at which a codex worker hands off, printed only when
-# config/worker-context-handoff is present and the launch-env override is a
+# config/worker-context-handoff is present: its explicit codex-handoff-pct,
+# or, absent that line, the launch-env override when it is a
 # threshold the handoff can honor: 1 up to one below the fallback ceiling, the
 # range bin/fm-context-handoff.sh accepts from a claude worker's environment.
 # Otherwise it fails, and the codex worker compacts in place as before.
 codex_handoff_pct() {
   local pct
   [ "$CONTEXT_HANDOFF_PRESENT" = 1 ] || return 1
+  if [ -n "$CONTEXT_HANDOFF_CODEX_PCT" ]; then
+    printf '%s' "$CONTEXT_HANDOFF_CODEX_PCT"
+    return 0
+  fi
   pct=$(launch_env_autocompact_pct)
   case "$pct" in '' | *[!0-9]*) return 1 ;; esac
   pct=$((10#$pct))
