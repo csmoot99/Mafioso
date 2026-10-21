@@ -86,7 +86,8 @@
 #       one file-existence test and exits 0 with no output, so the common path
 #       costs nothing. In Codex mode the no-marker path instead reads the
 #       latest `token_count` record in the payload's transcript_path (the
-#       Codex session log): once `last_token_usage.total_tokens` reaches P
+#       Codex session log), ignoring any written before the log's latest
+#       `compacted` record: once `last_token_usage.total_tokens` reaches P
 #       percent of its `model_context_window`, it writes the `due` marker and
 #       note the Claude PreCompact writes at its first block (window from the
 #       log, ceiling N percent of it) and delivers the notice on this call.

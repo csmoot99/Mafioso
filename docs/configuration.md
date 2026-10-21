@@ -1154,7 +1154,7 @@ The flag is read at every launch and relaunch and applies only to Claude and Cod
 Codex cannot hold back a compaction, so a Codex worker gets the same outcome another way: it is told to hand off once its context reaches the `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` share of the selected model's window, and Codex's own compaction waits at the fallback ceiling, so a handoff that never arrives ends in one compaction there, as on Claude.
 A Codex worker whose override is missing, or not below the ceiling, keeps compacting in place at the override share.
 To make Codex compact first and hand off only if compaction does not reduce its usage enough, add the optional line `codex-handoff-pct=<N>` beside `fallback-pct`.
-This value must be a whole number greater than `fallback-pct` (80 when omitted) and at most 80; invalid values and duplicate lines refuse the launch.
+This value must be a whole number greater than `fallback-pct` and at most 80, so it needs a `fallback-pct` line below 80; invalid values and duplicate lines refuse the launch.
 For example, `fallback-pct=30` and `codex-handoff-pct=50` keep Codex's own auto-compaction at 30 percent every time it is reached, and request a handoff only if context usage still reaches 50 percent.
 Compaction leaves that later handoff check armed throughout the session.
 The explicit Codex handoff percentage does not require a launch-env override; without the new line, Codex keeps the default handoff-first order described above, and Claude's behavior is unchanged.
