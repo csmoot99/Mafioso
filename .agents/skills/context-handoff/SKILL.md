@@ -2,7 +2,7 @@
 name: context-handoff
 description: >-
   Agent-only procedure for the opt-in worker context handoff.
-  A Claude or Codex worker loads it when a PostToolUse notice from bin/fm-context-handoff.sh names this skill: its context reached the handoff threshold, auto-compaction is being held off, and it must write a handoff document so a fresh worker can continue the same task.
+  A Claude or Codex worker loads it when a PostToolUse notice from bin/fm-context-handoff.sh names this skill: its context reached the handoff threshold (with auto-compaction held off, or, on a compact-first Codex worker, still after auto-compaction), and it must write a handoff document so a fresh worker can continue the same task.
   Firstmate loads its supervisor section on a `blocked [key=context-handoff-<n>]` status event, when a worker reports its context handoff ready, and replaces the worker with the one deterministic command there.
 user-invocable: false
 metadata:

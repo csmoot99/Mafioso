@@ -346,6 +346,7 @@ test_codex_posttooluse_marks_the_handoff_due_at_the_threshold() {
   ctx=$(printf '%s' "$out" | jq -r '.hookSpecificOutput.additionalContext')
   assert_contains "$ctx" "$DATA_DIR/$id/handoff-1.md" "the notice must be delivered on the call that crossed the threshold"
   assert_contains "$ctx" "context-handoff-1" "the notice must name the decision key"
+  assert_contains "$ctx" "auto-compaction is being held off" "the handoff-first notice must say compaction is held off"
   write_codex_log "$TRANSCRIPT" 110000 258400
   run_codex_hook "$rec" "$id" posttooluse >/dev/null
   [ "$(status_count "$STATE_DIR" "$id" 'context handoff due')" = 1 ] || fail "a later call must not note the handoff again"
@@ -597,6 +598,8 @@ test_codex_compacts_first_and_can_still_handoff_later() {
     [ "$(marker_field "$HOME_DIR/state" "$id" pct)" = 50 ] || fail "the marker must record the explicit Codex threshold"
     [ "$(status_count "$HOME_DIR/state" "$id" 'context handoff due')" = 1 ] || fail "the handoff must be noted once"
     assert_contains "$(printf '%s' "$out" | jq -r '.hookSpecificOutput.additionalContext')" 'context-handoff-1' "the normal handoff notice must carry the replacement key"
+    assert_contains "$(printf '%s' "$out" | jq -r '.hookSpecificOutput.additionalContext')" 'still reached the handoff threshold after auto-compaction' "the compact-first notice must say compaction already ran"
+    assert_not_contains "$(printf '%s' "$out" | jq -r '.hookSpecificOutput.additionalContext')" 'held off' "the compact-first notice must not claim compaction is held off"
     precompact_payload "$log" auto | sh -c "$pre"
     [ "$(marker_field "$HOME_DIR/state" "$id" state)" = due ] || fail "another compaction must leave a pending handoff intact"
     pass "Codex compacts at 30 repeatedly and still hands off at 50 (launch-env=$override)"

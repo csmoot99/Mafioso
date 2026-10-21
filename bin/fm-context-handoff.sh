@@ -426,7 +426,7 @@ codex_precompact() {
 }
 
 do_posttooluse() {
-  local marker handoff key calls notices skill
+  local marker handoff key calls notices skill reason
   hook_args "$@"
   if [ -n "$CODEX_PCT" ]; then
     PAYLOAD=$(cat 2>/dev/null || true)
@@ -452,16 +452,20 @@ do_posttooluse() {
   notices=$((notices + 1))
   marker_write "$MARKER" "$(printf '%s' "$marker" | sed "s/ calls=[0-9]* / calls=$calls /; s/ notices=[0-9]* / notices=$notices /")" || true
   skill="$SKILL_ROOT/.agents/skills/context-handoff/SKILL.md"
+  # Compact-first Codex has already compacted at the ceiling, so nothing is held off.
+  reason="reached the handoff threshold, and auto-compaction is being held off so you can hand over instead"
+  [ -z "$CODEX_PCT" ] || [ "$CODEX_PCT" -lt "$CEILING_PCT" ] ||
+    reason="still reached the handoff threshold after auto-compaction, so you must hand over instead"
   perl -MJSON::PP -e '
-    my ($id, $skill, $handoff, $status, $key) = @ARGV;
-    my $text = "FIRSTMATE CONTEXT HANDOFF for task $id: this worker'"'"'s context reached the handoff threshold, and auto-compaction is being held off so you can hand over instead. Do these four things, in order.\n"
+    my ($id, $skill, $handoff, $status, $key, $reason) = @ARGV;
+    my $text = "FIRSTMATE CONTEXT HANDOFF for task $id: this worker'"'"'s context $reason. Do these four things, in order.\n"
       . "1. Finish only the step already in hand and start nothing new. Never hand off in the middle of a running validation call: reach the next point where no pipeline call is in flight first.\n"
       . "2. Read and follow the handoff skill at $skill.\n"
       . "3. Write the handoff to exactly $handoff (create it; never overwrite an earlier handoff).\n"
       . "4. Report it by appending exactly this line to $status, with <epoch> replaced by the number `date +%s` prints: blocked [key=$key] [at=<epoch>]: context handoff ready at $handoff\n"
       . "Then end your turn and wait. A fresh worker replaces you and continues this task from the handoff.";
     print JSON::PP->new->canonical->encode({ hookSpecificOutput => { hookEventName => "PostToolUse", additionalContext => $text } }), "\n";
-  ' -- "$ID" "$skill" "$handoff" "$STATUS" "$key" 2>/dev/null || true
+  ' -- "$ID" "$skill" "$handoff" "$STATUS" "$key" "$reason" 2>/dev/null || true
   exit 0
 }
 
