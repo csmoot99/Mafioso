@@ -1,0 +1,6 @@
+== fm-spawn codex launch, config fallback-pct=30 codex-handoff-pct=50, launch-env override 20 (compact-first)
+--ceiling-pct 30 --codex-threshold-pct 50 model_auto_compact_token_limit=77520 
+== fm-spawn codex launch, config fallback-pct=30 codex-handoff-pct=50, no launch-env override (compact-first)
+--ceiling-pct 30 --codex-threshold-pct 50 model_auto_compact_token_limit=77520 
+== fm-spawn codex launch, config fallback-pct=30 only, launch-env override 20 (default handoff-first, unchanged)
+--ceiling-pct 30 --codex-threshold-pct 20 model_auto_compact_token_limit=77520 

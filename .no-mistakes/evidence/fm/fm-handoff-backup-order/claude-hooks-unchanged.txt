@@ -1,0 +1,6 @@
+Claude worker settings.local.json hooks: config 'fallback-pct=30 + codex-handoff-pct=50' vs 'fallback-pct=30' only
+IDENTICAL
+
+PreCompact/PostToolUse commands:
+'<ROOT>/bin/fm-context-handoff.sh' precompact '<HOME>/state' 'cl-with' --gen '<GEN>' --data-dir '<HOME>/data' --fm-root '<ROOT>' --ceiling-pct '30'
+'<ROOT>/bin/fm-context-handoff.sh' posttooluse '<HOME>/state' 'cl-with' --gen '<GEN>' --data-dir '<HOME>/data' --fm-root '<ROOT>' 2>/dev/null || true

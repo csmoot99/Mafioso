@@ -1,0 +1,49 @@
+FM_TEST_BEGIN 2026-10-21T23:14:46Z tests/fm-context-handoff.test.sh family=backend-dispatch expected_gate_skip=none
+ok - the first auto PreCompact blocks, binds a due marker to the incarnation, and notes the handoff once
+ok - repeat auto PreCompact fires keep blocking without new status events while the handoff is pending
+ok - the fallback ceiling lets compaction through once the window nears its limit and records the miss once
+ok - a worker environment without the lowering override compacts as before and says why once
+ok - an override too close to the window limit is treated as no safe handoff threshold
+ok - an explicit --ceiling-pct scales the fallback ceiling and bounds the usable override at N-1
+ok - a hook command written without a ceiling argument keeps meaning 80 percent
+ok - manual compaction is never blocked and leaves no record
+ok - stale incarnations, unreadable payloads, and missing transcripts all let compaction through
+ok - each handoff in a task gets the next durable path and key, never overwriting an earlier one
+ok - the no-marker PostToolUse path is a silent exit 0
+ok - PostToolUse delivers the handoff notice once, re-delivers it sparingly, and stops once the handoff exists
+ok - a Codex worker below its handoff threshold gets no marker, note, or notice
+ok - a Codex worker at its threshold gets the same due marker, note, and notice a held Claude worker gets
+ok - a recorded live Codex PostToolUse payload and session log fire the handoff notice at the threshold
+ok - a Codex PreCompact never blocks and records a handoff the fallback compaction overtook
+ok - a Codex compaction that overtakes the threshold between tool calls is recorded as the fallback
+ok - manual and superseded-incarnation Codex compactions leave no handoff record
+ok - with config/worker-context-handoff absent a claude worker's settings are exactly the busy-state hooks
+ok - with the flag on a claude ship gets working PreCompact and PostToolUse hooks bound to its incarnation
+ok - with the flag on a claude scout gets the handoff hooks
+ok - with the flag on a qwen worker gets no handoff wiring
+ok - with the flag on a codex ship gets working handoff hooks bound to its incarnation
+ok - Codex compacts at 30 repeatedly and still hands off at 50 (launch-env=20)
+ok - Codex compacts at 30 repeatedly and still hands off at 50 (launch-env=unset)
+ok - an invalid, duplicate, or at-or-below-fallback Codex handoff percentage refuses before launch
+ok - fallback-pct scales the Claude ceiling and codex-handoff-pct leaves Claude behavior unchanged
+ok - a flag file holding only comments and blank lines keeps the 80 percent ceiling
+ok - an invalid, too-high, duplicate, unknown-key, or at-or-below-threshold fallback-pct refuses the spawn and names the value
+ok - a relaunch clears the old handoff marker and re-wires the hooks for the new incarnation
+ok - replace refuses a missing, empty, whitespace-only, stale, or unrecorded handoff and never reaches fm-control
+ok - replace hands a valid handoff to fm-control relaunch with a read-it-first note and closes the record
+ok - a refused relaunch is relayed and leaves the handoff record open
+all fm-context-handoff tests passed
+FM_TEST_END 2026-10-21T23:15:24Z tests/fm-context-handoff.test.sh exit=0 duration_ms=38143 gate_skip=false
+FM_TEST_BEGIN 2026-10-21T23:15:24Z tests/fm-codex-hook-layer-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+ok - codex codex-cli 0.162.1 still publishes the hook feature flag firstmate enables
+ok - codex codex-cli 0.162.1 accepts a firstmate crewmate launch with its hook layer enabled
+ok - codex codex-cli 0.162.1 loads every firstmate session-flag hook from the crewmate launch with its exact command (handoff-first)
+ok - codex codex-cli 0.162.1 loads every firstmate session-flag hook from the crewmate launch with its exact command (compact-first)
+ok - codex codex-cli 0.162.1 renders the crewmate launch sandboxed under auto-review with only its task channels writable
+# all fm-codex-hook-layer-live-e2e tests passed
+FM_TEST_END 2026-10-21T23:15:38Z tests/fm-codex-hook-layer-live-e2e.test.sh exit=0 duration_ms=14386 gate_skip=false
+FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=52612
+FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=1 duration_ms=38143 failed=0
+FM_TEST_SUMMARY_FAMILY family=live-harness-optin count=1 duration_ms=14386 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-context-handoff.test.sh duration_ms=38143
+FM_TEST_SLOWEST rank=2 script=tests/fm-codex-hook-layer-live-e2e.test.sh duration_ms=14386

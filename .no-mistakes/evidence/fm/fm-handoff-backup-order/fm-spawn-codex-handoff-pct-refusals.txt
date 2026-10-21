@@ -1,0 +1,15 @@
+== config: fallback-pct=30 codex-handoff-pct=30 
+error: config/worker-context-handoff codex-handoff-pct must be greater than fallback-pct=30, got '30'
+spawn rc=1
+== config: fallback-pct=30 codex-handoff-pct=25 
+error: config/worker-context-handoff codex-handoff-pct must be greater than fallback-pct=30, got '25'
+spawn rc=1
+== config: fallback-pct=30 codex-handoff-pct=81 
+error: config/worker-context-handoff codex-handoff-pct must be a whole number from 1 to 80 (Claude keeps its own threshold near 83), got '81' (line 2)
+spawn rc=1
+== config: codex-handoff-pct=50 
+error: config/worker-context-handoff codex-handoff-pct must be greater than fallback-pct=80, got '50'
+spawn rc=1
+== config: fallback-pct=30 codex-handoff-pct=50 codex-handoff-pct=60 
+error: config/worker-context-handoff sets codex-handoff-pct twice (line 3: 'codex-handoff-pct=60'); keep one line
+spawn rc=1

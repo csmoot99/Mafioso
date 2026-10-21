@@ -1,0 +1,31 @@
+# Real Codex session log from the live run (codex-cli 0.162.1, gpt-6-sol), replayed through the generated PostToolUse hook at each compaction boundary
+## A) the live config: ceiling 7, handoff 8 (pre-compaction ~6.9%, post ~3.4%)
+compaction 1: log ends at pre-compaction token_count       marker=none         notice=no
+compaction 1: log ends at compacted record (stale usage)   marker=none         notice=no
+compaction 1: log ends at fresh post-compaction token_count marker=none         notice=no
+compaction 2: log ends at pre-compaction token_count       marker=none         notice=no
+compaction 2: log ends at compacted record (stale usage)   marker=none         notice=no
+compaction 2: log ends at fresh post-compaction token_count marker=none         notice=no
+compaction 3: log ends at pre-compaction token_count       marker=none         notice=no
+compaction 3: log ends at compacted record (stale usage)   marker=none         notice=no
+compaction 3: log ends at fresh post-compaction token_count marker=none         notice=no
+## B) adversarial: ceiling 3, handoff 6 -> pre-compaction usage 6.9% is past P but stale once compacted
+compaction 1: log ends at pre-compaction token_count       marker=due(pct=6)   notice=yes
+compaction 1: log ends at compacted record (stale usage)   marker=none         notice=no
+compaction 1: log ends at fresh post-compaction token_count marker=none         notice=no
+compaction 2: log ends at pre-compaction token_count       marker=due(pct=6)   notice=yes
+compaction 2: log ends at compacted record (stale usage)   marker=none         notice=no
+compaction 2: log ends at fresh post-compaction token_count marker=none         notice=no
+compaction 3: log ends at pre-compaction token_count       marker=due(pct=6)   notice=yes
+compaction 3: log ends at compacted record (stale usage)   marker=none         notice=no
+compaction 3: log ends at fresh post-compaction token_count marker=none         notice=no
+## C) compaction did not get usage below P: ceiling 2, handoff 3 -> post-compaction 3.4% is still >= P
+compaction 1: log ends at pre-compaction token_count       marker=due(pct=3)   notice=yes
+compaction 1: log ends at compacted record (stale usage)   marker=none         notice=no
+compaction 1: log ends at fresh post-compaction token_count marker=due(pct=3)   notice=yes
+compaction 2: log ends at pre-compaction token_count       marker=due(pct=3)   notice=yes
+compaction 2: log ends at compacted record (stale usage)   marker=none         notice=no
+compaction 2: log ends at fresh post-compaction token_count marker=due(pct=3)   notice=yes
+compaction 3: log ends at pre-compaction token_count       marker=due(pct=3)   notice=yes
+compaction 3: log ends at compacted record (stale usage)   marker=none         notice=no
+compaction 3: log ends at fresh post-compaction token_count marker=due(pct=3)   notice=yes

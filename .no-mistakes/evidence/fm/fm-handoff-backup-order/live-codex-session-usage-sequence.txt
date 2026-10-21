@@ -1,0 +1,35 @@
+18: tool_call
+22: token_count last=17587 window=258400 pct=6.8
+24: COMPACTED
+28: token_count last=8804 window=258400 pct=3.4
+35: tool_call
+39: token_count last=17866 window=258400 pct=6.9
+41: COMPACTED
+45: token_count last=8912 window=258400 pct=3.4
+52: tool_call
+56: token_count last=17904 window=258400 pct=6.9
+58: COMPACTED
+62: token_count last=8915 window=258400 pct=3.5
+69: tool_call
+73: token_count last=17910 window=258400 pct=6.9
+75: COMPACTED
+79: token_count last=8919 window=258400 pct=3.5
+86: tool_call
+90: token_count last=17906 window=258400 pct=6.9
+92: COMPACTED
+96: token_count last=8915 window=258400 pct=3.5
+103: tool_call
+107: token_count last=17902 window=258400 pct=6.9
+109: COMPACTED
+113: token_count last=8919 window=258400 pct=3.5
+120: tool_call
+124: token_count last=17905 window=258400 pct=6.9
+126: COMPACTED
+130: token_count last=8912 window=258400 pct=3.4
+137: tool_call
+141: token_count last=17902 window=258400 pct=6.9
+143: COMPACTED
+147: token_count last=8804 window=258400 pct=3.4
+152: tool_call
+156: token_count last=17835 window=258400 pct=6.9
+160: token_count last=17874 window=258400 pct=6.9
