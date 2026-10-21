@@ -574,10 +574,15 @@ test_codex_compacts_first_and_can_still_handoff_later() {
     write_codex_log "$log" 40000 200000
     out=$(posttooluse_payload "$log" | sh -c "$post")
     [ -z "$out" ] || fail "the old 20 percent threshold must not request a handoff"
-    write_codex_log "$log" 60000 200000
+    write_codex_log "$log" 104000 200000
     out=$(precompact_payload "$log" auto | sh -c "$pre"); rc=$?
     expect_code 0 "$rc" "normal compaction at 30 must proceed"
     [ -z "$out" ] || fail "normal compaction must be silent"
+    printf '{"type":"compacted","payload":{"message":"","replacement_history":[]}}\n' >> "$log"
+    [ -z "$(posttooluse_payload "$log" | sh -c "$post")" ] || fail "pre-compaction usage past 50 percent must not request a handoff after compaction"
+    assert_absent "$HOME_DIR/state/$id.context-handoff" "stale pre-compaction usage must not mark a handoff due"
+    printf '{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"total_tokens":999999},"last_token_usage":{"total_tokens":29000},"model_context_window":200000}}}\n' >> "$log"
+    [ -z "$(posttooluse_payload "$log" | sh -c "$post")" ] || fail "the post-compaction usage Codex reports must stay silent"
     precompact_payload "$log" auto | sh -c "$pre"
     assert_absent "$HOME_DIR/state/$id.context-handoff" "repeated normal compactions must not disarm the later handoff"
     assert_absent "$HOME_DIR/state/$id.status" "normal compaction must not report a missed handoff"

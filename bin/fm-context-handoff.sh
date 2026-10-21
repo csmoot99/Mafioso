@@ -235,11 +235,15 @@ _transcript_usage_scan() {
 # "<usage> <window>" from the latest Codex token_count event: the context the
 # last model response used (last_token_usage.total_tokens, what Codex's own
 # compaction limit is measured against) and the model's effective window.
+# A compaction record voids every earlier event: until Codex writes the
+# post-compaction token_count there is no current usage to report.
 _codex_usage_scan() {
   perl -MJSON::PP -ne '
-    next unless /"token_count"/;
+    next unless /"token_count"|"compacted"/;
     my $d = eval { JSON::PP->new->decode($_) } or next;
-    next unless ref $d eq "HASH" && ($d->{type} // "") eq "event_msg" && ref $d->{payload} eq "HASH";
+    next unless ref $d eq "HASH";
+    if (($d->{type} // "") eq "compacted") { undef $last; next }
+    next unless ($d->{type} // "") eq "event_msg" && ref $d->{payload} eq "HASH";
     my $i = $d->{payload}{info};
     next unless ($d->{payload}{type} // "") eq "token_count" && ref $i eq "HASH" && ref $i->{last_token_usage} eq "HASH";
     my ($u, $w) = ($i->{last_token_usage}{total_tokens}, $i->{model_context_window});
