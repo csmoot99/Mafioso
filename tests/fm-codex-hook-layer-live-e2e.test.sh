@@ -44,8 +44,8 @@ TMP_ROOT=$(fm_test_tmproot fm-codex-hook-layer-live)
 
 # capture_codex_launch <name> <extra fm-spawn args...>: spawns a codex crewmate
 # against a fake pane and echoes the literal launch command firstmate sent. The
-# home opts into the context handoff at 40 percent, so the launch carries every
-# hook Firstmate can wire.
+# home opts into the context handoff at 40 percent, or compact-first at 30/50
+# for the compact-first case, so the launch carries every hook Firstmate can wire.
 capture_codex_launch() {
   local name=$1
   shift
@@ -60,6 +60,10 @@ capture_codex_launch() {
   fm_test_spawn_home "$home" codex
   printf 'CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=40\n' > "$home/config/launch-env"
   : > "$home/config/worker-context-handoff"
+  if [ "$name" = compact-first ]; then
+    printf 'CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=20\n' > "$home/config/launch-env"
+    printf 'fallback-pct=30\ncodex-handoff-pct=50\n' > "$home/config/worker-context-handoff"
+  fi
   fm_test_spawn_brief "$home" "$id"
   fm_git_worktree "$proj" "$wt" "wt-$name"
   : > "$launchlog"
@@ -133,24 +137,26 @@ codex_session_flag_hooks() {
 }
 
 test_installed_codex_loads_every_firstmate_hook_from_the_captured_launch() {
-  local case_dir listing event name want got
-  capture_codex_launch hooks --mode no-mistakes --yolo off >/dev/null
-  case_dir="$TMP_ROOT/hooks"
-  listing=$(codex_session_flag_hooks "$case_dir")
-  for event in UserPromptSubmit:userPromptSubmit Stop:stop SessionEnd:sessionEnd PreCompact:preCompact PostToolUse:postToolUse; do
-    name=${event#*:}
-    event=${event%%:*}
-    want=$(fm_test_codex_hook_command "$case_dir/launch.log" "$event" "$case_dir/parse") ||
-      fail "codex $CODEX_VERSION: the captured launch carries no $event hook"
-    got=$(printf '%s' "$listing" | jq -r --arg e "$name" \
-      '[.result.data[]?.hooks[]? | select(.source == "sessionFlags" and .eventName == $e and .enabled == true)] | if length == 1 then .[0].command else empty end')
-    [ -n "$got" ] ||
-      fail "codex $CODEX_VERSION did not load exactly one enabled session-flag $event hook from firstmate's crewmate launch"
-    [ "$got" = "$want" ] ||
-      fail "codex $CODEX_VERSION parsed firstmate's $event hook as '$got', not the command the launch carries: '$want'"
-  done
+  local case_dir listing event name want got order
+  for order in handoff-first compact-first; do
+    capture_codex_launch "$order" --mode no-mistakes --yolo off >/dev/null
+    case_dir="$TMP_ROOT/$order"
+    listing=$(codex_session_flag_hooks "$case_dir")
+    for event in UserPromptSubmit:userPromptSubmit Stop:stop SessionEnd:sessionEnd PreCompact:preCompact PostToolUse:postToolUse; do
+      name=${event#*:}
+      event=${event%%:*}
+      want=$(fm_test_codex_hook_command "$case_dir/launch.log" "$event" "$case_dir/parse") ||
+        fail "codex $CODEX_VERSION: the captured launch carries no $event hook"
+      got=$(printf '%s' "$listing" | jq -r --arg e "$name" \
+        '[.result.data[]?.hooks[]? | select(.source == "sessionFlags" and .eventName == $e and .enabled == true)] | if length == 1 then .[0].command else empty end')
+      [ -n "$got" ] ||
+        fail "codex $CODEX_VERSION did not load exactly one enabled session-flag $event hook from firstmate's crewmate launch"
+      [ "$got" = "$want" ] ||
+        fail "codex $CODEX_VERSION parsed firstmate's $event hook as '$got', not the command the launch carries: '$want'"
+    done
 
-  printf 'ok - codex %s loads every firstmate session-flag hook from the crewmate launch with its exact command\n' "$CODEX_VERSION"
+    printf 'ok - codex %s loads every firstmate session-flag hook from the crewmate launch with its exact command (%s)\n' "$CODEX_VERSION" "$order"
+  done
 }
 
 test_installed_codex_still_reports_the_hook_feature() {

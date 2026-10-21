@@ -346,6 +346,7 @@ test_codex_posttooluse_marks_the_handoff_due_at_the_threshold() {
   ctx=$(printf '%s' "$out" | jq -r '.hookSpecificOutput.additionalContext')
   assert_contains "$ctx" "$DATA_DIR/$id/handoff-1.md" "the notice must be delivered on the call that crossed the threshold"
   assert_contains "$ctx" "context-handoff-1" "the notice must name the decision key"
+  assert_contains "$ctx" "auto-compaction is being held off" "the handoff-first notice must say compaction is held off"
   write_codex_log "$TRANSCRIPT" 110000 258400
   run_codex_hook "$rec" "$id" posttooluse >/dev/null
   [ "$(status_count "$STATE_DIR" "$id" 'context handoff due')" = 1 ] || fail "a later call must not note the handoff again"
@@ -550,6 +551,77 @@ test_flag_on_adds_the_hooks_for_a_codex_ship() {
   pass "with the flag on a codex ship gets working handoff hooks bound to its incarnation"
 }
 
+# Exercise compact-first ordering through the exact commands fm-spawn emits,
+# including Codex's own compaction limit from its model catalog.
+test_codex_compacts_first_and_can_still_handoff_later() {
+  local rec id out rc pre post log override
+  for override in 20 unset; do
+    id="sp-compact-first-$override"
+    rec=$(make_spawn_case "$id" codex "$id" on); read_spawn_case "$rec"
+    printf 'codex-handoff-pct=050\nfallback-pct=30\n' > "$HOME_DIR/config/worker-context-handoff"
+    if [ "$override" = unset ]; then
+      : > "$HOME_DIR/config/launch-env"
+    else
+      printf 'CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=20\n' > "$HOME_DIR/config/launch-env"
+    fi
+    mkdir -p "$CASE_DIR/codex-home"
+    printf '{"models":[{"slug":"gpt-5","context_window":200000,"effective_context_window_percent":100}]}\n' > "$CASE_DIR/codex-home/models_cache.json"
+    out=$(CODEX_HOME="$CASE_DIR/codex-home" FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --model gpt-5 --mode no-mistakes --yolo off); rc=$?
+    expect_code 0 "$rc" "compact-first Codex spawn should succeed ($override): $out"
+    pre=$(fm_test_codex_hook_command "$CASE_DIR/launch.log" PreCompact "$CASE_DIR/codex-args") || fail "no PreCompact hook"
+    post=$(fm_test_codex_hook_command "$CASE_DIR/launch.log" PostToolUse "$CASE_DIR/codex-args") || fail "no PostToolUse hook"
+    assert_contains "$(tr '\0' '\n' < "$CASE_DIR/codex-args/args")" 'model_auto_compact_token_limit=60000' "Codex must compact at 30 percent of its effective window"
+    log="$CASE_DIR/session.jsonl"
+    write_codex_log "$log" 40000 200000
+    out=$(posttooluse_payload "$log" | sh -c "$post")
+    [ -z "$out" ] || fail "the old 20 percent threshold must not request a handoff"
+    write_codex_log "$log" 104000 200000
+    out=$(precompact_payload "$log" auto | sh -c "$pre"); rc=$?
+    expect_code 0 "$rc" "normal compaction at 30 must proceed"
+    [ -z "$out" ] || fail "normal compaction must be silent"
+    printf '{"type":"compacted","payload":{"message":"","replacement_history":[]}}\n' >> "$log"
+    [ -z "$(posttooluse_payload "$log" | sh -c "$post")" ] || fail "pre-compaction usage past 50 percent must not request a handoff after compaction"
+    assert_absent "$HOME_DIR/state/$id.context-handoff" "stale pre-compaction usage must not mark a handoff due"
+    printf '{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"total_tokens":999999},"last_token_usage":{"total_tokens":29000},"model_context_window":200000}}}\n' >> "$log"
+    [ -z "$(posttooluse_payload "$log" | sh -c "$post")" ] || fail "the post-compaction usage Codex reports must stay silent"
+    precompact_payload "$log" auto | sh -c "$pre"
+    assert_absent "$HOME_DIR/state/$id.context-handoff" "repeated normal compactions must not disarm the later handoff"
+    assert_absent "$HOME_DIR/state/$id.status" "normal compaction must not report a missed handoff"
+    write_codex_log "$log" 20000 200000
+    [ -z "$(posttooluse_payload "$log" | sh -c "$post")" ] || fail "reduced usage after compaction must stay silent"
+    write_codex_log "$log" 99999 200000
+    [ -z "$(posttooluse_payload "$log" | sh -c "$post")" ] || fail "usage just below 50 percent must stay silent"
+    write_codex_log "$log" 100000 200000
+    out=$(posttooluse_payload "$log" | sh -c "$post"); rc=$?
+    expect_code 0 "$rc" "the later handoff must exit 0"
+    [ "$(marker_field "$HOME_DIR/state" "$id" state)" = due ] || fail "usage at 50 percent after compaction must request a handoff"
+    [ "$(marker_field "$HOME_DIR/state" "$id" pct)" = 50 ] || fail "the marker must record the explicit Codex threshold"
+    [ "$(status_count "$HOME_DIR/state" "$id" 'context handoff due')" = 1 ] || fail "the handoff must be noted once"
+    assert_contains "$(printf '%s' "$out" | jq -r '.hookSpecificOutput.additionalContext')" 'context-handoff-1' "the normal handoff notice must carry the replacement key"
+    assert_contains "$(printf '%s' "$out" | jq -r '.hookSpecificOutput.additionalContext')" 'still reached the handoff threshold after auto-compaction' "the compact-first notice must say compaction already ran"
+    assert_not_contains "$(printf '%s' "$out" | jq -r '.hookSpecificOutput.additionalContext')" 'held off' "the compact-first notice must not claim compaction is held off"
+    precompact_payload "$log" auto | sh -c "$pre"
+    [ "$(marker_field "$HOME_DIR/state" "$id" state)" = due ] || fail "another compaction must leave a pending handoff intact"
+    pass "Codex compacts at 30 repeatedly and still hands off at 50 (launch-env=$override)"
+  done
+}
+
+test_bad_codex_handoff_pct_refuses_the_spawn() {
+  local rec id=sp-codex-refuse out rc config
+  rec=$(make_spawn_case codex-refuse codex "$id" on); read_spawn_case "$rec"
+  printf 'CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=20\n' > "$HOME_DIR/config/launch-env"
+  for config in 'fallback-pct=30 codex-handoff-pct=30' 'codex-handoff-pct=29 fallback-pct=30' \
+    'fallback-pct=30 codex-handoff-pct=81' 'fallback-pct=30 codex-handoff-pct=zero' \
+    'fallback-pct=30 codex-handoff-pct=18446744073709551666' \
+    'fallback-pct=30 codex-handoff-pct=0' 'fallback-pct=30 codex-handoff-pct=' \
+    'fallback-pct=30 codex-handoff-pct=50 codex-handoff-pct=60' 'codex-handoff-pct=50'; do
+    printf '%s\n' "$config" | tr ' ' '\n' > "$HOME_DIR/config/worker-context-handoff"
+    out=$(fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --mode no-mistakes --yolo off); rc=$?
+    assert_flag_refused "$rc" "$out" 'codex-handoff-pct' "$id" "invalid Codex threshold ($config)"
+  done
+  pass "an invalid, duplicate, or at-or-below-fallback Codex handoff percentage refuses before launch"
+}
+
 # run_flag_precompact <settings.json> <transcript> <override> <tokens>: drive the
 # generated PreCompact command exactly as Claude would, returning its exit code.
 run_flag_precompact() {
@@ -562,7 +634,7 @@ run_flag_precompact() {
 test_flag_file_fallback_pct_is_baked_into_the_precompact_command() {
   local rec id=sp-fallback out settings rc
   rec=$(make_spawn_case fallback claude "$id" on); read_spawn_case "$rec"
-  printf "# the handoff point is set in launch-env\\n\\nfallback-pct=50\\n" > "$HOME_DIR/config/worker-context-handoff"
+  printf "# the handoff point is set in launch-env\\n\\nfallback-pct=50\\ncodex-handoff-pct=60\\n" > "$HOME_DIR/config/worker-context-handoff"
   printf "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=35\\n" > "$HOME_DIR/config/launch-env"
   out=$(fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --mode no-mistakes --yolo off)
   expect_code 0 $? "claude ship spawn with fallback-pct=50 should succeed: $out"
@@ -572,7 +644,7 @@ test_flag_file_fallback_pct_is_baked_into_the_precompact_command() {
   [ "$(marker_field "$HOME_DIR/state" "$id" ceiling)" = 100000 ] \
     || fail "fallback-pct=50 with a 35 override must put the ceiling at usage times 50 over 35 (100000), got '$(marker_field "$HOME_DIR/state" "$id" ceiling)'"
   [ "$(marker_field "$HOME_DIR/state" "$id" ceiling_pct)" = 50 ] || fail "the marker must record the baked ceiling percentage"
-  pass "fallback-pct in the flag file is baked into the PreCompact command and scales the ceiling"
+  pass "fallback-pct scales the Claude ceiling and codex-handoff-pct leaves Claude behavior unchanged"
 }
 
 test_comment_only_flag_file_keeps_the_default_ceiling() {
@@ -848,6 +920,8 @@ test_flag_on_adds_the_hooks_for_a_claude_ship
 test_flag_on_adds_the_hooks_for_a_claude_scout
 test_flag_on_adds_nothing_for_another_harness
 test_flag_on_adds_the_hooks_for_a_codex_ship
+test_codex_compacts_first_and_can_still_handoff_later
+test_bad_codex_handoff_pct_refuses_the_spawn
 test_flag_file_fallback_pct_is_baked_into_the_precompact_command
 test_comment_only_flag_file_keeps_the_default_ceiling
 test_bad_fallback_pct_refuses_the_spawn

@@ -856,6 +856,20 @@ The hook fired once for each of the worker's five shell calls.
 The first call's `additionalContext` appeared in the log as a developer message tagged `hooks.additional_context`, and the worker's next call created the file it asked for.
 `tests/captures/codex-cli-0.162.1/` holds the captured payload and log excerpt that `tests/fm-context-handoff.test.sh` replays through the hook.
 
+On 2026-10-21, codex-cli 0.162.1 loaded the generated session-flag hooks for both the default handoff-first order and the optional compact-first order documented in [Worker context handoff](../configuration.md#worker-context-handoff-configworker-context-handoff).
+The token-free live guard verifies the installed CLI's hook loading; the behavioral suite drives the generated commands to verify compaction leaves the later handoff armed.
+
+```sh
+bash bin/fm-test-run.sh tests/fm-context-handoff.test.sh tests/fm-codex-hook-layer-live-e2e.test.sh
+```
+
+The live guard reported:
+
+```text
+ok - codex codex-cli 0.162.1 loads every firstmate session-flag hook from the crewmate launch with its exact command (handoff-first)
+ok - codex codex-cli 0.162.1 loads every firstmate session-flag hook from the crewmate launch with its exact command (compact-first)
+```
+
 ## Composer classification matrix
 
 The shared composer classifier (`bin/fm-composer-lib.sh`, `fm_composer_classify_screen`) owns every composer shape fleet-wide; each backend contributes only a capture and a capability descriptor.

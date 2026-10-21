@@ -7,8 +7,8 @@
 # The whole feature is off unless the home holds the presence flag
 # config/worker-context-handoff (docs/configuration.md "Worker context
 # handoff"). bin/fm-spawn.sh reads the flag at every claude or codex ship or
-# scout launch and relaunch, validates its one optional `fallback-pct=<N>`
-# line (blank and `#` lines ignored; see fm-spawn's header for the exact
+# scout launch and relaunch, validates its optional `fallback-pct=<N>` and
+# `codex-handoff-pct=<P>` lines (see fm-spawn's header for the exact
 # rule), and only then wires the two hook commands below beside the
 # busy-state hooks: into a claude worker's .claude/settings.local.json, and
 # as session-flag hooks on a codex worker's launch command. A secondmate, the
@@ -20,7 +20,10 @@
 # gets the same outcome another way. fm-spawn moves Codex's own compaction
 # to the fallback ceiling, PostToolUse watches the handoff threshold P itself
 # in Codex's session log, and PreCompact only records that the fallback
-# compaction arrived. Both always exit 0; the records, status events, notice,
+# compaction arrived. With codex-handoff-pct configured, P is above the
+# fallback ceiling instead: Codex compacts normally at the ceiling every time,
+# PreCompact leaves the handoff check armed, and PostToolUse requests a handoff
+# only if usage still reaches P. Both always exit 0; the records, status events, notice,
 # and replacement are exactly the Claude ones.
 #
 # Subcommands:
@@ -75,13 +78,16 @@
 #       does; with no marker for G yet (usage jumped past the threshold and
 #       the ceiling between two tool calls) it writes a `fallback` marker and
 #       the same note, so this incarnation hands off no later, as on Claude.
+#       When P is above N instead, it leaves the marker untouched on every
+#       compaction so the later handoff check remains armed.
 #
 #   posttooluse <state-dir> <id> --gen G --data-dir D --fm-root R [--ceiling-pct N] [--codex-threshold-pct P]
 #       Claude PostToolUse hook, every tool. With no marker for the task it is
 #       one file-existence test and exits 0 with no output, so the common path
 #       costs nothing. In Codex mode the no-marker path instead reads the
 #       latest `token_count` record in the payload's transcript_path (the
-#       Codex session log): once `last_token_usage.total_tokens` reaches P
+#       Codex session log), ignoring any written before the log's latest
+#       `compacted` record: once `last_token_usage.total_tokens` reaches P
 #       percent of its `model_context_window`, it writes the `due` marker and
 #       note the Claude PreCompact writes at its first block (window from the
 #       log, ceiling N percent of it) and delivers the notice on this call.
@@ -230,11 +236,15 @@ _transcript_usage_scan() {
 # "<usage> <window>" from the latest Codex token_count event: the context the
 # last model response used (last_token_usage.total_tokens, what Codex's own
 # compaction limit is measured against) and the model's effective window.
+# A compaction record voids every earlier event: until Codex writes the
+# post-compaction token_count there is no current usage to report.
 _codex_usage_scan() {
   perl -MJSON::PP -ne '
-    next unless /"token_count"/;
+    next unless /"token_count"|"compacted"/;
     my $d = eval { JSON::PP->new->decode($_) } or next;
-    next unless ref $d eq "HASH" && ($d->{type} // "") eq "event_msg" && ref $d->{payload} eq "HASH";
+    next unless ref $d eq "HASH";
+    if (($d->{type} // "") eq "compacted") { undef $last; next }
+    next unless ($d->{type} // "") eq "event_msg" && ref $d->{payload} eq "HASH";
     my $i = $d->{payload}{info};
     next unless ($d->{payload}{type} // "") eq "token_count" && ref $i eq "HASH" && ref $i->{last_token_usage} eq "HASH";
     my ($u, $w) = ($i->{last_token_usage}{total_tokens}, $i->{model_context_window});
@@ -279,12 +289,12 @@ hook_args() {
   case "$CEILING_PCT" in ''|*[!0-9]*) usage ;; esac
   [ "$CEILING_PCT" -ge 1 ] && [ "$CEILING_PCT" -le "$CEILING_PCT_DEFAULT" ] || usage
   MARKER_MAX_PCT=$((CEILING_PCT - 1))
-  # The same bound a claude worker's override must meet, checked by fm-spawn
-  # before it bakes the value in.
+  # Below the ceiling means handoff first; above it means compact first.
+  # fm-spawn validates the configured ordering before baking these values in.
   case "$CODEX_PCT" in
     '') ;;
     *[!0-9]*) usage ;;
-    *) [ "$CODEX_PCT" -ge 1 ] && [ "$CODEX_PCT" -le "$MARKER_MAX_PCT" ] || usage ;;
+    *) [ "$CODEX_PCT" -ge 1 ] && [ "$CODEX_PCT" -le "$CEILING_PCT_DEFAULT" ] && [ "$CODEX_PCT" -ne "$CEILING_PCT" ] || usage ;;
   esac
   id_ok "$ID" || usage
   STATUS="$STATE/$ID.status"
@@ -386,9 +396,11 @@ codex_mark_due_at_threshold() {
 }
 
 # Codex mode PreCompact: never blocks; records that the fallback compaction
-# arrived before a handoff did.
+# arrived before a handoff did. In compact-first mode it leaves the handoff
+# check armed, including a handoff already due.
 codex_precompact() {
   local marker='' state usage handoff epoch
+  [ "$CODEX_PCT" -lt "$CEILING_PCT" ] || return 0
   [ "$(payload_field trigger)" = auto ] || return 0
   incarnation_current || return 0
   [ -d "$STATE" ] || return 0
@@ -414,7 +426,7 @@ codex_precompact() {
 }
 
 do_posttooluse() {
-  local marker handoff key calls notices skill
+  local marker handoff key calls notices skill reason
   hook_args "$@"
   if [ -n "$CODEX_PCT" ]; then
     PAYLOAD=$(cat 2>/dev/null || true)
@@ -440,16 +452,20 @@ do_posttooluse() {
   notices=$((notices + 1))
   marker_write "$MARKER" "$(printf '%s' "$marker" | sed "s/ calls=[0-9]* / calls=$calls /; s/ notices=[0-9]* / notices=$notices /")" || true
   skill="$SKILL_ROOT/.agents/skills/context-handoff/SKILL.md"
+  # Compact-first Codex has already compacted at the ceiling, so nothing is held off.
+  reason="reached the handoff threshold, and auto-compaction is being held off so you can hand over instead"
+  [ -z "$CODEX_PCT" ] || [ "$CODEX_PCT" -lt "$CEILING_PCT" ] ||
+    reason="still reached the handoff threshold after auto-compaction, so you must hand over instead"
   perl -MJSON::PP -e '
-    my ($id, $skill, $handoff, $status, $key) = @ARGV;
-    my $text = "FIRSTMATE CONTEXT HANDOFF for task $id: this worker'"'"'s context reached the handoff threshold, and auto-compaction is being held off so you can hand over instead. Do these four things, in order.\n"
+    my ($id, $skill, $handoff, $status, $key, $reason) = @ARGV;
+    my $text = "FIRSTMATE CONTEXT HANDOFF for task $id: this worker'"'"'s context $reason. Do these four things, in order.\n"
       . "1. Finish only the step already in hand and start nothing new. Never hand off in the middle of a running validation call: reach the next point where no pipeline call is in flight first.\n"
       . "2. Read and follow the handoff skill at $skill.\n"
       . "3. Write the handoff to exactly $handoff (create it; never overwrite an earlier handoff).\n"
       . "4. Report it by appending exactly this line to $status, with <epoch> replaced by the number `date +%s` prints: blocked [key=$key] [at=<epoch>]: context handoff ready at $handoff\n"
       . "Then end your turn and wait. A fresh worker replaces you and continues this task from the handoff.";
     print JSON::PP->new->canonical->encode({ hookSpecificOutput => { hookEventName => "PostToolUse", additionalContext => $text } }), "\n";
-  ' -- "$ID" "$skill" "$handoff" "$STATUS" "$key" 2>/dev/null || true
+  ' -- "$ID" "$skill" "$handoff" "$STATUS" "$key" "$reason" 2>/dev/null || true
   exit 0
 }
 
