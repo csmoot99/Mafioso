@@ -1,0 +1,34 @@
+### 9. BASE script (f9a58f1), all five billing-refused checks waived
+$ fm-pr-merge.sh lab-mia https://github.com/csmoot99/420mia/pull/193 --allow-red check --allow-red gitleaks --allow-red image --allow-red host\ \(debian:bookworm\) --allow-red host\ \(debian:trixie\)
+error: --allow-red may be specified only once
+exit=2
+gh pr merge attempted: 0
+
+### 10. FIXED script, four of five waived (host (debian:trixie) left out)
+$ fm-pr-merge.sh lab-mia https://github.com/csmoot99/420mia/pull/193 --allow-red check --allow-red gitleaks --allow-red image --allow-red host\ \(debian:bookworm\)
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+armed: state/lab-mia.check.sh
+error: refusing to merge https://github.com/csmoot99/420mia/pull/193
+  - check 'host (debian:trixie)' is not green
+error: these checks are not green: host (debian:trixie)
+exit=1
+gh pr merge attempted: 0
+
+### 11. FIXED script, all five waived (lab guard blocks the real merge write)
+$ fm-pr-merge.sh lab-mia https://github.com/csmoot99/420mia/pull/193 --allow-red check --allow-red gitleaks --allow-red image --allow-red host\ \(debian:bookworm\) --allow-red host\ \(debian:trixie\)
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+armed: state/lab-mia.check.sh
+verified: https://github.com/csmoot99/420mia/pull/193 is open and mergeable, with every unwaived required check reported and every unwaived check green at head e92bc1dd555c37af8916c14c17b348d0348fb0f1
+lab guard: pr merge blocked
+error: GitHub merge outcome was not successful: state=OPEN, merged=false, isInMergeQueue=false
+exit=97
+gh pr merge attempted: 1
+--- gh calls made by run 11:
+pr view https://github.com/csmoot99/420mia/pull/193 --json headRefOid -q .headRefOid
+pr view https://github.com/csmoot99/420mia/pull/193 --json state,isDraft,mergeable,mergeStateStatus,headRefOid,baseRefName,statusCheckRollup
+api repos/csmoot99/420mia/branches/main
+api --paginate repos/csmoot99/420mia/rules/branches/main
+pr merge 193 --repo csmoot99/420mia --match-head-commit e92bc1dd555c37af8916c14c17b348d0348fb0f1 --squash
+api graphql -f query=query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$number){state merged isInMergeQueue baseRefName}}} -F owner=csmoot99 -F repo=420mia -F number=193 --jq .data.repository.pullRequest | "state=" + (.state // ""), "merged=" + (.merged | tostring), "queued=" + (.isInMergeQueue | tostring), "base=" + (.baseRefName // "")
+api --paginate repos/csmoot99/420mia/rules/branches/main --jq .[] | select(.type == "merge_queue") | "merge_method=" + (.parameters.merge_method // "")
+

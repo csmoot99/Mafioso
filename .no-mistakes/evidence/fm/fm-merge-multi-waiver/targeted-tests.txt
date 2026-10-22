@@ -1,0 +1,7 @@
+ok - fm-pr-merge keeps --allow-red scoped to its named check beside a superseded failure
+ok - fm-pr-merge accepts repeated red-check waivers, tolerates duplicates, and refuses unwaived failures
+ok - fm-pr-merge rechecks away presence before an attended red merge
+ok - fm-pr-merge requires a separate nonempty name for each red-check waiver
+ok - fm-pr-merge refuses --allow-red on GitLab
+ok - fm-pr-merge --allow-missing is single use, attended-only, and GitHub-only
+ok - fm-pr-merge reports a red check and an unreported required check together with every other failure

@@ -1,0 +1,82 @@
+### 1. BASE script (f9a58f1), two waivers
+$ fm-pr-merge.sh lab-merge https://github.com/csmoot99/naughty-nomz/pull/23 --allow-red Tests\,\ build\,\ budgets\,\ Docker\ smoke --allow-red iPhone\ check\ \(emulated\ WebKit\)
+error: --allow-red may be specified only once
+exit=2
+gh pr merge attempted: 0
+
+### 2. FIXED script, no waiver
+$ fm-pr-merge.sh lab-merge https://github.com/csmoot99/naughty-nomz/pull/23 ''
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+armed: state/lab-merge.check.sh
+error: refusing to merge https://github.com/csmoot99/naughty-nomz/pull/23
+  - state is "CLOSED", not open
+  - the pull request is a draft
+  - check 'Tests, build, budgets, Docker smoke' is not green
+  - check 'iPhone check (emulated WebKit)' is not green
+error: these checks are not green: Tests, build, budgets, Docker smoke, iPhone check (emulated WebKit)
+exit=1
+gh pr merge attempted: 0
+
+### 3. FIXED script, both red checks waived
+$ fm-pr-merge.sh lab-merge https://github.com/csmoot99/naughty-nomz/pull/23 --allow-red Tests\,\ build\,\ budgets\,\ Docker\ smoke --allow-red iPhone\ check\ \(emulated\ WebKit\)
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+armed: state/lab-merge.check.sh
+error: refusing to merge https://github.com/csmoot99/naughty-nomz/pull/23
+  - state is "CLOSED", not open
+  - the pull request is a draft
+exit=1
+gh pr merge attempted: 0
+
+### 4. FIXED script, only one of two waived
+$ fm-pr-merge.sh lab-merge https://github.com/csmoot99/naughty-nomz/pull/23 --allow-red Tests\,\ build\,\ budgets\,\ Docker\ smoke
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+armed: state/lab-merge.check.sh
+error: refusing to merge https://github.com/csmoot99/naughty-nomz/pull/23
+  - state is "CLOSED", not open
+  - the pull request is a draft
+  - check 'iPhone check (emulated WebKit)' is not green
+error: these checks are not green: iPhone check (emulated WebKit)
+exit=1
+gh pr merge attempted: 0
+
+### 5. FIXED script, both waived plus a duplicate
+$ fm-pr-merge.sh lab-merge https://github.com/csmoot99/naughty-nomz/pull/23 --allow-red Tests\,\ build\,\ budgets\,\ Docker\ smoke --allow-red iPhone\ check\ \(emulated\ WebKit\) --allow-red Tests\,\ build\,\ budgets\,\ Docker\ smoke
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+armed: state/lab-merge.check.sh
+error: refusing to merge https://github.com/csmoot99/naughty-nomz/pull/23
+  - state is "CLOSED", not open
+  - the pull request is a draft
+exit=1
+gh pr merge attempted: 0
+
+### 6. FIXED script, second waiver has an empty name
+$ fm-pr-merge.sh lab-merge https://github.com/csmoot99/naughty-nomz/pull/23 --allow-red Tests\,\ build\,\ budgets\,\ Docker\ smoke --allow-red ''
+error: --allow-red requires a check name
+exit=2
+gh pr merge attempted: 0
+
+### 7. FIXED script, second waiver uses --allow-red=NAME
+$ fm-pr-merge.sh lab-merge https://github.com/csmoot99/naughty-nomz/pull/23 --allow-red Tests\,\ build\,\ budgets\,\ Docker\ smoke --allow-red=iPhone\ check\ \(emulated\ WebKit\)
+error: --allow-red requires a separate check name argument
+exit=2
+gh pr merge attempted: 0
+
+### 8. FIXED script, waiver names that differ only in case/prefix
+$ fm-pr-merge.sh lab-merge https://github.com/csmoot99/naughty-nomz/pull/23 --allow-red tests\,\ build\,\ budgets\,\ docker\ smoke --allow-red iPhone\ check
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+armed: state/lab-merge.check.sh
+error: refusing to merge https://github.com/csmoot99/naughty-nomz/pull/23
+  - state is "CLOSED", not open
+  - the pull request is a draft
+  - check 'Tests, build, budgets, Docker smoke' is not green
+  - check 'iPhone check (emulated WebKit)' is not green
+error: these checks are not green: Tests, build, budgets, Docker smoke, iPhone check (emulated WebKit)
+exit=1
+gh pr merge attempted: 0
+

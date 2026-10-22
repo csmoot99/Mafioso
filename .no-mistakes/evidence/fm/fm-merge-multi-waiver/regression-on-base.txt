@@ -1,0 +1,1 @@
+not ok - allow-red-both: named waivers should merge: error: --allow-red may be specified only once: expected exit 0, got 2
