@@ -35,9 +35,9 @@ def rows():
 result = run()
 assert result.returncode == 0, result.stderr
 record, = rows()
-assert record['input_tokens'] == 17 and record['output_tokens'] == 7
-assert record['cache_read_tokens'] == 34 and record['cache_write_tokens'] == 4
-assert record['context_peak'] == 33 and record['duration_s'] == 40
+assert record['input_tokens'] == 917 and record['output_tokens'] == 907
+assert record['cache_read_tokens'] == 934 and record['cache_write_tokens'] == 904
+assert record['context_peak'] == 2700 and record['duration_s'] == 40
 assert record['ts'] == '2026-10-22T19:02:00Z' and record['ended_at'] == '2026-10-22T19:01:40Z'
 assert record['row'] == 'code' and record['tier'] == 'T1' and record['attempt_n'] == 1
 assert record['gate_result'] is None and record['outcome'] is None

@@ -2,8 +2,9 @@
 """Read one attempt's Claude or Codex usage; emit JSON, never transcript text.
 
 The caller owns the task's exclusive worktree interval [start, end), in UTC.
-Exact cwd and event timestamps are required: no nearest-launch attribution or
-directory-prefix matching. Multiple sessions in that interval are summed.
+The launch cwd selects Claude's project directory or Codex's session header;
+event cwd changes do not change attribution. Event timestamps are required,
+and multiple sessions in that interval are summed.
 Claude requests (including subagents) are deduplicated by message id, keeping
 the latest usage. Codex cumulative counters deduplicate repeated token_count
 notifications and supply deltas; last_token_usage supplies context peak and a
@@ -99,7 +100,7 @@ def claude_requests(root, worktree, start, end, notes):
     for path in paths:
         with path.open(encoding="utf-8", errors="replace") as stream:
             for record in records(stream, notes):
-                if record.get("type") != "assistant" or record.get("cwd") != worktree:
+                if record.get("type") != "assistant":
                     continue
                 ts = event_time(record)
                 message = obj(record.get("message"))

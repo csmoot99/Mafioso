@@ -34,10 +34,27 @@ def expect(actual, inputs, outputs, reads, writes, peak, sessions):
     assert {k: actual[k] for k in expected} == expected, actual
 
 
-expect(result('claude'), 17, 7, 34, 4, 33, 2)
+expect(result('claude'), 917, 907, 934, 904, 2700, 2)
 assert result('claude')['notes'] == []
 assert result('claude')['last_activity'] == 1792695700  # 19:01:40Z, latest in-window request
 print('ok - Claude request ids deduplicate streaming and copies; subagents and replacement sessions sum')
+
+# Session and subagent records stay attributable after changing directory.
+for path in (root / 'claude/-task-worktree').rglob('*.jsonl'):
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    for index, row in enumerate(rows):
+        row['cwd'] = '/task/worktree/child' if index % 2 else '/elsewhere'
+    path.write_text(''.join(json.dumps(row) + '\n' for row in rows))
+expect(result('claude'), 917, 907, 934, 904, 2700, 2)
+assert result('claude')['notes'] == []
+print('ok - Claude counts all in-window assistant records in the launch project, regardless of cwd')
+
+# Codex already attributes through its launch header, not individual event cwd.
+for path in (root / 'codex').glob('*.jsonl'):
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    for row in rows[1:]:
+        row['cwd'] = '/elsewhere'
+    path.write_text(''.join(json.dumps(row) + '\n' for row in rows))
 
 expect(result('codex'), 120, 17, 60, 0, 88, 2)
 assert result('codex')['notes'] == []
@@ -63,7 +80,7 @@ for harness in ('claude', 'codex'):
     assert run(harness, extra=('--worktree', 'relative')).returncode != 0
     expect(result(harness, extra=('--worktree', '/task/worktree/child')),
            None, None, None, None, None, 0)
-print('ok - exact cwd, half-open windows, missing usage and invalid arguments')
+print('ok - launch directory, half-open windows, missing usage and invalid arguments')
 
 # Missing fields must remain unknown; a broken tail does not lose earlier data.
 claude = root / 'claude/-task-worktree/session-b.jsonl'
@@ -71,7 +88,7 @@ rows = [json.loads(line) for line in claude.read_text().splitlines()]
 del rows[0]['message']['usage']['cache_creation_input_tokens']
 claude.write_text(''.join(json.dumps(row) + '\n' for row in rows) + '{broken tail\n')
 unknown = result('claude')
-expect(unknown, 17, 7, 34, None, None, 2)
+expect(unknown, 917, 907, 934, None, None, 2)
 assert any('Malformed' in note for note in unknown['notes'])
 assert any('cache_write_tokens unavailable' in note for note in unknown['notes'])
 print('ok - partial usage is explicitly unknown and malformed JSONL is noted')
