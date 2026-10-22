@@ -544,6 +544,162 @@ test_claude_threads_model_and_effort() {
   pass "claude receives --model and --effort profile flags"
 }
 
+test_codex_project_mcp_preserves_worker_configuration() {
+  local rec id out argv
+  id=codex-mcp-values
+  rec=$(make_spawn_case "$id" codex "$id")
+  read_case_record "$rec"
+  mkdir -p "$WT_DIR/.claude" "$PROJ_DIR/.claude"
+  printf '%s\n' '{"enableAllProjectMcpServers":true}' > "$WT_DIR/.claude/settings.json"
+  # The primary copy deliberately differs: only the isolated worker copy wins.
+  printf '%s\n' '{"enableAllProjectMcpServers":false}' > "$PROJ_DIR/.claude/settings.json"
+  printf '%s\n' '{"mcpServers":{"wrong":{"command":"primary"}}}' > "$PROJ_DIR/.mcp.json"
+  cat > "$WT_DIR/.mcp.json" <<'JSON'
+{"mcpServers":{
+  "kg":{"command":"node","args":["scripts/kg-mcp.mjs","a b","quote\" and ' and $(false)","line\nbreak","back\\slash & literal"],"env":{"DOT.KEY":"quote\" and ' and $HOME","LINES":"one\ntwo"}},
+  "relative-dir":{"type":"stdio","command":"./tool with spaces","cwd":"nested dir"},
+  "absolute_dir":{"command":"node","cwd":"/tmp/absolute dir"}
+}}
+JSON
+  git -C "$WT_DIR" add .mcp.json .claude
+  git -C "$WT_DIR" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm 'Declare project MCP servers' || fail "could not commit MCP fixture"
+  git -C "$WT_DIR" push -q origin HEAD:main || fail "could not publish MCP fixture to its local origin"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  expect_code 0 "$?" "project MCP spawn should succeed: $out"
+  fm_test_codex_launch_argv "$LAUNCH_LOG" "$CASE_DIR/argv" || fail "could not capture MCP argv"
+  argv=$(jq -Rs 'split("\u0000")' "$CASE_DIR/argv/args")
+  jq -e --arg wt "$WT_DIR" --slurpfile project "$WT_DIR/.mcp.json" '
+    . as $argv |
+    def flag($value): any(range(1; $argv | length); $argv[.] == $value and $argv[. - 1] == "-c");
+    flag("mcp_servers.kg.command=\"node\"") and
+    flag("mcp_servers.kg.args=" + ($project[0].mcpServers.kg.args | tojson)) and
+    flag("mcp_servers.kg.env={\"DOT.KEY\"=\"quote\\\" and '\'' and $HOME\",\"LINES\"=\"one\\ntwo\"}") and
+    flag("mcp_servers.kg.cwd=" + ($wt | tojson)) and
+    flag("mcp_servers.kg.enabled=true") and
+    flag("mcp_servers.relative-dir.command=\"./tool with spaces\"") and
+    flag("mcp_servers.relative-dir.cwd=" + ($wt + "/nested dir" | tojson)) and
+    flag("mcp_servers.relative-dir.args=[]") and flag("mcp_servers.relative-dir.env={}") and
+    flag("mcp_servers.absolute_dir.cwd=\"/tmp/absolute dir\"") and
+    ([.[] | select(startswith("mcp_servers."))] | length == 15)
+  ' <<< "$argv" >/dev/null || fail "project MCP values did not survive launch parsing"
+  pass "codex preserves worker MCP command, args, env and working directories"
+}
+
+test_codex_project_mcp_relaunch_reads_base_commit() {
+  local rec id out base_args relaunch_bin
+  id=codex-mcp-relaunch
+  rec=$(make_spawn_case "$id" codex "$id")
+  read_case_record "$rec"
+  mkdir -p "$WT_DIR/.claude"
+  printf '%s\n' '{"enabledMcpjsonServers":["kg"]}' > "$WT_DIR/.claude/settings.json"
+  printf '%s\n' '{"mcpServers":{"kg":{"command":"node","args":["scripts/kg-mcp.mjs"]}}}' > "$WT_DIR/.mcp.json"
+  git -C "$WT_DIR" add .mcp.json .claude
+  git -C "$WT_DIR" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm 'Declare base MCP server' || fail "could not commit base MCP fixture"
+  git -C "$WT_DIR" push -q origin HEAD:main || fail "could not publish base MCP fixture to its local origin"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  expect_code 0 "$?" "base MCP spawn should succeed: $out"
+  # The worker commits new approvals and a server to its task branch, then
+  # leaves an uncommitted rewrite of the approved server's command.
+  printf '%s\n' '{"enableAllProjectMcpServers":true}' > "$WT_DIR/.claude/settings.json"
+  printf '%s\n' '{"mcpServers":{"kg":{"command":"node"},"extra":{"command":"extra"}}}' > "$WT_DIR/.mcp.json"
+  git -C "$WT_DIR" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qam 'Worker MCP edits' || fail "could not commit worker MCP edits"
+  printf '%s\n' '{"mcpServers":{"kg":{"command":"sh","args":["-c","escape"]},"extra":{"command":"extra"}}}' > "$WT_DIR/.mcp.json"
+  # The relaunch finds the recorded window holding only a shell.
+  relaunch_bin="$CASE_DIR/relaunch-bin"
+  cp -R "$FAKEBIN_DIR" "$relaunch_bin"
+  mv "$relaunch_bin/tmux" "$relaunch_bin/tmux-spawn"
+  cat > "$relaunch_bin/tmux" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+*'#{pane_current_command}'*) printf 'zsh\n'; exit 0 ;;
+*'#{pane_tty}'*) exit 0 ;;
+esac
+[ "\${1:-}" != list-windows ] || { printf '%s\n' 'fm-$id'; exit 0; }
+exec '$relaunch_bin/tmux-spawn' "\$@"
+SH
+  chmod +x "$relaunch_bin/tmux"
+  out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$relaunch_bin" "$LAUNCH_LOG" "$id" --relaunch)
+  expect_code 0 "$?" "MCP relaunch should succeed: $out"
+  fm_test_codex_launch_argv "$LAUNCH_LOG" "$CASE_DIR/argv" || fail "could not capture relaunch argv"
+  base_args='mcp_servers.kg.args=["scripts/kg-mcp.mjs"]'
+  jq -Rse --arg wt "$WT_DIR" --arg args "$base_args" '
+    split("\u0000") | map(select(startswith("mcp_servers."))) | sort ==
+      ([$args, "mcp_servers.kg.command=\"node\"", "mcp_servers.kg.cwd=" + ($wt | tojson),
+        "mcp_servers.kg.enabled=true", "mcp_servers.kg.env={}"] | sort)
+  ' "$CASE_DIR/argv/args" >/dev/null || fail "relaunch did not mirror the base commit's MCP declaration: $(tr '\0' '\n' < "$CASE_DIR/argv/args" | grep '^mcp_servers\.')"
+  pass "codex relaunch mirrors base-commit MCP servers, ignoring worker edits"
+}
+
+test_codex_project_mcp_approval_selection() {
+  local approval rec id out expected kind
+  for approval in absent empty listed all disabled; do
+    id="codex-mcp-$approval"
+    rec=$(make_spawn_case "$id" codex "$id")
+    read_case_record "$rec"
+    mkdir -p "$WT_DIR/.claude"
+    printf '%s\n' '{"mcpServers":{"kg":{"command":"node"},"other":{"command":"other"}}}' > "$WT_DIR/.mcp.json"
+    expected=0
+    kind=ship
+    case "$approval" in
+    absent) ;;
+    empty) printf '{}\n' > "$WT_DIR/.claude/settings.json" ;;
+    listed)
+      printf '%s\n' '{"enabledMcpjsonServers":["kg","missing"]}' > "$WT_DIR/.claude/settings.json"
+      expected=5 ;;
+    all)
+      printf '%s\n' '{"enableAllProjectMcpServers":true}' > "$WT_DIR/.claude/settings.json"
+      expected=10 ;;
+    disabled)
+      printf '%s\n' '{"enableAllProjectMcpServers":true,"enabledMcpjsonServers":["kg"],"disabledMcpjsonServers":["kg"]}' > "$WT_DIR/.claude/settings.json"
+      expected=5
+      kind=scout ;;
+    esac
+    git -C "$WT_DIR" add .mcp.json .claude
+    git -C "$WT_DIR" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm 'Declare MCP approvals' || fail "could not commit approval fixture"
+    git -C "$WT_DIR" push -q origin HEAD:main || fail "could not publish approval fixture to its local origin"
+    if [ "$kind" = scout ]; then
+      out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --scout)
+    else
+      out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+    fi
+    expect_code 0 "$?" "MCP approval case $approval should spawn: $out"
+    fm_test_codex_launch_argv "$LAUNCH_LOG" "$CASE_DIR/argv" || fail "could not capture approval argv"
+    jq -Rse --argjson expected "$expected" --arg approval "$approval" '
+      split("\u0000") | map(select(startswith("mcp_servers."))) |
+      length == $expected and
+      (if $approval == "listed" then all(.[]; startswith("mcp_servers.kg."))
+       elif $approval == "disabled" then all(.[]; startswith("mcp_servers.other.")) else true end)
+    ' "$CASE_DIR/argv/args" >/dev/null || fail "incorrect MCP selection for $approval"
+  done
+  pass "codex ships and scouts mirror only approved MCP servers; explicit disables win"
+}
+
+test_codex_project_mcp_invalid_configuration_refuses_launch() {
+  local invalid rec id out
+  for invalid in json command args env name; do
+    id="codex-mcp-invalid-$invalid"
+    rec=$(make_spawn_case "$id" codex "$id")
+    read_case_record "$rec"
+    mkdir -p "$WT_DIR/.claude"
+    printf '%s\n' '{"enableAllProjectMcpServers":true}' > "$WT_DIR/.claude/settings.json"
+    case "$invalid" in
+    json) printf '{\n' > "$WT_DIR/.mcp.json" ;;
+    command) printf '%s\n' '{"mcpServers":{"kg":{"command":42}}}' > "$WT_DIR/.mcp.json" ;;
+    args) printf '%s\n' '{"mcpServers":{"kg":{"command":"node","args":"script"}}}' > "$WT_DIR/.mcp.json" ;;
+    env) printf '%s\n' '{"mcpServers":{"kg":{"command":"node","env":{"TOKEN":42}}}}' > "$WT_DIR/.mcp.json" ;;
+    name) printf '%s\n' '{"mcpServers":{"kg.invalid":{"command":"node"}}}' > "$WT_DIR/.mcp.json" ;;
+    esac
+    git -C "$WT_DIR" add .mcp.json .claude
+    git -C "$WT_DIR" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm 'Declare invalid MCP fixture' || fail "could not commit invalid MCP fixture"
+    git -C "$WT_DIR" push -q origin HEAD:main || fail "could not publish invalid MCP fixture to its local origin"
+    out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+    expect_code 1 "$?" "invalid MCP $invalid should refuse launch: $out"
+    assert_contains "$out" "could not map project MCP servers" "MCP error should explain refusal"
+    assert_not_contains "$(cat "$LAUNCH_LOG")" "codex " "invalid MCP must not launch codex"
+  done
+  pass "invalid enabled MCP configurations stop the codex launch"
+}
+
 test_codex_threads_model_and_effort() {
   local rec id out status launch
   id=profile-codex-z3
@@ -2184,7 +2340,8 @@ SH
     envelope="$CASE_DIR/prompt-envelope"
     encoded="$CASE_DIR/encoded-prompt"
     prompt="$CASE_DIR/prompt"
-    FM_ROLE_PROMPT="$envelope" PATH="$FAKEBIN_DIR:$PATH" bash -c "$launch" || fail "could not consume $kind launch command"
+    HOME="$HOME_DIR/user-home" XDG_CACHE_HOME="$HOME_DIR/user-home/.cache" \
+      FM_ROLE_PROMPT="$envelope" PATH="$FAKEBIN_DIR:$PATH" bash -c "$launch" || fail "could not consume $kind launch command"
     sed -n '/FIRSTMATE_OP: v1 launch-brief:/,$p' "$envelope" > "$encoded"
     "$ROOT/bin/fm-operational-input.sh" body < "$encoded" > "$prompt" ||
       fail "could not decode $kind launch-brief envelope"
@@ -2416,6 +2573,10 @@ test_active_dispatch_profile_allows_positional_harness
 test_active_dispatch_profile_allows_raw_launch_command
 test_chained_raw_launch_strips_ai_trailer_in_every_step
 test_claude_threads_model_and_effort
+test_codex_project_mcp_preserves_worker_configuration
+test_codex_project_mcp_relaunch_reads_base_commit
+test_codex_project_mcp_approval_selection
+test_codex_project_mcp_invalid_configuration_refuses_launch
 test_codex_threads_model_and_effort
 test_codex_threads_model_and_max_effort
 test_codex_omits_max_effort_for_unsupported_model
