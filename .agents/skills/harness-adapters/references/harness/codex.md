@@ -51,12 +51,21 @@ Each compaction writes a `compacted` record to the session log followed by a fre
 The notice path that replaces the block was observed live on codex-cli 0.162.1: every `PostToolUse` payload names the session log in `transcript_path`, that log carries the `token_count` usage the hook reads, the hook fired for every shell call a worker made, and its `additionalContext` reached the model as a developer message the worker then acted on.
 [`../../../../../tests/captures/codex-cli-0.162.1/README.md`](../../../../../tests/captures/codex-cli-0.162.1/README.md) records that run, and its captured payload and log drive the hook in `../../../../../tests/fm-context-handoff.test.sh`.
 
-Parity gaps that remain against a Claude crewmate:
+## Project MCP servers
+
+Verified on 2026-10-22 with codex-cli 0.162.1.
+Crewmate and scout launches mirror the worker copy's `.mcp.json` stdio servers into session-only `-c mcp_servers.<name>.*` overrides when its `.claude/settings.json` approves them through `enabledMcpjsonServers` or `enableAllProjectMcpServers`; `disabledMcpjsonServers` takes precedence.
+The launch preserves command, args and env, resolves a relative server `cwd` against the worker copy, and defaults an omitted `cwd` to that copy.
+These project-declared processes run outside Codex's model-command sandbox under the project's approval; the launch does not persist them into the user's Codex configuration.
+[`fm-spawn.sh`](../../../../../bin/fm-spawn.sh)'s `codex_project_mcp_flags` owns the mapping and validation, with launch-argument regression coverage in [`fm-spawn-dispatch-profile.test.sh`](../../../../../tests/fm-spawn-dispatch-profile.test.sh).
+A live `gpt-6-astra` proof replayed the complete captured launch flags through `codex mcp list --json` and `codex exec --ephemeral --json` against a real project worktree: Codex resolved the enabled `kg` stdio server, listed its eight tools, and completed `kg_stats` with a real index response.
+The capture fixture copied that project's MCP declaration and approval, adding an explicit server `cwd` pointing at the existing project copy so the proof needed no changes there.
+
+## Remaining parity gaps
 
 - No `StopFailure` hook closes a turn that ends in an API error, and `Stop` on an Escape interrupt is unverified.
 - A handoff notice arrives on a tool call, and Codex writes a response's usage to the session log only after that response's tool call and its `PostToolUse` finish, so the notice comes one response after usage crosses the threshold; usage that jumps past the fallback ceiling in that span ends in one compaction, recorded as a missed handoff.
-- `PostToolUse` was seen firing for shell calls only; `apply_patch` and MCP tool calls were not exercised live.
-- A project's `.mcp.json` servers are Claude-only; Codex reads MCP servers only from its own config.
+- `PostToolUse` was seen firing for shell calls only; delivery for `apply_patch` and MCP tool calls remains unverified.
 - The status-file append, `git commit`, a push, `gh`, `no-mistakes`, and package installs run as reviewed escalations where a Claude worker's operator allowlist lets some of them through unreviewed.
 - The automatic reviewer judges an escalation against what the worker was asked to do, so it approved a force push to `main` that a test prompt explicitly requested; the push guard rules below are the hard block for the pushes Firstmate never wants.
 
