@@ -81,7 +81,7 @@ The launcher starts headless Chromium before Codex, binds CDP to loopback on an 
 Preserve those inherited variables when using `chrome-devtools-axi`; the launcher cleans up its session, browser and profile when Codex exits.
 If Chromium is absent, launch continues with a browser-setup warning; an installed Chromium that fails to start prevents the worker launch.
 
-This keeps Codex's `workspace-write`, blocked network and socket access, and automatic approval review unchanged: browser shell commands still require reviewed sandbox escalation.
+This keeps Codex's `workspace-write`, blocked network and socket access, and automatic approval review unchanged: browser shell commands still require reviewed sandbox escalation, which the launch's `developer_instructions` tell the worker to request for every `chrome-devtools-axi` command from the first attempt (unsteered, a worker retried inside the sandbox, failed with `BRIDGE_NOT_READY` and blocked).
 The original failure had two causes on the verified host: the default browser launch closed its target even after escalation, while sandboxed socket access also failed; prelaunching Playwright Chromium fixes the former and reviewed escalation handles the latter.
 A fresh `codex exec` using the captured worker launch flags and the committed launcher opened a local HTTP page, saved and viewed screenshots at 1100 x 800 and 390 x 844, and verified the phone layout through both the image and measured viewport.
 Two real `chrome-devtools-axi press Tab` calls moved focus from the document to a button and then a link, confirmed by `document.activeElement.id` and the phone screenshot's focus ring.

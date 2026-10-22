@@ -453,6 +453,11 @@ SH
     for flag in 'sandbox_mode="workspace-write"' 'approval_policy="on-request"' 'approvals_reviewer="auto_review"' sandbox_workspace_write.network_access=false; do
       tr '\0' '\n' < "$dir/args" | grep -Fxq -- "$flag" || fail "Codex lost $flag"
     done
+    # The sandboxed shell cannot reach the task browser, so the worker's
+    # system-level instructions must route browser commands through escalation.
+    tr '\0' '\n' < "$dir/args" | grep '^developer_instructions=' \
+      | grep -Fq 'Run every chrome-devtools-axi command with escalated sandbox permissions from the first attempt' \
+      || fail 'Codex was not told to escalate its browser commands'
   done
   # Installed Chromium dying before readiness must prevent a misleading launch.
   printf '#!/usr/bin/env bash\nexit 17\n' > "$dir/home/.cache/ms-playwright/chromium-999/chrome-linux64/chrome"
