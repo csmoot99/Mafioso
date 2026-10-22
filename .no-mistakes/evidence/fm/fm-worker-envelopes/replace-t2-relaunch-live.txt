@@ -1,0 +1,33 @@
+$ FM_HOME=$LAB bin/fm-context-handoff.sh replace labhaiku1 --harness claude --model sonnet --effort low
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.IoJpdE/home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.IoJpdE/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 118s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+relaunched labhaiku1 harness=claude from=claude model=sonnet effort=low backend=tmux endpoint=firstmate:fm-labhaiku1 worktree=/home/work/.treehouse/notes-f0d98c/1/notes
+replaced labhaiku1 from context handoff /tmp/fm-lab.IoJpdE/home/data/labhaiku1/handoff-1.md
+exit=0
+
+## state/labhaiku1.meta after replace
+worktree=/home/work/.treehouse/notes-f0d98c/1/notes
+harness=claude
+model=sonnet
+effort=low
+busy_gen=g1792696226.3102893.3782
+
+## marker after replace
+cat: /tmp/fm-lab.IoJpdE/home/state/labhaiku1.context-handoff: No such file or directory
+
+## status tail
+working [at=1792696146]: setup done, branch fm/labhaiku1 created, reading spec
+note [at=1792696165]: context handoff due: Haiku prompt usage 106070 crossed the 80000-token Haiku cap (including cache reads), so this T1 task was misclassified and must be reclassified to T2: replace it on the T2 route from config/crew-dispatch.json, never on Haiku; the worker was told to write /tmp/fm-lab.IoJpdE/home/data/labhaiku1/handoff-1.md and report it with key context-handoff-1
+blocked [key=context-handoff-1] [at=1792696195]: context handoff ready at /tmp/fm-lab.IoJpdE/home/data/labhaiku1/handoff-1.md
+resolved [key=context-handoff-1] [at=1792696228]: replaced the worker from context handoff /tmp/fm-lab.IoJpdE/home/data/labhaiku1/handoff-1.md
+
+## replacement hooks (sonnet: no --haiku-cap expected)
+'/home/work/.no-mistakes/worktrees/5f69104d19ce/01M5JFG0HWJD70QE1WR8QTF44C/bin/fm-context-handoff.sh' precompact '/tmp/fm-lab.IoJpdE/home/state' 'labhaiku1' --gen 'g1792696226.3102893.3782' --data-dir '/tmp/fm-lab.IoJpdE/home/data' --fm-root '/home/work/.no-mistakes/worktrees/5f69104d19ce/01M5JFG0HWJD70QE1WR8QTF44C'
+'/home/work/.no-mistakes/worktrees/5f69104d19ce/01M5JFG0HWJD70QE1WR8QTF44C/bin/fm-context-handoff.sh' posttooluse '/tmp/fm-lab.IoJpdE/home/state' 'labhaiku1' --gen 'g1792696226.3102893.3782' --data-dir '/tmp/fm-lab.IoJpdE/home/data' --fm-root '/home/work/.no-mistakes/worktrees/5f69104d19ce/01M5JFG0HWJD70QE1WR8QTF44C' 2>/dev/null || true

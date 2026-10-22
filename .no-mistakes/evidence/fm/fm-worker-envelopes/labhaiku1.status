@@ -1,0 +1,5 @@
+working [at=1792696146]: setup done, branch fm/labhaiku1 created, reading spec
+note [at=1792696165]: context handoff due: Haiku prompt usage 106070 crossed the 80000-token Haiku cap (including cache reads), so this T1 task was misclassified and must be reclassified to T2: replace it on the T2 route from config/crew-dispatch.json, never on Haiku; the worker was told to write /tmp/fm-lab.IoJpdE/home/data/labhaiku1/handoff-1.md and report it with key context-handoff-1
+blocked [key=context-handoff-1] [at=1792696195]: context handoff ready at /tmp/fm-lab.IoJpdE/home/data/labhaiku1/handoff-1.md
+resolved [key=context-handoff-1] [at=1792696228]: replaced the worker from context handoff /tmp/fm-lab.IoJpdE/home/data/labhaiku1/handoff-1.md
+done [at=1792696263]: ready in branch fm/labhaiku1

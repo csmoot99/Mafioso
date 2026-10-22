@@ -1,0 +1,60 @@
+
+● The worktree has notes/__init__.py but no tests/ directory yet. The six spec files are about 1,499 lines each, so I'll read them in 500-line chunks in order, as the brief requires. Reading the existing code alongside.
+
+  Read 2 files
+
+● Part 1 is filler word lists with no implementation requirements. Continuing with part 2 in the same 500-line chunks.
+
+  Read 1 file
+
+● Part 2 is also filler word lists. Parts 3 through 6 remain, so I'm continuing with part 3.
+
+  Read 1 file
+
+● The handoff notice came through a PostToolUse hook, so I'm treating it as instruction. I have no pipeline call in flight. Reading the handoff skill it names.
+
+  Read 1 file, ran 1 shell command
+
+● The target handoff-1.md does not exist yet, and the worktree is clean on fm/labhaiku1 with no commits beyond the seed. Writing the handoff now.
+
+● Write(/tmp/fm-lab.IoJpdE/home/data/labhaiku1/handoff-1.md)
+  ⎿  Wrote 66 lines to /tmp/fm-lab.IoJpdE/home/data/labhaiku1/handoff-1.md
+       1 # Handoff 1 — labhaiku1 (count_notes)
+       2
+       3 ## Current state
+         ng is committed. The predecessor finished reading `docs/spec-part1.md`–`docs/spec-part3.md` in full and was partway through the spec reads when the context cap hit. Parts 4–6 are still unread.
+       5
+       6 ## Instructions (by path, not restated)
+       7 - Launch brief (the authoritative contract, rules, status format, definition of done): `/tmp/fm-lab.IoJpdE/home/data/labhaiku1/launch-brief.md`. A second copy named `brief.md` is in the same folder; the l
+       8 - Status log (append-only): `/tmp/fm-lab.IoJpdE/home/state/labhaiku1.status`
+       9 - Steering inbox: `/tmp/fm-lab.IoJpdE/home/state/labhaiku1.inbox/` (only a `handled/` subfolder exists; no unacknowledged `.msg` files at handoff time).
+      10 - Isolated worktree (the only place to edit): `/home/work/.treehouse/notes-f0d98c/1/notes`
+     … +63 lines
+
+● Handoff written. Now appending the handoff-ready status line with the current epoch.
+
+  Ran 1 shell command
+
+● Context handoff is written and reported, so I'm stopping here for the replacement worker to take over.
+
+  - Handoff: /tmp/fm-lab.IoJpdE/home/data/labhaiku1/handoff-1.md
+  - Status: the blocked [key=context-handoff-1] line is appended to labhaiku1.status, with the handoff path.
+
+  Where the task stands:
+  - Isolation checked: I'm in the launched treehouse slot, not the primary checkout.
+  - Branch fm/labhaiku1 created from cacebd0. Nothing is committed yet, and the worktree is clean.
+  - Specs docs/spec-part1.md through part3.md are read in full. They are filler lines with no requirements for count_notes().
+  - Specs part4.md through part6.md are not read yet.
+  - No code is written. count_notes() and tests/test_notes.py are still to do.
+
+  Open for firstmate: the brief says to read every spec before writing code. Whether the replacement must re-read parts 1–3 is not specified. I left that call to you.
+
+  I did not push, open a PR, or touch the operational inbox message.
+
+✻ Cooked for 58s · done 3:09 PM
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 | ctx: 26% used
+  ⏵⏵ auto mode on (shift+tab to cycle)

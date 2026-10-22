@@ -1,0 +1,50 @@
+## state/labhaiku1.meta
+window=firstmate:fm-labhaiku1
+endpoint_task_id=labhaiku1
+worktree=/home/work/.treehouse/notes-f0d98c/1/notes
+project=/tmp/fm-lab.IoJpdE/home/projects/notes
+harness=claude
+kind=ship
+mode=local-only
+yolo=on
+branch=fm/labhaiku1
+tasktmp=/tmp/fm-labhaiku1
+model=haiku
+effort=default
+busy_gen=g1792696137.3015011.20521
+spawn_gen=s1792696137.3010731.15903
+
+## generated hooks in worker .claude/settings.local.json
+{
+  "PreCompact": [
+    {
+      "matcher": "auto",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "'/home/work/.no-mistakes/worktrees/5f69104d19ce/01M5JFG0HWJD70QE1WR8QTF44C/bin/fm-context-handoff.sh' precompact '/tmp/fm-lab.IoJpdE/home/state' 'labhaiku1' --gen 'g1792696137.3015011.20521' --data-dir '/tmp/fm-lab.IoJpdE/home/data' --fm-root '/home/work/.no-mistakes/worktrees/5f69104d19ce/01M5JFG0HWJD70QE1WR8QTF44C' --haiku-cap",
+          "timeout": 30
+        }
+      ]
+    }
+  ],
+  "PostToolUse": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "'/home/work/.no-mistakes/worktrees/5f69104d19ce/01M5JFG0HWJD70QE1WR8QTF44C/bin/fm-context-handoff.sh' posttooluse '/tmp/fm-lab.IoJpdE/home/state' 'labhaiku1' --gen 'g1792696137.3015011.20521' --data-dir '/tmp/fm-lab.IoJpdE/home/data' --fm-root '/home/work/.no-mistakes/worktrees/5f69104d19ce/01M5JFG0HWJD70QE1WR8QTF44C' --haiku-cap 2>/dev/null || true",
+          "timeout": 30
+        }
+      ]
+    }
+  ]
+}
+
+## state/labhaiku1.context-handoff (marker)
+v1 gen=g1792696137.3015011.20521 state=due seq=1 handoff=/tmp/fm-lab.IoJpdE/home/data/labhaiku1/handoff-1.md key=context-handoff-1 usage=106070 pct=0 window=0 ceiling=80000 ceiling_pct=80 reclassify=T2 notices=1 calls=5 at=1792696165
+
+## state/labhaiku1.status
+working [at=1792696146]: setup done, branch fm/labhaiku1 created, reading spec
+note [at=1792696165]: context handoff due: Haiku prompt usage 106070 crossed the 80000-token Haiku cap (including cache reads), so this T1 task was misclassified and must be reclassified to T2: replace it on the T2 route from config/crew-dispatch.json, never on Haiku; the worker was told to write /tmp/fm-lab.IoJpdE/home/data/labhaiku1/handoff-1.md and report it with key context-handoff-1
+blocked [key=context-handoff-1] [at=1792696195]: context handoff ready at /tmp/fm-lab.IoJpdE/home/data/labhaiku1/handoff-1.md

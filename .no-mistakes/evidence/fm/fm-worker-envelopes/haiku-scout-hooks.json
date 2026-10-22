@@ -1,0 +1,25 @@
+{
+  "PreCompact": [
+    {
+      "matcher": "auto",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "'/home/work/.no-mistakes/worktrees/5f69104d19ce/01M5JFG0HWJD70QE1WR8QTF44C/bin/fm-context-handoff.sh' precompact '/tmp/fm-lab.IoJpdE/home/state' 'labscout1' --gen 'g1792696299.3198924.793' --data-dir '/tmp/fm-lab.IoJpdE/home/data' --fm-root '/home/work/.no-mistakes/worktrees/5f69104d19ce/01M5JFG0HWJD70QE1WR8QTF44C' --haiku-cap",
+          "timeout": 30
+        }
+      ]
+    }
+  ],
+  "PostToolUse": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "'/home/work/.no-mistakes/worktrees/5f69104d19ce/01M5JFG0HWJD70QE1WR8QTF44C/bin/fm-context-handoff.sh' posttooluse '/tmp/fm-lab.IoJpdE/home/state' 'labscout1' --gen 'g1792696299.3198924.793' --data-dir '/tmp/fm-lab.IoJpdE/home/data' --fm-root '/home/work/.no-mistakes/worktrees/5f69104d19ce/01M5JFG0HWJD70QE1WR8QTF44C' --haiku-cap 2>/dev/null || true",
+          "timeout": 30
+        }
+      ]
+    }
+  ]
+}

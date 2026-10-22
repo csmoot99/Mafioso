@@ -1,0 +1,16 @@
+$ FM_HOME=$LAB bin/fm-context-handoff.sh replace labhaiku1 
+error: task labhaiku1 crossed the Haiku 80000 prompt-token cap, so it was misclassified as T1 and must be reclassified to T2; replace refuses to relaunch it on a Haiku model. Take the T2 route from config/crew-dispatch.json and pass it through as fm-control.sh relaunch's --harness/--model/--effort: fm-context-handoff.sh replace labhaiku1 --harness <harness> --model <model> --effort <effort>
+exit=1
+
+$ FM_HOME=$LAB bin/fm-context-handoff.sh replace labhaiku1 --model haiku
+error: task labhaiku1 crossed the Haiku 80000 prompt-token cap, so it was misclassified as T1 and must be reclassified to T2; replace refuses to relaunch it on a Haiku model. Take the T2 route from config/crew-dispatch.json and pass it through as fm-control.sh relaunch's --harness/--model/--effort: fm-context-handoff.sh replace labhaiku1 --harness <harness> --model <model> --effort <effort>
+exit=1
+
+$ FM_HOME=$LAB bin/fm-context-handoff.sh replace labhaiku1 --harness claude --model claude-haiku-4-5-20251001 --effort low
+error: task labhaiku1 crossed the Haiku 80000 prompt-token cap, so it was misclassified as T1 and must be reclassified to T2; replace refuses to relaunch it on a Haiku model. Take the T2 route from config/crew-dispatch.json and pass it through as fm-control.sh relaunch's --harness/--model/--effort: fm-context-handoff.sh replace labhaiku1 --harness <harness> --model <model> --effort <effort>
+exit=1
+
+## state/labhaiku1.meta after refusals (model unchanged, no relaunch)
+harness=claude
+model=haiku
+busy_gen=g1792696137.3015011.20521
