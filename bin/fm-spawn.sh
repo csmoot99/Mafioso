@@ -48,6 +48,20 @@
 #   base_branch= in state/<id>.meta, which a relaunch reuses and later review and
 #   cleanup read; it is refused on secondmates and relaunches, and without it
 #   nothing changes.
+#   Optional attempt classification: --row <label>, --tier <label>,
+#   --pool <label>, --attempt-n <positive-integer>, and --prior-tier <label>
+#   record the intake classification as row, tier, pool, attempt_n, and
+#   prior_tier in task metadata. Pool is never derived from harness or model.
+#   Fresh worker dispatches also record attempt_id and attempt_started_at (Unix
+#   seconds). Same-model/tier/harness replacements share an interval. A change
+#   closes the old attempt through fm-attempt-record.py before publication and
+#   starts a new interval at that durable boundary (also on a retry). A record
+#   failure only warns; the replacement still starts its own interval.
+#   Labels must be non-empty single lines; absent flags write no fields.
+#   A batch applies the same values to every task. A relaunch preserves each
+#   recorded value unless explicitly overridden. At a new attempt boundary a
+#   known attempt number increments and prior_tier takes the recorded tier;
+#   missing classification stays absent. A same-profile handoff changes neither.
 #   Ship/scout launches always put fm-dod-lib.sh's current worker role scope
 #   first in the private launch-brief overlay, including the exact task-owned
 #   steering inbox. This never rewrites a project's instruction files or a
@@ -63,8 +77,8 @@
 #   backend, kind, project or home, worktree, endpoint - comes from the task's
 #   validated state/<id>.meta, so --backend, --scout, --secondmate, a project
 #   positional, and batch pairs are all refused alongside it; only harness,
-#   model, and effort may change, which is what makes a harness switch one
-#   ordinary relaunch. It refuses unless the recorded endpoint is positively
+#   model, effort, and attempt classification may change. A harness switch is
+#   one ordinary relaunch. It refuses unless the recorded endpoint is positively
 #   agent-free on a backend with a recovery-grade agent-state classifier (tmux
 #   or herdr), and clears the previous harness's per-task wiring before arming
 #   the new incarnation. Two verdicts are agent-free: a `dead` endpoint is
@@ -1331,6 +1345,16 @@ MODE=
 YOLO=
 BRANCH_PREFIX=fm/
 TRACEPARENT_ARG=
+ROW=
+ROW_SET=0
+TIER=
+TIER_SET=0
+POOL=
+POOL_SET=0
+ATTEMPT_N=
+ATTEMPT_N_SET=0
+PRIOR_TIER=
+PRIOR_TIER_SET=0
 HARNESS_SET=0
 MODEL_SET=0
 EFFORT_SET=0
@@ -1368,6 +1392,11 @@ for a in "$@"; do
       EFFORT=$a
       EFFORT_SET=1
       ;;
+    row) ROW=$a; ROW_SET=1 ;;
+    tier) TIER=$a; TIER_SET=1 ;;
+    pool) POOL=$a; POOL_SET=1 ;;
+    attempt-n) ATTEMPT_N=$a; ATTEMPT_N_SET=1 ;;
+    prior-tier) PRIOR_TIER=$a; PRIOR_TIER_SET=1 ;;
     backend)
       BACKEND_ARG=$a
       BACKEND_SET=1
@@ -1426,6 +1455,16 @@ for a in "$@"; do
     EFFORT=${a#--effort=}
     EFFORT_SET=1
     ;;
+  --row) want_value=row ;;
+  --row=*) ROW=${a#--row=}; ROW_SET=1 ;;
+  --tier) want_value=tier ;;
+  --tier=*) TIER=${a#--tier=}; TIER_SET=1 ;;
+  --pool) want_value=pool ;;
+  --pool=*) POOL=${a#--pool=}; POOL_SET=1 ;;
+  --attempt-n) want_value="attempt-n" ;;
+  --attempt-n=*) ATTEMPT_N=${a#--attempt-n=}; ATTEMPT_N_SET=1 ;;
+  --prior-tier) want_value="prior-tier" ;;
+  --prior-tier=*) PRIOR_TIER=${a#--prior-tier=}; PRIOR_TIER_SET=1 ;;
   --backend) want_value=backend ;;
   --backend=*)
     BACKEND_ARG=${a#--backend=}
@@ -1463,6 +1502,23 @@ done
   echo "error: --$want_value requires a value" >&2
   exit 1
 }
+# Classification labels are opaque, single-line metadata values, not policy enums.
+for classification_key in ROW TIER POOL ATTEMPT_N PRIOR_TIER; do
+  classification_set=${classification_key}_SET
+  [ "${!classification_set}" -eq 1 ] || continue
+  classification_flag=${classification_key,,}
+  classification_flag=${classification_flag//_/-}
+  case "${!classification_key}" in
+    ''|*$'\n'*|*$'\r'*)
+      echo "error: --$classification_flag requires a non-empty, single-line value" >&2
+      exit 1
+      ;;
+  esac
+done
+if [ "$ATTEMPT_N_SET" -eq 1 ] && ! [[ "$ATTEMPT_N" =~ ^[1-9][0-9]*$ ]]; then
+  echo "error: --attempt-n must be a positive integer" >&2
+  exit 1
+fi
 [ "$HARNESS_SET" -eq 0 ] || [ -n "$HARNESS_ARG" ] || {
   echo "error: --harness requires a non-empty value" >&2
   exit 1
@@ -2180,6 +2236,11 @@ if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in *
   [ -z "$HARNESS_ARG" ] || shared_args+=(--harness "$HARNESS_ARG")
   [ -z "$MODEL" ] || shared_args+=(--model "$MODEL")
   [ -z "$EFFORT" ] || shared_args+=(--effort "$EFFORT")
+  [ "$ROW_SET" -eq 0 ] || shared_args+=(--row "$ROW")
+  [ "$TIER_SET" -eq 0 ] || shared_args+=(--tier "$TIER")
+  [ "$POOL_SET" -eq 0 ] || shared_args+=(--pool "$POOL")
+  [ "$ATTEMPT_N_SET" -eq 0 ] || shared_args+=(--attempt-n "$ATTEMPT_N")
+  [ "$PRIOR_TIER_SET" -eq 0 ] || shared_args+=(--prior-tier "$PRIOR_TIER")
   [ -z "$BACKEND_ARG" ] || shared_args+=(--backend "$BACKEND_ARG")
   # One delivery contract applies to every pair in a batch, exactly like the shared
   # harness. Each pair still re-validates it against its own brief, so a batch
@@ -2493,6 +2554,11 @@ if [ "$RELAUNCH" -eq 1 ]; then
       ;;
   esac
   RELAUNCH_PRIOR_HARNESS=$(fm_meta_get "$RELAUNCH_META" harness)
+  [ "$ROW_SET" -eq 1 ] || ROW=$(fm_meta_get "$RELAUNCH_META" row)
+  [ "$TIER_SET" -eq 1 ] || TIER=$(fm_meta_get "$RELAUNCH_META" tier)
+  [ "$POOL_SET" -eq 1 ] || POOL=$(fm_meta_get "$RELAUNCH_META" pool)
+  [ "$ATTEMPT_N_SET" -eq 1 ] || ATTEMPT_N=$(fm_meta_get "$RELAUNCH_META" attempt_n)
+  [ "$PRIOR_TIER_SET" -eq 1 ] || PRIOR_TIER=$(fm_meta_get "$RELAUNCH_META" prior_tier)
   KIND=$(fm_meta_get "$RELAUNCH_META" kind)
   [ -n "$KIND" ] || KIND=ship
   # A secondmate whose endpoint is gone already has ONE owner for that
@@ -5780,10 +5846,26 @@ else
   SPAWN_FRESH_COMMIT_PENDING=1
 fi
 SPAWN_META_PATH=$SPAWN_META_TMP
+SPAWN_ATTEMPT_START=
+if [ "$RELAUNCH" -eq 1 ] && [ "$KIND" != secondmate ]; then
+  # The previous worker is proven stopped and the task metadata lock is held.
+  # A durable prior record also recovers the boundary if publication failed.
+  SPAWN_ATTEMPT_START=$(python3 "$SCRIPT_DIR/fm-attempt-record.py" \
+    --task-id "$ID" --meta "$RELAUNCH_META" --data "$DATA" \
+    --relaunch "$HARNESS" "${MODEL:-default}" "$TIER") \
+    || echo "warning: could not record $ID's previous attempt; relaunch continues" >&2
+  if [ -n "$SPAWN_ATTEMPT_START" ]; then
+    if [ "$ATTEMPT_N_SET" -eq 0 ] && [[ "$ATTEMPT_N" =~ ^[1-9][0-9]*$ ]]; then
+      ATTEMPT_N=$(python3 -c 'import sys; print(int(sys.argv[1]) + 1)' "$ATTEMPT_N")
+    fi
+    [ "$PRIOR_TIER_SET" -eq 1 ] || PRIOR_TIER=$(fm_meta_get "$RELAUNCH_META" tier)
+  fi
+fi
 preserve_relaunch_meta() {
-  awk -F= '
+  awk -F= -v new_attempt="$SPAWN_ATTEMPT_START" '
     BEGIN {
-      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch model effort account account_provider busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx", keys, " ")
+      if (new_attempt != "") { owned["attempt_id"] = 1; owned["attempt_started_at"] = 1 }
+      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch model effort row tier pool attempt_n prior_tier account account_provider busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
@@ -5803,12 +5885,24 @@ preserve_relaunch_meta() {
   [ -z "$BASE_BRANCH" ] || echo "base_branch=$BASE_BRANCH"
   echo "model=${MODEL:-default}"
   echo "effort=${EFFORT:-default}"
+  [ -z "$ROW" ] || echo "row=$ROW"
+  [ -z "$TIER" ] || echo "tier=$TIER"
+  [ -z "$POOL" ] || echo "pool=$POOL"
+  [ -z "$ATTEMPT_N" ] || echo "attempt_n=$ATTEMPT_N"
+  [ -z "$PRIOR_TIER" ] || echo "prior_tier=$PRIOR_TIER"
   # The worker account pin, only when this home declares one, so an unpinned
   # task record stays byte-identical.
   [ -z "$WORKER_ACCOUNT" ] || echo "account=$WORKER_ACCOUNT_DECLARED"
   [ -z "$WORKER_ACCOUNT_PROVIDER" ] || echo "account_provider=$WORKER_ACCOUNT_PROVIDER"
   [ -z "${BUSY_GEN:-}" ] || echo "busy_gen=$BUSY_GEN"
   echo "spawn_gen=$SPAWN_GEN"
+  if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then
+    echo "attempt_id=$SPAWN_GEN"
+    echo "attempt_started_at=$(date +%s)"
+  elif [ -n "$SPAWN_ATTEMPT_START" ]; then
+    echo "attempt_id=$SPAWN_GEN"
+    echo "attempt_started_at=$SPAWN_ATTEMPT_START"
+  fi
   # Default-off writes no traceparent= line.
   # backend= is written only for a non-default (non-tmux) backend, so the
   # default path's meta stays byte-identical (absent backend= means tmux;

@@ -164,11 +164,52 @@ test_no_profile_keeps_claude_profile_defaults() {
   expect_code 0 "$status" "claude spawn without profile flags should succeed"
   assert_contains "$out" "spawned $id harness=claude" "spawn did not report claude"
   assert_meta_profile "$HOME_DIR/state/$id.meta" claude default default
+  if grep -Eq "^(row|tier|pool|attempt_n|prior_tier)=" "$HOME_DIR/state/$id.meta"; then
+    fail "unclassified dispatch must leave attempt fields absent"
+  fi
 
   launch=$(cat "$LAUNCH_LOG")
   expected=$(claude_expected_launch "$launch" "$HOME_DIR" "$id" --dangerously-skip-permissions)
   [ "$launch" = "$expected" ] || fail "no-profile claude launch did not use the canonical launch kind"$'\n'"expected: $expected"$'\n'"actual:   $launch"
   pass "no --model/--effort records defaults and types the claude launch instructions"
+}
+
+test_attempt_classification_is_recorded() {
+  local rec id out status
+  id=attempt-fields-z1
+  rec=$(make_spawn_case attempt-fields claude "$id")
+  read_case_record "$rec"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" \
+    --row 'implementation work' --tier=T2 --pool codex --attempt-n 2 --prior-tier=T1)
+  status=$?
+  expect_code 0 "$status" "classified dispatch should succeed: $out"
+  grep -Fxq 'row=implementation work' "$HOME_DIR/state/$id.meta" || fail "row missing"
+  grep -Fxq 'tier=T2' "$HOME_DIR/state/$id.meta" || fail "tier missing"
+  grep -Fxq 'pool=codex' "$HOME_DIR/state/$id.meta" || fail "pool missing"
+  grep -Fxq 'attempt_n=2' "$HOME_DIR/state/$id.meta" || fail "attempt number missing"
+  grep -Fxq 'prior_tier=T1' "$HOME_DIR/state/$id.meta" || fail "prior tier missing"
+  grep -Eq '^attempt_started_at=[0-9]+$' "$HOME_DIR/state/$id.meta" || fail "attempt start missing"
+  grep -Eq '^attempt_id=s[0-9]+\.' "$HOME_DIR/state/$id.meta" || fail "attempt identity missing"
+  pass "dispatch records explicit attempt classification with split and equals flags"
+}
+
+test_invalid_attempt_classification_refuses_before_launch() {
+  local rec id out status flag
+  id=attempt-invalid-z1
+  rec=$(make_spawn_case attempt-invalid claude "$id")
+  read_case_record "$rec"
+  for flag in --row= --tier= --pool= --prior-tier= --attempt-n= --attempt-n=0 \
+    --attempt-n=-1 --attempt-n=1.5 --attempt-n=abc --attempt-n=01 \
+    $'--row=bad\ntier=injected' $'--tier=bad\rvalue' $'--pool=bad\nvalue' $'--prior-tier=bad\nvalue' \
+    --row --tier --pool --attempt-n --prior-tier; do
+    out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "$flag" 2>&1)
+    status=$?
+    expect_code 1 "$status" "invalid classification '$flag' must refuse: $out"
+    assert_contains "$out" 'error: --' "refusal must identify the invalid flag"
+    [ ! -e "$HOME_DIR/state/$id.meta" ] || fail "invalid classification published metadata"
+    [ ! -s "$LAUNCH_LOG" ] || fail "invalid classification launched a worker"
+  done
+  pass "invalid attempt classification refuses before dispatch"
 }
 
 # Claude Code strips U+2063 from the launch-prompt argument, so a claude launch
@@ -586,7 +627,7 @@ JSON
 }
 
 test_codex_project_mcp_relaunch_reads_base_commit() {
-  local rec id out base_args relaunch_bin
+  local rec id out base_args relaunch_bin attempt_before
   id=codex-mcp-relaunch
   rec=$(make_spawn_case "$id" codex "$id")
   read_case_record "$rec"
@@ -598,6 +639,7 @@ test_codex_project_mcp_relaunch_reads_base_commit() {
   git -C "$WT_DIR" push -q origin HEAD:main || fail "could not publish base MCP fixture to its local origin"
   out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
   expect_code 0 "$?" "base MCP spawn should succeed: $out"
+  attempt_before=$(grep -E '^attempt_(id|started_at)=' "$HOME_DIR/state/$id.meta")
   # The worker commits new approvals and a server to its task branch, then
   # leaves an uncommitted rewrite of the approved server's command.
   printf '%s\n' '{"enableAllProjectMcpServers":true}' > "$WT_DIR/.claude/settings.json"
@@ -620,6 +662,8 @@ SH
   chmod +x "$relaunch_bin/tmux"
   out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$relaunch_bin" "$LAUNCH_LOG" "$id" --relaunch)
   expect_code 0 "$?" "MCP relaunch should succeed: $out"
+  [ "$(grep -E '^attempt_(id|started_at)=' "$HOME_DIR/state/$id.meta")" = "$attempt_before" ] \
+    || fail "replacement changed the attempt identity or start time"
   fm_test_codex_launch_argv "$LAUNCH_LOG" "$CASE_DIR/argv" || fail "could not capture relaunch argv"
   base_args='mcp_servers.kg.args=["scripts/kg-mcp.mjs"]'
   jq -Rse --arg wt "$WT_DIR" --arg args "$base_args" '
@@ -1749,7 +1793,7 @@ test_pi_exclude_tools_do_not_leak_across_homes_or_to_secondmates() {
 }
 
 test_batch_forwards_shared_profile_flags() {
-  local rec id1 id2 out status
+  local rec id id1 id2 out status
   id1=profile-batch-a-z9
   id2=profile-batch-b-z10
   rec=$(make_spawn_case profile-batch claude "$id1" "$id2")
@@ -1757,13 +1801,21 @@ test_batch_forwards_shared_profile_flags() {
   enable_dispatch_profile "$HOME_DIR"
 
   out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
-    "$id1=$PROJ_DIR" "$id2=$PROJ_DIR" --harness codex --model gpt-5 --effort high)
+    "$id1=$PROJ_DIR" "$id2=$PROJ_DIR" --harness codex --model gpt-5 --effort high \
+    --row=code --tier T2 --pool=codex --attempt-n=3 --prior-tier T1)
   status=$?
   expect_code 0 "$status" "batch spawn with shared profile flags should succeed"
   assert_contains "$out" "spawned $id1 harness=codex" "first batch task did not use shared harness"
   assert_contains "$out" "spawned $id2 harness=codex" "second batch task did not use shared harness"
   assert_meta_profile "$HOME_DIR/state/$id1.meta" codex gpt-5 high
   assert_meta_profile "$HOME_DIR/state/$id2.meta" codex gpt-5 high
+  for id in "$id1" "$id2"; do
+    grep -Fxq 'row=code' "$HOME_DIR/state/$id.meta" || fail "batch row missing"
+    grep -Fxq 'tier=T2' "$HOME_DIR/state/$id.meta" || fail "batch tier missing"
+    grep -Fxq 'pool=codex' "$HOME_DIR/state/$id.meta" || fail "batch pool missing"
+    grep -Fxq 'attempt_n=3' "$HOME_DIR/state/$id.meta" || fail "batch attempt number missing"
+    grep -Fxq 'prior_tier=T1' "$HOME_DIR/state/$id.meta" || fail "batch prior tier missing"
+  done
   pass "batch dispatch forwards shared --harness, --model, and --effort to every pair"
 }
 
@@ -2558,6 +2610,8 @@ test_non_claude_harness_ignores_claude_permission_mode() {
 
 test_worker_launch_delivers_role_scope
 test_no_profile_keeps_claude_profile_defaults
+test_attempt_classification_is_recorded
+test_invalid_attempt_classification_refuses_before_launch
 test_claude_launch_brief_publishes_record_doorbell
 test_claude_secondmate_launch_brief_publishes_into_its_own_home
 test_claude_spawn_refuses_when_the_brief_record_cannot_publish

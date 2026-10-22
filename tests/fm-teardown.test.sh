@@ -662,7 +662,7 @@ make_path_without_lsof() {  # <case-dir>
   local case_dir=$1 path_dir="$1/path-without-lsof" cmd resolved
   mkdir -p "$path_dir"
   for cmd in awk bash basename cat chmod cp cut date dirname env find git grep head hostname id ln \
-    mkdir mktemp mv perl ps readlink realpath rm sed sh sleep sort stat tail timeout tr uname wc xargs; do
+    mkdir mktemp mv perl ps python3 readlink realpath rm sed sh sleep sort stat tail timeout tr uname wc xargs; do
     resolved=$(command -v "$cmd" 2>/dev/null) || continue
     case "$resolved" in /*) ln -sf "$resolved" "$path_dir/$cmd" ;; esac
   done
@@ -685,6 +685,8 @@ test_local_only_fork_remote_allows() {
   set -e
 
   expect_code 0 "$rc" "fork-allow: teardown should succeed when HEAD is on a fork remote"
+  jq -e '.task_id == "task-x1" and .attempt_id == "teardown-test-task-x1" and .input_tokens == null' \
+    "$case_dir/data/attempts.jsonl" >/dev/null || fail "cleanup did not preserve the legacy attempt"
   ! grep -q REFUSED "$case_dir/stderr" || fail "fork-allow: teardown printed a REFUSED line"
   [ ! -e "$case_dir/state/.task-x1.branch-outcome-index" ] \
     || fail "fork-allow: teardown left the task's branch outcome index behind"
@@ -707,6 +709,27 @@ test_local_only_fork_remote_allows() {
   ' "$case_dir/state/home-summary.json" >/dev/null \
     || fail "successful task teardown did not publish the task's removal from the home summary ledger"
   pass "local-only worktree with HEAD on a fork remote is torn down and the home summary is refreshed"
+}
+
+test_attempt_record_failure_warns_and_cleanup_continues() {
+  local case_dir rc
+  case_dir=$(make_case attempt-record-failure)
+  write_meta "$case_dir" local-only ship
+  wt_commit "$case_dir" "record before release"
+  add_fork_with_pushed_branch "$case_dir"
+  printf '{partial' > "$case_dir/data/attempts.jsonl"
+
+  set +e
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  expect_code 0 "$rc" "attempt-record-failure: a failed record write must not block cleanup"
+  assert_grep "warning: could not record task-x1's attempt; cleanup continues" "$case_dir/stderr" \
+    "attempt record failure did not warn"
+  [ ! -e "$case_dir/state/task-x1.meta" ] || fail "attempt record failure blocked metadata cleanup"
+  [ "$(cat "$case_dir/data/attempts.jsonl")" = '{partial' ] \
+    || fail "attempt record failure changed the existing ledger"
+  pass "attempt record failure warns and cleanup continues"
 }
 
 test_teardown_closes_the_backlog_item_itself() {
@@ -807,6 +830,7 @@ test_local_only_truly_unpushed_refuses() {
   set -e
 
   expect_code 1 "$rc" "truly-unpushed: teardown should refuse"
+  [ ! -e "$case_dir/data/attempts.jsonl" ] || fail "refused cleanup recorded an unfinished attempt"
   grep -q REFUSED "$case_dir/stderr" || fail "truly-unpushed: no REFUSED line in stderr"
   pass "local-only worktree with truly unpushed work is refused (safety preserved)"
 }
@@ -4651,6 +4675,7 @@ test_forced_child_missing_adapter_sibling_refuses_before_cleanup
 test_forced_secondmate_own_missing_adapter_sibling_refuses_before_child_cleanup
 test_retained_sources_still_reach_the_ordinary_refusal
 test_local_only_fork_remote_allows
+test_attempt_record_failure_warns_and_cleanup_continues
 test_teardown_closes_the_backlog_item_itself
 test_teardown_closes_a_gerrit_task_with_its_change_url_as_a_note
 test_teardown_manual_backend_leaves_the_backlog_to_the_operator

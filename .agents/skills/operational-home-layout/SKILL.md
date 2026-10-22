@@ -62,6 +62,7 @@ data/                personal fleet records; LOCAL, gitignored as a whole
   <id>/report.md     scout task deliverable, written by the crewmate; survives teardown
   <id>/consigliere.json  supervisor-written Consigliere stage record and clear receipt for a builder task, beside its consigliere-gates-<round>.md evidence; bin/fm-consigliere-lib.sh owns the receipt fields
   pipeline-spend.jsonl  optional per-task no-mistakes pipeline spend, written only when config/pipeline-spend is present; bin/fm-pipeline-spend.sh owns the schema
+  attempts.jsonl     private per-attempt worker usage and lifecycle ledger (0600), appended at teardown and at a profile-changing relaunch; bin/fm-attempt-record.py owns the schema
 projects/            cloned repos; gitignored; read-only except under hard rule 1's concrete captain-approved project operation exception
 state/               runtime records and signals; gitignored
   <id>.status        append-only wake events, not current-state truth; bin/fm-classify-lib.sh owns their syntax

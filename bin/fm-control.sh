@@ -5,7 +5,9 @@
 # Usage: fm-control.sh <task-id> interrupt
 #        fm-control.sh <task-id> exit
 #        fm-control.sh <task-id> relaunch [--harness <name>] [--model <name>]
-#                                         [--effort <level>]
+#                                         [--effort <level>] [--row <label>] [--tier <label>]
+#                                         [--pool <label>] [--attempt-n <positive-integer>]
+#                                         [--prior-tier <label>]
 #                                         (--note <text> | --note-file <path>)
 #
 # Why this exists, and how it differs from fm-send.sh. bin/fm-send.sh is the
@@ -65,6 +67,9 @@
 #              answer. Reclaim is HERDR-ONLY for the reason `exit` gives above:
 #              a tmux `missing` cannot be proven absent from a task record, so
 #              it refuses.
+#              Attempt classification is retained unless --row, --tier,
+#              --pool, --attempt-n, or --prior-tier overrides it (values and metadata
+#              contract: bin/fm-spawn.sh). These flags apply only to relaunch.
 #              An explicit `default` model or effort clears that
 #              axis for the replacement. With no explicit axis, a secondmate
 #              re-resolves its durable config/secondmate-harness pin (harness
@@ -246,6 +251,16 @@ fi
 NEW_HARNESS=
 NEW_MODEL=
 NEW_EFFORT=
+ROW=
+ROW_SET=0
+TIER=
+TIER_SET=0
+POOL=
+POOL_SET=0
+ATTEMPT_N=
+ATTEMPT_N_SET=0
+PRIOR_TIER=
+PRIOR_TIER_SET=0
 HARNESS_SET=0
 MODEL_SET=0
 EFFORT_SET=0
@@ -261,6 +276,11 @@ for control_arg in "$@"; do
       harness) NEW_HARNESS=$control_arg; HARNESS_SET=1 ;;
       model) NEW_MODEL=$control_arg; MODEL_SET=1 ;;
       effort) NEW_EFFORT=$control_arg; EFFORT_SET=1 ;;
+      row) ROW=$control_arg; ROW_SET=1 ;;
+      tier) TIER=$control_arg; TIER_SET=1 ;;
+      pool) POOL=$control_arg; POOL_SET=1 ;;
+      attempt-n) ATTEMPT_N=$control_arg; ATTEMPT_N_SET=1 ;;
+      prior-tier) PRIOR_TIER=$control_arg; PRIOR_TIER_SET=1 ;;
       note) NOTE=$control_arg; NOTE_SET=1 ;;
       note_file)
         [ -f "$control_arg" ] || die "--note-file '$control_arg' is not a readable file"
@@ -278,6 +298,16 @@ for control_arg in "$@"; do
     --model=*) NEW_MODEL=${control_arg#--model=}; MODEL_SET=1 ;;
     --effort) control_want_value=effort ;;
     --effort=*) NEW_EFFORT=${control_arg#--effort=}; EFFORT_SET=1 ;;
+    --row) control_want_value=row ;;
+    --row=*) ROW=${control_arg#--row=}; ROW_SET=1 ;;
+    --tier) control_want_value=tier ;;
+    --tier=*) TIER=${control_arg#--tier=}; TIER_SET=1 ;;
+    --pool) control_want_value=pool ;;
+    --pool=*) POOL=${control_arg#--pool=}; POOL_SET=1 ;;
+    --attempt-n) control_want_value="attempt-n" ;;
+    --attempt-n=*) ATTEMPT_N=${control_arg#--attempt-n=}; ATTEMPT_N_SET=1 ;;
+    --prior-tier) control_want_value="prior-tier" ;;
+    --prior-tier=*) PRIOR_TIER=${control_arg#--prior-tier=}; PRIOR_TIER_SET=1 ;;
     --note) control_want_value=note ;;
     --note=*) NOTE=${control_arg#--note=}; NOTE_SET=1 ;;
     --note-file) control_want_value=note_file ;;
@@ -296,7 +326,26 @@ fi
 
 if [ "$VERB" != relaunch ]; then
   [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] \
-    || die "--harness, --model, --effort, and --note apply to 'relaunch' only"
+    && [ "$ROW_SET" = 0 ] && [ "$TIER_SET" = 0 ] && [ "$POOL_SET" = 0 ] && [ "$ATTEMPT_N_SET" = 0 ] \
+    && [ "$PRIOR_TIER_SET" = 0 ] \
+    || die "--harness, --model, --effort, --row, --tier, --pool, --attempt-n, --prior-tier, and --note apply to 'relaunch' only"
+fi
+# Classification labels are opaque, single-line metadata values, not policy enums.
+for classification_key in ROW TIER POOL ATTEMPT_N PRIOR_TIER; do
+  classification_set=${classification_key}_SET
+  [ "${!classification_set}" -eq 1 ] || continue
+  classification_flag=${classification_key,,}
+  classification_flag=${classification_flag//_/-}
+  case "${!classification_key}" in
+    ''|*$'\n'*|*$'\r'*)
+      echo "error: --$classification_flag requires a non-empty, single-line value" >&2
+      exit 1
+      ;;
+  esac
+done
+if [ "$ATTEMPT_N_SET" -eq 1 ] && ! [[ "$ATTEMPT_N" =~ ^[1-9][0-9]*$ ]]; then
+  echo "error: --attempt-n must be a positive integer" >&2
+  exit 1
 fi
 [ "$HARNESS_SET" = 0 ] || [ -n "$NEW_HARNESS" ] || die "--harness requires a non-empty value"
 [ "$MODEL_SET" = 0 ] || [ -n "$NEW_MODEL" ] || die "--model requires a non-empty value"
@@ -1154,6 +1203,11 @@ do_relaunch() {
   spawn_args=("$ID" --relaunch --harness "$TARGET_HARNESS")
   [ "$TARGET_MODEL" = default ] || spawn_args+=(--model "$TARGET_MODEL")
   [ "$TARGET_EFFORT" = default ] || spawn_args+=(--effort "$TARGET_EFFORT")
+  [ "$ROW_SET" -eq 0 ] || spawn_args+=(--row "$ROW")
+  [ "$TIER_SET" -eq 0 ] || spawn_args+=(--tier "$TIER")
+  [ "$POOL_SET" -eq 0 ] || spawn_args+=(--pool "$POOL")
+  [ "$ATTEMPT_N_SET" -eq 0 ] || spawn_args+=(--attempt-n "$ATTEMPT_N")
+  [ "$PRIOR_TIER_SET" -eq 0 ] || spawn_args+=(--prior-tier "$PRIOR_TIER")
   if FM_CONTROL_RELAUNCH_TX="$RELAUNCH_TX" \
       "$SCRIPT_DIR/fm-spawn.sh" "${spawn_args[@]}" >/dev/null; then
     RELAUNCH_META_PUBLISHED=1

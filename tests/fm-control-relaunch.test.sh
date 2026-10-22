@@ -45,9 +45,9 @@ TASK_TMPS=()
 relaunch_cleanup() {
   local d
   for d in "${TASK_TMPS[@]:-}"; do
-    [ -n "$d" ] && rm -rf "$d"
+    [ -n "$d" ] && fm_test_remove_tree "$d"
   done
-  rm -rf "$TMP_ROOT"
+  fm_test_remove_tree "$TMP_ROOT"
 }
 trap relaunch_cleanup EXIT
 
@@ -370,6 +370,7 @@ test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint() {
   local dir out rc gen_before gen_after
   dir=$(new_case same rl1)
   add_ship_task "$dir" rl1 claude
+  printf 'row=code\ntier=T1\nattempt_n=1\nprior_tier=T0\n' >> "$dir/home/state/rl1.meta"
   gen_before=$("$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" rl1)
   printf 'busy_gen=%s\n' "$gen_before" >> "$dir/home/state/rl1.meta"
   out=$(run_control "$dir" rl1 relaunch --note "stopped mid-refactor"); rc=$?
@@ -381,6 +382,10 @@ test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint() {
     || fail "the worktree must be reused, not reallocated"
   [ "$(meta_field "$dir" rl1 kind)" = ship ] || fail "kind must survive the relaunch"
   [ "$(meta_field "$dir" rl1 project)" = "$dir/proj" ] || fail "project must survive the relaunch"
+  [ "$(meta_field "$dir" rl1 row)" = code ] || fail "row must survive relaunch"
+  [ "$(meta_field "$dir" rl1 tier)" = T1 ] || fail "tier must survive relaunch"
+  [ "$(meta_field "$dir" rl1 attempt_n)" = 1 ] || fail "same-profile relaunch must not increment attempt"
+  [ "$(meta_field "$dir" rl1 prior_tier)" = T0 ] || fail "prior tier must survive relaunch"
   gen_after=$(meta_field "$dir" rl1 busy_gen)
   [ -n "$gen_after" ] && [ "$gen_after" != "$gen_before" ] \
     || fail "a relaunch must arm a fresh busy generation, got '$gen_after'"
@@ -920,7 +925,101 @@ test_explicit_model_wins_over_the_recorded_one() {
   expect_code 0 "$rc" "relaunch with explicit axes should succeed"$'\n'"$out"
   [ "$(meta_field "$dir" rl7 model)" = sonnet ] || fail "an explicit model should be recorded"
   [ "$(meta_field "$dir" rl7 effort)" = low ] || fail "an explicit effort should be recorded"
+  if grep -Eq "^(row|tier|pool|attempt_n|prior_tier)=" "$dir/home/state/rl7.meta"; then
+    fail "a legacy unclassified task must stay unclassified on relaunch"
+  fi
   pass "fm-control relaunch: explicit model and effort win over the recorded ones"
+}
+
+test_relaunch_overrides_attempt_classification() {
+  local dir out rc key attempt_id
+  dir=$(new_case classification rl73)
+  add_ship_task "$dir" rl73 claude
+  printf 'row=code\ntier=T1\npool=claude\nattempt_n=1\n' >> "$dir/home/state/rl73.meta"
+  out=$(run_control "$dir" rl73 relaunch --model sonnet --row=debug --tier T2 --pool=codex \
+    --attempt-n=2 --prior-tier T1 --note "escalate this attempt"); rc=$?
+  expect_code 0 "$rc" "relaunch with classification overrides should succeed: $out"
+  [ "$(meta_field "$dir" rl73 row)" = debug ] || fail "row override missing"
+  [ "$(meta_field "$dir" rl73 tier)" = T2 ] || fail "tier override missing"
+  [ "$(meta_field "$dir" rl73 pool)" = codex ] || fail "pool override missing"
+  [ "$(meta_field "$dir" rl73 attempt_n)" = 2 ] || fail "attempt override missing"
+  [ "$(meta_field "$dir" rl73 prior_tier)" = T1 ] || fail "prior tier override missing"
+  for key in row tier pool attempt_n prior_tier; do
+    [ "$(grep -c "^$key=" "$dir/home/state/rl73.meta")" = 1 ] || fail "duplicate $key metadata"
+  done
+  attempt_id=$(meta_field "$dir" rl73 attempt_id)
+  [ -n "$attempt_id" ] || fail "model/tier change did not start an attempt"
+  if ! python3 - "$dir/home/data/attempts.jsonl" "$dir/home/state/rl73.meta" <<'PYTEST'
+import json
+from pathlib import Path
+import sys
+rows = [json.loads(line) for line in Path(sys.argv[1]).read_text().splitlines()]
+record, = rows
+meta = dict(line.split('=', 1) for line in Path(sys.argv[2]).read_text().splitlines() if '=' in line)
+assert record['model'] == 'default' and record['tier'] == 'T1' and record['pool'] == 'claude'
+assert record['attempt_n'] == 1 and record['outcome'] == 'escalated'
+assert record['ts'] == meta['attempt_started_at']
+PYTEST
+  then
+    fail "prior attempt was not recorded with the replacement boundary"
+  fi
+  out=$(run_control "$dir" rl73 relaunch --row review --note "refine classification only"); rc=$?
+  expect_code 0 "$rc" "partial classification override should succeed: $out"
+  [ "$(meta_field "$dir" rl73 row)" = review ] || fail "partial row override missing"
+  [ "$(meta_field "$dir" rl73 tier)" = T2 ] || fail "partial override lost tier"
+  [ "$(meta_field "$dir" rl73 pool)" = codex ] || fail "partial override lost pool"
+  [ "$(meta_field "$dir" rl73 attempt_n)" = 2 ] || fail "partial override changed attempt"
+  [ "$(meta_field "$dir" rl73 prior_tier)" = T1 ] || fail "partial override lost prior tier"
+  [ "$(meta_field "$dir" rl73 attempt_id)" = "$attempt_id" ] || fail "same profile split the attempt"
+  [ "$(wc -l < "$dir/home/data/attempts.jsonl" | tr -d ' ')" = 1 ] || fail "same profile logged another attempt"
+  out=$(run_control "$dir" rl73 relaunch --tier T3 --note "tier-only escalation"); rc=$?
+  expect_code 0 "$rc" "tier-only escalation should succeed: $out"
+  [ "$(meta_field "$dir" rl73 attempt_n)" = 3 ] || fail "known attempt number did not increment"
+  [ "$(meta_field "$dir" rl73 prior_tier)" = T2 ] || fail "previous tier not retained"
+  [ "$(meta_field "$dir" rl73 attempt_id)" != "$attempt_id" ] || fail "tier change reused attempt identity"
+  [ "$(wc -l < "$dir/home/data/attempts.jsonl" | tr -d ' ')" = 2 ] || fail "tier change did not record old attempt"
+  pass "fm-control relaunch: classification and model/tier attempt boundaries survive replacement"
+}
+
+test_attempt_record_failure_warns_and_relaunch_continues() {
+  local dir out rc
+  dir=$(new_case record-failure rl75)
+  add_ship_task "$dir" rl75 claude
+  printf 'tier=T2\nattempt_n=1\nattempt_id=old\nattempt_started_at=100\n' >> "$dir/home/state/rl75.meta"
+  mkdir -p "$dir/home/data/attempts.jsonl"
+  out=$(run_control "$dir" rl75 relaunch --model sonnet --note "lateral switch"); rc=$?
+  expect_code 0 "$rc" "an attempt record failure must not block the relaunch: $out"
+  assert_contains "$out" "warning: could not record rl75's previous attempt; relaunch continues" \
+    "the relaunch should warn about the lost attempt record"
+  [ "$(meta_field "$dir" rl75 model)" = sonnet ] || fail "the replacement was not published"
+  [ "$(meta_field "$dir" rl75 attempt_id)" != old ] || fail "a changed profile kept the old attempt"
+  [ "$(meta_field "$dir" rl75 attempt_n)" = 2 ] || fail "a changed profile did not advance the attempt"
+  [ "$(meta_field "$dir" rl75 attempt_started_at)" != 100 ] || fail "the replacement reused the old start"
+  pass "fm-control relaunch: an attempt record failure warns and the replacement starts its own attempt"
+}
+
+test_invalid_attempt_classification_refuses_before_stop() {
+  local dir out rc flag verb before
+  dir=$(new_case invalid-classification rl74)
+  add_ship_task "$dir" rl74 claude
+  before=$(cat "$dir/home/state/rl74.meta")
+  for flag in --row= --tier= --pool= --prior-tier= --attempt-n= --attempt-n=0 \
+    --attempt-n=-1 --attempt-n=1.5 --attempt-n=abc --attempt-n=01 \
+    $'--row=bad\ntier=injected' $'--tier=bad\rvalue' $'--pool=bad\nvalue' $'--prior-tier=bad\nvalue' \
+    --row --tier --pool --attempt-n --prior-tier; do
+    out=$(run_control "$dir" rl74 relaunch --note "invalid classification" "$flag"); rc=$?
+    expect_code 1 "$rc" "invalid classification '$flag' must refuse: $out"
+  done
+  for verb in exit interrupt; do
+    for flag in --row=code --tier=T1 --pool=claude --attempt-n=1 --prior-tier=T0; do
+      out=$(run_control "$dir" rl74 "$verb" "$flag"); rc=$?
+      expect_code 1 "$rc" "classification must be relaunch-only: $out"
+    done
+  done
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "invalid classification stopped the agent"
+  [ ! -s "$dir/fake/literal" ] || fail "invalid classification sent lifecycle input"
+  [ "$(cat "$dir/home/state/rl74.meta")" = "$before" ] || fail "invalid classification changed metadata"
+  pass "fm-control relaunch: invalid attempt flags refuse before stopping the agent"
 }
 
 test_relaunch_onto_an_unverified_harness_is_refused() {
@@ -1389,11 +1488,12 @@ test_launch_failure_keeps_the_prior_record_and_reports_it() {
   local dir out rc before
   dir=$(new_case rollback rl13)
   add_ship_task "$dir" rl13 claude
+  printf 'row=code\ntier=T1\nattempt_n=1\n' >> "$dir/home/state/rl13.meta"
   before=$(cat "$dir/home/state/rl13.meta")
   # The endpoint's shell is not in the recorded worktree, so the launch owner
   # refuses AFTER the previous agent has already been stopped.
   printf '%s' "$dir/proj" > "$dir/fake/cwd"
-  out=$(run_control "$dir" rl13 relaunch --harness codex --note "carry this forward"); rc=$?
+  out=$(run_control "$dir" rl13 relaunch --harness codex --tier T2 --attempt-n 2 --prior-tier T1 --note "carry this forward"); rc=$?
   expect_code 1 "$rc" "a failed launch should fail closed"$'\n'"$out"
   assert_contains "$out" "no agent is running" "the failure should say no agent is running"
   assert_contains "$out" "$dir/wt" "the failure should say where the work is preserved"
@@ -2267,6 +2367,8 @@ test_herdr_relaunch_resumes_only_the_registered_pi_session() {
       return 0
     }
     dir=$HERDR_CASE_DIR
+    printf '#!/usr/bin/env bash\nprintf "Options: --tui-mode\\n"\n' > "$dir/fakebin/pi"
+    chmod +x "$dir/fakebin/pi"
     rm -f "$dir/fake/herdr-stopped"
     sed -i 's/^harness=claude$/harness=pi/' "$dir/home/state/resume-$registered.meta"
     # Keep the pane's status authority registered to an existing Pi session,
@@ -2601,6 +2703,9 @@ test_worker_account_pin_follows_the_relaunch
 test_pi_exclude_tools_follow_the_relaunch
 test_exclude_tools_refusals_happen_before_the_agent_stops
 test_explicit_model_wins_over_the_recorded_one
+test_relaunch_overrides_attempt_classification
+test_attempt_record_failure_warns_and_relaunch_continues
+test_invalid_attempt_classification_refuses_before_stop
 test_relaunch_onto_an_unverified_harness_is_refused
 test_prior_harness_turnend_registry_entry_is_cleared
 test_wiring_removal_failure_refuses_before_replacement_arm
