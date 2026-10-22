@@ -759,6 +759,14 @@ IFS= read -r -d '' SHARED_INFRA_RULE <<'EOF' || true
 EOF
 SHARED_INFRA_RULE=${SHARED_INFRA_RULE%$'\n'}
 
+# One return contract covers every worker brief shape.
+IFS= read -r -d '' RETURN_ENVELOPE <<'EOF' || true
+Keep every done or blocked report (status line and final reply) to at most about 500 tokens: outcome, files changed, diff stat, checks run and results, and one open question only if blocked.
+Use "none" or "not run" for fields with no changes or checks; never return a full diff or a transcript.
+Keep detailed evidence in the task report or task data folder and return its path when needed.
+EOF
+RETURN_ENVELOPE=${RETURN_ENVELOPE%$'\n'}
+
 if [ -n "$BASE_BRANCH" ]; then
   SETUP_BASE="You are in a disposable git worktree of $REPO, at a detached HEAD on a clean copy of its base branch.
 Base branch: $BASE_BRANCH"
@@ -795,7 +803,8 @@ The report is the only thing that survives, so anything worth keeping must be in
    Substitute \`<epoch>\` with the current Unix time in seconds - run \`date +%s\` and write the number it printed; a stamp that is not plain digits records no time at all.
    Each append wakes firstmate, so report sparingly: only phase changes a supervisor
    would act on and the needs-decision/blocked/paused/done/failed states. No step-by-step
-   FYI progress lines; firstmate reads your pane for that.
+   FYI progress lines.
+   $RETURN_ENVELOPE
    Whenever you mention a PR anywhere - a status line, your terminal, a summary - write its full
    https:// URL exactly as the forge printed it, never a bare number such as "PR 108"; firstmate
    copies that URL from your line rather than assembling one.
@@ -811,10 +820,12 @@ $WAIT_BLOCK$INBOX_SECTION
 
 # Definition of done
 Write your findings to \`$DATA/$ID/report.md\`.
+Open the report with a \`## Envelope\` section using the return fields and cap in rule 4, with the findings and recommendation in its outcome so it stands alone.
+Put detailed evidence after the next level-two heading; firstmate reads only the envelope unless it dispatches an extraction worker.
 The report must stand alone: what you did, what you found, the evidence (commands run, output, file:line references), and what you recommend.
 $LAVISH_LINE
 Before reporting done, read and follow \`$FM_ROOT/.agents/skills/captain-hold-lifecycle/SKILL.md\` and pass its shared completion gate for the report and any visual review.
-When the report is complete, append \`done [at=<epoch>]: {one-line conclusion}\` to the status file and stop.
+When the report is complete, append \`done [at=<epoch>]: {return envelope; report path}\` to the status file and stop.
 If your findings reveal work that should ship (e.g. you reproduced a bug and the fix is clear), say so in the report; firstmate may promote this task in place, and you would then receive mode-specific ship instructions as a follow-up message.
 EOF
 append_brief_include
@@ -912,9 +923,11 @@ It checks every fold and the tests, pushes, opens the combined PR and writes you
 If publish prints \`refused:\`, fix only what it names, in a file a step names; commit a fix with \`git commit -m "fix: <what>" -- <that file>\`; run it again. Only this script writes the done line; never write one yourself.
 
 # Reporting
-When a command prints \`Published.\` or \`WAIT:\`, reply with one line and call no more tools.
+$RETURN_ENVELOPE
+When a command prints \`Published.\` or \`WAIT:\`, reply with its result and the return fields on one line and call no more tools.
 If a command still refuses after two fixes, or anything else fails twice, run this, and stop:
-    echo "blocked [at=\$(date +%s)]: <one line>" >> $STATUS_FILE
+    echo "blocked [at=\$(date +%s)]: <return envelope>" >> $STATUS_FILE
+Replace \`<return envelope>\` with the return fields on one line.
 Write status lines only with the commands in this brief.
 Firstmate answers through message files in $INBOX_DIR; when your terminal announces one, read it, act on it, then move it with \`mv $INBOX_DIR/NNN.msg $INBOX_DIR/handled/\`.
 EOF
@@ -983,10 +996,12 @@ $DONE_COMMAND_BLOCK
 Run it; until it exits 0, fix the first failure and run it again. Never say it passed unless it printed a pass.
 
 # Reporting
+$RETURN_ENVELOPE
+Replace \`<return envelope>\` in the commands below with those fields on one line.
 When the done command exits 0, run this as one command, then reply with one line and call no more tools:
-    git add --$QWEN_FILES_Q && git commit -m "<conventional commit title>" && git push -u origin $BRANCH_Q && url=\$(gh-axi pr create$QWEN_PR_BASE --title "<the same title>" --body "<two or three sentences on what changed>" | grep -m1 -o 'https://[^ ]*/pull/[0-9]*') && echo "done [at=\$(date +%s)]: PR \$url" | tee -a $STATUS_FILE
+    git add --$QWEN_FILES_Q && git commit -m "<conventional commit title>" && git push -u origin $BRANCH_Q && url=\$(gh-axi pr create$QWEN_PR_BASE --title "<the same title>" --body "<two or three sentences on what changed>" | grep -m1 -o 'https://[^ ]*/pull/[0-9]*') && echo "done [at=\$(date +%s)]: PR \$url; <return envelope>" | tee -a $STATUS_FILE
 If that fails, if you are stuck after two attempts at the same thing, or if the plan does not answer something you need, run this, and stop:
-    echo "blocked [at=\$(date +%s)]: <one line>" >> $STATUS_FILE
+    echo "blocked [at=\$(date +%s)]: <return envelope>" >> $STATUS_FILE
 Write status lines only with the commands in this brief.
 Firstmate answers through message files in $INBOX_DIR; when your terminal announces one, read it, act on it, then move it with \`mv $INBOX_DIR/NNN.msg $INBOX_DIR/handled/\`.
 EOF
@@ -1052,8 +1067,8 @@ $RULE1
    Substitute \`<epoch>\` with the current Unix time in seconds - run \`date +%s\` and write the number it printed; a stamp that is not plain digits records no time at all.
    Each append wakes firstmate, so report sparingly: only phase changes a supervisor
    would act on (setup done, bug reproduced, fix implemented, validation passed) and the
-   needs-decision/blocked/paused/done/failed states. No step-by-step FYI progress lines;
-   firstmate reads your pane for that.
+   needs-decision/blocked/paused/done/failed states. No step-by-step FYI progress lines.
+   $RETURN_ENVELOPE
    Whenever you mention a PR anywhere - a status line, your terminal, a summary - write its full
    https:// URL exactly as the forge printed it, never a bare number such as "PR 108"; firstmate
    copies that URL from your line rather than assembling one.
