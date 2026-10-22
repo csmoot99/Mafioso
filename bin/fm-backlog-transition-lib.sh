@@ -369,9 +369,11 @@ fm_tasks_axi() {
 # callers that capture its status set it. The latch is deliberately
 # process-wide because these scripts are short-lived and a backend that wedged
 # once will wedge again within the same run.
-fm_backlog_row_show() {  # <resolved-data-dir> <id> [flag...]
-  local data=$1 id=$2 out status addressing_status secs=${FM_BACKLOG_ROW_TIMEOUT_SECS:-10}
+fm_backlog_row_show() {  # <resolved-data-dir> <id> [--archive] [tasks-axi-flag...]
+  local data=$1 id=$2 out status addressing_status archive='' secs=${FM_BACKLOG_ROW_TIMEOUT_SECS:-10}
   shift 2
+  local archived=0
+  if [ "${1:-}" = --archive ]; then archived=1; shift; fi
   # A non-positive bound is not a bound (fm-timeout-lib.sh), and a padded zero
   # such as 00 is still zero, so the digits test alone would let the very read
   # this bound exists to prevent back in. Compare arithmetically, tolerating a
@@ -388,12 +390,29 @@ fm_backlog_row_show() {  # <resolved-data-dir> <id> [flag...]
     printf 'tasks-axi show %s skipped: the backlog backend already exceeded its %ss read bound\n' "$id" "$secs"
     return 124
   fi
-  if [ -n "$FM_BACKLOG_AXI_FILE" ]; then
+  if [ "$archived" = 1 ]; then
+    [ -n "$FM_BACKLOG_AXI_FILE" ] || return 1
+    archive=$(fm_tasks_axi_archive_file "$FM_BACKLOG_AXI_ROOT" "$FM_BACKLOG_AXI_FILE") || return $?
+    [ -f "$archive" ] || return 1
+  elif [ -n "$FM_BACKLOG_AXI_FILE" ]; then
     set -- "$@" --file "$FM_BACKLOG_AXI_FILE"
   fi
   # shellcheck disable=SC2016  # Expansion is deliberately deferred to the child shell.
-  out=$(fm_run_timed "$secs" bash -c 'cd "$1" 2>/dev/null || exit 1; shift; exec tasks-axi show "$@"' \
-    _ "$FM_BACKLOG_AXI_ROOT" "$id" "$@" 2>&1)
+  out=$(fm_run_timed "$secs" bash -c '
+    cd "$1" 2>/dev/null || exit 1
+    archive=$2; shift 2
+    if [ -n "$archive" ]; then
+      # tasks-axi refuses to open its configured archive as the active backlog.
+      # Read a snapshot through the same parser without altering either file.
+      snapshot=$(mktemp) || exit 1
+      trap '\''rm -f "$snapshot"'\'' EXIT
+      # Archive batches use dated headings, which are not live backlog sections.
+      sed -E '\''s/^## Archived [0-9]{4}-[0-9]{2}-[0-9]{2}$/## Done/'\'' "$archive" > "$snapshot" || exit 1
+      tasks-axi show "$@" --file "$snapshot"
+    else
+      exec tasks-axi show "$@"
+    fi
+  ' _ "$FM_BACKLOG_AXI_ROOT" "$archive" "$id" "$@" 2>&1)
   status=$?
   # A backend that wrote a header or a progress line before wedging leaves that
   # fragment as the first output line, and every caller reads the first line as

@@ -4629,6 +4629,81 @@ SH
   pass "marked hold reasons round-trip through public reads, fleet, startup, and return without changing other fields"
 }
 
+test_archived_answer_satisfies_completion() (
+  local home scout call mode archive before
+  for mode in answered default absolute global unresolved missing; do
+    home=$(make_home "archived-$mode")
+    scout=archived-scout
+    call=archived-call
+    archive="$home/records/old calls.md"
+    mkdir -p "$home/records"
+    cat > "$home/.tasks.toml" <<'EOF'
+backend = "markdown"
+[markdown]
+path = "data/backlog.md"
+archive = "records/old calls.md"
+done_keep = 10
+EOF
+    export HOME="$home/user"
+    mkdir -p "$HOME"
+    case "$mode" in
+      default)
+        sed '/^archive =/d' "$home/.tasks.toml" > "$home/config.tmp"
+        mv "$home/config.tmp" "$home/.tasks.toml"
+        archive="$home/data/done-archive.md" ;;
+      absolute)
+        printf '[markdown]\npath = "data/backlog.md"\narchive = "%s"\n' "$archive" > "$home/.tasks.toml" ;;
+      global)
+        mkdir -p "$HOME/.tasks-axi"
+        mv "$home/.tasks.toml" "$HOME/.tasks-axi/config.toml" ;;
+    esac
+    tasks_in "$home" add "$scout" "Review the card" --kind scout --repo sample --start >/dev/null \
+      || fail "could not create archive origin"
+    write_scout_with_attested_inventory "$home" "$scout" "$call"
+    if [ "$mode" != missing ]; then
+      run_captain "$home" hold "$call" --title "Approve the card" \
+        --reason "card needs approval" --origin "$scout" --repo sample >/dev/null \
+        || fail "could not create archive hold"
+      if [ "$mode" != unresolved ]; then
+        printf 'I approve the business card.\n' > "$home/decision.txt"
+        run_captain "$home" answer "$call" --decision-file "$home/decision.txt" >/dev/null \
+          || fail "could not record answer before retention"
+      else
+        tasks_in "$home" "done" "$call" >/dev/null || fail "could not close unresolved fixture"
+      fi
+      tasks_in "$home" prune --keep 0 >/dev/null || fail "could not apply Done retention"
+      assert_grep "$call" "$archive" "retention did not archive the hold"
+      if tasks_in "$home" show "$call" >/dev/null 2>&1; then
+        fail "retention left the hold in the live backlog"
+      fi
+    fi
+    if [ "$mode" != unresolved ] && [ "$mode" != missing ]; then
+      assert_grep 'Resolution recorded by fm-captain-hold' "$archive" "retention lost the answer"
+      before=$(shasum -a 256 "$archive")
+      run_captain "$home" complete "$scout" "$call" >/dev/null \
+        || fail "completion refused the archived answer"
+      run_captain "$home" verify "$scout" >/dev/null \
+        || fail "verification refused the archived answer"
+      run_teardown "$home" "$scout" >/dev/null 2> "$home/teardown.err" \
+        || fail "teardown refused the archived answer: $(cat "$home/teardown.err")"
+      [ "$before" = "$(shasum -a 256 "$archive")" ] || fail "verification mutated the archive"
+    else
+      if run_captain "$home" complete "$scout" "$call" > "$home/complete.out" 2>&1; then
+        fail "completion accepted $mode archive evidence"
+      fi
+      if run_captain "$home" verify "$scout" > "$home/verify.out" 2>&1; then
+        fail "verification accepted $mode archive evidence"
+      fi
+      if run_teardown "$home" "$scout" > "$home/teardown.out" 2>&1; then
+        fail "teardown accepted $mode archive evidence"
+      fi
+      [ -f "$home/state/$scout.meta" ] || fail "refused teardown removed origin metadata"
+    fi
+  done
+  pass "answered holds remain durable after Done retention; unresolved and missing entries refuse"
+)
+
+test_archived_answer_satisfies_completion
 test_hold_reason_round_trips_awkward_characters
 test_hold_origins_precede_backend_holds
 test_historical_self_inventory_has_workable_repair
