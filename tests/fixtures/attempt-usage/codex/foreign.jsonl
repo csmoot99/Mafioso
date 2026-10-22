@@ -1,0 +1,2 @@
+{"type":"session_meta","timestamp":"2026-10-22T19:01:00Z","payload":{"id":"foreign","cwd":"/task/worktree-other"}}
+{"type":"event_msg","timestamp":"2026-10-22T19:01:10Z","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":900,"cached_input_tokens":900,"cache_write_input_tokens":0,"output_tokens":900,"reasoning_output_tokens":450,"total_tokens":1800},"last_token_usage":{"input_tokens":900,"cached_input_tokens":900,"cache_write_input_tokens":0,"output_tokens":900,"reasoning_output_tokens":450,"total_tokens":1800},"model_context_window":258400}}}
