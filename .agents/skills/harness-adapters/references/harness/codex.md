@@ -57,11 +57,11 @@ Verified on 2026-10-22 with codex-cli 0.162.1.
 Crewmate and scout launches mirror the project's `.mcp.json` stdio servers into session-only `-c mcp_servers.<name>.*` overrides when its `.claude/settings.json` approves them through `enabledMcpjsonServers` or `enableAllProjectMcpServers`; `disabledMcpjsonServers` takes precedence.
 Both files are read from the task's base commit, where the worker copy forked from origin's base branch, never from the working copy or the task branch, so a worker's edits to them change nothing on a fresh launch or a relaunch; when that commit cannot be resolved the launch mirrors no servers.
 The launch preserves command, args and env, resolves a relative server `cwd` against the worker copy, and defaults an omitted `cwd` to that copy.
+Invalid JSON or approvals, or an approved server it cannot express as stdio (another `type`, a missing command, a non-string argument or env value, a name outside `[A-Za-z0-9_-]`), refuses the launch rather than starting the worker without that server.
 These project-declared processes run outside Codex's model-command sandbox under the project's approval; the launch does not persist them into the user's Codex configuration.
 The server's own code still runs from the worker copy, so after a restart a worker's edits to a server script take effect, the same trust a Claude worker already gives its working copy.
 [`fm-spawn.sh`](../../../../../bin/fm-spawn.sh)'s `codex_project_mcp_flags` owns the mapping and validation, with launch-argument regression coverage in [`fm-spawn-dispatch-profile.test.sh`](../../../../../tests/fm-spawn-dispatch-profile.test.sh).
 A live `gpt-6-astra` proof replayed the complete captured launch flags through `codex mcp list --json` and `codex exec --ephemeral --json` against a real project worktree: Codex resolved the enabled `kg` stdio server, listed its eight tools, and completed `kg_stats` with a real index response.
-The capture fixture copied that project's MCP declaration and approval, adding an explicit server `cwd` pointing at the existing project copy so the proof needed no changes there.
 
 ## Remaining parity gaps
 
