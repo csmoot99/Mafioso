@@ -417,6 +417,13 @@ for arg do
 done
 mkdir -p "$profile"
 printf '43210\n/devtools/browser/test\n' > "$profile/DevToolsActivePort"
+# Like Chromium's network service, a helper keeps writing the profile after
+# the main process is gone, until it is signalled itself.
+(
+  trap 'exit 0' TERM
+  while :; do mkdir -p "$profile/Default" && : > "$profile/Default/state.$RANDOM"; sleep 0.02; done
+) &
+printf '%s\n' "$!" > "$FM_TEST_CODEX_ARGS.chrome-helper-pid"
 trap 'exit 0' TERM INT
 while :; do sleep 0.1; done
 SH
@@ -439,6 +446,7 @@ SH
     profile=$(sed -n 's/^--user-data-dir=//p' "$dir/args.chrome-args")
     [ -n "$profile" ] && [ ! -e "$profile" ] || fail 'scratch browser profile survived cleanup'
     if kill -0 "$(cat "$dir/args.chrome-pid")" 2>/dev/null; then fail 'task browser survived Codex exit'; fi
+    if kill -0 "$(cat "$dir/args.chrome-helper-pid")" 2>/dev/null; then fail 'task browser helper survived Codex exit'; fi
     for flag in --headless=new --no-sandbox --remote-debugging-address=127.0.0.1 --remote-debugging-port=0; do
       grep -Fxq -- "$flag" "$dir/args.chrome-args" || fail "browser missing $flag"
     done

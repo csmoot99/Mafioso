@@ -27,17 +27,23 @@ cleanup() {
     chrome-devtools-axi stop >/dev/null 2>&1 || true
   fi
   if [ -n "$browser_pid" ]; then
-    kill "$browser_pid" 2>/dev/null || true
+    # Chromium's helpers outlive its main process and keep writing the
+    # profile; stop the whole process group and wait for it to be gone.
+    kill -- "-$browser_pid" 2>/dev/null || true
     wait "$browser_pid" 2>/dev/null || true
+    for ((attempt = 0; attempt < 50; attempt++)); do
+      kill -0 -- "-$browser_pid" 2>/dev/null || break
+      sleep 0.1
+    done
   fi
-  rm -rf -- "$scratch"
+  rm -rf -- "$scratch" || true
 }
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 trap 'exit 129' HUP
 
-"$browser" --headless=new --no-sandbox --use-mock-keychain --password-store=basic \
+setsid "$browser" --headless=new --no-sandbox --use-mock-keychain --password-store=basic \
   --remote-debugging-address=127.0.0.1 --remote-debugging-port=0 \
   --user-data-dir="$scratch/profile" >"$scratch/chromium.log" 2>&1 &
 browser_pid=$!
