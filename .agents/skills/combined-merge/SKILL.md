@@ -89,7 +89,7 @@ The folded PRs' receipts never stand in for it; `bin/fm-pr-check.sh` and `bin/fm
 
 1. Register the combined PR on the integrator's task with `bin/fm-pr-check.sh <integrator-task> <combined-url>` per `ship-landing`; that rebinds a reused worker's task from its own folded PR, and `bin/fm-pr-merge.sh` refuses the combined URL until it does.
 2. Compare each folded PR's live head with the commit the combined PR body lists for it; when one moved, have the integrator merge the new head and report ready again.
-3. Merge with `bin/fm-pr-merge.sh <integrator-task> <combined-url> -- --merge`, since only a merge commit lands every folded head intact; add `--allow-red <check-name>` before the `--` only for a waiver carried under Merge authority.
+3. Merge with `bin/fm-pr-merge.sh <integrator-task> <combined-url> -- --merge`, since only a merge commit lands every folded head intact; add one `--allow-red <check-name>` per waived check before the `--`, only for waivers carried under Merge authority.
 4. Confirm GitHub now reads each folded PR merged; its own merge poll then wakes tagged `external`, which is expected because the merge authority was recorded on the integrator's task.
    A folded PR still open holds work the combined PR did not carry and lands on its own through ordinary landing.
 5. Clean up the integrator and every folded task through `bin/fm-teardown.sh <id>`, never `--force`; its landed-work test accepts a folded task whose local head the combined merge carried, and a refusal is investigated per `ship-landing`.
