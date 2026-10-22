@@ -84,6 +84,9 @@ Hand the captain that exact command to type as `! <command>` in the integrator's
 
 ## Land
 
+When `config/consigliere` is `on`, the combined PR is a PR like any other: once its checks are green on its own head, run the ordinary `ship-landing` Consigliere stage on that head with the integrator as its builder for reviewer selection, before registering it in step 1.
+The folded PRs' receipts never stand in for it; `bin/fm-pr-check.sh` and `bin/fm-pr-merge.sh` require a clear receipt for the combined URL and head in the integrator's `data/<integrator-task>/consigliere.json`, so a new combined head from step 2 needs that review again.
+
 1. Register the combined PR on the integrator's task with `bin/fm-pr-check.sh <integrator-task> <combined-url>` per `ship-landing`; that rebinds a reused worker's task from its own folded PR, and `bin/fm-pr-merge.sh` refuses the combined URL until it does.
 2. Compare each folded PR's live head with the commit the combined PR body lists for it; when one moved, have the integrator merge the new head and report ready again.
 3. Merge with `bin/fm-pr-merge.sh <integrator-task> <combined-url> -- --merge`, since only a merge commit lands every folded head intact; add `--allow-red <check-name>` before the `--` only for a waiver carried under Merge authority.

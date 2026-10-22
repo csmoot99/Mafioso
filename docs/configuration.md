@@ -1190,7 +1190,7 @@ The two same-family exceptions require explicit recorded grounds and an independ
 The policy supplies no reverse Astra mapping or rule for an unlisted builder; resolve that gap explicitly before launching a reviewer.
 Profile arrays use the existing quota-aware dispatch procedure, not a new selector.
 
-[`ship-landing`](../.agents/skills/ship-landing/SKILL.md#opt-in-consigliere-review) owns gate evidence, launch, one bounded correction and re-review, verdict reporting, and no-mistakes attribution.
+[`ship-landing`](../.agents/skills/ship-landing/SKILL.md#opt-in-consigliere-review) owns gate evidence, launch, one bounded correction and re-review, and verdict reporting.
 The reviewer uses `fm-brief.sh --review` through the existing scout launch path and never edits code.
 Firstmate keeps the stage's head, round, linked reviewer, consumed correction allowances, and evidence under `data/<builder-id>/consigliere.json`; a pending or failed review cannot stand in for a clear verdict.
 [`bin/fm-consigliere-lib.sh`](../bin/fm-consigliere-lib.sh) owns the receipt fields and validation mechanics, including `FM_CONFIG_OVERRIDE` and `FM_DATA_OVERRIDE` for the normal home overrides.

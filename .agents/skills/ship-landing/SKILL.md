@@ -79,15 +79,9 @@ For a clear report, re-read the live head and gate results, then atomically repl
 Do not write a clear receipt from the builder's self-review.
 Return to the normal PR-ready handoff above only when the guard accepts that head.
 
-### No-mistakes integration
+### No-mistakes review gap
 
-Count the pipeline's own review only with evidence of the actual cross-family reviewer, the exact reviewed PR head, and green lint/typecheck/test results preceding that review.
-Installed no-mistakes 1.75.2 has no per-run reviewer flag or environment override: repository `agent:` selects the general pipeline agent, while `review_agents.reviewer` is global-only.
-Its normal review runs before tests and lint, so that native review does not satisfy this stage's ordering; launch the separate reviewer after green checks.
-Do not rewrite shared global configuration, redirect `NM_HOME`, or change the repository's whole pipeline agent just to select this reviewer.
-When verifying native attribution, locate the run database through `fm_nm_state_db` in `bin/fm-nm-run-lib.sh` and inspect `state.sqlite`'s `agent_invocations` for the run ID, `step_name=review`, `purpose=review`, round, agent, model, model_provider, exit_status, and timestamps.
-An agent/harness name without actual model-family evidence is insufficient, and the current `fm-nm-run-lib.sh` run-state reader does not supply reviewer attribution.
-Re-check installed help and source if no-mistakes adds a scoped reviewer selector; use such a selector only when it also satisfies the exact-head and gate-order requirements, and record that evidence rather than charging for a duplicate qualifying review.
+Installed no-mistakes 1.75.2 cannot choose its review agent per run and reviews before tests and lint, so its own review never satisfies this stage; launch the separate reviewer after green checks.
 
 ## Landing and cleanup
 
