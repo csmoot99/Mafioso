@@ -1,0 +1,15 @@
+## config/consigliere absent (default off), no receipt
+$ bin/fm-pr-check.sh lab5e546645fa53-off https://github.com/csmoot99/Mafioso/pull/26
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+armed: state/lab5e546645fa53-off.check.sh
+exit=0
+pr=https://github.com/csmoot99/Mafioso/pull/26
+
+## fm-pr-merge with config/consigliere=on and no receipt (yolo on in meta; gh merge blocked by safety shim)
+$ bin/fm-pr-merge.sh lab5e546645fa53-merge https://github.com/csmoot99/Mafioso/pull/26 -- --merge
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: Consigliere review pending or invalid for https://github.com/csmoot99/Mafioso/pull/26 at fe2df083e6f78e18f954892388d4b019d257d522; follow ship-landing
+exit=1
+gh calls made:
+gh pr view https://github.com/csmoot99/Mafioso/pull/26 --json headRefOid -q .headRefOid
+any merge call: 0

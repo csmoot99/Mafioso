@@ -1,0 +1,43 @@
+## config/consigliere=on, no receipt
+$ bin/fm-pr-check.sh lab5e546645fa53-prcheck https://github.com/csmoot99/Mafioso/pull/26
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: Consigliere review pending or invalid for https://github.com/csmoot99/Mafioso/pull/26 at fe2df083e6f78e18f954892388d4b019d257d522; follow ship-landing
+exit=1
+0
+ls: cannot access 'state/lab5e546645fa53-prcheck.check.sh': No such file or directory
+
+## receipt for a stale head (af1620c...)
+$ bin/fm-pr-check.sh lab5e546645fa53-prcheck https://github.com/csmoot99/Mafioso/pull/26
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: Consigliere review pending or invalid for https://github.com/csmoot99/Mafioso/pull/26 at fe2df083e6f78e18f954892388d4b019d257d522; follow ship-landing
+exit=1
+
+## same-family receipt without named exception (anthropic builder, anthropic reviewer)
+$ bin/fm-pr-check.sh lab5e546645fa53-prcheck https://github.com/csmoot99/Mafioso/pull/26
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: Consigliere review pending or invalid for https://github.com/csmoot99/Mafioso/pull/26 at fe2df083e6f78e18f954892388d4b019d257d522; follow ship-landing
+exit=1
+
+## receipt with major: 1
+$ bin/fm-pr-check.sh lab5e546645fa53-prcheck https://github.com/csmoot99/Mafioso/pull/26
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: Consigliere review pending or invalid for https://github.com/csmoot99/Mafioso/pull/26 at fe2df083e6f78e18f954892388d4b019d257d522; follow ship-landing
+exit=1
+
+## config/consigliere=garbage
+$ bin/fm-pr-check.sh lab5e546645fa53-prcheck https://github.com/csmoot99/Mafioso/pull/26
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: config/consigliere must contain on or off
+exit=1
+
+state after refusals: pr= lines: 0; check.sh: absent
+
+## clear cross-family receipt for the live forge head fe2df08
+{"pr":"https://github.com/csmoot99/Mafioso/pull/26","head":"fe2df083e6f78e18f954892388d4b019d257d522","round":1,"verdict":"clear","blocker":0,"major":0,"minor":1,"builder_family":"anthropic","reviewer_family":"openai","report":"/tmp/fmlab.kRfRyT/home/data/lab5e546645fa53-prcheck/report.md","gates":"/tmp/fmlab.kRfRyT/home/data/lab5e546645fa53-prcheck/gates.md"}
+$ bin/fm-pr-check.sh lab5e546645fa53-prcheck https://github.com/csmoot99/Mafioso/pull/26
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+armed: state/lab5e546645fa53-prcheck.check.sh
+exit=0
+pr=https://github.com/csmoot99/Mafioso/pull/26
+pr_head=fe2df083e6f78e18f954892388d4b019d257d522
+state/lab5e546645fa53-prcheck.check.sh

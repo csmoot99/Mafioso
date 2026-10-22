@@ -1,0 +1,26 @@
+$ fm-brief.sh rv1 notes --review   (first run)
+scaffolded: /tmp/fmlab.kRfRyT/home/data/rv1/brief.md (review; replace {TASK} and {FIRSTMATE_SPEC})
+exit=0
+(second run below is a deliberate re-run; it refuses to overwrite)
+$ fm-brief.sh rv1 notes --review
+error: /tmp/fmlab.kRfRyT/home/data/rv1/brief.md already exists
+exit=1
+$ fm-brief.sh rvbad notes --review --scout
+error: --review, --scout, and --secondmate are mutually exclusive
+exit=1
+$ fm-brief.sh rvbad notes --scout --review
+error: --review, --scout, and --secondmate are mutually exclusive
+exit=1
+$ fm-brief.sh rvbad notes --review --secondmate
+error: --review, --scout, and --secondmate are mutually exclusive
+exit=1
+$ fm-brief.sh rvbad notes --review --herdr-lab
+error: --herdr-lab applies only to crewmate ship or scout briefs
+exit=1
+$ fm-brief.sh rvbad notes --review --mode direct-PR
+error: --mode applies only to ship briefs; a scout delivers a report and a secondmate charter is not a delivery contract
+exit=1
+$ fm-brief.sh rvbad notes --review --branch-prefix x/
+error: --branch-prefix applies only to ship briefs; a scout makes no branch and a secondmate charter is not a delivery contract
+exit=1
+ls: cannot access 'data/rvbad': No such file or directory

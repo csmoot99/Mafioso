@@ -1,0 +1,8 @@
+## ship brief (lab5e546645fa53-worker, local-only) return contract
+37:   Keep every done or blocked report (status line and final reply) to at most about 500 tokens: outcome, files changed, diff stat, checks run and results, and one open question only if blocked.
+38:Use "none" or "not run" for fields with no changes or checks; never return a full diff or a transcript.
+
+## scout brief return contract
+32:   Keep every done or blocked report (status line and final reply) to at most about 500 tokens: outcome, files changed, diff stat, checks run and results, and one open question only if blocked.
+82:Open the report with a `## Envelope` section using the return fields and cap in rule 4, with the findings and recommendation in its outcome so it stands alone.
+87:When the report is complete, append `done [at=<epoch>]: {return envelope; report path}` to the status file and stop.
