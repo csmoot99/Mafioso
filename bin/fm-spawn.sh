@@ -51,6 +51,8 @@
 #   Optional attempt classification: --row <label>, --tier <label>,
 #   --attempt-n <positive-integer>, and --prior-tier <label> record the intake
 #   classification as row, tier, attempt_n, and prior_tier in task metadata.
+#   Fresh worker dispatches also record attempt_id and attempt_started_at (Unix
+#   seconds); relaunch preserves them so replacement sessions share an interval.
 #   Labels must be non-empty single lines; absent flags write no fields.
 #   A batch applies the same values to every task. A relaunch preserves each
 #   recorded value unless explicitly overridden; no attempt number is inferred
@@ -5862,6 +5864,10 @@ preserve_relaunch_meta() {
   [ -z "$WORKER_ACCOUNT_PROVIDER" ] || echo "account_provider=$WORKER_ACCOUNT_PROVIDER"
   [ -z "${BUSY_GEN:-}" ] || echo "busy_gen=$BUSY_GEN"
   echo "spawn_gen=$SPAWN_GEN"
+  if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then
+    echo "attempt_id=$SPAWN_GEN"
+    echo "attempt_started_at=$(date +%s)"
+  fi
   # Default-off writes no traceparent= line.
   # backend= is written only for a non-default (non-tmux) backend, so the
   # default path's meta stays byte-identical (absent backend= means tmux;

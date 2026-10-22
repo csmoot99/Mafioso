@@ -187,6 +187,8 @@ test_attempt_classification_is_recorded() {
   grep -Fxq 'tier=T2' "$HOME_DIR/state/$id.meta" || fail "tier missing"
   grep -Fxq 'attempt_n=2' "$HOME_DIR/state/$id.meta" || fail "attempt number missing"
   grep -Fxq 'prior_tier=T1' "$HOME_DIR/state/$id.meta" || fail "prior tier missing"
+  grep -Eq '^attempt_started_at=[0-9]+$' "$HOME_DIR/state/$id.meta" || fail "attempt start missing"
+  grep -Eq '^attempt_id=s[0-9]+\.' "$HOME_DIR/state/$id.meta" || fail "attempt identity missing"
   pass "dispatch records explicit attempt classification with split and equals flags"
 }
 
@@ -624,7 +626,7 @@ JSON
 }
 
 test_codex_project_mcp_relaunch_reads_base_commit() {
-  local rec id out base_args relaunch_bin
+  local rec id out base_args relaunch_bin attempt_before
   id=codex-mcp-relaunch
   rec=$(make_spawn_case "$id" codex "$id")
   read_case_record "$rec"
@@ -636,6 +638,7 @@ test_codex_project_mcp_relaunch_reads_base_commit() {
   git -C "$WT_DIR" push -q origin HEAD:main || fail "could not publish base MCP fixture to its local origin"
   out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
   expect_code 0 "$?" "base MCP spawn should succeed: $out"
+  attempt_before=$(grep -E '^attempt_(id|started_at)=' "$HOME_DIR/state/$id.meta")
   # The worker commits new approvals and a server to its task branch, then
   # leaves an uncommitted rewrite of the approved server's command.
   printf '%s\n' '{"enableAllProjectMcpServers":true}' > "$WT_DIR/.claude/settings.json"
@@ -658,6 +661,8 @@ SH
   chmod +x "$relaunch_bin/tmux"
   out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$relaunch_bin" "$LAUNCH_LOG" "$id" --relaunch)
   expect_code 0 "$?" "MCP relaunch should succeed: $out"
+  [ "$(grep -E '^attempt_(id|started_at)=' "$HOME_DIR/state/$id.meta")" = "$attempt_before" ] \
+    || fail "replacement changed the attempt identity or start time"
   fm_test_codex_launch_argv "$LAUNCH_LOG" "$CASE_DIR/argv" || fail "could not capture relaunch argv"
   base_args='mcp_servers.kg.args=["scripts/kg-mcp.mjs"]'
   jq -Rse --arg wt "$WT_DIR" --arg args "$base_args" '
