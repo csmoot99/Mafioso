@@ -1170,7 +1170,7 @@ Regression coverage runs the real hook commands, spawn wiring, and replacement c
 Any other value, an empty file, or an unreadable file stops PR readiness rather than silently disabling review.
 Local-only tasks are unaffected, and this switch never grants merge authority.
 Enable it only on the captain's instruction, after configuring the review rules below; there is no tracked default configuration to install.
-Each owning home needs its own explicit setting and review rules; this change does not automatically copy them into secondmate homes.
+The switch is not inherited by secondmate homes, so each owning home needs its own explicit setting; review rules in `config/crew-dispatch.json` reach secondmate homes through that file's normal inheritance.
 
 To enable after installation, write `on` followed by a newline to `$FM_HOME/config/consigliere` and add review-specific rules to that home's existing `config/crew-dispatch.json`, preserving its builder rules and default.
 To disable, write `off` or remove the switch.
