@@ -1,0 +1,3 @@
+Regression check: tests/fm-spawn-launch-env.test.sh (ee56baf) run against the PRE-FIX bin/fm-codex-browser.sh from 7fae15e
+not ok - task browser helper survived Codex exit
+exit=1

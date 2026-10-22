@@ -1,0 +1,8 @@
+CDP_URL=http://127.0.0.1:38747
+SESSION=fm-codex-browser.9RmW8zgy
+TITLE=FM browser probe
+VIEWPORT=390x844
+FOCUS1=btn
+FOCUS2=lnk
+CARDS_STACKED=yes
+SCREENSHOTS=./codex-desktop.png, ./codex-phone.png, ./codex-phone-focus.png

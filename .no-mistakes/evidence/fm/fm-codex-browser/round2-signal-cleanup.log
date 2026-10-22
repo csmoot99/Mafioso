@@ -1,0 +1,5 @@
+Adversarial (tmux pane on a private socket): stop the worker while the Codex stand-in has a page open
+ctrl-c: session=fm-codex-browser.9phHdKkB page_opened=1 chromium_procs_before=13
+ctrl-c: wrapper-exit=(pane killed; nothing after the wrapper ran) profile_left_behind=no chromium_procs_after=0 procs_naming_session_after=0
+kill-pane: session=fm-codex-browser.b369B3Sv page_opened=1 chromium_procs_before=13
+kill-pane: wrapper-exit=(pane killed; nothing after the wrapper ran) profile_left_behind=no chromium_procs_after=0 procs_naming_session_after=0

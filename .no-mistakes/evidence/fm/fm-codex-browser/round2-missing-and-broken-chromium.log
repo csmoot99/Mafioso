@@ -1,0 +1,9 @@
+Missing Playwright Chromium (empty XDG cache):
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+  codex stand-in ran: URL=<unset> SESSION=<unset>
+  exit=0
+Installed Chromium that dies before publishing a CDP port (chrome -> /bin/false):
+error: task Chromium did not publish a loopback CDP port
+coreutils: unknown program 'chrome'
+  exit=1 (codex stand-in must not have run)
+  scratch dirs before=0 after=0

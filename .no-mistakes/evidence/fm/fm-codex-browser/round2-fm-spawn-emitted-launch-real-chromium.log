@@ -1,0 +1,41 @@
+EMITTED LAUNCH (codex segment): 
+replay 1:
+    codex flag: sandbox_mode="workspace-write"
+    codex flag: approval_policy="on-request"
+    codex flag: approvals_reviewer="auto_review"
+    codex flag: sandbox_workspace_write.network_access=false
+    codex env: URL=http://127.0.0.1:34239 SESSION=fm-codex-browser.LN6dvEVY
+    page   title: FM browser probe
+  launch exit=3 (codex probe exited 3) profile_left_behind=no chromium_procs_alive=0
+replay 2:
+    codex flag: sandbox_mode="workspace-write"
+    codex flag: approval_policy="on-request"
+    codex flag: approvals_reviewer="auto_review"
+    codex flag: sandbox_workspace_write.network_access=false
+    codex env: URL=http://127.0.0.1:35465 SESSION=fm-codex-browser.RdxvmARh
+    page   title: FM browser probe
+  launch exit=3 (codex probe exited 3) profile_left_behind=no chromium_procs_alive=0
+replay 3:
+    codex flag: sandbox_mode="workspace-write"
+    codex flag: approval_policy="on-request"
+    codex flag: approvals_reviewer="auto_review"
+    codex flag: sandbox_workspace_write.network_access=false
+    codex env: URL=http://127.0.0.1:46863 SESSION=fm-codex-browser.nQtiEO1l
+    page   title: FM browser probe
+  launch exit=3 (codex probe exited 3) profile_left_behind=no chromium_procs_alive=0
+replay 4:
+    codex flag: sandbox_mode="workspace-write"
+    codex flag: approval_policy="on-request"
+    codex flag: approvals_reviewer="auto_review"
+    codex flag: sandbox_workspace_write.network_access=false
+    codex env: URL=http://127.0.0.1:40935 SESSION=fm-codex-browser.GrAePChk
+    page   title: FM browser probe
+  launch exit=3 (codex probe exited 3) profile_left_behind=no chromium_procs_alive=0
+replay 5:
+    codex flag: sandbox_mode="workspace-write"
+    codex flag: approval_policy="on-request"
+    codex flag: approvals_reviewer="auto_review"
+    codex flag: sandbox_workspace_write.network_access=false
+    codex env: URL=http://127.0.0.1:34741 SESSION=fm-codex-browser.2dld0BCV
+    page   title: FM browser probe
+  launch exit=3 (codex probe exited 3) profile_left_behind=no chromium_procs_alive=0

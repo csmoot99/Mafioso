@@ -1,0 +1,16 @@
+Round 2: committed bin/fm-codex-browser.sh (ee56baf) with real Playwright Chromium 1248; child opens a page via chrome-devtools-axi then exits 3
+run 1: exit=3 (child exited 3) session=fm-codex-browser.zStbM3fF page_title='FM browser probe' profile_left_behind=no chromium_procs_alive=0 stderr_extra=
+run 2: exit=3 (child exited 3) session=fm-codex-browser.a5JDgODq page_title='FM browser probe' profile_left_behind=no chromium_procs_alive=0 stderr_extra=
+run 3: exit=3 (child exited 3) session=fm-codex-browser.qdcABw18 page_title='FM browser probe' profile_left_behind=no chromium_procs_alive=0 stderr_extra=
+run 4: exit=3 (child exited 3) session=fm-codex-browser.uYpGVl0L page_title='FM browser probe' profile_left_behind=no chromium_procs_alive=0 stderr_extra=
+run 5: exit=3 (child exited 3) session=fm-codex-browser.LNMfp1XH page_title='FM browser probe' profile_left_behind=no chromium_procs_alive=0 stderr_extra=
+run 6: exit=3 (child exited 3) session=fm-codex-browser.KAxzZ1d6 page_title='FM browser probe' profile_left_behind=no chromium_procs_alive=0 stderr_extra=
+run 7: exit=3 (child exited 3) session=fm-codex-browser.DNGdha99 page_title='FM browser probe' profile_left_behind=no chromium_procs_alive=0 stderr_extra=
+run 8: exit=3 (child exited 3) session=fm-codex-browser.y60MHaD7 page_title='FM browser probe' profile_left_behind=no chromium_procs_alive=0 stderr_extra=
+run 9: exit=3 (child exited 3) session=fm-codex-browser.QTuhJkjk page_title='FM browser probe' profile_left_behind=no chromium_procs_alive=0 stderr_extra=
+run 10: exit=3 (child exited 3) session=fm-codex-browser.43M0eLC5 page_title='FM browser probe' profile_left_behind=no chromium_procs_alive=0 stderr_extra=
+run 11: exit=3 (child exited 3) session=fm-codex-browser.smmOKSP6 page_title='FM browser probe' profile_left_behind=no chromium_procs_alive=0 stderr_extra=
+run 12: exit=3 (child exited 3) session=fm-codex-browser.0iR2UzG5 page_title='FM browser probe' profile_left_behind=no chromium_procs_alive=0 stderr_extra=
+run 13: exit=3 (child exited 3) session=fm-codex-browser.B9cpXcxS page_title='FM browser probe' profile_left_behind=no chromium_procs_alive=0 stderr_extra=
+run 14: exit=3 (child exited 3) session=fm-codex-browser.o0C7ZiyV page_title='FM browser probe' profile_left_behind=no chromium_procs_alive=0 stderr_extra=
+run 15: exit=3 (child exited 3) session=fm-codex-browser.RG1uSLwM page_title='FM browser probe' profile_left_behind=no chromium_procs_alive=0 stderr_extra=

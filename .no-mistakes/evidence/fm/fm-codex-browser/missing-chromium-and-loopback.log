@@ -1,0 +1,13 @@
+=== Missing Playwright Chromium: XDG_CACHE_HOME=<empty dir>, child prints env and exits 0
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+child ran; CHROME_DEVTOOLS_AXI_BROWSER_URL=<unset>
+codex-cli 0.162.1
+exit=0
+
+=== CDP listener binding while the task browser is up
+URL=http://127.0.0.1:45371
+State  Recv-Q Send-Q Local Address:Port  Peer Address:Port
+LISTEN 0      10         127.0.0.1:45371      0.0.0.0:*   
+curl via non-loopback 192.168.23.98:45371 ->
+refused/unreachable (good)
+exit=0

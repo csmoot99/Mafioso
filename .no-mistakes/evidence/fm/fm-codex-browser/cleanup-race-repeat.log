@@ -1,0 +1,27 @@
+Repeated runs: fm-codex-browser.sh <child that opens a page via chrome-devtools-axi, then exits 3>
+run 1: exit=1 (codex exited 3) profile_left_behind=YES (profile/Default/Network Persistent State ) stderr=rm: cannot remove '/tmp/fm-codex-browser.sgUpgOY3/profile/Default': Directory not empty 
+run 2: exit=3 (codex exited 3) profile_left_behind=no stderr=
+run 3: exit=1 (codex exited 3) profile_left_behind=YES (profile/Default/Network Persistent State ) stderr=rm: cannot remove '/tmp/fm-codex-browser.1caQFr40/profile/Default': Directory not empty 
+run 4: exit=1 (codex exited 3) profile_left_behind=YES (profile/Default/Network Persistent State ) stderr=rm: cannot remove '/tmp/fm-codex-browser.ARTeJ4CV/profile/Default': Directory not empty 
+run 5: exit=3 (codex exited 3) profile_left_behind=no stderr=
+run 6: exit=1 (codex exited 3) profile_left_behind=YES (profile/Default/Network Persistent State ) stderr=rm: cannot remove '/tmp/fm-codex-browser.8lyipLTw/profile/Default': Directory not empty 
+run 7: exit=1 (codex exited 3) profile_left_behind=YES (profile/Default/Network Persistent State ) stderr=rm: cannot remove '/tmp/fm-codex-browser.esawkdFE/profile/Default': Directory not empty 
+run 8: exit=1 (codex exited 3) profile_left_behind=YES (profile/Default/Network Persistent State ) stderr=rm: cannot remove '/tmp/fm-codex-browser.JthxjKEd/profile/Default': Directory not empty 
+run 9: exit=1 (codex exited 3) profile_left_behind=YES (profile/Default/Network Persistent State ) stderr=rm: cannot remove '/tmp/fm-codex-browser.8ZrgnDnb/profile/Default': Directory not empty 
+run 10: exit=1 (codex exited 3) profile_left_behind=YES (profile/Default/Network Persistent State ) stderr=rm: cannot remove '/tmp/fm-codex-browser.mwQ26bl6/profile/Default': Directory not empty 
+run 11: exit=3 (codex exited 3) profile_left_behind=no stderr=
+run 12: exit=3 (codex exited 3) profile_left_behind=no stderr=
+
+Same 12-run repeat with candidate fix (setsid + process-group kill + wait for group + tolerant rm):
+patched run 1: exit=3 left=no
+patched run 2: exit=3 left=no
+patched run 3: exit=3 left=no
+patched run 4: exit=3 left=no
+patched run 5: exit=3 left=no
+patched run 6: exit=3 left=no
+patched run 7: exit=3 left=no
+patched run 8: exit=3 left=no
+patched run 9: exit=3 left=no
+patched run 10: exit=3 left=no
+patched run 11: exit=3 left=no
+patched run 12: exit=3 left=no

@@ -1,0 +1,151 @@
+Reading additional input from stdin...
+OpenAI Codex v0.162.1
+--------
+workdir: /tmp/fmcb-r2.2XzG/work
+model: gpt-6-astra
+provider: openai
+approval: on-request
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 01a16414-37e0-7103-8138-2803c771b38c
+--------
+user
+You are verifying browser tooling. Use the chrome-devtools-axi CLI (already on PATH; keep the inherited CHROME_DEVTOOLS_AXI_* environment variables unchanged; request escalation if the sandbox blocks socket access). Steps: 1) chrome-devtools-axi open http://127.0.0.1:18766/index.html 2) chrome-devtools-axi screenshot ./codex-desktop.png 3) chrome-devtools-axi resize 390 844 4) chrome-devtools-axi screenshot ./codex-phone.png 5) chrome-devtools-axi press Tab twice, and after each run chrome-devtools-axi eval "document.activeElement.id" 6) chrome-devtools-axi screenshot ./codex-phone-focus.png 7) chrome-devtools-axi eval "innerWidth+\"x\"+innerHeight". Look at codex-phone.png and say whether the two cards are stacked vertically. Do not edit any other files. Finally reply with exactly these lines: CDP_URL=<value of $CHROME_DEVTOOLS_AXI_BROWSER_URL>; SESSION=<value of $CHROME_DEVTOOLS_AXI_SESSION>; TITLE=<page title>; VIEWPORT=<result>; FOCUS1=<id>; FOCUS2=<id>; CARDS_STACKED=<yes/no>; SCREENSHOTS=<paths or FAILED>.
+codex
+I’ll run the browser checks in order and inspect the phone screenshot.
+
+exec
+/usr/bin/zsh -lc 'chrome-devtools-axi open http://127.0.0.1:18766/index.html' in /tmp/fmcb-r2.2XzG/work
+ exited 1 in 30001ms:
+error: Bridge failed to start within 30s
+code: BRIDGE_NOT_READY
+help[4]: "Check that chrome-devtools-mcp is installed: npx chrome-devtools-mcp@latest --help","If `npx -y chrome-devtools-mcp@latest` is slow on this machine, install mcp globally and set:","  export CHROME_DEVTOOLS_AXI_MCP_PATH=\"$(npm prefix -g)/lib/node_modules/chrome-devtools-mcp/build/src/bin/chrome-devtools-mcp.js\"","Or extend the deadline: export CHROME_DEVTOOLS_AXI_BRIDGE_TIMEOUT_MS=60000"
+
+exec
+/usr/bin/zsh -lc 'chrome-devtools-axi open http://127.0.0.1:18766/index.html' in /tmp/fmcb-r2.2XzG/work
+ succeeded in 1356ms:
+page:
+  title: FM browser probe
+  url: "http://127.0.0.1:18766/index.html"
+  refs: 7
+snapshot:
+uid=g1:1_0 RootWebArea "FM browser probe" url="http://127.0.0.1:18766/index.html"
+  uid=g1:1_1 heading "Codex worker browser probe" level="1"
+  uid=g1:1_2 "Card A"
+  uid=g1:1_3 "Card B"
+  uid=g1:1_4 button "First button"
+  uid=g1:1_5 link "Second link" url="http://127.0.0.1:18766/index.html#x"
+  uid=g1:1_7 "viewport 780x437"
+help[3]:
+  Run `chrome-devtools-axi click @g1:1_4` to click the "First button" button
+  Run `chrome-devtools-axi click @g1:1_5` to click the "Second link" link
+  Use `chrome-devtools-axi eval <expr>` for JS expressions. For multi-statement code, pass a function: `eval "() => { ...; return result }"`
+
+exec
+/usr/bin/zsh -lc 'chrome-devtools-axi screenshot ./codex-desktop.png' in /tmp/fmcb-r2.2XzG/work
+ succeeded in 0ms:
+screenshot: /tmp/fmcb-r2.2XzG/work/codex-desktop.png
+
+exec
+/usr/bin/zsh -lc 'chrome-devtools-axi resize 390 844' in /tmp/fmcb-r2.2XzG/work
+ succeeded in 0ms:
+resized:
+  width: 390
+  height: 844
+
+exec
+/usr/bin/zsh -lc 'chrome-devtools-axi screenshot ./codex-phone.png' in /tmp/fmcb-r2.2XzG/work
+ succeeded in 0ms:
+screenshot: /tmp/fmcb-r2.2XzG/work/codex-phone.png
+
+exec
+/usr/bin/zsh -lc 'chrome-devtools-axi press Tab' in /tmp/fmcb-r2.2XzG/work
+ succeeded in 339ms:
+page:
+  title: FM browser probe
+  refs: 7
+snapshot:
+uid=g2:1_0 RootWebArea "FM browser probe" url="http://127.0.0.1:18766/index.html"
+  uid=g2:1_1 heading "Codex worker browser probe" level="1"
+  uid=g2:1_2 "Card A"
+  uid=g2:1_3 "Card B"
+  uid=g2:1_4 button "First button" focusable focused
+  uid=g2:1_5 link "Second link" url="http://127.0.0.1:18766/index.html#x"
+  uid=g2:2_0 "viewport 390x844"
+help[3]:
+  Run `chrome-devtools-axi click @g2:1_4` to click the "First button" button
+  Run `chrome-devtools-axi click @g2:1_5` to click the "Second link" link
+  Use `chrome-devtools-axi eval <expr>` for JS expressions. For multi-statement code, pass a function: `eval "() => { ...; return result }"`
+
+exec
+/usr/bin/zsh -lc 'chrome-devtools-axi eval "document.activeElement.id"' in /tmp/fmcb-r2.2XzG/work
+ succeeded in 126ms:
+result: "\"btn\""
+help[1]:
+  Run `chrome-devtools-axi snapshot` to see current page state
+
+exec
+/usr/bin/zsh -lc 'chrome-devtools-axi press Tab' in /tmp/fmcb-r2.2XzG/work
+ succeeded in 332ms:
+page:
+  title: FM browser probe
+  refs: 7
+snapshot:
+uid=g3:1_0 RootWebArea "FM browser probe" url="http://127.0.0.1:18766/index.html"
+  uid=g3:1_1 heading "Codex worker browser probe" level="1"
+  uid=g3:1_2 "Card A"
+  uid=g3:1_3 "Card B"
+  uid=g3:1_4 button "First button"
+  uid=g3:1_5 link "Second link" focusable focused url="http://127.0.0.1:18766/index.html#x"
+  uid=g3:2_0 "viewport 390x844"
+help[3]:
+  Run `chrome-devtools-axi click @g3:1_4` to click the "First button" button
+  Run `chrome-devtools-axi click @g3:1_5` to click the "Second link" link
+  Use `chrome-devtools-axi eval <expr>` for JS expressions. For multi-statement code, pass a function: `eval "() => { ...; return result }"`
+
+exec
+/usr/bin/zsh -lc 'chrome-devtools-axi eval "document.activeElement.id"' in /tmp/fmcb-r2.2XzG/work
+ succeeded in 127ms:
+result: "\"lnk\""
+help[1]:
+  Run `chrome-devtools-axi snapshot` to see current page state
+
+exec
+/usr/bin/zsh -lc 'chrome-devtools-axi screenshot ./codex-phone-focus.png' in /tmp/fmcb-r2.2XzG/work
+ succeeded in 0ms:
+screenshot: /tmp/fmcb-r2.2XzG/work/codex-phone-focus.png
+
+exec
+/usr/bin/zsh -lc "chrome-devtools-axi eval 'innerWidth+\"x\"+innerHeight'" in /tmp/fmcb-r2.2XzG/work
+ succeeded in 121ms:
+result: "\"390x844\""
+help[1]:
+  Run `chrome-devtools-axi snapshot` to see current page state
+
+exec
+/usr/bin/zsh -lc 'print -r -- "CDP_URL=$CHROME_DEVTOOLS_AXI_BROWSER_URL" "SESSION=$CHROME_DEVTOOLS_AXI_SESSION"' in /tmp/fmcb-r2.2XzG/work
+ succeeded in 0ms:
+CDP_URL=http://127.0.0.1:38747 SESSION=fm-codex-browser.9RmW8zgy
+
+codex
+CDP_URL=http://127.0.0.1:38747
+SESSION=fm-codex-browser.9RmW8zgy
+TITLE=FM browser probe
+VIEWPORT=390x844
+FOCUS1=btn
+FOCUS2=lnk
+CARDS_STACKED=yes
+SCREENSHOTS=./codex-desktop.png, ./codex-phone.png, ./codex-phone-focus.png
+tokens used
+9,566
+CDP_URL=http://127.0.0.1:38747
+SESSION=fm-codex-browser.9RmW8zgy
+TITLE=FM browser probe
+VIEWPORT=390x844
+FOCUS1=btn
+FOCUS2=lnk
+CARDS_STACKED=yes
+SCREENSHOTS=./codex-desktop.png, ./codex-phone.png, ./codex-phone-focus.png
+bash $WT/bin/fm-codex-browser.sh codex exec --model gpt-6-astra -c  -c  -c  -  2.51s user 2.20s system 6% cpu 1:16.67 total
+WRAPPER EXIT=0

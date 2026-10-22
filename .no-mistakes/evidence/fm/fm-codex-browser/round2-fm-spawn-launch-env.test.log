@@ -1,0 +1,17 @@
+ok - Codex gets isolated browser environment, unchanged safety flags, and owned cleanup on success/failure
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+ok - ship launch with no allowlist starts its agent with the configured values, from the pane export and the launch command alike
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+ok - ship launch under an enabled allowlist carries the configured values through the cleared environment, overriding a contrary pane value
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+ok - an absent config/launch-env changes nothing about the launch
+ok - a secondmate inherits config/launch-env and its own launch starts with the values
+ok - a compound raw launch command still starts its agent with the configured values
+ok - a malformed line, an invalid or repeated name, or a non-regular file refuses the launch before anything mutates
+ok - a reserved name refuses the launch and names the offending assignment
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+ok - relaunch rebuilds the configured values for the replacement agent in both allowlist postures
+bash tests/fm-spawn-launch-env.test.sh  10.14s user 5.21s system 65% cpu 23.590 total
