@@ -932,7 +932,7 @@ test_explicit_model_wins_over_the_recorded_one() {
 }
 
 test_relaunch_overrides_attempt_classification() {
-  local dir out rc key
+  local dir out rc key attempt_id
   dir=$(new_case classification rl73)
   add_ship_task "$dir" rl73 claude
   printf 'row=code\ntier=T1\nattempt_n=1\n' >> "$dir/home/state/rl73.meta"
@@ -946,13 +946,37 @@ test_relaunch_overrides_attempt_classification() {
   for key in row tier attempt_n prior_tier; do
     [ "$(grep -c "^$key=" "$dir/home/state/rl73.meta")" = 1 ] || fail "duplicate $key metadata"
   done
+  attempt_id=$(meta_field "$dir" rl73 attempt_id)
+  [ -n "$attempt_id" ] || fail "model/tier change did not start an attempt"
+  if ! python3 - "$dir/home/data/attempts.jsonl" "$dir/home/state/rl73.meta" <<'PYTEST'
+import json
+from pathlib import Path
+import sys
+rows = [json.loads(line) for line in Path(sys.argv[1]).read_text().splitlines()]
+record, = rows
+meta = dict(line.split('=', 1) for line in Path(sys.argv[2]).read_text().splitlines() if '=' in line)
+assert record['model'] == 'default' and record['tier'] == 'T1'
+assert record['attempt_n'] == 1 and record['outcome'] == 'escalated'
+assert record['ended_at'] == meta['attempt_started_at']
+PYTEST
+  then
+    fail "prior attempt was not recorded with the replacement boundary"
+  fi
   out=$(run_control "$dir" rl73 relaunch --row review --note "refine classification only"); rc=$?
   expect_code 0 "$rc" "partial classification override should succeed: $out"
   [ "$(meta_field "$dir" rl73 row)" = review ] || fail "partial row override missing"
   [ "$(meta_field "$dir" rl73 tier)" = T2 ] || fail "partial override lost tier"
   [ "$(meta_field "$dir" rl73 attempt_n)" = 2 ] || fail "partial override changed attempt"
   [ "$(meta_field "$dir" rl73 prior_tier)" = T1 ] || fail "partial override lost prior tier"
-  pass "fm-control relaunch: explicit classification overrides replace only supplied fields"
+  [ "$(meta_field "$dir" rl73 attempt_id)" = "$attempt_id" ] || fail "same profile split the attempt"
+  [ "$(wc -l < "$dir/home/data/attempts.jsonl" | tr -d ' ')" = 1 ] || fail "same profile logged another attempt"
+  out=$(run_control "$dir" rl73 relaunch --tier T3 --note "tier-only escalation"); rc=$?
+  expect_code 0 "$rc" "tier-only escalation should succeed: $out"
+  [ "$(meta_field "$dir" rl73 attempt_n)" = 3 ] || fail "known attempt number did not increment"
+  [ "$(meta_field "$dir" rl73 prior_tier)" = T2 ] || fail "previous tier not retained"
+  [ "$(meta_field "$dir" rl73 attempt_id)" != "$attempt_id" ] || fail "tier change reused attempt identity"
+  [ "$(wc -l < "$dir/home/data/attempts.jsonl" | tr -d ' ')" = 2 ] || fail "tier change did not record old attempt"
+  pass "fm-control relaunch: classification and model/tier attempt boundaries survive replacement"
 }
 
 test_invalid_attempt_classification_refuses_before_stop() {

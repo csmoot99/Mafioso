@@ -52,11 +52,14 @@
 #   --attempt-n <positive-integer>, and --prior-tier <label> record the intake
 #   classification as row, tier, attempt_n, and prior_tier in task metadata.
 #   Fresh worker dispatches also record attempt_id and attempt_started_at (Unix
-#   seconds); relaunch preserves them so replacement sessions share an interval.
+#   seconds). Same-model/tier/harness replacements share an interval. A change
+#   closes the old attempt through fm-attempt-record.py before publication and
+#   starts a new interval at that durable boundary (also on a retry).
 #   Labels must be non-empty single lines; absent flags write no fields.
 #   A batch applies the same values to every task. A relaunch preserves each
-#   recorded value unless explicitly overridden; no attempt number is inferred
-#   or incremented automatically, including on a same-profile context handoff.
+#   recorded value unless explicitly overridden. At a new attempt boundary a
+#   known attempt number increments and prior_tier takes the recorded tier;
+#   missing classification stays absent. A same-profile handoff changes neither.
 #   Ship/scout launches always put fm-dod-lib.sh's current worker role scope
 #   first in the private launch-brief overlay, including the exact task-owned
 #   steering inbox. This never rewrites a project's instruction files or a
@@ -5831,9 +5834,27 @@ else
   SPAWN_FRESH_COMMIT_PENDING=1
 fi
 SPAWN_META_PATH=$SPAWN_META_TMP
+SPAWN_ATTEMPT_START=
+if [ "$RELAUNCH" -eq 1 ] && [ "$KIND" != secondmate ]; then
+  # The previous worker is proven stopped and the task metadata lock is held.
+  # A durable prior record also recovers the boundary if publication failed.
+  SPAWN_ATTEMPT_START=$(python3 "$SCRIPT_DIR/fm-attempt-record.py" \
+    --task-id "$ID" --meta "$RELAUNCH_META" --data "$DATA" \
+    --relaunch "$HARNESS" "${MODEL:-default}" "$TIER") || {
+    echo "error: cannot record previous attempt for $ID; preserving its task record" >&2
+    exit 1
+  }
+  if [ -n "$SPAWN_ATTEMPT_START" ]; then
+    if [ "$ATTEMPT_N_SET" -eq 0 ] && [[ "$ATTEMPT_N" =~ ^[1-9][0-9]*$ ]]; then
+      ATTEMPT_N=$(python3 -c 'import sys; print(int(sys.argv[1]) + 1)' "$ATTEMPT_N")
+    fi
+    [ "$PRIOR_TIER_SET" -eq 1 ] || PRIOR_TIER=$(fm_meta_get "$RELAUNCH_META" tier)
+  fi
+fi
 preserve_relaunch_meta() {
-  awk -F= '
+  awk -F= -v new_attempt="$SPAWN_ATTEMPT_START" '
     BEGIN {
+      if (new_attempt != "") { owned["attempt_id"] = 1; owned["attempt_started_at"] = 1 }
       split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch model effort row tier attempt_n prior_tier account account_provider busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
@@ -5867,6 +5888,9 @@ preserve_relaunch_meta() {
   if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then
     echo "attempt_id=$SPAWN_GEN"
     echo "attempt_started_at=$(date +%s)"
+  elif [ -n "$SPAWN_ATTEMPT_START" ]; then
+    echo "attempt_id=$SPAWN_GEN"
+    echo "attempt_started_at=$SPAWN_ATTEMPT_START"
   fi
   # Default-off writes no traceparent= line.
   # backend= is written only for a non-default (non-tmux) backend, so the
