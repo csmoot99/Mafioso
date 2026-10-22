@@ -33,6 +33,9 @@
 # also checks it, but always allows compaction, including below the cap.
 # Compaction never clears a pending handoff. This is a hook-observed threshold,
 # not a pre-request token limiter: one response can overshoot it before a hook.
+# A crossing means the T1 task was misclassified: the due marker carries
+# `reclassify=T2`, its note says the task must be reclassified to T2, and
+# `replace` refuses to relaunch it on a Haiku model.
 # Other models and launches without the opt-in flag retain their behavior.
 #
 # Subcommands:
@@ -111,7 +114,7 @@
 #       handoff is still missing, never on every call. Once the handoff file
 #       exists it stays silent.
 #
-#   replace <id>
+#   replace <id> [--harness H] [--model M] [--effort E]
 #       Firstmate side, FM_HOME-resolved like bin/fm-control.sh. Loaded by the
 #       context-handoff skill on the worker's `blocked [key=context-handoff-N]`
 #       handoff-ready event. Checks that the task's marker names a handoff, that
@@ -119,8 +122,12 @@
 #       handoff exists and holds more than whitespace; refuses with a precise
 #       message otherwise. Then drives `fm-control.sh <id> relaunch --note`
 #       (the note tells the replacement to read the handoff first), which keeps
-#       the same isolated copy, harness, model, and effort and owns its own
-#       checkpoint, journal, and rollback. The relaunch arms a fresh
+#       the same isolated copy and owns its own checkpoint, journal, and
+#       rollback. --harness, --model, and --effort pass through to that
+#       relaunch; without them it keeps the same harness, model, and effort.
+#       A marker carrying `reclassify=T2` (the Haiku cap) is refused unless
+#       --model names a model other than Haiku; the refusal names the T2 route
+#       from config/crew-dispatch.json, which firstmate picks. The relaunch arms a fresh
 #       incarnation and clears the marker, so the replacement's next threshold
 #       crossing hands off again. On success it appends the closing
 #       `resolved [key=context-handoff-N]` event. FM_CONTROL_BIN overrides the
@@ -130,7 +137,7 @@
 #   state/<id>.context-handoff   one line, atomically replaced, mode 600:
 #       v1 gen=G state=due|fallback|no-override seq=N handoff=<path>
 #          key=context-handoff-N usage=U pct=P window=W ceiling=C
-#          notices=K calls=M at=<epoch>
+#          [reclassify=T2] notices=K calls=M at=<epoch>
 #       bin/fm-spawn.sh removes it at every launch and relaunch of the task
 #       (a marker never outlives its incarnation) and bin/fm-teardown.sh at
 #       teardown. Safe to delete: the next auto fire starts over.
@@ -157,7 +164,7 @@ usage() {
 usage:
   fm-context-handoff.sh precompact <state-dir> <id> --gen G --data-dir D --fm-root R [--ceiling-pct N] [--codex-threshold-pct P | --haiku-cap]   (PreCompact payload on stdin)
   fm-context-handoff.sh posttooluse <state-dir> <id> --gen G --data-dir D --fm-root R [--ceiling-pct N] [--codex-threshold-pct P | --haiku-cap]  (PostToolUse payload on stdin)
-  fm-context-handoff.sh replace <id>                                                (FM_HOME-resolved)
+  fm-context-handoff.sh replace <id> [--harness H] [--model M] [--effort E]           (FM_HOME-resolved)
 See the header comment for the full contract.
 EOF
   exit 2
@@ -382,15 +389,15 @@ do_precompact() {
   exit 2
 }
 
-# mark_due <usage> <pct> <window> <ceiling> [reason]: write the incarnation's `due`
-# marker naming the next handoff (left in DUE_HANDOFF) and append the one
-# handoff-due note.
+# mark_due <usage> <pct> <window> <ceiling> [reason [field]]: write the
+# incarnation's `due` marker naming the next handoff (left in DUE_HANDOFF) and
+# append the one handoff-due note.
 mark_due() {
   local n key reason=${5:-"usage $1 of about $3 tokens at $2 percent"}
   n=$(next_handoff_number "$DATA_DIR" "$ID")
   DUE_HANDOFF="$DATA_DIR/$ID/handoff-$n.md"
   key="context-handoff-$n"
-  marker_write "$MARKER" "v1 gen=$GEN state=due seq=$n handoff=$DUE_HANDOFF key=$key usage=$1 pct=$2 window=$3 ceiling=$4 ceiling_pct=$CEILING_PCT notices=0 calls=0 at=$(date +%s 2>/dev/null || echo 0)" || return 1
+  marker_write "$MARKER" "v1 gen=$GEN state=due seq=$n handoff=$DUE_HANDOFF key=$key usage=$1 pct=$2 window=$3 ceiling=$4 ceiling_pct=$CEILING_PCT${6:+ $6} notices=0 calls=0 at=$(date +%s 2>/dev/null || echo 0)" || return 1
   status_note "$STATUS" "note: context handoff due: $reason; the worker was told to write $DUE_HANDOFF and report it with key $key" || true
 }
 
@@ -405,7 +412,7 @@ haiku_mark_due_at_threshold() {
   [ -z "$marker" ] || [ "$(marker_field "$marker" gen)" != "$GEN" ] || return 0
   usage=$(transcript_usage "$(payload_field transcript_path)") || return 1
   [ "$usage" -ge 80000 ] || return 1
-  mark_due "$usage" 0 0 80000 "Haiku prompt usage $usage reached the 80000-token cap (including cache reads)"
+  mark_due "$usage" 0 0 80000 "Haiku prompt usage $usage crossed the 80000-token Haiku cap (including cache reads), so this T1 task was misclassified and must be reclassified to T2: replace it on the T2 route from config/crew-dispatch.json, never on Haiku" reclassify=T2
 }
 
 # Codex mode: the marker this incarnation already has, or a new `due` one once
@@ -487,7 +494,7 @@ do_posttooluse() {
   reason="reached the handoff threshold, and auto-compaction is being held off so you can hand over instead"
   [ -z "$CODEX_PCT" ] || [ "$CODEX_PCT" -lt "$CEILING_PCT" ] ||
     reason="still reached the handoff threshold after auto-compaction, so you must hand over instead"
-  [ "$HAIKU_CAP" = 0 ] || reason="reached Haiku's 80000 prompt-token cap (including cache reads), so you must hand over"
+  [ "$HAIKU_CAP" = 0 ] || reason="crossed Haiku's 80000 prompt-token cap (including cache reads), so this task is being reclassified to T2 and you must hand over"
   perl -MJSON::PP -e '
     my ($id, $skill, $handoff, $status, $key, $reason) = @ARGV;
     my $text = "FIRSTMATE CONTEXT HANDOFF for task $id: this worker'"'"'s context $reason. Do these four things, in order.\n"
@@ -504,10 +511,18 @@ do_posttooluse() {
 # --- firstmate side --------------------------------------------------------------
 
 do_replace() {
-  local marker state gen current handoff key note out rc line
+  local marker state gen current handoff key note out rc line model=
+  local profile=()
   ID=${1:-}
   [ -n "$ID" ] || usage
-  [ $# -eq 1 ] || usage
+  shift
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --harness|--effort) [ -n "${2:-}" ] || usage; profile+=("$1" "$2"); shift 2 ;;
+      --model) [ -n "${2:-}" ] || usage; model=$2; profile+=("$1" "$2"); shift 2 ;;
+      *) usage ;;
+    esac
+  done
   id_ok "$ID" || { echo "error: invalid task id '$ID'" >&2; exit 1; }
   if [ -z "${FM_HOME:-}" ]; then
     echo "error: FM_HOME is not set; fm-context-handoff refuses to resolve a task without an explicit firstmate home" >&2
@@ -553,8 +568,16 @@ do_replace() {
     echo "error: the handoff $handoff is empty; refusing to replace a worker from a blank document" >&2
     exit 1
   fi
+  if [ "$(marker_field "$marker" reclassify)" = T2 ]; then
+    case "$model" in
+      ''|*[Hh][Aa][Ii][Kk][Uu]*)
+        echo "error: task $ID crossed the Haiku 80000 prompt-token cap, so it was misclassified as T1 and must be reclassified to T2; replace refuses to relaunch it on a Haiku model. Take the T2 route from config/crew-dispatch.json and pass it through as fm-control.sh relaunch's --harness/--model/--effort: fm-context-handoff.sh replace $ID --harness <harness> --model <model> --effort <effort>" >&2
+        exit 1
+        ;;
+    esac
+  fi
   note="Context handoff: the previous worker for this task reached its context limit and wrote a handoff document. Read $handoff first and continue from it. Treat anything it marks as unverified as a claim to check, not a fact. Earlier handoffs for this task, if any, sit beside it in the same directory."
-  out=$("${FM_CONTROL_BIN:-$SCRIPT_DIR/fm-control.sh}" "$ID" relaunch --note "$note" 2>&1); rc=$?
+  out=$("${FM_CONTROL_BIN:-$SCRIPT_DIR/fm-control.sh}" "$ID" relaunch ${profile[@]+"${profile[@]}"} --note "$note" 2>&1); rc=$?
   if [ "$rc" -ne 0 ]; then
     printf '%s\n' "$out" >&2
     echo "error: the replacement for task $ID could not be launched from $handoff (fm-control exit $rc); the handoff-ready record stays open" >&2

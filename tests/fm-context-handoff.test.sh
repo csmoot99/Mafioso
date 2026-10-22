@@ -317,6 +317,10 @@ test_haiku_cap_counts_cached_prompt_tokens_at_the_boundary() {
   [ "$(marker_field "$STATE_DIR" "$id" usage)" = 80000 ] || fail "the cap must count input, cache read, and cache creation tokens"
   [ "$(marker_field "$STATE_DIR" "$id" ceiling)" = 80000 ] || fail "the cap must be absolute"
   assert_contains "$(printf '%s' "$out" | jq -r '.hookSpecificOutput.additionalContext')" "Haiku's 80000 prompt-token cap" "the crossing tool call must deliver the handoff notice"
+  assert_contains "$(printf '%s' "$out" | jq -r '.hookSpecificOutput.additionalContext')" "reclassified to T2" "the notice must say the task is being reclassified"
+  [ "$(marker_field "$STATE_DIR" "$id" reclassify)" = T2 ] || fail "the Haiku due marker must record the T2 reclassification"
+  assert_grep "crossed the 80000-token Haiku cap" "$STATE_DIR/$id.status" "the due event must say the Haiku cap was crossed"
+  assert_grep "must be reclassified to T2" "$STATE_DIR/$id.status" "the due event must say the task must be reclassified to T2"
   out=$(run_haiku_hook "$rec" "$id" posttooluse)
   [ -z "$out" ] || fail "a repeated call must respect notice throttling"
   [ "$(status_count "$STATE_DIR" "$id" 'context handoff due')" = 1 ] || fail "the cap must append exactly one due event"
@@ -924,10 +928,11 @@ SH
   printf '%s\n' "$home|$gen"
 }
 
-run_replace() {  # <home> <id>
+run_replace() {  # <home> <id> [replace-flags...]
   local home=$1 id=$2
+  shift 2
   FM_HOME="$home" FM_CONTROL_BIN="$home/bin/fm-control" FM_TEST_CONTROL_ARGS="$home/control.args" \
-    "$HANDOFF" replace "$id" 2>&1
+    "$HANDOFF" replace "$id" "$@" 2>&1
 }
 
 test_replace_refuses_a_missing_empty_or_stale_handoff() {
@@ -991,6 +996,35 @@ EOF
   pass "a refused relaunch is relayed and leaves the handoff record open"
 }
 
+test_replace_reclassifies_a_haiku_cap_crossing_to_t2() {
+  local id=rp-haiku rec home gen out rc dir
+  rec=$(new_replace_case "$id"); IFS='|' read -r home gen <<EOF
+$rec
+EOF
+  rm -f "$home/state/$id.context-handoff"
+  dir="$TMP_ROOT/rp-haiku-hook"; mkdir -p "$dir"
+  write_transcript "$dir/transcript.jsonl" 80000
+  posttooluse_payload "$dir/transcript.jsonl" \
+    | "$HANDOFF" posttooluse "$home/state" "$id" --gen "$gen" --data-dir "$home/data" --fm-root "$ROOT" --haiku-cap >/dev/null
+  [ "$(marker_field "$home/state" "$id" reclassify)" = T2 ] || fail "the Haiku cap crossing must record a T2 reclassification"
+  printf '# handoff\n\nState.\n' > "$home/data/$id/handoff-1.md"
+  for args in '' '--model haiku' '--harness claude --model claude-haiku-4-5-20251001 --effort high' '--harness claude --effort high'; do
+    # shellcheck disable=SC2086
+    out=$(run_replace "$home" "$id" $args); rc=$?
+    expect_code 1 "$rc" "a Haiku cap crossing must not be replaced on Haiku (args: '$args')"
+    assert_contains "$out" "reclassified to T2" "the refusal must say the task must be reclassified to T2"
+    assert_contains "$out" "config/crew-dispatch.json" "the refusal must point at the T2 route"
+    assert_contains "$out" "--harness <harness> --model <model> --effort <effort>" "the refusal must name the relaunch profile form"
+    assert_absent "$home/control.args" "a refused reclassification must never reach fm-control"
+  done
+  out=$(run_replace "$home" "$id" --harness claude --model sonnet --effort high); rc=$?
+  expect_code 0 "$rc" "a T2 profile must be replaced: $out"
+  [ "$(sed -n 2,9p "$home/control.args" | tr '\n' ' ')" = "relaunch --harness claude --model sonnet --effort high --note " ] \
+    || fail "the T2 profile must pass through to fm-control relaunch, got '$(cat "$home/control.args")'"
+  assert_grep "resolved [key=context-handoff-1]" "$home/state/$id.status" "the reclassified replacement must close the handoff-ready record"
+  pass "a Haiku cap crossing is refused on Haiku and replaced only on an explicit T2 profile passed to fm-control relaunch"
+}
+
 test_first_auto_fire_blocks_and_records_the_marker
 test_repeat_fires_keep_blocking_silently
 test_ceiling_lets_compaction_through_and_records_the_fallback
@@ -1027,5 +1061,6 @@ test_relaunch_starts_with_fresh_handoff_state
 test_replace_refuses_a_missing_empty_or_stale_handoff
 test_replace_hands_a_valid_handoff_to_fm_control
 test_replace_reports_a_refused_relaunch_without_closing_the_record
+test_replace_reclassifies_a_haiku_cap_crossing_to_t2
 
 echo "all fm-context-handoff tests passed"
