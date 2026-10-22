@@ -306,7 +306,7 @@ for control_arg in "$@"; do
     --pool=*) POOL=${control_arg#--pool=}; POOL_SET=1 ;;
     --attempt-n) control_want_value="attempt-n" ;;
     --attempt-n=*) ATTEMPT_N=${control_arg#--attempt-n=}; ATTEMPT_N_SET=1 ;;
-    --prior-tier) control_want_value=prior-tier ;;
+    --prior-tier) control_want_value="prior-tier" ;;
     --prior-tier=*) PRIOR_TIER=${control_arg#--prior-tier=}; PRIOR_TIER_SET=1 ;;
     --note) control_want_value=note ;;
     --note=*) NOTE=${control_arg#--note=}; NOTE_SET=1 ;;

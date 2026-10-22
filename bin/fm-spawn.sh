@@ -1463,7 +1463,7 @@ for a in "$@"; do
   --pool=*) POOL=${a#--pool=}; POOL_SET=1 ;;
   --attempt-n) want_value="attempt-n" ;;
   --attempt-n=*) ATTEMPT_N=${a#--attempt-n=}; ATTEMPT_N_SET=1 ;;
-  --prior-tier) want_value=prior-tier ;;
+  --prior-tier) want_value="prior-tier" ;;
   --prior-tier=*) PRIOR_TIER=${a#--prior-tier=}; PRIOR_TIER_SET=1 ;;
   --backend) want_value=backend ;;
   --backend=*)
