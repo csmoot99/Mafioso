@@ -139,6 +139,7 @@
 # has no unresolved captain call, and is refused while the origin still has an
 # open keyed status decision. With a non-empty inventory, every listed task is
 # verified durable (captain-held, or carrying a recorded resolution),
+# including recorded resolutions moved to the configured Markdown Done archive,
 # is never the origin itself, and, when `hold --origin` recorded one, was held
 # for this origin; a hold with no recorded origin is accepted on durability
 # alone and named in the output,
@@ -376,10 +377,10 @@ require_tasks_axi() {
 # inside a command substitution can still tell a wedged backend from a
 # genuinely unknown id.
 TASK_SHOW_OUTPUT=
-task_show() {  # <id>; sets TASK_SHOW_OUTPUT
+task_show() {  # <id> [--archive]; sets TASK_SHOW_OUTPUT
   local data status=0 reason
   data=$(fm_backlog_data_absolute "$DATA") || fail "data directory cannot be resolved: $DATA"
-  TASK_SHOW_OUTPUT=$(fm_backlog_row_show "$data" "$1" --full 2>/dev/null) || status=$?
+  TASK_SHOW_OUTPUT=$(fm_backlog_row_show "$data" "$@" --full 2>/dev/null) || status=$?
   if [ "$status" -eq 124 ]; then
     reason=${TASK_SHOW_OUTPUT%%$'\n'*}
     printf 'fm-captain-hold: %s\n' \
@@ -523,9 +524,9 @@ resolution_block() {  # <mode>
 
 # Durable state of one captain call: an active captain hold (annotations
 # surviving even when a date gate has expired) or a recorded captain answer.
-verify_hold_durable() {  # <task-id>
-  local id=$1 show state hold_kind body
-  task_show "$id" || fail "captain-held task $id is absent from this home's configured backlog (data directory $DATA)"
+verify_hold_durable() {  # <task-id> [--archive]
+  local id=$1 show state hold_kind body archived=${2:-}
+  task_show "$@" || fail "captain-held task $id is absent from this home's configured backlog (data directory $DATA)"
   show=$TASK_SHOW_OUTPUT
   state=$(show_field "$show" state)
   hold_kind=$(show_field_value "$show" hold_kind)
@@ -533,7 +534,7 @@ verify_hold_durable() {  # <task-id>
   if body_has_resolution_record "$body"; then
     return 0
   fi
-  if [ "$state" != "done" ] && [ "$hold_kind" = captain ]; then
+  if [ -z "$archived" ] && [ "$state" != "done" ] && [ "$hold_kind" = captain ]; then
     return 0
   fi
   fail "captain-held task $id is neither held for the captain nor closed with a recorded captain answer"
@@ -735,9 +736,10 @@ resolve_migrated_entry() {  # <origin-or-empty> <entry>
 # exact task id when it exists, else the legacy derived identity, else - on the
 # beads backend - the migrated row the markdown-to-beads hold migration wrote.
 # Prints "<resolved id> <how>", where <how> is exact, legacy, migrated-note or
-# migrated-prefix, so a caller can record which evidence carried the attestation.
-resolve_entry() {  # <origin-or-empty> <entry>; prints "<id> <how>" or fails
-  local origin=$1 entry=$2 legacy migrated rc
+# migrated-prefix (with -archive for archived exact or legacy rows).
+# Only completion verification opts into archive reads; answer intake stays live.
+resolve_entry() {  # <origin-or-empty> <entry> [include-archive-0-or-1]
+  local origin=$1 entry=$2 legacy='' migrated rc include_archive=${3:-0}
   if task_show "$entry"; then
     printf '%s exact' "$entry"
     return 0
@@ -746,6 +748,16 @@ resolve_entry() {  # <origin-or-empty> <entry>; prints "<id> <how>" or fails
     legacy=$(legacy_hold_id "$origin" "$entry")
     if task_show "$legacy"; then
       printf '%s legacy' "$legacy"
+      return 0
+    fi
+  fi
+  if [ "$include_archive" = 1 ]; then
+    if task_show "$entry" --archive; then
+      printf '%s exact-archive' "$entry"
+      return 0
+    fi
+    if [ -n "$legacy" ] && task_show "$legacy" --archive; then
+      printf '%s legacy-archive' "$legacy"
       return 0
     fi
   fi
@@ -871,7 +883,7 @@ verify_entry_durable() {  # <origin-or-empty> <entry>; prints "<id> <how> <origi
   if [ -n "$origin" ] && [ "$origin" != "$BINDING_ANY" ] && [ "$entry" = "$origin" ]; then
     refuse_self_inventory "$origin" "$entry"
   fi
-  resolved=$(resolve_entry "$origin" "$entry") || resolve_status=$?
+  resolved=$(resolve_entry "$origin" "$entry" 1) || resolve_status=$?
   if [ "$resolve_status" -ne 0 ]; then
     [ "$resolve_status" -ne 124 ] \
       || fail "the backlog backend exceeded its read bound resolving $entry"
@@ -879,7 +891,10 @@ verify_entry_durable() {  # <origin-or-empty> <entry>; prints "<id> <how> <origi
   fi
   id=${resolved%% *}
   how=${resolved##* }
-  verify_hold_durable "$id"
+  case "$how" in
+    *-archive) verify_hold_durable "$id" --archive ;;
+    *) verify_hold_durable "$id" ;;
+  esac
   id=$(show_field_value "$TASK_SHOW_OUTPUT" id)
   validate_slug backend-task-id "$id"
   stored=$(body_hold_origin "$(decode_shown_value "$(show_field "$TASK_SHOW_OUTPUT" body)")")

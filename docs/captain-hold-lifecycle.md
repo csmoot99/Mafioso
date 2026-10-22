@@ -108,6 +108,7 @@ A post-teardown visual review can complete against the surviving report and dura
 `complete` accepts `--none` as an explicit semantic inventory result.
 `--none` is refused while the origin still has a lifecycle-open keyed status decision.
 Before recording completion, `complete` verifies every listed task against tasks-axi.
+An entry that Done retention moved out of the live backlog is read from the configured Markdown Done archive, newest archived row first, and is accepted only with its recorded resolution; live rows, including a live legacy identity, always win over archived ones.
 The origin is never its own inventory entry, so a hold that failed cannot be vouched for by the origin row.
 For a historical inventory that names its own origin, hold a separate captain task with `--origin`, replace only the invalid entry in the final `decision_keys=` line of the origin metadata with that task id while preserving all other entries, and re-run `complete`.
 An entry whose recorded origin differs from the one being completed is refused.
@@ -525,6 +526,9 @@ The suite does not test the accepted merge-to-cleanup re-hold window or asynchro
 - A report-only unresolved captain call refuses `--none` completion before teardown can erase the source.
 - Non-forced scout teardown always requires the durable inventory verification.
 - The recorded-answer guard holds: a bare `tasks-axi done` close fails `verify` until `answer` records the captain's word, and an ordinary finished task cannot be dressed up as an answered call.
+- An answered call that Done retention archived still passes `complete`, `verify`, and scout teardown without altering the archive, whether the archive path is project-relative, absolute, configured in the user's tasks-axi config, or the default `done-archive.md` beside the backlog.
+  An archived call closed without an answer, or an absent one, is refused.
+  A reused id resolves to its newest archived row, and a live legacy hold wins over an archived exact row.
 
 ### Answers, stamps, and deferral
 

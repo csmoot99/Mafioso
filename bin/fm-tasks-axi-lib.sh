@@ -176,6 +176,57 @@ fm_tasks_axi_backend() {  # <tasks-axi-working-directory>
   fm_tasks_axi_backend_resolve "$1"
 }
 
+# Markdown archive addressing follows tasks-axi: project config, home config,
+# then done-archive.md beside the explicitly addressed backlog. Configured
+# relative paths are relative to the tasks-axi working directory.
+fm_tasks_axi_archive_file() {  # <tasks-axi-working-directory> <backlog-file>
+  local root=$1 backlog=$2 config archive rc
+  for config in "$root/.tasks.toml" "${HOME:-}/.tasks-axi/config.toml"; do
+    [ -e "$config" ] || [ -L "$config" ] || continue
+    [ -f "$config" ] && [ -r "$config" ] || return 2
+    archive=$(LC_ALL=C awk '
+      function trim(s) {
+        sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s
+      }
+      BEGIN { single=sprintf("%c", 39); found=0; bad=0 }
+      {
+        line=$0; quote=""
+        for (i=1; i<=length(line); i++) {
+          ch=substr(line,i,1)
+          if (quote != "") { if (ch == quote) quote="" }
+          else if (ch == "\"" || ch == single) quote=ch
+          else if (ch == "#") { line=substr(line,1,i-1); break }
+        }
+        line=trim(line)
+        if (line ~ /^\[[^]]+\]$/) {
+          section=substr(line,2,length(line)-2); section=trim(section); next
+        }
+        if (section != "markdown" || line !~ /^archive[[:space:]]*=/) next
+        sub(/^archive[[:space:]]*=[[:space:]]*/, "", line)
+        first=substr(line,1,1)
+        if ((first != "\"" && first != single) || substr(line,length(line),1) != first) {
+          bad=1; next
+        }
+        value=substr(line,2,length(line)-2)
+        if (trim(value) == "") { bad=1; next }
+        found=1
+      }
+      END { if (bad) exit 2; if (!found) exit 1; print value }
+    ' "$config") && rc=0 || rc=$?
+    case "$rc" in
+      0)
+        case "$archive" in
+          /*) printf '%s\n' "$archive" ;;
+          *) printf '%s/%s\n' "$root" "$archive" ;;
+        esac
+        return 0 ;;
+      1) ;;
+      *) return "$rc" ;;
+    esac
+  done
+  printf '%s/done-archive.md\n' "${backlog%/*}"
+}
+
 fm_backlog_backend_value() {
   local config_dir=$1 backend_file value
   backend_file="$config_dir/backlog-backend"
