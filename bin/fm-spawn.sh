@@ -429,6 +429,7 @@
 #                  flag naming exactly this task's steering inbox and data
 #                  directory (codex_writable_roots_flag below; supplies its
 #                  own trailing space)
+#     __CODEXBROWSER__ quoted task-browser launch helper path
 #     __CODEXCOMPACT__ optional -c model_auto_compact_token_limit and its
 #                  scope, the launch-env threshold share of the selected
 #                  model's window, or the handoff fallback ceiling's share when
@@ -782,7 +783,9 @@ launch_template() {
     if [ "$kind" = secondmate ]; then
       printf '%s' 'codex __MODELFLAG____EFFORTFLAG__--dangerously-bypass-approvals-and-sandbox "$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
     else
-      printf '%s' 'codex __MODELFLAG____EFFORTFLAG__-c '\''sandbox_mode="workspace-write"'\'' -c '\''approval_policy="on-request"'\'' -c '\''approvals_reviewer="auto_review"'\'' -c '\''sandbox_workspace_write.network_access=false'\'' __CODEXWRITABLEROOTS____CODEXCOMPACT__'
+      # Start the task browser outside the model sandbox; browser commands
+      # still require its existing reviewed escalation for socket access.
+      printf '%s' 'bash __CODEXBROWSER__ codex __MODELFLAG____EFFORTFLAG__-c '\''sandbox_mode="workspace-write"'\'' -c '\''approval_policy="on-request"'\'' -c '\''approvals_reviewer="auto_review"'\'' -c '\''sandbox_workspace_write.network_access=false'\'' __CODEXWRITABLEROOTS____CODEXCOMPACT__'
       printf '%s' "-c 'developer_instructions=\"$TASK_WORKER_TRUST_STATEMENT\"' "
       printf '%s' '-c '\''project_doc_max_bytes=1048576'\'' -c '\''project_doc_fallback_filenames=["CLAUDE.md"]'\'' -c '\''check_for_update_on_startup=false'\'' '
       printf '%s' '--enable hooks --dangerously-bypass-hook-trust __CODEXHOOKS__"$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
@@ -5934,6 +5937,7 @@ if [ "$HARNESS" = rovo ]; then
 fi
 LAUNCH=${LAUNCH//__BRIEF__/$sq_brief}
 LAUNCH=${LAUNCH//__CODEXHOOKS__/"$CODEX_HOOKS"}
+LAUNCH=${LAUNCH//__CODEXBROWSER__/"$(shell_quote "$SCRIPT_DIR/fm-codex-browser.sh")"}
 LAUNCH=${LAUNCH//__PIEXT__/$sq_piext}
 LAUNCH=${LAUNCH//__PITURNEND__/$sq_piturnend}
 LAUNCH=${LAUNCH//__PIWATCH__/$sq_piwatch}

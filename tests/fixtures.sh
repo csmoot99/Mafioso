@@ -340,15 +340,18 @@ fm_test_run_spawn() {
 # fm_test_codex_launch_argv <launch-log> <scratch-dir>
 # Records in <scratch-dir>/args, NUL-separated, the argv the codex crewmate
 # launch in <launch-log> (FM_FAKE_LAUNCH_LOG) hands codex: bash itself parses the
-# launch, against a codex that only records its arguments.
+# launch, against a codex that records its arguments and browser environment.
+# A scratch HOME keeps the replay away from the operator's browser cache.
 fm_test_codex_launch_argv() {
   local log=$1 dir=$2 launch
   launch=$(grep -m1 -- '--dangerously-bypass-hook-trust' "$log") || return 1
-  mkdir -p "$dir"
+  mkdir -p "$dir/home"
   # shellcheck disable=SC2016 # the recorder expands its own arguments
-  printf '%s\n' '#!/usr/bin/env bash' 'printf "%s\0" "$@" > "$FM_TEST_CODEX_ARGS"' > "$dir/codex"
+  printf '%s\n' '#!/usr/bin/env bash' 'printf "%s\0" "$@" > "$FM_TEST_CODEX_ARGS"' \
+    'printf "%s\n" "${CHROME_DEVTOOLS_AXI_BROWSER_URL-}" "${CHROME_DEVTOOLS_AXI_SESSION-}" > "$FM_TEST_CODEX_ARGS.browser-env"' \
+    'exit "${FM_TEST_CODEX_EXIT:-0}"' > "$dir/codex"
   chmod +x "$dir/codex"
-  FM_TEST_CODEX_ARGS="$dir/args" PATH="$dir:$PATH" bash -c "$launch"
+  HOME="$dir/home" XDG_CACHE_HOME="$dir/home/.cache" FM_TEST_CODEX_ARGS="$dir/args" PATH="$dir:$PATH" bash -c "$launch"
 }
 
 # fm_test_codex_hook_command <launch-log> <hook-event> <scratch-dir>
