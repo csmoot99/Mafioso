@@ -4,6 +4,7 @@ description: >-
   Agent-only playbook for stuck or missing ordinary Firstmate direct reports.
   Use when the session-start digest reports an ordinary direct report's endpoint dead or its metadata has no window, or after a stale wake, looping pane, repeated confusion, an answered-by-brief question, an unresponsive crewmate, or a failed steer.
   Also use on the inverse case: a live crewmate reporting the no-mistakes pipeline dead, unreachable, or timed out.
+  Load before retrying or escalating a failed implementation attempt; owns the bounded attempt budget, failure envelope, and preserved-copy procedure.
   Reconciles recorded work before escalating from targeted inspection through safe relaunch or failure.
 user-invocable: false
 metadata:
@@ -21,6 +22,78 @@ Interrupt, stop, and relaunch a worker through `bin/fm-control.sh <task-id> inte
 That plane covers workers running in this home; a remotely placed secondmate is refused by name and reconciled through `secondmate-provisioning` instead.
 Load `harness-adapters` before a resume command or a harness-specific skill invocation, and whenever the adapter's own quirks matter.
 The target window's harness is recorded as `harness=` in `state/<id>.meta`.
+
+## Failed implementation attempts
+
+Use this procedure when an implementation approach fails, before any corrective steer, model change, or replacement that would try the implementation again.
+Endpoint recovery below resumes interrupted work; it is not permission to reset this attempt budget or carry a failed implementation into a stronger model's context.
+An active no-mistakes run keeps ownership of its fixes and gates under `validation-supervision`; do not launch a competing attempt or count its internal fix rounds as separate worker attempts.
+
+### Reconcile evidence and choose the next attempt
+
+1. Read the worker's bounded return and the task's existing attempt record, not its transcript.
+   If evidence is missing, have the worker complete the envelope below, or dispatch a cheap T1 extraction scout through normal intake with the evidence paths and one bounded question.
+   Extraction gathers evidence only; it does not retry implementation or consume an implementation attempt.
+2. Distinguish an implementation failure from an operational blocker.
+   Missing credentials, unavailable services, and broken tooling return as `blocked` with the concrete blocker; a heavier model is not a remedy.
+   Reconcile claims about a dead pipeline through the pipeline section below before making that classification.
+3. Keep a durable attempt record in the original task's data folder, linked from its backlog note and every successor's brief.
+   Record the original task id, original base commit, attempt number, tier and resolved profile, worker id, branch and copy, outcome, evidence paths, and whether the same-tier correction has been used.
+   The first implementation is attempt 1; reconstruct it from recorded launch or worker evidence when handling an existing task.
+   The original base is the full commit actually used before that first implementation, not today's branch tip, a guessed merge base, or the failed attempt's HEAD.
+   If the base or attempt history cannot be established, stop as blocked rather than guessing or resetting the counter.
+4. Allow one bounded same-tier correction per task only when the envelope identifies an obvious local cause and a concrete correction.
+   That correction consumes the next attempt number and uses its own fresh copy under the preparation procedure below.
+   If it fails, or no obvious local correction exists, escalate exactly one tier through the configured dispatch policy with the failure envelope.
+   Do not equate a harness change with a tier change or invent a profile; an unavailable or ambiguous tier goes back to firstmate's normal routing decision.
+5. Allow at most three implementation attempts in total across all tiers and successor worker ids, including the first attempt and the same-tier correction.
+   After attempt 3 fails, return the unresolved question and preserved evidence to the captain instead of launching attempt 4.
+   Repeated failure with no new evidence stops retries earlier for reassessment; record what was learned and what decision is missing, rather than treating a larger model as new evidence.
+
+### Preserve the failure and prepare a fresh attempt
+
+Before replacing the worker, have it save the failure envelope and its current diff in the original task's data folder under a distinct attempt-numbered name.
+The diff must cover the original base through the current working tree, including committed, staged, unstaged, and binary changes; separately preserve task-relevant untracked files with a manifest because a tracked diff omits them.
+Record the failed HEAD and dirty-file inventory with those artifacts, and verify the files were written before starting another attempt.
+If the worker cannot produce them, use a bounded extraction worker against the preserved copy; never let it edit that copy or race a live writer.
+Firstmate reads the envelope and artifact paths, never the full diff or transcript.
+
+Reconcile ownership and any active validation before stopping the failed worker through the lifecycle plane above.
+Preserve its branch, commits, uncommitted files, task records, and copy; saving a diff does not authorize teardown, reset, stash, pool return, or deletion.
+Keep cleanup pending for the captain and ask about the preserved failed attempts in a batch, separately from the implementation result.
+
+Create the successor through the normal intake, brief, dispatch, and isolated-spawn path with a distinct worker id and branch, linked to the original task and its shared attempt count.
+Do not use same-copy relaunch for an implementation retry, and do not allocate a copy by bypassing `fm-spawn`.
+Carry the original acceptance criteria, delivery mode, merge authority, and PR target forward; pass only paths to the failure envelope and evidence, not their contents or the failed worker's conversation.
+Reserve the next attempt number in the shared record before dispatch so a repeated notification reconciles that successor instead of launching another one.
+If launch fails before implementation starts, record the operational blocker and reconcile that reservation before resuming; never create a second successor for it.
+
+In the successor's brief, replace the generated Setup branch-start instruction with an explicit pinned-start requirement: after the isolation assertion and before any edits or tests, verify the fresh copy is clean, resolve the recorded original commit, and start its new attempt branch at exactly that commit.
+Keep the spawn's base-branch selection as the PR target; it is a branch name, not a way to pass an original commit SHA.
+Fresh spawn normally refreshes to the target's current tip, so that refresh alone does not satisfy the pinned-start requirement.
+For a launch path that precreates the branch, require proof that it is the new, clean attempt branch with no worker commits before positioning it at the original commit; never move an existing attempt's branch.
+The worker must report its verified starting SHA before implementation and stop as blocked if the original commit is unavailable, the copy is dirty, or the branch cannot be positioned without overwriting work.
+Do not apply the failed diff or cherry-pick failed commits into the new attempt; those artifacts are evidence for a fresh implementation from the original base.
+
+### Failure-envelope template
+
+Store this envelope with the attempt evidence and keep its filled body within about 500 tokens.
+Use paths and narrow line ranges for supporting evidence; never embed a full diff or transcript.
+The attempt record above owns the complete attempt history; this envelope is the standalone handoff to the next worker or the captain.
+
+```markdown
+## Failure envelope
+- Outcome: implementation failure or operational blocker, and the concrete reason.
+- Attempt: original task id; attempt number of 3; tier/profile; same-tier correction used or unused.
+- Base and preserved work: original commit; failed HEAD; branch/copy; attempt-record path.
+- Expected vs observed: required behavior and actual result.
+- Reproduction: minimal command or steps, inputs, and evidence path.
+- Files changed: paths and relevant line ranges.
+- Diff: stat; saved binary-capable diff path; untracked manifest/artifact paths or none.
+- Checks: commands, results, and any checks not run.
+- Approaches tried: bounded correction, if any, and new evidence since the previous attempt.
+- Unresolved question: the single question preventing completion.
+```
 
 ## Session-start reconciliation for a dead ordinary direct report
 
@@ -68,6 +141,8 @@ It is one instance serving every lane and home, so a restart kills other lanes' 
 Only positive socket refusal or absence is a daemon-down finding; escalate that finding, or a failed run record that names a daemon error, to the captain.
 
 ## Live-endpoint escalation
+
+For a failed implementation, use the attempt procedure above instead; the steps here address worker responsiveness and delivery of instructions, not another implementation attempt.
 
 Escalate in order:
 

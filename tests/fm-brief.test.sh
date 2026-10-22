@@ -1306,8 +1306,57 @@ qwen_scaffold() { # <home> <id> <plan> [extra fm-brief args...]
     --plan "$plan" --files 'src/a.ts src/a.test.ts' --done-command 'pnpm test && pnpm lint' "$@"
 }
 
+test_worker_return_envelopes() {
+  local home plan kind brief field combine
+  home="$TMP_ROOT/envelope-home"
+  mkdir -p "$home/data"
+  plan="$TMP_ROOT/envelope-plan.md"
+  printf '%s\n' 'Update src/a.ts and its test.' > "$plan"
+  combine="$TMP_ROOT/envelope-combine.txt"
+  qwen_combine_file "$combine" "$(printf 'b%.0s' {1..40})"
+  for kind in no-mistakes direct-PR local-only scout qwen qwen-combine; do
+    case "$kind" in
+      qwen-combine)
+        FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$kind" some-proj --mode direct-PR --harness qwen \
+          --combine "$combine" --done-command 'make test' >/dev/null \
+          || fail "envelope qwen combine scaffold failed"
+        ;;
+      scout)
+        FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$kind" some-proj --scout >/dev/null \
+          || fail "envelope scout scaffold failed"
+        ;;
+      qwen)
+        qwen_scaffold "$home" "$kind" "$plan" >/dev/null \
+          || fail "envelope qwen scaffold failed"
+        ;;
+      *)
+        FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$kind" some-proj --mode "$kind" >/dev/null \
+          || fail "envelope $kind scaffold failed"
+        ;;
+    esac
+    brief="$home/data/$kind/brief.md"
+    assert_grep 'every done or blocked report (status line and final reply) to at most about 500 tokens' "$brief" \
+      "$kind brief omitted the bounded return contract"
+    for field in 'outcome' 'files changed' 'diff stat' 'checks run and results' 'one open question only if blocked'; do
+      assert_grep "$field" "$brief" "$kind brief omitted return field: $field"
+    done
+    assert_grep 'never return a full diff or a transcript' "$brief" "$kind brief permits unbounded evidence"
+    assert_no_grep 'firstmate reads your pane for that' "$brief" "$kind brief still promises transcript reading"
+  done
+  brief="$home/data/scout/brief.md"
+  # shellcheck disable=SC2016 # Literal Markdown in generated instructions.
+  assert_grep 'Open the report with a `## Envelope` section using the return fields and cap in rule 4' "$brief" \
+    'scout report does not open with the bounded return envelope'
+  assert_grep 'findings and recommendation in its outcome so it stands alone' "$brief" \
+    'scout envelope does not require self-contained findings'
+  assert_grep 'Put detailed evidence after the next level-two heading' "$brief" \
+    'scout report does not separate the envelope from detailed evidence'
+  assert_grep '{return envelope; report path}' "$brief" 'scout done report omits its envelope or artifact path'
+  pass "fm-brief.sh: all worker shapes bound returns; scout reports open with a standalone envelope"
+}
+
 test_qwen_shape_inlines_the_plan_and_keeps_the_contract() {
-  local home plan brief id=brief-qwen-q1 standard before after epoch status wt fakebin start report blocked out line ack inbox
+  local home plan brief id=brief-qwen-q1 standard before after epoch status wt fakebin start report blocked out line ack inbox done_envelope blocked_envelope
   home="$TMP_ROOT/qwen-home"
   mkdir -p "$home/data"
   plan="$TMP_ROOT/qwen-plan.md"
@@ -1362,7 +1411,10 @@ test_qwen_shape_inlines_the_plan_and_keeps_the_contract() {
   report=${report//<conventional commit title>/feat: a}
   report=${report//<the same title>/feat: a}
   report=${report//<two or three sentences on what changed>/Adds a.}
-  blocked=${blocked//<one line>/stuck}
+  done_envelope='added a; files changed: src/a.ts, src/a.test.ts; diff stat: 2 files, 2 insertions; checks: pnpm test and pnpm lint passed'
+  blocked_envelope='stuck; files changed: none; diff stat: 0; checks: not run; question: which behavior is expected?'
+  report=${report//<return envelope>/$done_envelope}
+  blocked=${blocked//<return envelope>/$blocked_envelope}
   before=$(date +%s)
   out=$(cd "$wt" && bash -c "$start") || fail "the qwen start command failed in its copy: $start"
   [ "$out" = OK ] || fail "the qwen start command printed '$out' in its own copy"
@@ -1387,7 +1439,7 @@ test_qwen_shape_inlines_the_plan_and_keeps_the_contract() {
   printf 'a2\n' > "$wt/src/a.ts"
   printf '#!/usr/bin/env bash\nprintf "created:\\n  number: 7\\n  url: https://github.com/o/r/pull/7\\nhelp[1]:\\n  Run gh-axi pr view 7\\n"\n' > "$fakebin/gh-axi"
   out=$(cd "$wt" && fm_git_identity && PATH="$fakebin:$PATH" bash -c "$report" 2>/dev/null) || fail "the qwen report failed: $report"
-  [[ $(printf '%s\n' "$out" | tail -1) == 'done ['*']: PR https://github.com/o/r/pull/7' ]] \
+  [[ $(printf '%s\n' "$out" | tail -1) == 'done ['*']: PR https://github.com/o/r/pull/7; '"$done_envelope" ]] \
     || fail "the qwen report did not show the worker the done line it wrote: $out"
   [ "$(git -C "$wt" diff --name-only main HEAD | sort | tr '\n' ' ')" = 'src/a.test.ts src/a.ts ' ] \
     || fail "the qwen commits do not hold exactly the listed files"
@@ -1395,9 +1447,11 @@ test_qwen_shape_inlines_the_plan_and_keeps_the_contract() {
     || fail "the qwen report did not push the task branch"
   (cd "$wt" && bash -c "$blocked") || fail "the qwen blocked command failed: $blocked"
   after=$(date +%s)
-  [ "$(grep -c '^done \[at=[0-9]*\]: PR https://github.com/o/r/pull/7$' "$status")" -eq 1 ] \
+  [ "$(grep -c '^done \[at=[0-9]*\]: PR https://github.com/o/r/pull/7; ' "$status")" -eq 1 ] \
     || fail "the qwen done line does not carry the URL the PR command printed"
-  grep -q '^blocked \[at=[0-9]*\]: stuck$' "$status" || fail "the qwen blocked command did not write its line"
+  assert_grep "$done_envelope" "$status" "the qwen done command did not write its envelope"
+  [[ $(tail -1 "$status") == 'blocked [at='*']: '"$blocked_envelope" ]] \
+    || fail "the qwen blocked command did not write its envelope"
   while IFS= read -r line; do
     epoch=$(bash -c '. "$1"; status_line_at_epoch "$2"' _ "$ROOT/bin/fm-classify-lib.sh" "$line")
     [ "$epoch" -ge "$before" ] && [ "$epoch" -le "$after" ] || fail "a qwen status line carries no run-time stamp: $line"
@@ -1853,6 +1907,7 @@ test_branch_prefix_is_refused_where_it_does_not_apply
 test_branch_prefix_value_is_validated
 test_branch_prefix_command_is_shell_safe
 test_crewmate_scaffolds_forbid_pool_administration
+test_worker_return_envelopes
 test_qwen_shape_inlines_the_plan_and_keeps_the_contract
 test_qwen_shape_is_refused_outside_its_shape
 test_qwen_shape_looks_up_through_the_project_kg_and_map

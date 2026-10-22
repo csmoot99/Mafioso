@@ -8,7 +8,10 @@ metadata:
 
 # Scout outcome and promotion
 
-A completed scout must leave a self-contained report before its scratch worktree can be discarded; read and relay its findings, record the report as the Done artifact, and re-evaluate the queue.
+A completed scout must leave a self-contained report before its scratch worktree can be discarded; read and relay only its opening `## Envelope` section, record the report as the Done artifact, and re-evaluate the queue.
+`bin/fm-brief.sh` owns the envelope's return fields and cap; stop reading at the next level-two heading rather than loading the full report or a worker transcript.
+If the envelope is missing or does not answer a necessary question, dispatch a cheap T1 extraction scout through the normal intake and dispatch path, with that bounded question and the report or evidence paths and line ranges, not their contents.
+Have that worker return the missing evidence in its envelope; firstmate never reads the transcript or full report to extract it itself.
 A report may recommend implementation but does not authorize it.
 Before treating the investigation or any visual review as complete, load `captain-hold-lifecycle`; teardown enforces that shared completion gate.
 When a scout's deliverable is a visual artifact the captain will iterate on, keep it alive and follow the crew-hosted Lavish board contract in `docs/configuration.md` rather than arming or polling the board from firstmate.
