@@ -3569,7 +3569,7 @@ if [ "$KIND" != secondmate ] && [ -z "$CLEANUP_RECOVERY" ]; then
   if ! teardown_owns_worktree; then
     attempt_record_args+=(--worktree-reassigned)
   fi
-  python3 "$SCRIPT_DIR/fm-attempt-record.py" --task-id "$ID" --meta "$META" --data "$DATA" "${attempt_record_args[@]}" \
+  python3 "$SCRIPT_DIR/fm-attempt-record.py" --task-id "$ID" --meta "$META" --data "$DATA" ${attempt_record_args[@]+"${attempt_record_args[@]}"} \
     || echo "warning: could not record $ID's attempt; cleanup continues" >&2
 fi
 
