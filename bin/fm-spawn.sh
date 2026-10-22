@@ -782,7 +782,7 @@ launch_template() {
     if [ "$kind" = secondmate ]; then
       printf '%s' 'codex __MODELFLAG____EFFORTFLAG__--dangerously-bypass-approvals-and-sandbox "$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
     else
-      printf '%s' 'codex __MODELFLAG____EFFORTFLAG__-c '\''sandbox_mode="workspace-write"'\'' -c '\''approval_policy="on-request"'\'' -c '\''approvals_reviewer="auto_review"'\'' -c '\''sandbox_workspace_write.network_access=false'\'' __CODEXWRITABLEROOTS____CODEXCOMPACT__'
+      printf '%s' 'codex __MODELFLAG____EFFORTFLAG__-c '\''sandbox_mode="workspace-write"'\'' -c '\''approval_policy="on-request"'\'' -c '\''approvals_reviewer="auto_review"'\'' -c '\''sandbox_workspace_write.network_access=false'\'' __CODEXWRITABLEROOTS____CODEXCOMPACT____CODEXMCP__'
       printf '%s' "-c 'developer_instructions=\"$TASK_WORKER_TRUST_STATEMENT\"' "
       printf '%s' '-c '\''project_doc_max_bytes=1048576'\'' -c '\''project_doc_fallback_filenames=["CLAUDE.md"]'\'' -c '\''check_for_update_on_startup=false'\'' '
       printf '%s' '--enable hooks --dangerously-bypass-hook-trust __CODEXHOOKS__"$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
@@ -3288,6 +3288,53 @@ codex_writable_roots_flag() {  # <state-dir> <data-dir> <task-id>
   data_real=$(cd "$2" && pwd -P) || return 1
   mkdir -p "$state_real/$3.inbox/handled" "$data_real/$3" || return 1
   printf -- '-c %s ' "$(shell_quote "sandbox_workspace_write.writable_roots=[\"$(json_escape "$state_real/$3.inbox")\",\"$(json_escape "$data_real/$3")\"]")"
+}
+
+# Mirror only project-approved stdio servers from the worker copy. Commands
+# run outside Codex's sandbox, under the same project consent as Claude MCP.
+# Emit TOML values inside shell-quoted -c arguments; never evaluate project text.
+codex_project_mcp_flags() {  # <worktree>
+  local wt=$1 settings assignments assignment
+  settings="$wt/.claude/settings.json"
+  [ -f "$wt/.mcp.json" ] && [ -f "$settings" ] || return 0
+  assignments=$(jq -nr --arg wt "$wt" --slurpfile project "$wt/.mcp.json" --slurpfile settings "$settings" '
+    def strings: type == "array" and all(.[]; type == "string");
+    $settings[0] as $s | $project[0].mcpServers as $servers |
+    if ($settings | length) != 1 or ($project | length) != 1
+      or ($s | type) != "object" or ($servers | type) != "object"
+      or (($s.enabledMcpjsonServers // []) | strings | not)
+      or (($s.disabledMcpjsonServers // []) | strings | not)
+      or (($s.enableAllProjectMcpServers // false) | type) != "boolean"
+    then error("invalid project MCP configuration or approvals") else
+      $servers | to_entries[] |
+      .key as $name | .value as $server |
+      select(($s.enableAllProjectMcpServers == true
+        or (($s.enabledMcpjsonServers // []) | index($name)) != null)
+        and (($s.disabledMcpjsonServers // []) | index($name)) == null) |
+      if ($name | test("^[A-Za-z0-9_-]+$") | not)
+        or ($server | type) != "object"
+        or ($server.type // "stdio") != "stdio"
+        or ($server.command | type) != "string" or $server.command == ""
+        or (($server.args // []) | strings | not)
+        or (($server.env // {}) | type) != "object"
+        or (($server.env // {}) | all(.[]; type == "string") | not)
+        or (($server.cwd // $wt) | type) != "string" or $server.cwd == ""
+      then error("enabled project MCP server is not a supported stdio configuration") else
+        ($server.cwd // $wt) as $cwd |
+        "mcp_servers.\($name)." as $prefix |
+        $prefix + "command=" + ($server.command | tojson),
+        $prefix + "args=" + ($server.args // [] | tojson),
+        $prefix + "env={" + (($server.env // {} | to_entries |
+          map((.key | tojson) + "=" + (.value | tojson))) | join(",")) + "}",
+        $prefix + "cwd=" + (if $cwd | startswith("/") then $cwd else $wt + "/" + $cwd end | tojson),
+        $prefix + "enabled=true"
+      end
+    end
+  ') || return 1
+  [ -n "$assignments" ] || return 0
+  while IFS= read -r assignment; do
+    printf -- '-c %s ' "$(shell_quote "$assignment")"
+  done <<< "$assignments"
 }
 
 # A codex ship or scout's auto-compaction point: the same share of the window
@@ -5987,6 +6034,15 @@ case "$LAUNCH" in
     exit 1
   }
   LAUNCH=${LAUNCH//__CODEXWRITABLEROOTS__/$CODEX_WRITABLE_ROOTS}
+  ;;
+esac
+case "$LAUNCH" in
+*__CODEXMCP__*)
+  CODEX_MCP_FLAGS=$(codex_project_mcp_flags "$WT") || {
+    echo "error: could not map project MCP servers for $ID's codex launch" >&2
+    exit 1
+  }
+  LAUNCH=${LAUNCH//__CODEXMCP__/"$CODEX_MCP_FLAGS"}
   ;;
 esac
 case "$HARNESS" in
