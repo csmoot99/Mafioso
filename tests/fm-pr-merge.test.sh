@@ -1731,6 +1731,18 @@ test_parses_pr_url_for_gh_axi() {
 test_gitlab_url_resolves_and_merges() {
   local case_dir rc merge_line
   case_dir=$(make_gitlab_case gitlab-merges)
+  mkdir -p "$case_dir/home/config" "$case_dir/home/data/task-x1"
+  printf 'on\n' > "$case_dir/home/config/consigliere"
+  if run_pr_merge "$case_dir" task-x1 "$MR_URL" > "$case_dir/stdout" 2> "$case_dir/stderr"; then
+    fail "gitlab-merges: enabled Consigliere accepted missing review"
+  fi
+  assert_grep 'Consigliere review pending' "$case_dir/stderr" "missing review refusal"
+  [ -z "$(glab_merge_line "$case_dir/glab.log")" ] || fail "unreviewed GitLab head merged"
+  printf 'review and gate evidence\n' > "$case_dir/evidence.md"
+  jq -n --arg pr "$MR_URL" --arg head "$MR_HEAD" --arg evidence "$case_dir/evidence.md" '
+    {pr: $pr, head: $head, round: 1, verdict: "clear", blocker: 0, major: 0, minor: 0,
+     builder_family: "anthropic", reviewer_family: "openai", report: $evidence, gates: $evidence}' \
+    > "$case_dir/home/data/task-x1/consigliere.json"
 
   set +e
   run_pr_merge "$case_dir" task-x1 "$MR_URL" \

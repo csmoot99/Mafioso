@@ -35,6 +35,8 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 . "$SCRIPT_DIR/fm-parent-channel-lib.sh"
 # shellcheck source=bin/fm-dod-lib.sh
 . "$SCRIPT_DIR/fm-dod-lib.sh"
+# shellcheck source=bin/fm-consigliere-lib.sh
+. "$SCRIPT_DIR/fm-consigliere-lib.sh"
 
 if [ "$#" -ne 2 ]; then
   echo "error: invalid PR check request" >&2
@@ -148,6 +150,24 @@ if { [ -z "$PR_HEAD" ] || ! fm_dod_forge_head_is_named_head "$MODE"; } \
   && ! GATE_REASON=$(fm_dod_accept_ship_done "${KIND:-ship}" "$MODE" "$WT" "$PROJECT" "$DONE_LINE" "$STATE" "$ID" "$META"); then
   echo "error: $GATE_REASON" >&2
   exit 1
+fi
+
+# Registration can publish readiness even when called by the merge wrapper.
+# Require the review here and again for the head used by the merge command.
+REVIEW_MODE=$(fm_consigliere_mode "$FM_HOME") || exit 1
+if [ "$REVIEW_MODE" = on ]; then
+  REVIEW_HEAD=$PR_HEAD
+  case "$PROVIDER" in
+    gitlab)
+      REVIEW_HEAD=$(GITLAB_HOST="$HOST" glab mr view "$NUMBER" -R "https://$HOST/$PROJECT_PATH" -F json \
+        | jq -er '.sha') || exit 1
+      ;;
+    gerrit)
+      fm_pr_gerrit_read_revision "$HOST" "$NUMBER" || exit 1
+      REVIEW_HEAD=$FM_PR_RECORD_REVISION
+      ;;
+  esac
+  fm_consigliere_require_review "$FM_HOME" "$ID" "$URL" "$REVIEW_HEAD" || exit 1
 fi
 
 META_TMP=
