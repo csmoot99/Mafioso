@@ -26,11 +26,21 @@
 # only if usage still reaches P. Both always exit 0; the records, status events, notice,
 # and replacement are exactly the Claude ones.
 #
+# Haiku mode (--haiku-cap on both Claude hooks): fm-spawn selects this for
+# an explicitly selected Haiku model. The absolute threshold is 80000 prompt
+# tokens, including cache reads and cache creation, instead of the percentage.
+# PostToolUse requests the handoff at the first observed crossing; PreCompact
+# also checks it, but always allows compaction, including below the cap.
+# Compaction never clears a pending handoff. This is a hook-observed threshold,
+# not a pre-request token limiter: one response can overshoot it before a hook.
+# Other models and launches without the opt-in flag retain their behavior.
+#
 # Subcommands:
 #
-#   precompact <state-dir> <id> --gen G --data-dir D --fm-root R [--ceiling-pct N] [--codex-threshold-pct P]
+#   precompact <state-dir> <id> --gen G --data-dir D --fm-root R [--ceiling-pct N] [--codex-threshold-pct P | --haiku-cap]
 #       Claude PreCompact hook (matcher `auto`; a manual /compact is never
-#       blocked). Reads the hook payload on stdin. The threshold is Claude's
+#       blocked). Reads the hook payload on stdin. Except in Haiku mode above,
+#       the threshold is Claude's
 #       own: the hook fires exactly when auto-compaction would, which
 #       CLAUDE_AUTOCOMPACT_PCT_OVERRIDE from config/launch-env places at the
 #       home's chosen percentage. Exit 2 blocks the compaction (Claude skips a
@@ -81,8 +91,9 @@
 #       When P is above N instead, it leaves the marker untouched on every
 #       compaction so the later handoff check remains armed.
 #
-#   posttooluse <state-dir> <id> --gen G --data-dir D --fm-root R [--ceiling-pct N] [--codex-threshold-pct P]
-#       Claude PostToolUse hook, every tool. With no marker for the task it is
+#   posttooluse <state-dir> <id> --gen G --data-dir D --fm-root R [--ceiling-pct N] [--codex-threshold-pct P | --haiku-cap]
+#       Claude PostToolUse hook, every tool. Except in Haiku mode above,
+#       with no marker for the task it is
 #       one file-existence test and exits 0 with no output, so the common path
 #       costs nothing. In Codex mode the no-marker path instead reads the
 #       latest `token_count` record in the payload's transcript_path (the
@@ -144,8 +155,8 @@ set -u
 usage() {
   cat >&2 <<'EOF'
 usage:
-  fm-context-handoff.sh precompact <state-dir> <id> --gen G --data-dir D --fm-root R [--ceiling-pct N] [--codex-threshold-pct P]   (PreCompact payload on stdin)
-  fm-context-handoff.sh posttooluse <state-dir> <id> --gen G --data-dir D --fm-root R [--ceiling-pct N] [--codex-threshold-pct P]  (PostToolUse payload on stdin)
+  fm-context-handoff.sh precompact <state-dir> <id> --gen G --data-dir D --fm-root R [--ceiling-pct N] [--codex-threshold-pct P | --haiku-cap]   (PreCompact payload on stdin)
+  fm-context-handoff.sh posttooluse <state-dir> <id> --gen G --data-dir D --fm-root R [--ceiling-pct N] [--codex-threshold-pct P | --haiku-cap]  (PostToolUse payload on stdin)
   fm-context-handoff.sh replace <id>                                                (FM_HOME-resolved)
 See the header comment for the full contract.
 EOF
@@ -272,7 +283,7 @@ hook_args() {
   STATE=${1:-}; ID=${2:-}
   [ -n "$STATE" ] && [ -n "$ID" ] || usage
   shift 2
-  GEN=; DATA_DIR=; SKILL_ROOT=; CEILING_PCT=$CEILING_PCT_DEFAULT; CODEX_PCT=
+  GEN=; DATA_DIR=; SKILL_ROOT=; CEILING_PCT=$CEILING_PCT_DEFAULT; CODEX_PCT=; HAIKU_CAP=0
   while [ $# -gt 0 ]; do
     case "$1" in
       --gen) GEN=${2:-}; shift 2 || usage ;;
@@ -280,6 +291,7 @@ hook_args() {
       --fm-root) SKILL_ROOT=${2:-}; shift 2 || usage ;;
       --ceiling-pct) CEILING_PCT=${2:-}; shift 2 || usage ;;
       --codex-threshold-pct) CODEX_PCT=${2:-}; shift 2 || usage ;;
+      --haiku-cap) HAIKU_CAP=1; shift ;;
       *) usage ;;
     esac
   done
@@ -296,6 +308,7 @@ hook_args() {
     *[!0-9]*) usage ;;
     *) [ "$CODEX_PCT" -ge 1 ] && [ "$CODEX_PCT" -le "$CEILING_PCT_DEFAULT" ] && [ "$CODEX_PCT" -ne "$CEILING_PCT" ] || usage ;;
   esac
+  [ "$HAIKU_CAP" = 0 ] || [ -z "$CODEX_PCT" ] || usage
   id_ok "$ID" || usage
   STATUS="$STATE/$ID.status"
   MARKER=$(marker_path "$STATE" "$ID")
@@ -317,6 +330,7 @@ do_precompact() {
   if [ -n "$CODEX_PCT" ]; then codex_precompact; exit 0; fi
   trigger=$(payload_field trigger) || exit 0
   [ "$trigger" = auto ] || exit 0
+  if [ "$HAIKU_CAP" = 1 ]; then haiku_mark_due_at_threshold; exit 0; fi
   incarnation_current || exit 0
   [ -d "$STATE" ] || exit 0
 
@@ -368,16 +382,30 @@ do_precompact() {
   exit 2
 }
 
-# mark_due <usage> <pct> <window> <ceiling>: write the incarnation's `due`
+# mark_due <usage> <pct> <window> <ceiling> [reason]: write the incarnation's `due`
 # marker naming the next handoff (left in DUE_HANDOFF) and append the one
 # handoff-due note.
 mark_due() {
-  local n key
+  local n key reason=${5:-"usage $1 of about $3 tokens at $2 percent"}
   n=$(next_handoff_number "$DATA_DIR" "$ID")
   DUE_HANDOFF="$DATA_DIR/$ID/handoff-$n.md"
   key="context-handoff-$n"
   marker_write "$MARKER" "v1 gen=$GEN state=due seq=$n handoff=$DUE_HANDOFF key=$key usage=$1 pct=$2 window=$3 ceiling=$4 ceiling_pct=$CEILING_PCT notices=0 calls=0 at=$(date +%s 2>/dev/null || echo 0)" || return 1
-  status_note "$STATUS" "note: context handoff due: usage $1 of about $3 tokens at $2 percent; the worker was told to write $DUE_HANDOFF and report it with key $key" || true
+  status_note "$STATUS" "note: context handoff due: $reason; the worker was told to write $DUE_HANDOFF and report it with key $key" || true
+}
+
+# Haiku uses the same prompt-usage reader as Claude PreCompact, without
+# inferring a window from an auto-compaction percentage. Zero pct/window
+# fields mean unknown, and ceiling records the absolute cap.
+haiku_mark_due_at_threshold() {
+  local marker='' usage
+  incarnation_current || return 1
+  [ -d "$STATE" ] || return 1
+  [ ! -f "$MARKER" ] || IFS= read -r marker < "$MARKER" || marker=
+  [ -z "$marker" ] || [ "$(marker_field "$marker" gen)" != "$GEN" ] || return 0
+  usage=$(transcript_usage "$(payload_field transcript_path)") || return 1
+  [ "$usage" -ge 80000 ] || return 1
+  mark_due "$usage" 0 0 80000 "Haiku prompt usage $usage reached the 80000-token cap (including cache reads)"
 }
 
 # Codex mode: the marker this incarnation already has, or a new `due` one once
@@ -431,6 +459,9 @@ do_posttooluse() {
   if [ -n "$CODEX_PCT" ]; then
     PAYLOAD=$(cat 2>/dev/null || true)
     codex_mark_due_at_threshold || exit 0
+  elif [ "$HAIKU_CAP" = 1 ]; then
+    PAYLOAD=$(cat 2>/dev/null || true)
+    haiku_mark_due_at_threshold || exit 0
   fi
   [ -f "$MARKER" ] || exit 0
   cat >/dev/null 2>&1 || true
@@ -456,6 +487,7 @@ do_posttooluse() {
   reason="reached the handoff threshold, and auto-compaction is being held off so you can hand over instead"
   [ -z "$CODEX_PCT" ] || [ "$CODEX_PCT" -lt "$CEILING_PCT" ] ||
     reason="still reached the handoff threshold after auto-compaction, so you must hand over instead"
+  [ "$HAIKU_CAP" = 0 ] || reason="reached Haiku's 80000 prompt-token cap (including cache reads), so you must hand over"
   perl -MJSON::PP -e '
     my ($id, $skill, $handoff, $status, $key, $reason) = @ARGV;
     my $text = "FIRSTMATE CONTEXT HANDOFF for task $id: this worker'"'"'s context $reason. Do these four things, in order.\n"
