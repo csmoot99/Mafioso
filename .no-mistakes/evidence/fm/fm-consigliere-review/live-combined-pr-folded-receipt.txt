@@ -1,0 +1,16 @@
+folded https://github.com/csmoot99/Mafioso/pull/25 head 5dc126d365609bc25f7565d99f564d3a8d2a86d3 (has a clear receipt); combined https://github.com/csmoot99/Mafioso/pull/24 head 34d491c03d0c29860fb8f10d2e844ad76a0094df
+
+$ bin/fm-pr-check.sh integrator https://github.com/csmoot99/Mafioso/pull/24   # only the folded PR's receipt exists
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  This is a supervision warning only; the guarded operation WILL still run.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: Consigliere review pending or invalid for https://github.com/csmoot99/Mafioso/pull/24 at 34d491c03d0c29860fb8f10d2e844ad76a0094df; follow ship-landing
+[exit 1] pr= recorded: 0
+
+$ bin/fm-pr-check.sh integrator https://github.com/csmoot99/Mafioso/pull/24   # after a clear review of the combined head itself
+armed: state/integrator.check.sh
+[exit 0]
+project=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M5JGZJVRE7BWF406JMXA9RST
+pr=https://github.com/csmoot99/Mafioso/pull/24
+pr_head=34d491c03d0c29860fb8f10d2e844ad76a0094df
+lab removed

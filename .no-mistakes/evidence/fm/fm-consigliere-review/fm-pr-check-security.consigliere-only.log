@@ -1,0 +1,2 @@
+ok - Consigliere gates PR-ready registration and rechecks the live head before merging
+ok - Consigliere reads fresh GitLab and Gerrit heads without changing legacy metadata

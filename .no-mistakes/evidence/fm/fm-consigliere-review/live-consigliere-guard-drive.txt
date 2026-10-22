@@ -1,0 +1,121 @@
+lab home: /tmp/fm-lab.AFvhcs
+PR: https://github.com/csmoot99/Mafioso/pull/24 live head: 34d491c03d0c29860fb8f10d2e844ad76a0094df
+
+=== S-default-off: switch absent -> registration proceeds as before ===
+
+$ bin/fm-pr-check.sh cons-task https://github.com/csmoot99/Mafioso/pull/24
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+armed: state/cons-task.check.sh
+[exit 0]
+pr=https://github.com/csmoot99/Mafioso/pull/24
+pr_head=34d491c03d0c29860fb8f10d2e844ad76a0094df
+2
+
+=== S-invalid-switch: config/consigliere='yes' -> refuses ===
+
+$ bin/fm-pr-check.sh cons-task https://github.com/csmoot99/Mafioso/pull/24
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: config/consigliere must contain on or off
+[exit 1]
+0
+
+=== S-on-no-receipt: switch on, no receipt -> refuses; no pr= recorded, no poll armed ===
+
+$ bin/fm-pr-check.sh cons-task https://github.com/csmoot99/Mafioso/pull/24
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: Consigliere review pending or invalid for https://github.com/csmoot99/Mafioso/pull/24 at 34d491c03d0c29860fb8f10d2e844ad76a0094df; follow ship-landing
+[exit 1]
+pr= lines: 0
+cons-task.meta
+cons-task.pr-poll
+cons-task.pr-poll-registration
+contributions.check-trust
+contributions.check.sh
+
+=== S-stale-head: receipt for an older head -> refuses ===
+
+$ bin/fm-pr-check.sh cons-task https://github.com/csmoot99/Mafioso/pull/24
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: Consigliere review pending or invalid for https://github.com/csmoot99/Mafioso/pull/24 at 34d491c03d0c29860fb8f10d2e844ad76a0094df; follow ship-landing
+[exit 1]
+
+=== S-same-family: receipt same family, no exception -> refuses ===
+
+$ bin/fm-pr-check.sh cons-task https://github.com/csmoot99/Mafioso/pull/24
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: Consigliere review pending or invalid for https://github.com/csmoot99/Mafioso/pull/24 at 34d491c03d0c29860fb8f10d2e844ad76a0094df; follow ship-landing
+[exit 1]
+
+=== S-blocker: receipt with blocker:1 / verdict changes-required -> refuses ===
+
+$ bin/fm-pr-check.sh cons-task https://github.com/csmoot99/Mafioso/pull/24
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: Consigliere review pending or invalid for https://github.com/csmoot99/Mafioso/pull/24 at 34d491c03d0c29860fb8f10d2e844ad76a0094df; follow ship-landing
+[exit 1]
+
+=== S-exception: same family + opus-independent + reason -> accepted ===
+
+$ bin/fm-pr-check.sh cons-task https://github.com/csmoot99/Mafioso/pull/24
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+armed: state/cons-task.check.sh
+[exit 0]
+pr=https://github.com/csmoot99/Mafioso/pull/24
+pr_head=34d491c03d0c29860fb8f10d2e844ad76a0094df
+
+=== S-clear: cross-family clear receipt for live head -> registered and poll armed ===
+
+$ bin/fm-pr-check.sh cons-task https://github.com/csmoot99/Mafioso/pull/24
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+armed: state/cons-task.check.sh
+[exit 0]
+pr=https://github.com/csmoot99/Mafioso/pull/24
+pr_head=34d491c03d0c29860fb8f10d2e844ad76a0094df
+cons-task.check.sh
+cons-task.meta
+cons-task.pr-poll
+cons-task.pr-poll-registration
+contributions.check-trust
+contributions.check.sh
+
+=== S-merge-stale: merge with receipt for an older head -> refused before forge merge ===
+
+$ bin/fm-pr-merge.sh cons-task https://github.com/csmoot99/Mafioso/pull/24 -- --merge
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: Consigliere review pending or invalid for https://github.com/csmoot99/Mafioso/pull/24 at 34d491c03d0c29860fb8f10d2e844ad76a0094df; follow ship-landing
+[exit 1]
+merge attempts: 0
+
+=== S-merge-none: merge with no receipt -> refused ===
+
+$ bin/fm-pr-merge.sh cons-task https://github.com/csmoot99/Mafioso/pull/24 -- --merge
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: Consigliere review pending or invalid for https://github.com/csmoot99/Mafioso/pull/24 at 34d491c03d0c29860fb8f10d2e844ad76a0094df; follow ship-landing
+[exit 1]
+merge attempts: 0
+
+=== gh calls made (writes blocked by shim) ===
+gh pr view https://github.com/csmoot99/Mafioso/pull/24 --json isDraft
+gh pr view https://github.com/csmoot99/Mafioso/pull/24 --json headRefOid -q .headRefOid
+gh pr view https://github.com/csmoot99/Mafioso/pull/24 --json isDraft
+gh pr view https://github.com/csmoot99/Mafioso/pull/24 --json headRefOid -q .headRefOid
+gh pr view https://github.com/csmoot99/Mafioso/pull/24 --json isDraft
+gh pr view https://github.com/csmoot99/Mafioso/pull/24 --json headRefOid -q .headRefOid
+gh pr view https://github.com/csmoot99/Mafioso/pull/24 --json isDraft
+gh pr view https://github.com/csmoot99/Mafioso/pull/24 --json headRefOid -q .headRefOid
+gh pr view https://github.com/csmoot99/Mafioso/pull/24 --json isDraft
+gh pr view https://github.com/csmoot99/Mafioso/pull/24 --json headRefOid -q .headRefOid
+gh pr view https://github.com/csmoot99/Mafioso/pull/24 --json isDraft
+gh pr view https://github.com/csmoot99/Mafioso/pull/24 --json headRefOid -q .headRefOid
+gh pr view https://github.com/csmoot99/Mafioso/pull/24 --json isDraft
+gh pr view https://github.com/csmoot99/Mafioso/pull/24 --json headRefOid -q .headRefOid
+gh pr view https://github.com/csmoot99/Mafioso/pull/24 --json isDraft
+gh pr view https://github.com/csmoot99/Mafioso/pull/24 --json headRefOid -q .headRefOid
+gh pr view https://github.com/csmoot99/Mafioso/pull/24 --json headRefOid -q .headRefOid
+gh pr view https://github.com/csmoot99/Mafioso/pull/24 --json headRefOid -q .headRefOid
+lab removed: yes

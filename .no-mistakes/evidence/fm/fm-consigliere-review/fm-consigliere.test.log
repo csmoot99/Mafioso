@@ -1,0 +1,5 @@
+ok - review is opt-in and malformed configuration or absent evidence refuses readiness
+ok - receipt must be clear for this PR head, with evidence and valid severity counts
+ok - only named independent-brief exceptions with grounds permit same-family review
+ok - configuration and evidence honor the home overrides
+rc=0
