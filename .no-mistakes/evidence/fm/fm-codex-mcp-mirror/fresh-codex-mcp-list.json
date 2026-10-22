@@ -1,0 +1,24 @@
+[
+  {
+    "name": "kg",
+    "enabled": true,
+    "disabled_reason": null,
+    "transport": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "scripts/lab-probe.mjs",
+        "BASE7731"
+      ],
+      "env": {
+        "LAB_MARKER": "/tmp/fm-lab.4xU0mS/markers/kg.log",
+        "LAB_TAG": "base"
+      },
+      "env_vars": [],
+      "cwd": "/tmp/fm-lab.4xU0mS/treehouse/.treehouse/probe-2752b3/1/probe"
+    },
+    "startup_timeout_sec": null,
+    "tool_timeout_sec": null,
+    "auth_status": "unsupported"
+  }
+]

@@ -1,0 +1,60 @@
+       `no-mistakes axi status`. If the daemon socket refuses connections or is missing, append
+       `blocked [at=<epoch>]: {the daemon error}` and stop even when the local run record still says running or
+       fixing, because that record can be stale after the daemon exits. A run record failed with a
+       daemon error is also a real block.
+       Only after ruling out socket refusal, if the run is still running or fixing, reattach and keep
+       going. A drive-call error, timeout, slow read, or generic unreachability is NOT a daemon error:
+       the daemon accepts `respond` immediately and runs the round in the background, so a killed or
+       timed-out call was only waiting for a read while the run kept working.
+     - The worktree pool your own worktree came from, and the repository every lane's worktree
+       shares. Never create, remove, return, prune, move, or reassign a worktree or pool slot, and
+       never write into a sibling slot's directory. Rule 2 does not cover this: removing a worktree
+       is administration rather than an edit outside your directory, and it lands on lanes that are
+       running right now. The act is the rule and commands are only examples of it - `treehouse`
+       get/return/remove/prune, the equivalent operations on any other worktree provider or runtime
+       backend, and `git worktree add|remove|move|prune`. A slot that looks unused is not evidence
+       that it is free, and returning your own worktree is firstmate's job at cleanup, not yours.
+     If you genuinely need a second checkout, another slot, or the daemon touched, append
+     `blocked [at=<epoch>]: {what you need}` and stop; firstmate arranges it.
+
+  # Firstmate instruction inbox
+  Firstmate steers you through durable message files in '/tmp/fm-lab.4xU0mS/home/state/labmcp-worker.inbox'.
+  When a terminal message says an instruction is waiting there - and at any natural checkpoint when you are unsure - list '/tmp/fm-lab.4xU0mS/home/state/labmcp-worker.inbox'/*.msg, read and act on each message in
+  numeric order, then acknowledge each handled message by moving it: `mv '/tmp/fm-lab.4xU0mS/home/state/labmcp-worker.inbox'/NNN.msg '/tmp/fm-lab.4xU0mS/home/state/labmcp-worker.inbox'/handled/`.
+  The move IS the acknowledgement: without it firstmate rings again and eventually treats you as stuck. An empty or absent inbox needs no action.
+
+  # Coding discipline
+  Before editing, read and follow `/home/work/.no-mistakes/worktrees/5f69104d19ce/01M5HZMQEMH219QFP47XY69C6G/.agents/skills/ponytail/SKILL.md`.
+
+  # Project memory
+  A project's `AGENTS.md` or `CLAUDE.md` is loaded into every agent session in that project, so edit it only to correct information that is factually wrong - including information your own change made wrong - and never
+  to add knowledge because it is missing.
+  A correction edits only the wrong text: do not run `/home/work/.no-mistakes/worktrees/5f69104d19ce/01M5HZMQEMH219QFP47XY69C6G/bin/fm-ensure-agents-md.sh`, create either file, or add sections, headings, or pointers
+  alongside it.
+
+  # Definition of done
+  Delivery contract: mode=local-only
+  Ship branch: fm/labmcp-worker
+  This task ships **local-only**: no remote, no PR, no pipeline.
+  The task is complete only when committed on your branch `fm/labmcp-worker`. Do NOT push, do NOT open a PR, do NOT merge.
+  A `done:` is accepted when the named head is on this project's shared local branch, not only on a detached copy; the check tests that head, not merely that a branch moved.
+  Keep your branch a clean fast-forward onto the current default branch - if `main` has advanced, rebase onto it so the eventual merge stays a fast-forward.
+  When it is implemented and committed, append `done [at=<epoch>]: ready in branch fm/labmcp-worker` to the status file and stop.
+  The configured merge authority approves the ready branch, then firstmate merges it into local `main` through the guarded fast-forward path.
+
+
+• I’ll list the available MCP servers and tools, then call kg.lab_probe once if it is available.
+
+• Available MCP servers: codex_apps, codex_worktrees. Every available MCP tool name is listed in the inventory above.
+
+  The kg server and lab_probe tool are unavailable in this session; no probe call was possible.
+
+  PROBE-RESULT: none
+
+  Worked for 21s • 11:05
+
+
+› Ask Codex to do anything
+
+  GPT-6-Astra low · /tmp/fm-lab.4xU0mS/treehouse/.treehouse/probe-2752b3/1/probe · Review launch brief
+  ? for shortcuts                                                                                                                                                                                 ⚠ 3 warnings · f2 to view
