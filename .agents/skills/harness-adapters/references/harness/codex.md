@@ -60,6 +60,22 @@ Parity gaps that remain against a Claude crewmate:
 - The status-file append, `git commit`, a push, `gh`, `no-mistakes`, and package installs run as reviewed escalations where a Claude worker's operator allowlist lets some of them through unreviewed.
 - The automatic reviewer judges an escalation against what the worker was asked to do, so it approved a force push to `main` that a test prompt explicitly requested; the push guard rules below are the hard block for the pushes Firstmate never wants.
 
+## Browser
+
+Verified on 2026-10-22 with codex-cli 0.162.1 and chrome-devtools-axi 0.1.34.
+Codex CLI has no callable built-in browser; OpenAI's [Browser documentation](https://learn.chatgpt.com/docs/browser?surface=app) reserves that feature for the desktop app, not the CLI or IDE extension.
+Crewmate and scout launches use [`fm-codex-browser.sh`](../../../../../bin/fm-codex-browser.sh), whose header owns browser startup and cleanup.
+It requires an installed Linux Playwright Chromium in the user's cache and `chrome-devtools-axi` on PATH for browser operations; no system Chrome or persistent browser profile is required.
+The launcher starts headless Chromium before Codex, binds CDP to loopback on an OS-selected port, and exports `CHROME_DEVTOOLS_AXI_BROWSER_URL` and a unique `CHROME_DEVTOOLS_AXI_SESSION` with a scratch profile.
+Preserve those inherited variables when using `chrome-devtools-axi`; the launcher cleans up its session, browser and profile when Codex exits.
+If Chromium is absent, launch continues with a browser-setup warning; an installed Chromium that fails to start prevents the worker launch.
+
+This keeps Codex's `workspace-write`, blocked network and socket access, and automatic approval review unchanged: browser shell commands still require reviewed sandbox escalation.
+The original failure had two causes on the verified host: the default browser launch closed its target even after escalation, while sandboxed socket access also failed; prelaunching Playwright Chromium fixes the former and reviewed escalation handles the latter.
+A fresh `codex exec` using the captured worker launch flags and the committed launcher opened a local HTTP page, saved and viewed screenshots at 1100 x 800 and 390 x 844, and verified the phone layout through both the image and measured viewport.
+Two real `chrome-devtools-axi press Tab` calls moved focus from the document to a button and then a link, confirmed by `document.activeElement.id` and the phone screenshot's focus ring.
+Use a distinct page URL for probes: chrome-devtools-axi 0.1.34 can report ambiguous page selection when duplicate `about:blank` pages exist.
+
 ## Push guard rules
 
 Codex refuses a command that matches a `forbidden` prefix rule from a `.rules` file in its config directory ("blocked by policy"), and loads no rules file from a session flag, so the guard is one machine-wide file that also binds the operator's own Codex sessions.
