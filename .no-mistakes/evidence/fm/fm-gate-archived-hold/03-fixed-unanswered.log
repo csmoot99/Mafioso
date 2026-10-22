@@ -1,0 +1,35 @@
+### root=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M5JFZV7WTWQ1NWPR41MVG9HH scenario=unanswered lab=/tmp/fm-lab.pQwZGL
+
+$ grep archive
+3:- [x] card-call - Approve the card color (repo: sample) (kind: captain) (done 2026-10-22) (hold: fm-hold-v1:Y2FyZCBuZWVkcyBhcHByb3ZhbA==) (hold-kind: captain)
+4-  Captain hold set: 2026-10-22T19:16:47Z
+5-  Captain hold origin: card-scout
+6-
+7-  Origin: card-scout
+
+$ cap verify card-scout
+fm-captain-hold: captain-held task card-call is neither held for the captain nor closed with a recorded captain answer
+[exit 1]
+
+$ cap complete card-scout card-call
+fm-captain-hold: captain-held task card-call is neither held for the captain nor closed with a recorded captain answer
+[exit 1]
+
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M5JFZV7WTWQ1NWPR41MVG9HH/bin/fm-teardown.sh card-scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.pQwZGL
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-captain-hold: captain-held task card-call is neither held for the captain nor closed with a recorded captain answer
+REFUSED: scout task card-scout has not passed the captain-call completion gate.
+Inventory its report and any visual review through bin/fm-captain-hold.sh before teardown.
+[exit 1]
+
+$ origin meta still present?
+/tmp/fm-lab.pQwZGL/state/card-scout.meta
+### lab removed: yes
+### TMUX=/tmp/fmlt.KIGR/tmux-1000/fm-lab,3477418,0

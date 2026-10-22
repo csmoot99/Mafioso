@@ -1,0 +1,10 @@
+### root=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M5JFZV7WTWQ1NWPR41MVG9HH scenario=answer-intake lab=/tmp/fm-lab.4wUAYF
+
+$ cap answer card-call --decision-file /tmp/fm-lab.4wUAYF/d2.txt
+fm-captain-hold: captain-held task card-call is absent from this home's configured backlog (data directory /tmp/fm-lab.4wUAYF/data)
+[exit 1]
+
+$ archive unchanged?
+archive sha256 unchanged
+### lab removed: yes
+### TMUX=/tmp/fmlt.7sAP/tmux-1000/fm-lab,3508481,0

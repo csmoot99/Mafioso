@@ -1,0 +1,19 @@
+### root=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M5JFZV7WTWQ1NWPR41MVG9HH scenario=reused lab=/tmp/fm-lab.IZXp9g
+
+$ grep -c archive rows
+3:- [x] reused-call - Approve the card color (repo: sample) (kind: captain) (done 2026-10-22) (hold: fm-hold-v1:Y2FyZCBuZWVkcyBhcHByb3ZhbA==) (hold-kind: captain)
+17:- [x] reused-call - Approve the card color (repo: sample) (kind: captain) (done 2026-10-22) (hold: fm-hold-v1:Y2FyZCBuZWVkcyBhcHByb3ZhbA==) (hold-kind: captain)
+
+$ cap complete second-scout reused-call
+complete: second-scout captain-call inventory reviewed (reused-call)
+[exit 0]
+
+$ cap verify second-scout
+verified: second-scout captain-call inventory
+[exit 0]
+
+$ cap verify first-scout
+fm-captain-hold: captain-held task reused-call was held for origin second-scout, not first-scout; hold a task for first-scout or list the right one
+[exit 1]
+### lab removed: yes
+### TMUX=/tmp/fmlt.gBeC/tmux-1000/fm-lab,3495380,0

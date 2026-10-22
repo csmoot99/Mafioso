@@ -1,0 +1,7 @@
+### root=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M5JFZV7WTWQ1NWPR41MVG9HH scenario=legacy lab=/tmp/fm-lab.QOVb1A
+
+$ cap complete legacy-scout legacy-call
+complete: legacy-scout captain-call inventory reviewed (legacy-call)
+[exit 0]
+### lab removed: yes
+### TMUX=/tmp/fmlt.ayDV/tmux-1000/fm-lab,3505280,0

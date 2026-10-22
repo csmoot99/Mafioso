@@ -1,0 +1,46 @@
+### root=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M5JFZV7WTWQ1NWPR41MVG9HH scenario=business-card lab=/tmp/fm-lab.AOpL6a
+
+$ tx show cooked-card-color-approval
+error: "Task \"cooked-card-color-approval\" not found in this backlog"
+code: NOT_FOUND
+help[1]: Run `tasks-axi list` to see existing tasks
+[exit 1]
+
+$ grep -n -A3 'cooked-card-color-approval' done-archive.md
+3:- [x] cooked-card-color-approval - Approve the card color (repo: sample) (kind: captain) (done 2026-10-22) (hold: fm-hold-v1:Y2FyZCBuZWVkcyBhcHByb3ZhbA==) (hold-kind: captain)
+4-  Resolution recorded by fm-captain-hold.
+5-  Decision digest: 20dceaac04a831ce4eccee1e59f906578cd343cc50cb001e66a40f822eb46e9e
+6-  Resolution mode: answered
+7-
+8-  Captain decision:
+9-  I approve the business card.
+
+$ cap verify cooked-business-card
+verified: cooked-business-card captain-call inventory
+[exit 0]
+
+$ cap complete cooked-business-card cooked-card-color-approval
+complete: cooked-business-card captain-call inventory reviewed (cooked-card-color-approval)
+[exit 0]
+
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M5JFZV7WTWQ1NWPR41MVG9HH/bin/fm-teardown.sh cooked-business-card
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.AOpL6a
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown cooked-business-card complete (window firstmate:fm-cooked-business-card, worktree /tmp/fm-lab.AOpL6a/projects/missing-cooked-business-card)
+Backlog: cooked-business-card is closed in /tmp/fm-lab.AOpL6a/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+[exit 0]
+
+$ archive unchanged?
+archive sha256 unchanged
+
+$ ls state/
+home-summary.json
+terminal-outcomes
+### lab removed: yes
+### TMUX=/tmp/fmlt.bjrm/tmux-1000/fm-lab,3465297,0

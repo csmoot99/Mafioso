@@ -1,0 +1,25 @@
+### root=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M5JFZV7WTWQ1NWPR41MVG9HH scenario=missing lab=/tmp/fm-lab.BF06gk
+
+$ cap verify card-scout
+fm-captain-hold: no captain-held task never-held-call and no migrated hold for it in this home's configured backlog (data directory /tmp/fm-lab.BF06gk/data); the nearest legacy identity card-scout-decision-never-held-call also resolves to nothing
+[exit 1]
+
+$ cap complete card-scout never-held-call
+fm-captain-hold: no captain-held task never-held-call and no migrated hold for it in this home's configured backlog (data directory /tmp/fm-lab.BF06gk/data); the nearest legacy identity card-scout-decision-never-held-call also resolves to nothing
+[exit 1]
+
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M5JFZV7WTWQ1NWPR41MVG9HH/bin/fm-teardown.sh card-scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.BF06gk
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-captain-hold: no captain-held task never-held-call and no migrated hold for it in this home's configured backlog (data directory /tmp/fm-lab.BF06gk/data); the nearest legacy identity card-scout-decision-never-held-call also resolves to nothing
+REFUSED: scout task card-scout has not passed the captain-call completion gate.
+Inventory its report and any visual review through bin/fm-captain-hold.sh before teardown.
+[exit 1]
+### lab removed: yes
+### TMUX=/tmp/fmlt.y010/tmux-1000/fm-lab,3489138,0
