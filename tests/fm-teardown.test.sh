@@ -711,30 +711,25 @@ test_local_only_fork_remote_allows() {
   pass "local-only worktree with HEAD on a fork remote is torn down and the home summary is refreshed"
 }
 
-test_attempt_record_failure_preserves_worktree_for_retry() {
+test_attempt_record_failure_warns_and_cleanup_continues() {
   local case_dir rc
   case_dir=$(make_case attempt-record-failure)
   write_meta "$case_dir" local-only ship
   wt_commit "$case_dir" "record before release"
   add_fork_with_pushed_branch "$case_dir"
-  mkdir -p "$case_dir/data/attempts.jsonl"
+  printf '{partial' > "$case_dir/data/attempts.jsonl"
 
   set +e
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
-  expect_code 1 "$rc" "attempt-record-failure: cleanup must refuse a failed record write"
-  assert_grep "could not record task-x1's attempt" "$case_dir/stderr" \
-    "attempt record failure did not explain the refusal"
-  [ -d "$case_dir/wt" ] && [ -f "$case_dir/state/task-x1.meta" ] \
-    || fail "attempt record failure removed the worktree or metadata"
-
-  rmdir "$case_dir/data/attempts.jsonl"
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" \
-    || fail "cleanup could not retry after attempt storage recovered"
-  [ "$(wc -l < "$case_dir/data/attempts.jsonl")" -eq 1 ] \
-    || fail "cleanup retry did not write exactly one attempt"
-  pass "attempt record failure preserves the worktree and metadata for cleanup retry"
+  expect_code 0 "$rc" "attempt-record-failure: a failed record write must not block cleanup"
+  assert_grep "warning: could not record task-x1's attempt; cleanup continues" "$case_dir/stderr" \
+    "attempt record failure did not warn"
+  [ ! -e "$case_dir/state/task-x1.meta" ] || fail "attempt record failure blocked metadata cleanup"
+  [ "$(cat "$case_dir/data/attempts.jsonl")" = '{partial' ] \
+    || fail "attempt record failure changed the existing ledger"
+  pass "attempt record failure warns and cleanup continues"
 }
 
 test_teardown_closes_the_backlog_item_itself() {
@@ -4680,7 +4675,7 @@ test_forced_child_missing_adapter_sibling_refuses_before_cleanup
 test_forced_secondmate_own_missing_adapter_sibling_refuses_before_child_cleanup
 test_retained_sources_still_reach_the_ordinary_refusal
 test_local_only_fork_remote_allows
-test_attempt_record_failure_preserves_worktree_for_retry
+test_attempt_record_failure_warns_and_cleanup_continues
 test_teardown_closes_the_backlog_item_itself
 test_teardown_closes_a_gerrit_task_with_its_change_url_as_a_note
 test_teardown_manual_backend_leaves_the_backlog_to_the_operator

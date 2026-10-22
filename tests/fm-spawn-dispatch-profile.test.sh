@@ -164,7 +164,7 @@ test_no_profile_keeps_claude_profile_defaults() {
   expect_code 0 "$status" "claude spawn without profile flags should succeed"
   assert_contains "$out" "spawned $id harness=claude" "spawn did not report claude"
   assert_meta_profile "$HOME_DIR/state/$id.meta" claude default default
-  if grep -Eq "^(row|tier|attempt_n|prior_tier)=" "$HOME_DIR/state/$id.meta"; then
+  if grep -Eq "^(row|tier|pool|attempt_n|prior_tier)=" "$HOME_DIR/state/$id.meta"; then
     fail "unclassified dispatch must leave attempt fields absent"
   fi
 
@@ -180,11 +180,12 @@ test_attempt_classification_is_recorded() {
   rec=$(make_spawn_case attempt-fields claude "$id")
   read_case_record "$rec"
   out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" \
-    --row 'implementation work' --tier=T2 --attempt-n 2 --prior-tier=T1)
+    --row 'implementation work' --tier=T2 --pool codex --attempt-n 2 --prior-tier=T1)
   status=$?
   expect_code 0 "$status" "classified dispatch should succeed: $out"
   grep -Fxq 'row=implementation work' "$HOME_DIR/state/$id.meta" || fail "row missing"
   grep -Fxq 'tier=T2' "$HOME_DIR/state/$id.meta" || fail "tier missing"
+  grep -Fxq 'pool=codex' "$HOME_DIR/state/$id.meta" || fail "pool missing"
   grep -Fxq 'attempt_n=2' "$HOME_DIR/state/$id.meta" || fail "attempt number missing"
   grep -Fxq 'prior_tier=T1' "$HOME_DIR/state/$id.meta" || fail "prior tier missing"
   grep -Eq '^attempt_started_at=[0-9]+$' "$HOME_DIR/state/$id.meta" || fail "attempt start missing"
@@ -197,10 +198,10 @@ test_invalid_attempt_classification_refuses_before_launch() {
   id=attempt-invalid-z1
   rec=$(make_spawn_case attempt-invalid claude "$id")
   read_case_record "$rec"
-  for flag in --row= --tier= --prior-tier= --attempt-n= --attempt-n=0 \
+  for flag in --row= --tier= --pool= --prior-tier= --attempt-n= --attempt-n=0 \
     --attempt-n=-1 --attempt-n=1.5 --attempt-n=abc --attempt-n=01 \
-    $'--row=bad\ntier=injected' $'--tier=bad\rvalue' $'--prior-tier=bad\nvalue' \
-    --row --tier --attempt-n --prior-tier; do
+    $'--row=bad\ntier=injected' $'--tier=bad\rvalue' $'--pool=bad\nvalue' $'--prior-tier=bad\nvalue' \
+    --row --tier --pool --attempt-n --prior-tier; do
     out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "$flag" 2>&1)
     status=$?
     expect_code 1 "$status" "invalid classification '$flag' must refuse: $out"
@@ -1801,7 +1802,7 @@ test_batch_forwards_shared_profile_flags() {
 
   out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
     "$id1=$PROJ_DIR" "$id2=$PROJ_DIR" --harness codex --model gpt-5 --effort high \
-    --row=code --tier T2 --attempt-n=3 --prior-tier T1)
+    --row=code --tier T2 --pool=codex --attempt-n=3 --prior-tier T1)
   status=$?
   expect_code 0 "$status" "batch spawn with shared profile flags should succeed"
   assert_contains "$out" "spawned $id1 harness=codex" "first batch task did not use shared harness"
@@ -1811,6 +1812,7 @@ test_batch_forwards_shared_profile_flags() {
   for id in "$id1" "$id2"; do
     grep -Fxq 'row=code' "$HOME_DIR/state/$id.meta" || fail "batch row missing"
     grep -Fxq 'tier=T2' "$HOME_DIR/state/$id.meta" || fail "batch tier missing"
+    grep -Fxq 'pool=codex' "$HOME_DIR/state/$id.meta" || fail "batch pool missing"
     grep -Fxq 'attempt_n=3' "$HOME_DIR/state/$id.meta" || fail "batch attempt number missing"
     grep -Fxq 'prior_tier=T1' "$HOME_DIR/state/$id.meta" || fail "batch prior tier missing"
   done

@@ -6,12 +6,14 @@ The caller holds the task metadata lock and has stopped its worker. The ledger
 is DIR/attempts.jsonl (0600). An exclusive file lock serializes concurrent
 writers; fsync completes before success. Retries keep the first record for
 (task_id, attempt_id), including its original end time. Invalid ledger data
-refuses the append so cleanup can preserve the remaining evidence.
+refuses the append; callers warn and continue rather than block on telemetry.
 
 fm-spawn.sh owns attempt_id and attempt_started_at. Same-profile replacements
 retain them and all sessions in [attempt_started_at, end) are counted by
 fm-attempt-usage.py. --end accepts Unix seconds or a timezone-qualified ISO
 timestamp, defaulting to now; --claude-root/--codex-root forward log locations.
+--end bounds attribution and becomes ts. ended_at and duration_s use the
+attempt's last counted usage event, falling back to --end with a note.
 Older metadata uses spawn_gen (or a metadata digest) for retry identity, but
 does not infer a usage interval from mutable file times or reused paths.
 
@@ -22,7 +24,10 @@ validated PR merge receipt. Review labels are never translated to policy
 severities. Accepted remains unknown until the seven-day fix-forward check.
 --relaunch HARNESS MODEL TIER closes an attempt only when those axes change
 (or a previous interrupted relaunch already closed it), printing the durable
-end time for the replacement's start. Same-profile handoffs print nothing.
+ts for the replacement's start; if recording fails it still prints --end and
+exits nonzero. Same-profile handoffs print nothing. Only a rise in the leading
+T<n> of the tier label is escalated; other changes close with a null outcome
+and a note naming the switch.
 Additional attempt_id, started_at, ended_at and worktree fields preserve the
 attribution boundary. No transcript text or credentials enter the ledger.
 """
@@ -35,6 +40,7 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 import subprocess
 import sqlite3
 import sys
@@ -55,6 +61,11 @@ def timestamp(value):
 
 def iso(value):
     return datetime.fromtimestamp(value, timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def tier_rank(label):
+    match = re.match(r"T(\d+)\b", label or "")
+    return int(match.group(1)) if match else None
 
 
 def shell_read(script, *args):
@@ -192,13 +203,10 @@ def build_record(args, meta, attempt_id, end):
     else:
         notes.append("Attempt start unavailable; usage and duration not attributed.")
     worktree = meta.get("worktree") or None
-    record.update(ts=iso(end), task_id=args.task_id, attempt_id=attempt_id,
-                  started_at=iso(start) if start is not None else None,
-                  ended_at=iso(end), worktree=worktree,
-                  duration_s=end - start if start is not None else None)
     usage_fields = ("input_tokens", "output_tokens", "cache_read_tokens",
                     "cache_write_tokens", "context_peak")
     record.update(dict.fromkeys(usage_fields))
+    finished = None
     if start is not None and worktree and os.path.isabs(worktree):
         if record["harness"] in ("claude", "codex"):
             command = [sys.executable, str(Path(__file__).with_name("fm-attempt-usage.py")),
@@ -207,16 +215,39 @@ def build_record(args, meta, attempt_id, end):
             for name in ("claude_root", "codex_root"):
                 if getattr(args, name):
                     command.extend(["--" + name.replace("_", "-"), getattr(args, name)])
-            usage = json.loads(subprocess.check_output(command, text=True))
-            record.update({field: usage[field] for field in usage_fields})
-            notes.extend(usage["notes"])
+            try:
+                usage = json.loads(subprocess.check_output(command, text=True))
+                record.update({field: usage[field] for field in usage_fields})
+                notes.extend(usage["notes"])
+                finished = usage["last_activity"]
+            except (OSError, ValueError, KeyError, TypeError, subprocess.CalledProcessError):
+                notes.append("Usage logs unreadable; usage not attributed.")
         else:
             notes.append("Usage extraction unavailable for this harness.")
     elif not worktree or not os.path.isabs(worktree):
         notes.append("Absolute task worktree unavailable; usage not attributed.")
+    if finished is None:
+        finished = end
+        notes.append("No recorded worker activity; ended_at is the cleanup time.")
+    record.update(ts=iso(end), task_id=args.task_id, attempt_id=attempt_id,
+                  started_at=iso(start) if start is not None else None,
+                  ended_at=iso(finished), worktree=worktree,
+                  duration_s=finished - start if start is not None else None)
     record.update(lifecycle(args, meta, start, end, notes))
     if args.relaunch:
-        record["outcome"] = "escalated"
+        harness, model, tier = args.relaunch
+        prior, rank = tier_rank(record["tier"]), tier_rank(tier)
+        if prior is not None and rank is not None and rank > prior:
+            record["outcome"] = "escalated"
+        else:
+            record["outcome"] = None
+            if tier == (record["tier"] or ""):
+                notes.append(f"Lateral switch at tier {tier or 'unknown'}: "
+                             f"{record['harness']}/{meta.get('model') or 'default'} -> "
+                             f"{harness}/{model}; not an escalation.")
+            else:
+                notes.append(f"Tier changed from {record['tier']} to {tier or 'unknown'} "
+                             "without a recorded rise; not an escalation.")
     record.update(fix_forward_7d=None, don_minutes=None)
     notes.append("fix_forward_7d and don_minutes not collected yet.")
     record["notes"] = sorted(set(notes))
@@ -233,6 +264,7 @@ def main():
     parser.add_argument("--claude-root")
     parser.add_argument("--codex-root")
     args = parser.parse_args()
+    changed = False
     try:
         raw = args.meta.read_bytes()
         meta = {}
@@ -243,6 +275,9 @@ def main():
         attempt_id = (meta.get("attempt_id") or meta.get("spawn_gen")
                       or "legacy-" + hashlib.sha256(raw).hexdigest())
         end = timestamp(args.end)
+        if args.relaunch:
+            prior = [meta.get("harness", ""), meta.get("model") or "default", meta.get("tier", "")]
+            changed = args.relaunch != prior
         args.data.mkdir(parents=True, exist_ok=True)
         ledger = args.data / "attempts.jsonl"
         fd = os.open(ledger, os.O_RDWR | os.O_CREAT | os.O_APPEND, 0o600)
@@ -258,10 +293,8 @@ def main():
                     raise ValueError("attempt ledger record lacks identity")
                 if (entry["task_id"], entry["attempt_id"]) == (args.task_id, attempt_id):
                     found = entry
-            if args.relaunch and found is None:
-                prior = [meta.get("harness", ""), meta.get("model") or "default", meta.get("tier", "")]
-                if args.relaunch == prior:
-                    return 0
+            if args.relaunch and found is None and not changed:
+                return 0
             if found is None:
                 record = build_record(args, meta, attempt_id, end)
                 stream.write(json.dumps(record, sort_keys=True) + "\n")
@@ -275,9 +308,11 @@ def main():
         finally:
             os.close(directory)
         if args.relaunch:
-            print(found["ended_at"])
-    except (OSError, ValueError, OverflowError, subprocess.CalledProcessError) as error:
+            print(found["ts"])
+    except (OSError, ValueError, KeyError, OverflowError, subprocess.CalledProcessError) as error:
         print(f"Cannot record attempt: {error}", file=sys.stderr)
+        if changed:
+            print(iso(end))
         return 1
     return 0
 

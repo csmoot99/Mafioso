@@ -16,7 +16,8 @@ already included in output_tokens. Context peak follows the existing handoff
 readers: Claude input plus caches; Codex last_token_usage.total_tokens.
 Missing measurements are null with notes, never inferred as zero. Missing
 fields in any counted request make that aggregate field null. Session counts
-include only sessions with counted usage. Roots can be supplied for account
+include only sessions with counted usage. last_activity is the Unix time of
+the latest counted usage event, or null. Roots can be supplied for account
 stores or fixtures; defaults honor CLAUDE_CONFIG_DIR and CODEX_HOME.
 """
 
@@ -112,7 +113,7 @@ def claude_requests(root, worktree, start, end, notes):
                     messages[mid] = (ts, session, usage(message["usage"], "claude"))
     for ts, session, values in messages.values():
         if start <= ts < end:
-            yield session, values, add([values[0], values[2], values[3]])
+            yield session, values, add([values[0], values[2], values[3]]), ts
 
 
 def codex_requests(root, worktree, start, end, notes):
@@ -176,7 +177,7 @@ def codex_requests(root, worktree, start, end, notes):
                     notes.add("Codex usage without a baseline in the interval; used last_token_usage.")
             else:
                 notes.add("Codex cumulative counters missing; last_token_usage cannot deduplicate repeated notifications.")
-            yield sid, values, count(last.get("total_tokens"))
+            yield sid, values, count(last.get("total_tokens")), ts
 
 
 def main():
@@ -198,15 +199,17 @@ def main():
     sessions = set()
     totals = [0] * len(FIELDS)
     peaks = []
+    last_activity = None
     root = args.claude_root if args.harness == "claude" else args.codex_root
     extractor = claude_requests if args.harness == "claude" else codex_requests
     try:
         if not root.is_dir():
             notes.add("Transcript root is missing.")
-        for session, values, peak in extractor(root, args.worktree, start, end, notes):
+        for session, values, peak, ts in extractor(root, args.worktree, start, end, notes):
             sessions.add(session)
             totals = [add([a, b]) for a, b in zip(totals, values)]
             peaks.append(peak)
+            last_activity = ts if last_activity is None else max(last_activity, ts)
     except OSError as error:
         # Do not publish partial totals as complete when a log could not be read.
         print(f"Cannot read usage logs: {error}", file=sys.stderr)
@@ -219,7 +222,7 @@ def main():
     for field, value in result.items():
         if value is None and sessions:
             notes.add(f"{field} unavailable in one or more usage records.")
-    result.update(sessions=len(sessions), notes=sorted(notes))
+    result.update(sessions=len(sessions), last_activity=last_activity, notes=sorted(notes))
     print(json.dumps(result, sort_keys=True))
     return 0
 

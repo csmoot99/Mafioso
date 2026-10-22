@@ -117,13 +117,25 @@ print('ok - failures are explicit; unrelated runs and stale code cannot establis
 
 record, output = run('same-profile', ['--relaunch', 'pi', 'old', 'T1'])
 assert record is None and output == ''
-record, boundary = run('escalation', ['--relaunch', 'pi', 'new', 'T1'])
-assert record['outcome'] == 'escalated' and boundary == record['ended_at']
-record, retry = run('escalation', ['--end', '300', '--relaunch', 'pi', 'old', 'T1'])
+record, boundary = run('lateral', ['--relaunch', 'codex', 'sol', 'T1'])
+assert record['outcome'] is None and boundary == record['ts']
+assert any('Lateral switch at tier T1: pi/old -> codex/sol' in note for note in record['notes'])
+record, retry = run('lateral', ['--end', '300', '--relaunch', 'pi', 'old', 'T1'])
 assert retry == boundary
 record, _ = run('tier-only', ['--relaunch', 'pi', 'old', 'T2'])
 assert record['outcome'] == 'escalated'
-print('ok - same profile stays open; model/tier changes and failed-publication retries share a durable boundary')
+record, _ = run('escalation', ['--relaunch', 'codex', 'astra', 'T4 Heavy'])
+assert record['outcome'] == 'escalated'
+record, _ = run('de-escalation', ['--relaunch', 'pi', 'old', 'T0'])
+assert record['outcome'] is None and any('without a recorded rise' in note for note in record['notes'])
+print('ok - only a tier rise escalates; lateral switches close with a note; retries share a durable boundary')
+(data / 'attempts.jsonl').write_text('{partial')
+meta.write_text(base + 'attempt_id=broken-ledger\n')
+for relaunch, expected in [(['pi', 'new', 'T1'], '1970-01-01T00:03:20Z'), (['pi', 'old', 'T1'], '')]:
+    result = subprocess.run([*command, '--relaunch', *relaunch], env=env, text=True, capture_output=True)
+    assert result.returncode != 0 and result.stdout.strip() == expected, result
+(data / 'attempts.jsonl').unlink()
+print('ok - a failed record still gives a changed profile its own boundary')
 conn.execute('UPDATE runs SET head_sha=?', (head,))
 conn.execute("UPDATE step_results SET findings_json='[]' WHERE step_name='review'")
 conn.commit()

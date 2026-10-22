@@ -925,7 +925,7 @@ test_explicit_model_wins_over_the_recorded_one() {
   expect_code 0 "$rc" "relaunch with explicit axes should succeed"$'\n'"$out"
   [ "$(meta_field "$dir" rl7 model)" = sonnet ] || fail "an explicit model should be recorded"
   [ "$(meta_field "$dir" rl7 effort)" = low ] || fail "an explicit effort should be recorded"
-  if grep -Eq "^(row|tier|attempt_n|prior_tier)=" "$dir/home/state/rl7.meta"; then
+  if grep -Eq "^(row|tier|pool|attempt_n|prior_tier)=" "$dir/home/state/rl7.meta"; then
     fail "a legacy unclassified task must stay unclassified on relaunch"
   fi
   pass "fm-control relaunch: explicit model and effort win over the recorded ones"
@@ -935,15 +935,16 @@ test_relaunch_overrides_attempt_classification() {
   local dir out rc key attempt_id
   dir=$(new_case classification rl73)
   add_ship_task "$dir" rl73 claude
-  printf 'row=code\ntier=T1\nattempt_n=1\n' >> "$dir/home/state/rl73.meta"
-  out=$(run_control "$dir" rl73 relaunch --model sonnet --row=debug --tier T2 \
+  printf 'row=code\ntier=T1\npool=claude\nattempt_n=1\n' >> "$dir/home/state/rl73.meta"
+  out=$(run_control "$dir" rl73 relaunch --model sonnet --row=debug --tier T2 --pool=codex \
     --attempt-n=2 --prior-tier T1 --note "escalate this attempt"); rc=$?
   expect_code 0 "$rc" "relaunch with classification overrides should succeed: $out"
   [ "$(meta_field "$dir" rl73 row)" = debug ] || fail "row override missing"
   [ "$(meta_field "$dir" rl73 tier)" = T2 ] || fail "tier override missing"
+  [ "$(meta_field "$dir" rl73 pool)" = codex ] || fail "pool override missing"
   [ "$(meta_field "$dir" rl73 attempt_n)" = 2 ] || fail "attempt override missing"
   [ "$(meta_field "$dir" rl73 prior_tier)" = T1 ] || fail "prior tier override missing"
-  for key in row tier attempt_n prior_tier; do
+  for key in row tier pool attempt_n prior_tier; do
     [ "$(grep -c "^$key=" "$dir/home/state/rl73.meta")" = 1 ] || fail "duplicate $key metadata"
   done
   attempt_id=$(meta_field "$dir" rl73 attempt_id)
@@ -955,9 +956,9 @@ import sys
 rows = [json.loads(line) for line in Path(sys.argv[1]).read_text().splitlines()]
 record, = rows
 meta = dict(line.split('=', 1) for line in Path(sys.argv[2]).read_text().splitlines() if '=' in line)
-assert record['model'] == 'default' and record['tier'] == 'T1'
+assert record['model'] == 'default' and record['tier'] == 'T1' and record['pool'] == 'claude'
 assert record['attempt_n'] == 1 and record['outcome'] == 'escalated'
-assert record['ended_at'] == meta['attempt_started_at']
+assert record['ts'] == meta['attempt_started_at']
 PYTEST
   then
     fail "prior attempt was not recorded with the replacement boundary"
@@ -966,6 +967,7 @@ PYTEST
   expect_code 0 "$rc" "partial classification override should succeed: $out"
   [ "$(meta_field "$dir" rl73 row)" = review ] || fail "partial row override missing"
   [ "$(meta_field "$dir" rl73 tier)" = T2 ] || fail "partial override lost tier"
+  [ "$(meta_field "$dir" rl73 pool)" = codex ] || fail "partial override lost pool"
   [ "$(meta_field "$dir" rl73 attempt_n)" = 2 ] || fail "partial override changed attempt"
   [ "$(meta_field "$dir" rl73 prior_tier)" = T1 ] || fail "partial override lost prior tier"
   [ "$(meta_field "$dir" rl73 attempt_id)" = "$attempt_id" ] || fail "same profile split the attempt"
@@ -979,20 +981,37 @@ PYTEST
   pass "fm-control relaunch: classification and model/tier attempt boundaries survive replacement"
 }
 
+test_attempt_record_failure_warns_and_relaunch_continues() {
+  local dir out rc
+  dir=$(new_case record-failure rl75)
+  add_ship_task "$dir" rl75 claude
+  printf 'tier=T2\nattempt_n=1\nattempt_id=old\nattempt_started_at=100\n' >> "$dir/home/state/rl75.meta"
+  mkdir -p "$dir/home/data/attempts.jsonl"
+  out=$(run_control "$dir" rl75 relaunch --model sonnet --note "lateral switch"); rc=$?
+  expect_code 0 "$rc" "an attempt record failure must not block the relaunch: $out"
+  assert_contains "$out" "warning: could not record rl75's previous attempt; relaunch continues" \
+    "the relaunch should warn about the lost attempt record"
+  [ "$(meta_field "$dir" rl75 model)" = sonnet ] || fail "the replacement was not published"
+  [ "$(meta_field "$dir" rl75 attempt_id)" != old ] || fail "a changed profile kept the old attempt"
+  [ "$(meta_field "$dir" rl75 attempt_n)" = 2 ] || fail "a changed profile did not advance the attempt"
+  [ "$(meta_field "$dir" rl75 attempt_started_at)" != 100 ] || fail "the replacement reused the old start"
+  pass "fm-control relaunch: an attempt record failure warns and the replacement starts its own attempt"
+}
+
 test_invalid_attempt_classification_refuses_before_stop() {
   local dir out rc flag verb before
   dir=$(new_case invalid-classification rl74)
   add_ship_task "$dir" rl74 claude
   before=$(cat "$dir/home/state/rl74.meta")
-  for flag in --row= --tier= --prior-tier= --attempt-n= --attempt-n=0 \
+  for flag in --row= --tier= --pool= --prior-tier= --attempt-n= --attempt-n=0 \
     --attempt-n=-1 --attempt-n=1.5 --attempt-n=abc --attempt-n=01 \
-    $'--row=bad\ntier=injected' $'--tier=bad\rvalue' $'--prior-tier=bad\nvalue' \
-    --row --tier --attempt-n --prior-tier; do
+    $'--row=bad\ntier=injected' $'--tier=bad\rvalue' $'--pool=bad\nvalue' $'--prior-tier=bad\nvalue' \
+    --row --tier --pool --attempt-n --prior-tier; do
     out=$(run_control "$dir" rl74 relaunch --note "invalid classification" "$flag"); rc=$?
     expect_code 1 "$rc" "invalid classification '$flag' must refuse: $out"
   done
   for verb in exit interrupt; do
-    for flag in --row=code --tier=T1 --attempt-n=1 --prior-tier=T0; do
+    for flag in --row=code --tier=T1 --pool=claude --attempt-n=1 --prior-tier=T0; do
       out=$(run_control "$dir" rl74 "$verb" "$flag"); rc=$?
       expect_code 1 "$rc" "classification must be relaunch-only: $out"
     done
@@ -2685,6 +2704,7 @@ test_pi_exclude_tools_follow_the_relaunch
 test_exclude_tools_refusals_happen_before_the_agent_stops
 test_explicit_model_wins_over_the_recorded_one
 test_relaunch_overrides_attempt_classification
+test_attempt_record_failure_warns_and_relaunch_continues
 test_invalid_attempt_classification_refuses_before_stop
 test_relaunch_onto_an_unverified_harness_is_refused
 test_prior_harness_turnend_registry_entry_is_cleared

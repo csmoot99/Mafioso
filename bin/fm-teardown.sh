@@ -94,7 +94,7 @@
 # data/<id>/ is deliberately left in place: a successor spawn reads brief.md
 # from it.
 # Before releasing a worker's worktree, fm-attempt-record.py durably records
-# its attempt; a write failure preserves the worktree and metadata for retry.
+# its attempt; like pipeline spend, a record failure only warns.
 # Worktree-slot ownership (teardown-slot-collision): a treehouse pool slot is
 # reused across tasks, so a stale, duplicated, or drifted worktree= record can
 # name a slot a DIFFERENT live task now holds. Cleanup kills every process under
@@ -3565,10 +3565,8 @@ if [ "$KIND" = ship ] && teardown_owns_worktree && [ -e "$CONFIG/pipeline-spend"
 fi
 
 if [ "$KIND" != secondmate ] && [ -z "$CLEANUP_RECOVERY" ]; then
-  python3 "$SCRIPT_DIR/fm-attempt-record.py" --task-id "$ID" --meta "$META" --data "$DATA" || {
-    echo "error: could not record $ID's attempt; preserving worktree and task records for retry" >&2
-    exit 1
-  }
+  python3 "$SCRIPT_DIR/fm-attempt-record.py" --task-id "$ID" --meta "$META" --data "$DATA" \
+    || echo "warning: could not record $ID's attempt; cleanup continues" >&2
 fi
 
 # Fix 3 (see script header): sweep remote job workers abandoned by an already

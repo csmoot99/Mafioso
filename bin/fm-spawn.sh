@@ -49,12 +49,14 @@
 #   cleanup read; it is refused on secondmates and relaunches, and without it
 #   nothing changes.
 #   Optional attempt classification: --row <label>, --tier <label>,
-#   --attempt-n <positive-integer>, and --prior-tier <label> record the intake
-#   classification as row, tier, attempt_n, and prior_tier in task metadata.
+#   --pool <label>, --attempt-n <positive-integer>, and --prior-tier <label>
+#   record the intake classification as row, tier, pool, attempt_n, and
+#   prior_tier in task metadata. Pool is never derived from harness or model.
 #   Fresh worker dispatches also record attempt_id and attempt_started_at (Unix
 #   seconds). Same-model/tier/harness replacements share an interval. A change
 #   closes the old attempt through fm-attempt-record.py before publication and
-#   starts a new interval at that durable boundary (also on a retry).
+#   starts a new interval at that durable boundary (also on a retry). A record
+#   failure only warns; the replacement still starts its own interval.
 #   Labels must be non-empty single lines; absent flags write no fields.
 #   A batch applies the same values to every task. A relaunch preserves each
 #   recorded value unless explicitly overridden. At a new attempt boundary a
@@ -1347,6 +1349,8 @@ ROW=
 ROW_SET=0
 TIER=
 TIER_SET=0
+POOL=
+POOL_SET=0
 ATTEMPT_N=
 ATTEMPT_N_SET=0
 PRIOR_TIER=
@@ -1390,6 +1394,7 @@ for a in "$@"; do
       ;;
     row) ROW=$a; ROW_SET=1 ;;
     tier) TIER=$a; TIER_SET=1 ;;
+    pool) POOL=$a; POOL_SET=1 ;;
     attempt-n) ATTEMPT_N=$a; ATTEMPT_N_SET=1 ;;
     prior-tier) PRIOR_TIER=$a; PRIOR_TIER_SET=1 ;;
     backend)
@@ -1454,6 +1459,8 @@ for a in "$@"; do
   --row=*) ROW=${a#--row=}; ROW_SET=1 ;;
   --tier) want_value=tier ;;
   --tier=*) TIER=${a#--tier=}; TIER_SET=1 ;;
+  --pool) want_value=pool ;;
+  --pool=*) POOL=${a#--pool=}; POOL_SET=1 ;;
   --attempt-n) want_value="attempt-n" ;;
   --attempt-n=*) ATTEMPT_N=${a#--attempt-n=}; ATTEMPT_N_SET=1 ;;
   --prior-tier) want_value=prior-tier ;;
@@ -1496,7 +1503,7 @@ done
   exit 1
 }
 # Classification labels are opaque, single-line metadata values, not policy enums.
-for classification_key in ROW TIER ATTEMPT_N PRIOR_TIER; do
+for classification_key in ROW TIER POOL ATTEMPT_N PRIOR_TIER; do
   classification_set=${classification_key}_SET
   [ "${!classification_set}" -eq 1 ] || continue
   classification_flag=${classification_key,,}
@@ -2231,6 +2238,7 @@ if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in *
   [ -z "$EFFORT" ] || shared_args+=(--effort "$EFFORT")
   [ "$ROW_SET" -eq 0 ] || shared_args+=(--row "$ROW")
   [ "$TIER_SET" -eq 0 ] || shared_args+=(--tier "$TIER")
+  [ "$POOL_SET" -eq 0 ] || shared_args+=(--pool "$POOL")
   [ "$ATTEMPT_N_SET" -eq 0 ] || shared_args+=(--attempt-n "$ATTEMPT_N")
   [ "$PRIOR_TIER_SET" -eq 0 ] || shared_args+=(--prior-tier "$PRIOR_TIER")
   [ -z "$BACKEND_ARG" ] || shared_args+=(--backend "$BACKEND_ARG")
@@ -2548,6 +2556,7 @@ if [ "$RELAUNCH" -eq 1 ]; then
   RELAUNCH_PRIOR_HARNESS=$(fm_meta_get "$RELAUNCH_META" harness)
   [ "$ROW_SET" -eq 1 ] || ROW=$(fm_meta_get "$RELAUNCH_META" row)
   [ "$TIER_SET" -eq 1 ] || TIER=$(fm_meta_get "$RELAUNCH_META" tier)
+  [ "$POOL_SET" -eq 1 ] || POOL=$(fm_meta_get "$RELAUNCH_META" pool)
   [ "$ATTEMPT_N_SET" -eq 1 ] || ATTEMPT_N=$(fm_meta_get "$RELAUNCH_META" attempt_n)
   [ "$PRIOR_TIER_SET" -eq 1 ] || PRIOR_TIER=$(fm_meta_get "$RELAUNCH_META" prior_tier)
   KIND=$(fm_meta_get "$RELAUNCH_META" kind)
@@ -5840,10 +5849,8 @@ if [ "$RELAUNCH" -eq 1 ] && [ "$KIND" != secondmate ]; then
   # A durable prior record also recovers the boundary if publication failed.
   SPAWN_ATTEMPT_START=$(python3 "$SCRIPT_DIR/fm-attempt-record.py" \
     --task-id "$ID" --meta "$RELAUNCH_META" --data "$DATA" \
-    --relaunch "$HARNESS" "${MODEL:-default}" "$TIER") || {
-    echo "error: cannot record previous attempt for $ID; preserving its task record" >&2
-    exit 1
-  }
+    --relaunch "$HARNESS" "${MODEL:-default}" "$TIER") \
+    || echo "warning: could not record $ID's previous attempt; relaunch continues" >&2
   if [ -n "$SPAWN_ATTEMPT_START" ]; then
     if [ "$ATTEMPT_N_SET" -eq 0 ] && [[ "$ATTEMPT_N" =~ ^[1-9][0-9]*$ ]]; then
       ATTEMPT_N=$(python3 -c 'import sys; print(int(sys.argv[1]) + 1)' "$ATTEMPT_N")
@@ -5855,7 +5862,7 @@ preserve_relaunch_meta() {
   awk -F= -v new_attempt="$SPAWN_ATTEMPT_START" '
     BEGIN {
       if (new_attempt != "") { owned["attempt_id"] = 1; owned["attempt_started_at"] = 1 }
-      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch model effort row tier attempt_n prior_tier account account_provider busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx", keys, " ")
+      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch model effort row tier pool attempt_n prior_tier account account_provider busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
@@ -5877,6 +5884,7 @@ preserve_relaunch_meta() {
   echo "effort=${EFFORT:-default}"
   [ -z "$ROW" ] || echo "row=$ROW"
   [ -z "$TIER" ] || echo "tier=$TIER"
+  [ -z "$POOL" ] || echo "pool=$POOL"
   [ -z "$ATTEMPT_N" ] || echo "attempt_n=$ATTEMPT_N"
   [ -z "$PRIOR_TIER" ] || echo "prior_tier=$PRIOR_TIER"
   # The worker account pin, only when this home declares one, so an unpinned

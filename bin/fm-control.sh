@@ -6,7 +6,8 @@
 #        fm-control.sh <task-id> exit
 #        fm-control.sh <task-id> relaunch [--harness <name>] [--model <name>]
 #                                         [--effort <level>] [--row <label>] [--tier <label>]
-#                                         [--attempt-n <positive-integer>] [--prior-tier <label>]
+#                                         [--pool <label>] [--attempt-n <positive-integer>]
+#                                         [--prior-tier <label>]
 #                                         (--note <text> | --note-file <path>)
 #
 # Why this exists, and how it differs from fm-send.sh. bin/fm-send.sh is the
@@ -67,7 +68,7 @@
 #              a tmux `missing` cannot be proven absent from a task record, so
 #              it refuses.
 #              Attempt classification is retained unless --row, --tier,
-#              --attempt-n, or --prior-tier overrides it (values and metadata
+#              --pool, --attempt-n, or --prior-tier overrides it (values and metadata
 #              contract: bin/fm-spawn.sh). These flags apply only to relaunch.
 #              An explicit `default` model or effort clears that
 #              axis for the replacement. With no explicit axis, a secondmate
@@ -254,6 +255,8 @@ ROW=
 ROW_SET=0
 TIER=
 TIER_SET=0
+POOL=
+POOL_SET=0
 ATTEMPT_N=
 ATTEMPT_N_SET=0
 PRIOR_TIER=
@@ -275,6 +278,7 @@ for control_arg in "$@"; do
       effort) NEW_EFFORT=$control_arg; EFFORT_SET=1 ;;
       row) ROW=$control_arg; ROW_SET=1 ;;
       tier) TIER=$control_arg; TIER_SET=1 ;;
+      pool) POOL=$control_arg; POOL_SET=1 ;;
       attempt-n) ATTEMPT_N=$control_arg; ATTEMPT_N_SET=1 ;;
       prior-tier) PRIOR_TIER=$control_arg; PRIOR_TIER_SET=1 ;;
       note) NOTE=$control_arg; NOTE_SET=1 ;;
@@ -298,6 +302,8 @@ for control_arg in "$@"; do
     --row=*) ROW=${control_arg#--row=}; ROW_SET=1 ;;
     --tier) control_want_value=tier ;;
     --tier=*) TIER=${control_arg#--tier=}; TIER_SET=1 ;;
+    --pool) control_want_value=pool ;;
+    --pool=*) POOL=${control_arg#--pool=}; POOL_SET=1 ;;
     --attempt-n) control_want_value="attempt-n" ;;
     --attempt-n=*) ATTEMPT_N=${control_arg#--attempt-n=}; ATTEMPT_N_SET=1 ;;
     --prior-tier) control_want_value=prior-tier ;;
@@ -320,11 +326,12 @@ fi
 
 if [ "$VERB" != relaunch ]; then
   [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] \
-    && [ "$ROW_SET" = 0 ] && [ "$TIER_SET" = 0 ] && [ "$ATTEMPT_N_SET" = 0 ] && [ "$PRIOR_TIER_SET" = 0 ] \
-    || die "--harness, --model, --effort, --row, --tier, --attempt-n, --prior-tier, and --note apply to 'relaunch' only"
+    && [ "$ROW_SET" = 0 ] && [ "$TIER_SET" = 0 ] && [ "$POOL_SET" = 0 ] && [ "$ATTEMPT_N_SET" = 0 ] \
+    && [ "$PRIOR_TIER_SET" = 0 ] \
+    || die "--harness, --model, --effort, --row, --tier, --pool, --attempt-n, --prior-tier, and --note apply to 'relaunch' only"
 fi
 # Classification labels are opaque, single-line metadata values, not policy enums.
-for classification_key in ROW TIER ATTEMPT_N PRIOR_TIER; do
+for classification_key in ROW TIER POOL ATTEMPT_N PRIOR_TIER; do
   classification_set=${classification_key}_SET
   [ "${!classification_set}" -eq 1 ] || continue
   classification_flag=${classification_key,,}
@@ -1198,6 +1205,7 @@ do_relaunch() {
   [ "$TARGET_EFFORT" = default ] || spawn_args+=(--effort "$TARGET_EFFORT")
   [ "$ROW_SET" -eq 0 ] || spawn_args+=(--row "$ROW")
   [ "$TIER_SET" -eq 0 ] || spawn_args+=(--tier "$TIER")
+  [ "$POOL_SET" -eq 0 ] || spawn_args+=(--pool "$POOL")
   [ "$ATTEMPT_N_SET" -eq 0 ] || spawn_args+=(--attempt-n "$ATTEMPT_N")
   [ "$PRIOR_TIER_SET" -eq 0 ] || spawn_args+=(--prior-tier "$PRIOR_TIER")
   if FM_CONTROL_RELAUNCH_TX="$RELAUNCH_TX" \

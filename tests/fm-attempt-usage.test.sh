@@ -36,10 +36,12 @@ def expect(actual, inputs, outputs, reads, writes, peak, sessions):
 
 expect(result('claude'), 17, 7, 34, 4, 33, 2)
 assert result('claude')['notes'] == []
+assert result('claude')['last_activity'] == 1792695700  # 19:01:40Z, latest in-window request
 print('ok - Claude request ids deduplicate streaming and copies; subagents and replacement sessions sum')
 
 expect(result('codex'), 120, 17, 60, 0, 88, 2)
 assert result('codex')['notes'] == []
+assert result('codex')['last_activity'] == 1792695710  # 19:01:50Z, latest in-window token_count
 expect(result('codex', start='2026-10-22T19:01:15Z', end='2026-10-22T19:01:45Z'),
        40, 7, 40, 0, 54, 2)
 expect(result('codex', start='2026-10-22T19:00:00Z'), 180, 27, 100, 0, 110, 2)
@@ -53,7 +55,7 @@ print('ok - duplicate Codex session ids and events counted once')
 for harness in ('claude', 'codex'):
     empty = result(harness, start='2026-10-22T19:03:00Z', end='2026-10-22T19:04:00Z')
     expect(empty, None, None, None, None, None, 0)
-    assert empty['notes']
+    assert empty['notes'] and empty['last_activity'] is None
     assert run(harness, start='bad').returncode != 0
     assert run(harness, start='NaN').returncode != 0
     assert run(harness, start='2026-10-22T19:01:00').returncode != 0
