@@ -2902,6 +2902,41 @@ test_allow_red_still_waives_only_the_current_failure() {
   pass "fm-pr-merge keeps --allow-red scoped to its named check beside a superseded failure"
 }
 
+test_repeated_allow_red_waives_only_named_checks() {
+  local case_dir rc head label
+  local waiver_args=()
+  head=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  for label in both partial duplicate; do
+    case_dir=$(make_case "github-allow-red-$label")
+    add_gh_mocks "$case_dir" "$head"
+    write_github_red_json "$case_dir" "$head" lint
+    jq '.statusCheckRollup += [(.statusCheckRollup[0] | .name = "unit")]' \
+      "$case_dir/github-view.json" > "$case_dir/github-view.tmp"
+    mv "$case_dir/github-view.tmp" "$case_dir/github-view.json"
+    waiver_args=(--allow-red lint)
+    [ "$label" = partial ] || waiver_args+=(--allow-red unit)
+    [ "$label" != duplicate ] || waiver_args+=(--allow-red lint)
+    set +e
+    run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/88 \
+      "${waiver_args[@]}" > "$case_dir/stdout" 2> "$case_dir/stderr"
+    rc=$?
+    set -e
+    if [ "$label" = partial ]; then
+      expect_code 1 "$rc" "allow-red-partial: an unwaived red check must refuse"
+      assert_grep "check 'unit' is not green" "$case_dir/stderr" \
+        "allow-red-partial: the unwaived red check was not named"
+      assert_no_grep "check 'lint' is not green" "$case_dir/stderr" \
+        "allow-red-partial: the waived check was still reported"
+      assert_no_grep 'pr merge' "$case_dir/gh.log" \
+        "allow-red-partial: gh pr merge ran with an unwaived red check"
+    else
+      expect_code 0 "$rc" "allow-red-$label: named waivers should merge: $(cat "$case_dir/stderr")"
+      assert_logged_gh_merge "$case_dir" 88 example/repo --squash
+    fi
+  done
+  pass "fm-pr-merge accepts repeated red-check waivers, tolerates duplicates, and refuses unwaived failures"
+}
+
 test_allow_red_is_refused_while_away() {
   local case_dir rc head
   head=abababababababababababababababababababab
@@ -2912,7 +2947,7 @@ test_allow_red_is_refused_while_away() {
   write_away_record "$case_dir" --words 'merge task-x1 when green'
   set +e
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/82 \
-    --allow-red lint \
+    --allow-red lint --allow-red unit \
     > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
@@ -2930,7 +2965,7 @@ test_allow_red_is_refused_while_away() {
   mv "$case_dir/state/.afk-contract" "$case_dir/away-record-after-view"
   set +e
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/82 \
-    --allow-red lint \
+    --allow-red lint --allow-red unit \
     > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
@@ -2981,19 +3016,20 @@ test_allow_red_requires_one_separate_name() {
   assert_no_grep 'pr merge' "$case_dir/gh.log" \
     "github-allow-red-equals: gh pr merge ran for the equals alias"
 
-  case_dir=$(make_case github-allow-red-duplicate)
+  case_dir=$(make_case github-allow-red-empty)
   mkdir -p "$case_dir/wt"
   add_gh_mocks "$case_dir" "$head"
-  write_github_red_json "$case_dir" "$head" lint
   set +e
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/88 \
-    --allow-red lint --allow-red unit > "$case_dir/stdout" 2> "$case_dir/stderr"
+    --allow-red '' > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
-  expect_code 2 "$rc" "github-allow-red-duplicate: duplicate waiver must be refused"
+  expect_code 2 "$rc" "github-allow-red-empty: an empty name must be refused"
+  assert_grep '--allow-red requires a check name' "$case_dir/stderr" \
+    "github-allow-red-empty: refusal did not name the missing argument"
   assert_no_grep 'pr merge' "$case_dir/gh.log" \
-    "github-allow-red-duplicate: gh pr merge ran for duplicate waivers"
-  pass "fm-pr-merge accepts exactly one separately named red-check waiver"
+    "github-allow-red-empty: gh pr merge ran for an empty name"
+  pass "fm-pr-merge requires a separate nonempty name for each red-check waiver"
 }
 
 test_away_record_permits_any_green_merge_under_away_authority() {
@@ -3841,7 +3877,7 @@ test_allow_missing_follows_the_allow_red_rules() {
   assert_grep '--allow-missing does not apply to GitLab' "$case_dir/stderr" \
     "gitlab-allow-missing: the refusal did not name GitLab"
   [ ! -s "$case_dir/glab.log" ] || fail "gitlab-allow-missing: glab ran despite the waiver"
-  pass "fm-pr-merge --allow-missing is single use, attended-only, and GitHub-only like --allow-red"
+  pass "fm-pr-merge --allow-missing is single use, attended-only, and GitHub-only"
 }
 
 # The project clone task-x1 records, whose main holds a bookkeeping file every
@@ -4174,6 +4210,7 @@ test_unfinished_rerun_keeps_a_check_red
 test_supersession_never_crosses_check_names
 test_undated_runs_never_supersede
 test_allow_red_still_waives_only_the_current_failure
+test_repeated_allow_red_waives_only_named_checks
 test_allow_red_is_refused_while_away
 test_quiet_record_keeps_merges_attended
 test_allow_red_requires_one_separate_name
