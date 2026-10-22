@@ -1,0 +1,15 @@
+# Fresh codex spawn refused when base-commit approved MCP server has non-string-array args
+
+.mcp.json at base: {"mcpServers":{"kg":{"command":"node","args":"scripts/kg.mjs"}}}
+.claude/settings.json at base: {"enabledMcpjsonServers":["kg"]}
+
+## fm-spawn.sh output
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+jq: error (at <unknown>): enabled project MCP server is not a supported stdio configuration
+error: could not map project MCP servers for labcef16c2b-bad's codex launch
+warning: leaving task labcef16c2b-bad's slot claim on /tmp/fm-lab.4xU0mS/treehouse/.treehouse/bad-8d9ef7/1/bad in place; the Treehouse project lock is no longer held, so the next spawn's claim replaces it
+exit=1
+
+## worker window pane: child processes of pane shell (expect none / no codex)
+    PID COMMAND
+4055522 treehouse get

@@ -1,0 +1,108 @@
++ EV=/home/work/.no-mistakes/evidence/01M5J4RXDXCHDNCGFFR97PYE8Z
++ echo 'BROWSER_URL=http://127.0.0.1:40737 SESSION=fm-codex-browser.elJcx8ZN'
+BROWSER_URL=http://127.0.0.1:40737 SESSION=fm-codex-browser.elJcx8ZN
++ curl -s http://127.0.0.1:40737/json/version
++ head -c 300
+{
+   "Browser": "Chrome/156.0.8078.4",
+   "File-Path-Style": "posix",
+   "Protocol-Version": "1.3",
+   "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+   "V8-Version": "15.6.75",
+   "WebKit-Version": "537.36 (@f842f52ef39+ echo
+
++ pgrep -af fm-codex-browser
++ grep -c remote-debugging-address=127.0.0.1
+2
++ chrome-devtools-axi open http://127.0.0.1:18777/
+page:
+  title: FM Codex Browser Probe
+  url: "http://127.0.0.1:18777/"
+  refs: 9
+snapshot:
+uid=g1:1_0 RootWebArea "FM Codex Browser Probe" url="http://127.0.0.1:18777/"
+  uid=g1:1_1 heading "Codex browser probe" level="1"
+  uid=g1:1_2 "Viewport width: "
+  uid=g1:1_3 "780px"
+  uid=g1:1_4 "Card A"
+  uid=g1:1_5 "Card B"
+  uid=g1:1_6 "Card C"
+  uid=g1:1_7 button "First button"
+  uid=g1:1_8 link "A link" url="http://127.0.0.1:18777/#x"
+help[3]:
+  Run `chrome-devtools-axi click @g1:1_7` to click the "First button" button
+  Run `chrome-devtools-axi click @g1:1_8` to click the "A link" link
+  Use `chrome-devtools-axi eval <expr>` for JS expressions. For multi-statement code, pass a function: `eval "() => { ...; return result }"`
++ chrome-devtools-axi resize 1100 800
+resized:
+  width: 1100
+  height: 800
++ chrome-devtools-axi screenshot /home/work/.no-mistakes/evidence/01M5J4RXDXCHDNCGFFR97PYE8Z/launcher-desktop-1100x800.png
+screenshot: /home/work/.no-mistakes/evidence/01M5J4RXDXCHDNCGFFR97PYE8Z/launcher-desktop-1100x800.png
++ chrome-devtools-axi eval 'window.innerWidth + "x" + window.innerHeight'
+result: "\"1100x800\""
+help[1]:
+  Run `chrome-devtools-axi snapshot` to see current page state
++ chrome-devtools-axi resize 390 844
+resized:
+  width: 390
+  height: 844
++ chrome-devtools-axi eval 'window.innerWidth + "x" + window.innerHeight'
+result: "\"390x844\""
+help[1]:
+  Run `chrome-devtools-axi snapshot` to see current page state
++ chrome-devtools-axi press Tab
+page:
+  title: FM Codex Browser Probe
+  refs: 9
+snapshot:
+uid=g2:1_0 RootWebArea "FM Codex Browser Probe" url="http://127.0.0.1:18777/"
+  uid=g2:1_1 heading "Codex browser probe" level="1"
+  uid=g2:1_2 "Viewport width: "
+  uid=g2:2_0 "390px"
+  uid=g2:1_4 "Card A"
+  uid=g2:1_5 "Card B"
+  uid=g2:1_6 "Card C"
+  uid=g2:1_7 button "First button" focusable focused
+  uid=g2:1_8 link "A link" url="http://127.0.0.1:18777/#x"
+help[3]:
+  Run `chrome-devtools-axi click @g2:1_7` to click the "First button" button
+  Run `chrome-devtools-axi click @g2:1_8` to click the "A link" link
+  Use `chrome-devtools-axi eval <expr>` for JS expressions. For multi-statement code, pass a function: `eval "() => { ...; return result }"`
++ chrome-devtools-axi eval document.activeElement.id
+result: "\"btn\""
+help[1]:
+  Run `chrome-devtools-axi snapshot` to see current page state
++ chrome-devtools-axi press Tab
+page:
+  title: FM Codex Browser Probe
+  refs: 9
+snapshot:
+uid=g3:1_0 RootWebArea "FM Codex Browser Probe" url="http://127.0.0.1:18777/"
+  uid=g3:1_1 heading "Codex browser probe" level="1"
+  uid=g3:1_2 "Viewport width: "
+  uid=g3:2_0 "390px"
+  uid=g3:1_4 "Card A"
+  uid=g3:1_5 "Card B"
+  uid=g3:1_6 "Card C"
+  uid=g3:1_7 button "First button"
+  uid=g3:1_8 link "A link" focusable focused url="http://127.0.0.1:18777/#x"
+help[3]:
+  Run `chrome-devtools-axi click @g3:1_7` to click the "First button" button
+  Run `chrome-devtools-axi click @g3:1_8` to click the "A link" link
+  Use `chrome-devtools-axi eval <expr>` for JS expressions. For multi-statement code, pass a function: `eval "() => { ...; return result }"`
++ chrome-devtools-axi eval document.activeElement.id
+result: "\"lnk\""
+help[1]:
+  Run `chrome-devtools-axi snapshot` to see current page state
++ chrome-devtools-axi screenshot /home/work/.no-mistakes/evidence/01M5J4RXDXCHDNCGFFR97PYE8Z/launcher-phone-390x844-focus.png
+screenshot: /home/work/.no-mistakes/evidence/01M5J4RXDXCHDNCGFFR97PYE8Z/launcher-phone-390x844-focus.png
+++ ls -d /tmp/fm-codex-browser.elJcx8ZN
++ echo SCRATCH_PROFILE=/tmp/fm-codex-browser.elJcx8ZN
+SCRATCH_PROFILE=/tmp/fm-codex-browser.elJcx8ZN
++ echo fm-codex-browser.elJcx8ZN
++ exit 7
+wrapper exit=7
+--- after exit ---
+scratch dir exists? ls: cannot access '/tmp/fm-codex-browser.elJcx8ZN': No such file or directory
+chromium processes with this profile: 0

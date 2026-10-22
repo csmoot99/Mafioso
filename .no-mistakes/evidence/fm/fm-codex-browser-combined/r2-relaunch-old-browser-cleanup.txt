@@ -1,0 +1,8 @@
+## Old task browser after the first Codex incarnation exited (fm-control relaunch stopped it)
+profile dir /tmp/fm-codex-browser.dxRcfCeD: removed (ls: No such file or directory)
+chrome processes still using the old profile: 0
+relaunched incarnation got a fresh browser: CHROME_DEVTOOLS_AXI_SESSION=fm-codex-browser.rVpY6seY (11 chrome processes)
+## After fm-control.sh labf6ad7cc2-cdx exit
+profile dir /tmp/fm-codex-browser.rVpY6seY: ls: cannot access '/tmp/fm-codex-browser.rVpY6seY': No such file or directory
+chrome processes with that profile: 0
+fm-codex-browser.sh wrappers left for this lab: 0

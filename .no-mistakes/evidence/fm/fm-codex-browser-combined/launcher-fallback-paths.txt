@@ -1,0 +1,10 @@
+$ XDG_CACHE_HOME=<empty dir> bin/fm-codex-browser.sh codex --version
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+codex-cli 0.162.1
+exit=0
+
+$ XDG_CACHE_HOME=<cache whose installed chromium exits 17> bin/fm-codex-browser.sh codex --version
+error: task Chromium did not publish a loopback CDP port
+chromium: cannot open shared object
+exit=1
+leftover scratch dirs: 1

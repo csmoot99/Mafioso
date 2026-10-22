@@ -1,0 +1,18 @@
+      1 labmcp cwd=/tmp/fm-lab.4xU0mS/treehouse/.treehouse/probe-2752b3/1/probe method=initialize
+      1 labmcp cwd=/tmp/fm-lab.4xU0mS/treehouse/.treehouse/probe-2752b3/1/probe method=notifications/initialized
+      1 labmcp cwd=/tmp/fm-lab.4xU0mS/treehouse/.treehouse/probe-2752b3/1/probe method=tools/call
+      1 labmcp cwd=/tmp/fm-lab.4xU0mS/treehouse/.treehouse/probe-2752b3/1/probe method=tools/list
+      1 toolsdir cwd=/tmp/fm-lab.4xU0mS/treehouse/.treehouse/probe-2752b3/1/probe/tools method=initialize
+      1 toolsdir cwd=/tmp/fm-lab.4xU0mS/treehouse/.treehouse/probe-2752b3/1/probe/tools method=notifications/initialized
+      1 toolsdir cwd=/tmp/fm-lab.4xU0mS/treehouse/.treehouse/probe-2752b3/1/probe/tools method=tools/call
+      1 toolsdir cwd=/tmp/fm-lab.4xU0mS/treehouse/.treehouse/probe-2752b3/1/probe/tools method=tools/list
+mcp_servers.labmcp.command="node"
+mcp_servers.labmcp.args=["scripts/lab-mcp.mjs","labmcp"]
+mcp_servers.labmcp.env={"LAB_NONCE"="alpha-f6ad7cc2","LAB_MCP_LOG"="/tmp/fm-lab.4xU0mS/mcp.log"}
+mcp_servers.labmcp.cwd="/tmp/fm-lab.4xU0mS/treehouse/.treehouse/probe-2752b3/1/probe"
+mcp_servers.labmcp.enabled=true
+mcp_servers.toolsdir.command="node"
+mcp_servers.toolsdir.args=["lab-mcp.mjs","toolsdir"]
+mcp_servers.toolsdir.env={"LAB_NONCE"="beta-f6ad7cc2","LAB_MCP_LOG"="/tmp/fm-lab.4xU0mS/mcp.log"}
+mcp_servers.toolsdir.cwd="/tmp/fm-lab.4xU0mS/treehouse/.treehouse/probe-2752b3/1/probe/tools"
+mcp_servers.toolsdir.enabled=true

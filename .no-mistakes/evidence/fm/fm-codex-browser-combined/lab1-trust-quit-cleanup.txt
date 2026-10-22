@@ -1,0 +1,2 @@
+Lab 1 (/tmp/fmlab.9oOaT0): real fm-spawn codex worker hit Codex's first-run folder-trust dialog; quit without trusting (no ~/.codex/config.toml change).
+After quitting codex: scratch profile /tmp/fm-codex-browser.NBGyRfwB removed; no chromium process with that profile remains.

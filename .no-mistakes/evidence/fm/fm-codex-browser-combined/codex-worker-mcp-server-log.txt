@@ -1,0 +1,8 @@
+toolsdir cwd=/tmp/fm-lab.4xU0mS/treehouse/.treehouse/probe-2752b3/1/probe/tools method=initialize
+toolsdir cwd=/tmp/fm-lab.4xU0mS/treehouse/.treehouse/probe-2752b3/1/probe/tools method=notifications/initialized
+toolsdir cwd=/tmp/fm-lab.4xU0mS/treehouse/.treehouse/probe-2752b3/1/probe/tools method=tools/list
+labmcp cwd=/tmp/fm-lab.4xU0mS/treehouse/.treehouse/probe-2752b3/1/probe method=initialize
+labmcp cwd=/tmp/fm-lab.4xU0mS/treehouse/.treehouse/probe-2752b3/1/probe method=notifications/initialized
+labmcp cwd=/tmp/fm-lab.4xU0mS/treehouse/.treehouse/probe-2752b3/1/probe method=tools/list
+labmcp cwd=/tmp/fm-lab.4xU0mS/treehouse/.treehouse/probe-2752b3/1/probe method=tools/call
+toolsdir cwd=/tmp/fm-lab.4xU0mS/treehouse/.treehouse/probe-2752b3/1/probe/tools method=tools/call

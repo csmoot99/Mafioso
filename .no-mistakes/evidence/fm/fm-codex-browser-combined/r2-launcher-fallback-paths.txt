@@ -1,0 +1,17 @@
+$ XDG_CACHE_HOME=<empty cache> bash bin/fm-codex-browser.sh sh -c "echo launched; env | grep -c CHROME_DEVTOOLS_AXI || true"
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+launched-without-browser
+CHROME_DEVTOOLS_AXI vars: 0
+exit=0
+
+$ XDG_CACHE_HOME=<cache with a Chromium that exits 17> bash bin/fm-codex-browser.sh sh -c "echo SHOULD-NOT-LAUNCH"
+error: task Chromium did not publish a loopback CDP port
+exit=1
+leftover scratch dirs from this run: 0
+
+$ bash bin/fm-codex-browser.sh sh -c ... (real Playwright Chromium)
+BROWSER_URL=http://127.0.0.1:39267
+"Browser": "Chrome/156.0.8078.4"
+SESSION=fm-codex-browser.APAJdKLd
+exit=0
+after exit: /tmp/fm-codex-browser.APAJdKLd exists? no; chrome procs: 0

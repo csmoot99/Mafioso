@@ -1,0 +1,5 @@
+paused [at=1792684616]: browser open pending; resume when chrome-devtools-axi returns
+resolved [at=1792684676]: browser startup wait ended with BRIDGE_NOT_READY on both attempts
+blocked [at=1792684676]: browser bridge failed twice with BRIDGE_NOT_READY; MCP probes passed; report saved in task data/probe-report.md; screenshots and focus checks unavailable
+resolved [at=1792684846]: BRIDGE_NOT_READY cleared with authorized escalated browser socket access; all browser checks passed
+done [at=1792684846]: MCP and browser readiness passed; screenshots viewed and report updated in task data; project clean, no commits or pushes per task scope
