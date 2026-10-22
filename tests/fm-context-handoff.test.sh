@@ -293,6 +293,75 @@ test_posttooluse_delivers_the_notice_sparingly_until_the_handoff_exists() {
   pass "PostToolUse delivers the handoff notice once, re-delivers it sparingly, and stops once the handoff exists"
 }
 
+# --- Haiku absolute cap ---------------------------------------------------------
+
+run_haiku_hook() {  # <case-record> <id> precompact|posttooluse [trigger] [gen]
+  local rec=$1 id=$2 sub=$3 trigger=${4:-auto} gen
+  read_hook_case "$rec"
+  gen=${5:-$GEN}
+  precompact_payload "$TRANSCRIPT" "$trigger" \
+    | "$HANDOFF" "$sub" "$STATE_DIR" "$id" --gen "$gen" --data-dir "$DATA_DIR" --fm-root "$ROOT" --haiku-cap
+}
+
+test_haiku_cap_counts_cached_prompt_tokens_at_the_boundary() {
+  local rec id=haiku-boundary out rc
+  rec=$(new_hook_case "$id"); read_hook_case "$rec"
+  write_transcript "$TRANSCRIPT" 79999
+  out=$(CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=30 run_haiku_hook "$rec" "$id" posttooluse); rc=$?
+  expect_code 0 "$rc" "Haiku below the absolute cap must exit 0"
+  [ -z "$out" ] || fail "79999 prompt tokens must not trigger a handoff"
+  assert_absent "$STATE_DIR/$id.context-handoff" "output tokens must not count toward the prompt cap"
+  write_transcript "$TRANSCRIPT" 80000
+  out=$(CLAUDE_AUTOCOMPACT_PCT_OVERRIDE='' run_haiku_hook "$rec" "$id" posttooluse); rc=$?
+  expect_code 0 "$rc" "Haiku at the cap must exit 0 without a percentage override"
+  [ "$(marker_field "$STATE_DIR" "$id" usage)" = 80000 ] || fail "the cap must count input, cache read, and cache creation tokens"
+  [ "$(marker_field "$STATE_DIR" "$id" ceiling)" = 80000 ] || fail "the cap must be absolute"
+  assert_contains "$(printf '%s' "$out" | jq -r '.hookSpecificOutput.additionalContext')" "Haiku's 80000 prompt-token cap" "the crossing tool call must deliver the handoff notice"
+  assert_contains "$(printf '%s' "$out" | jq -r '.hookSpecificOutput.additionalContext')" "reclassified to T2" "the notice must say the task is being reclassified"
+  [ "$(marker_field "$STATE_DIR" "$id" reclassify)" = T2 ] || fail "the Haiku due marker must record the T2 reclassification"
+  assert_grep "crossed the 80000-token Haiku cap" "$STATE_DIR/$id.status" "the due event must say the Haiku cap was crossed"
+  assert_grep "must be reclassified to T2" "$STATE_DIR/$id.status" "the due event must say the task must be reclassified to T2"
+  out=$(run_haiku_hook "$rec" "$id" posttooluse)
+  [ -z "$out" ] || fail "a repeated call must respect notice throttling"
+  [ "$(status_count "$STATE_DIR" "$id" 'context handoff due')" = 1 ] || fail "the cap must append exactly one due event"
+  pass "Haiku hands off at 80000 prompt tokens including cache reads, independent of percentage settings"
+}
+
+test_haiku_precompact_preserves_the_absolute_cap() {
+  local rec id=haiku-compact out rc
+  rec=$(new_hook_case "$id"); read_hook_case "$rec"
+  write_transcript "$TRANSCRIPT" 60000
+  out=$(CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=30 run_haiku_hook "$rec" "$id" precompact); rc=$?
+  expect_code 0 "$rc" "a lower percentage compaction must proceed without requesting a Haiku handoff"
+  assert_absent "$STATE_DIR/$id.context-handoff" "a percentage crossing below 80000 must not set a marker"
+  write_transcript "$TRANSCRIPT" 81000
+  out=$(run_haiku_hook "$rec" "$id" precompact); rc=$?
+  expect_code 0 "$rc" "a compaction at the cap must proceed while recording the handoff"
+  [ "$(marker_field "$STATE_DIR" "$id" state)" = due ] || fail "PreCompact must catch an overshoot before a tool call"
+  write_transcript "$TRANSCRIPT" 20000
+  out=$(run_haiku_hook "$rec" "$id" posttooluse)
+  assert_contains "$(printf '%s' "$out" | jq -r '.hookSpecificOutput.additionalContext')" 'handoff-1.md' "compaction must not clear a pending handoff"
+  pass "Haiku compaction never substitutes a percentage threshold or clears a pending handoff"
+}
+
+test_haiku_ignores_manual_stale_and_unreadable_events() {
+  local rec id=haiku-invalid out rc
+  rec=$(new_hook_case "$id"); read_hook_case "$rec"
+  write_transcript "$TRANSCRIPT" 90000
+  out=$(run_haiku_hook "$rec" "$id" precompact manual); rc=$?
+  expect_code 0 "$rc" "manual compaction must proceed"
+  assert_absent "$STATE_DIR/$id.context-handoff" "manual compaction must not open a handoff"
+  out=$(run_haiku_hook "$rec" "$id" posttooluse auto stale-gen); rc=$?
+  expect_code 0 "$rc" "a stale hook must exit 0"
+  assert_absent "$STATE_DIR/$id.context-handoff" "a stale generation must not open a handoff"
+  printf 'invalid transcript\n' > "$TRANSCRIPT"
+  out=$(run_haiku_hook "$rec" "$id" posttooluse); rc=$?
+  expect_code 0 "$rc" "unreadable usage must exit 0"
+  [ -z "$out" ] || fail "unreadable usage must not print a notice"
+  assert_absent "$STATE_DIR/$id.context-handoff" "unreadable usage must not open a handoff"
+  pass "Haiku retains manual-compaction, generation, and missing-usage protections"
+}
+
 # --- Codex mode -----------------------------------------------------------------
 
 # write_codex_log <path> <tokens> <window>: a Codex session log whose latest
@@ -456,7 +525,7 @@ hook_names() {  # <settings.json>
 test_flag_off_leaves_the_claude_settings_exactly_as_today() {
   local rec id=sp-off out settings
   rec=$(make_spawn_case off claude "$id" off); read_spawn_case "$rec"
-  out=$(fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --mode no-mistakes --yolo off)
+  out=$(fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --model haiku --mode no-mistakes --yolo off)
   expect_code 0 $? "claude ship spawn should succeed: $out"
   settings="$WT_DIR/.claude/settings.local.json"
   assert_present "$settings" "the busy-state settings file must still be written"
@@ -494,6 +563,35 @@ test_flag_on_adds_the_hooks_for_a_claude_ship() {
   printf '%s' "$out" | jq -e '.hookSpecificOutput.additionalContext | contains("handoff-1.md")' >/dev/null \
     || fail "the generated PostToolUse command must deliver the notice once the marker exists, got '$out'"
   pass "with the flag on a claude ship gets working PreCompact and PostToolUse hooks bound to its incarnation"
+}
+
+test_spawn_wires_the_haiku_cap_for_ship_and_scout() {
+  local rec id model role out cmd settings rc
+  for role in ship scout; do
+    id="sp-haiku-$role"
+    if [ "$role" = ship ]; then model=haiku; else model=claude-haiku-4-5-20251001; fi
+    rec=$(make_spawn_case "haiku-$role" claude "$id" on); read_spawn_case "$rec"
+    if [ "$role" = ship ]; then
+      out=$(fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --model "$model" --mode no-mistakes --yolo off); rc=$?
+    else
+      out=$(fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" --scout "$id" "$PROJ_DIR" --model "$model"); rc=$?
+    fi
+    expect_code 0 "$rc" "Haiku $role spawn must succeed: $out"
+    settings="$WT_DIR/.claude/settings.local.json"
+    cmd=$(jq -r '.hooks.PreCompact[0].hooks[0].command' "$settings")
+    write_transcript "$CASE_DIR/transcript.jsonl" 60000
+    precompact_payload "$CASE_DIR/transcript.jsonl" auto \
+      | CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=30 sh -c "$cmd"; rc=$?
+    expect_code 0 "$rc" "the generated Haiku PreCompact command must allow compaction below the cap"
+    assert_absent "$HOME_DIR/state/$id.context-handoff" "the generated command must ignore the percentage threshold"
+    cmd=$(jq -r '.hooks.PostToolUse[0].hooks[0].command' "$settings")
+    write_transcript "$CASE_DIR/transcript.jsonl" 80000
+    out=$(posttooluse_payload "$CASE_DIR/transcript.jsonl" | sh -c "$cmd"); rc=$?
+    expect_code 0 "$rc" "the generated Haiku PostToolUse command must exit 0"
+    [ "$(marker_field "$HOME_DIR/state" "$id" state)" = due ] || fail "Haiku $role must get the absolute cap"
+    assert_contains "$(printf '%s' "$out" | jq -r '.hookSpecificOutput.additionalContext')" "Haiku's 80000 prompt-token cap" "the generated command must deliver the Haiku notice"
+  done
+  pass "spawn wires the absolute cap for Haiku aliases and full model IDs on ships and scouts"
 }
 
 test_flag_on_adds_the_hooks_for_a_claude_scout() {
@@ -830,10 +928,11 @@ SH
   printf '%s\n' "$home|$gen"
 }
 
-run_replace() {  # <home> <id>
+run_replace() {  # <home> <id> [replace-flags...]
   local home=$1 id=$2
+  shift 2
   FM_HOME="$home" FM_CONTROL_BIN="$home/bin/fm-control" FM_TEST_CONTROL_ARGS="$home/control.args" \
-    "$HANDOFF" replace "$id" 2>&1
+    "$HANDOFF" replace "$id" "$@" 2>&1
 }
 
 test_replace_refuses_a_missing_empty_or_stale_handoff() {
@@ -897,6 +996,35 @@ EOF
   pass "a refused relaunch is relayed and leaves the handoff record open"
 }
 
+test_replace_reclassifies_a_haiku_cap_crossing_to_t2() {
+  local id=rp-haiku rec home gen out rc dir
+  rec=$(new_replace_case "$id"); IFS='|' read -r home gen <<EOF
+$rec
+EOF
+  rm -f "$home/state/$id.context-handoff"
+  dir="$TMP_ROOT/rp-haiku-hook"; mkdir -p "$dir"
+  write_transcript "$dir/transcript.jsonl" 80000
+  posttooluse_payload "$dir/transcript.jsonl" \
+    | "$HANDOFF" posttooluse "$home/state" "$id" --gen "$gen" --data-dir "$home/data" --fm-root "$ROOT" --haiku-cap >/dev/null
+  [ "$(marker_field "$home/state" "$id" reclassify)" = T2 ] || fail "the Haiku cap crossing must record a T2 reclassification"
+  printf '# handoff\n\nState.\n' > "$home/data/$id/handoff-1.md"
+  for args in '' '--model haiku' '--harness claude --model claude-haiku-4-5-20251001 --effort high' '--harness claude --effort high'; do
+    # shellcheck disable=SC2086
+    out=$(run_replace "$home" "$id" $args); rc=$?
+    expect_code 1 "$rc" "a Haiku cap crossing must not be replaced on Haiku (args: '$args')"
+    assert_contains "$out" "reclassified to T2" "the refusal must say the task must be reclassified to T2"
+    assert_contains "$out" "config/crew-dispatch.json" "the refusal must point at the T2 route"
+    assert_contains "$out" "--harness <harness> --model <model> --effort <effort>" "the refusal must name the relaunch profile form"
+    assert_absent "$home/control.args" "a refused reclassification must never reach fm-control"
+  done
+  out=$(run_replace "$home" "$id" --harness claude --model sonnet --effort high); rc=$?
+  expect_code 0 "$rc" "a T2 profile must be replaced: $out"
+  [ "$(sed -n 2,9p "$home/control.args" | tr '\n' ' ')" = "relaunch --harness claude --model sonnet --effort high --note " ] \
+    || fail "the T2 profile must pass through to fm-control relaunch, got '$(cat "$home/control.args")'"
+  assert_grep "resolved [key=context-handoff-1]" "$home/state/$id.status" "the reclassified replacement must close the handoff-ready record"
+  pass "a Haiku cap crossing is refused on Haiku and replaced only on an explicit T2 profile passed to fm-control relaunch"
+}
+
 test_first_auto_fire_blocks_and_records_the_marker
 test_repeat_fires_keep_blocking_silently
 test_ceiling_lets_compaction_through_and_records_the_fallback
@@ -909,6 +1037,9 @@ test_stale_incarnation_and_bad_input_let_compaction_through
 test_second_handoff_gets_the_next_number
 test_posttooluse_is_silent_without_a_marker
 test_posttooluse_delivers_the_notice_sparingly_until_the_handoff_exists
+test_haiku_cap_counts_cached_prompt_tokens_at_the_boundary
+test_haiku_precompact_preserves_the_absolute_cap
+test_haiku_ignores_manual_stale_and_unreadable_events
 test_codex_posttooluse_is_silent_below_the_threshold
 test_codex_posttooluse_marks_the_handoff_due_at_the_threshold
 test_codex_recorded_live_payload_marks_the_handoff_due_at_the_threshold
@@ -917,6 +1048,7 @@ test_codex_precompact_without_a_marker_records_the_fallback
 test_codex_manual_and_stale_compactions_leave_no_record
 test_flag_off_leaves_the_claude_settings_exactly_as_today
 test_flag_on_adds_the_hooks_for_a_claude_ship
+test_spawn_wires_the_haiku_cap_for_ship_and_scout
 test_flag_on_adds_the_hooks_for_a_claude_scout
 test_flag_on_adds_nothing_for_another_harness
 test_flag_on_adds_the_hooks_for_a_codex_ship
@@ -929,5 +1061,6 @@ test_relaunch_starts_with_fresh_handoff_state
 test_replace_refuses_a_missing_empty_or_stale_handoff
 test_replace_hands_a_valid_handoff_to_fm_control
 test_replace_reports_a_refused_relaunch_without_closing_the_record
+test_replace_reclassifies_a_haiku_cap_crossing_to_t2
 
 echo "all fm-context-handoff tests passed"

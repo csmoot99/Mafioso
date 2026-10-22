@@ -2,7 +2,7 @@
 name: context-handoff
 description: >-
   Agent-only procedure for the opt-in worker context handoff.
-  A Claude or Codex worker loads it when a PostToolUse notice from bin/fm-context-handoff.sh names this skill: its context reached the handoff threshold (with auto-compaction held off, or, on a compact-first Codex worker, still after auto-compaction), and it must write a handoff document so a fresh worker can continue the same task.
+  A Claude or Codex worker loads it when a PostToolUse notice from bin/fm-context-handoff.sh names this skill: its context reached the handoff threshold (with auto-compaction held off, on a Haiku worker at its 80000 prompt-token cap, or, on a compact-first Codex worker, still after auto-compaction), and it must write a handoff document so a fresh worker can continue the same task.
   Firstmate loads its supervisor section on a `blocked [key=context-handoff-<n>]` status event, when a worker reports its context handoff ready, and replaces the worker with the one deterministic command there.
 user-invocable: false
 metadata:
@@ -63,5 +63,7 @@ bin/fm-context-handoff.sh replace <task-id>
 
 It checks that the named handoff exists, is non-empty, and belongs to the current worker incarnation, refuses with a precise message otherwise, and then drives `bin/fm-control.sh <task-id> relaunch` with a note telling the replacement to read the handoff first.
 On success it appends the closing `resolved [key=context-handoff-<n>]` event itself, so the open record needs no separate `--resolve-key` steer.
+A Haiku worker that crossed the 80000 prompt-token cap was a misclassified T1 task: its `note: context handoff due` says it must be reclassified to T2, and `replace` refuses to relaunch it on a Haiku model.
+Pick the T2 route from config/crew-dispatch.json and pass it through to the relaunch with `bin/fm-context-handoff.sh replace <task-id> --harness <harness> --model <model> --effort <effort>`.
 A refusal is evidence: read its message, and if the worker reported ready before the file existed, steer it to write the file rather than relaunching around the refusal.
 A `note: context handoff missed` event means the worker never wrote the handoff before the fallback ceiling and compacted instead; the task continues as before the flag existed, and the next threshold crossing tries again.

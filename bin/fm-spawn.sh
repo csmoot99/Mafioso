@@ -5283,6 +5283,9 @@ if [ "$KIND" != secondmate ]; then
       DATA_REAL=$(cd "$DATA" && pwd -P)
       handoff_cmd_prefix="$(shell_quote "$FM_ROOT/bin/fm-context-handoff.sh")"
       handoff_suffix="$(shell_quote "$STATE_REAL") $(shell_quote "$ID") --gen $(shell_quote "$BUSY_GEN") --data-dir $(shell_quote "$DATA_REAL") --fm-root $(shell_quote "$FM_ROOT")"
+      case "$MODEL" in
+        *[Hh][Aa][Ii][Kk][Uu]*) handoff_suffix="$handoff_suffix --haiku-cap" ;;
+      esac
       handoff_ceiling=
       [ -z "$CONTEXT_HANDOFF_CEILING_PCT" ] || handoff_ceiling=" --ceiling-pct $(shell_quote "$CONTEXT_HANDOFF_CEILING_PCT")"
       j_precompact=$(json_escape "$handoff_cmd_prefix precompact $handoff_suffix$handoff_ceiling")
