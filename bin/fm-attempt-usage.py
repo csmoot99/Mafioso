@@ -2,9 +2,11 @@
 """Read one attempt's Claude or Codex usage; emit JSON, never transcript text.
 
 The caller owns the task's exclusive worktree interval [start, end), in UTC.
-The launch cwd selects Claude's project directory or Codex's session header;
-event cwd changes do not change attribution. Event timestamps are required,
-and multiple sessions in that interval are summed.
+A session is attributed by its launch cwd: the first cwd in a Claude session
+file (subagents inherit their parent session's) or Codex's session header.
+Later cwd changes do not change attribution, and sessions launched in another
+worktree that shares Claude's sanitized project directory are excluded. Event
+timestamps are required, and multiple sessions in that interval are summed.
 Claude requests (including subagents) are deduplicated by message id, keeping
 the latest usage. Codex cumulative counters deduplicate repeated token_count
 notifications and supply deltas; last_token_usage supplies context peak and a
@@ -93,11 +95,26 @@ def records(stream, notes):
             yield record
 
 
+def launch_cwd(path, notes):
+    try:
+        stream = path.open(encoding="utf-8", errors="replace")
+    except FileNotFoundError:
+        return None
+    with stream:
+        for record in records(stream, notes):
+            if isinstance(record.get("cwd"), str):
+                return record["cwd"]
+    return None
+
+
 def claude_requests(root, worktree, start, end, notes):
     project = root / re.sub(r"[^a-zA-Z0-9]", "-", worktree)
     messages = {}
     paths = sorted(project.glob("*.jsonl")) + sorted(project.glob("*/subagents/*.jsonl"))
     for path in paths:
+        session_file = path if path.parent == project else project / (path.parent.parent.name + ".jsonl")
+        if launch_cwd(session_file, notes) != worktree:
+            continue
         with path.open(encoding="utf-8", errors="replace") as stream:
             for record in records(stream, notes):
                 if record.get("type") != "assistant":

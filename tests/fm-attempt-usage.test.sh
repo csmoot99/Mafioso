@@ -34,20 +34,25 @@ def expect(actual, inputs, outputs, reads, writes, peak, sessions):
     assert {k: actual[k] for k in expected} == expected, actual
 
 
-expect(result('claude'), 917, 907, 934, 904, 2700, 2)
+expect(result('claude'), 17, 7, 34, 4, 33, 2)
 assert result('claude')['notes'] == []
 assert result('claude')['last_activity'] == 1792695700  # 19:01:40Z, latest in-window request
 print('ok - Claude request ids deduplicate streaming and copies; subagents and replacement sessions sum')
+print('ok - Claude sessions launched in a colliding worktree, and their subagents, are excluded')
 
-# Session and subagent records stay attributable after changing directory.
+# Sessions launched in the worktree stay attributable after changing directory.
 for path in (root / 'claude/-task-worktree').rglob('*.jsonl'):
+    if path.parent.name == 'collision' or path.parent.parent.name == 'collision':
+        continue
     rows = [json.loads(line) for line in path.read_text().splitlines()]
+    top_level = path.parent.name == '-task-worktree'
     for index, row in enumerate(rows):
-        row['cwd'] = '/task/worktree/child' if index % 2 else '/elsewhere'
+        if index or not top_level:
+            row['cwd'] = '/task/worktree/child' if index % 2 else '/elsewhere'
     path.write_text(''.join(json.dumps(row) + '\n' for row in rows))
-expect(result('claude'), 917, 907, 934, 904, 2700, 2)
+expect(result('claude'), 17, 7, 34, 4, 33, 2)
 assert result('claude')['notes'] == []
-print('ok - Claude counts all in-window assistant records in the launch project, regardless of cwd')
+print('ok - Claude counts every in-window record of a session launched in the worktree, whatever its later cwd')
 
 # Codex already attributes through its launch header, not individual event cwd.
 for path in (root / 'codex').glob('*.jsonl'):
@@ -88,7 +93,7 @@ rows = [json.loads(line) for line in claude.read_text().splitlines()]
 del rows[0]['message']['usage']['cache_creation_input_tokens']
 claude.write_text(''.join(json.dumps(row) + '\n' for row in rows) + '{broken tail\n')
 unknown = result('claude')
-expect(unknown, 917, 907, 934, None, None, 2)
+expect(unknown, 17, 7, 34, None, None, 2)
 assert any('Malformed' in note for note in unknown['notes'])
 assert any('cache_write_tokens unavailable' in note for note in unknown['notes'])
 print('ok - partial usage is explicitly unknown and malformed JSONL is noted')
