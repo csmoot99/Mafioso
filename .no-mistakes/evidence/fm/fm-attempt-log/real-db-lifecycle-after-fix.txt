@@ -1,0 +1,22 @@
+# fm-attempt-record.py at eb6bf18 against the INSTALLED ~/.no-mistakes/state.sqlite (opened read-only by the recorder)
+# real run 01M5JFZV7WTWQ1NWPR41MVG9HH (repo /home/work/firstmate, branch fm/fm-gate-archived-hold, status completed, ci_ready_at 1792698644)
+# attempt window [created_at-60, updated_at+60); worktree = detached checkout of the run head 34d491c
+$ python3 bin/fm-attempt-record.py --task-id nmreal --meta state/nmreal.meta --data data --end 1792699195 --claude-root empty
+exit=0
+# resulting ledger record (data/attempts.jsonl):
+  task_id: 'nmreal'
+  gate_result: 'green'
+  outcome: None
+  review_model: 'claude-opus-5-5'
+  review_findings: {'blocker': None, 'major': None, 'minor': None}
+  nm_run_ids: ['01M5JFZV7WTWQ1NWPR41MVG9HH']
+  started_at: '2026-10-22T19:03:16Z'
+  ended_at: '2026-10-22T19:59:55Z'
+  duration_s: 3399.0
+  notes: ['Acceptance awaits fix_forward_7d; a merge alone is not acceptance.', 'No attributable usage in the requested worktree interval.', 'No recorded worker activity; ended_at is the cleanup time.', 'Policy review severities unavailable; native error/warning/info are not mapped.', 'Validated merge receipt unavailable.', 'effort not recorded in task metadata.', 'fix_forward_7d and don_minutes not collected yet.', 'outcome not established by lifecycle evidence.', 'prior_tier not recorded in task metadata.']
+# same input, recorder from the pre-fix commit 7ad1a2f
+exit=0
+  gate_result: None
+  review_model: None
+  nm_run_ids: None
+  notes: ['Acceptance awaits fix_forward_7d; a merge alone is not acceptance.', 'No attributable usage in the requested worktree interval.', 'No recorded worker activity; ended_at is the cleanup time.', 'No-mistakes lifecycle evidence unavailable or schema unsupported.', 'Validated merge receipt unavailable.', 'effort not recorded in task metadata.', 'fix_forward_7d and don_minutes not collected yet.', 'gate_result not established by lifecycle evidence.', 'outcome not established by lifecycle evidence.', 'prior_tier not recorded in task metadata.']

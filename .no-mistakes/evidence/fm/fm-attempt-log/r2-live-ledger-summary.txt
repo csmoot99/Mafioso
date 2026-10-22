@@ -1,0 +1,13 @@
+Round-2 live lab ledger (data/attempts.jsonl), one row per attempt:
+- attempt_n=1 row=R2 tier=T1 prior_tier=None pool=claude harness=claude model=haiku effort=low outcome=None
+  started=2026-10-22T20:37:02Z ended(last activity)=2026-10-22T20:37:25.159000Z ts(cleanup)=2026-10-22T20:40:47.399993Z duration_s=23.2
+  tokens in/out/cache_r/cache_w/ctx_peak = 16/2718/341770/22379/48253
+  notes: ['Acceptance awaits fix_forward_7d; a merge alone is not acceptance.', 'Lateral switch at tier T1: claude/haiku -> claude/sonnet; not an escalation.', 'No no-mistakes run attributed to this attempt.', 'Validated merge receipt unavailable.', 'fix_forward_7d and don_minutes not collected yet.', 'gate_result not established by lifecycle evidence.', 'outcome not established by lifecycle evidence.', 'prior_tier not recorded in task metadata.']
+- attempt_n=2 row=R2 tier=T1 prior_tier=T1 pool=claude harness=claude model=sonnet effort=low outcome=escalated
+  started=2026-10-22T20:40:47.399993Z ended(last activity)=2026-10-22T20:41:26.959000Z ts(cleanup)=2026-10-22T20:41:34.429346Z duration_s=39.6
+  tokens in/out/cache_r/cache_w/ctx_peak = 16/1457/310491/37055/45534
+  notes: ['Acceptance awaits fix_forward_7d; a merge alone is not acceptance.', 'No no-mistakes run attributed to this attempt.', 'Validated merge receipt unavailable.', 'fix_forward_7d and don_minutes not collected yet.', 'gate_result not established by lifecycle evidence.']
+- attempt_n=3 row=R2 tier=T2 prior_tier=T1 pool=claude harness=claude model=sonnet effort=low outcome=None
+  started=2026-10-22T20:41:34.429346Z ended(last activity)=2026-10-22T20:41:44.854000Z ts(cleanup)=2026-10-22T20:41:58.914760Z duration_s=10.4
+  tokens in/out/cache_r/cache_w/ctx_peak = 8/768/156283/17127/45124
+  notes: ['Acceptance awaits fix_forward_7d; a merge alone is not acceptance.', 'No no-mistakes run attributed to this attempt.', 'Validated merge receipt unavailable.', 'fix_forward_7d and don_minutes not collected yet.', 'gate_result not established by lifecycle evidence.', 'outcome not established by lifecycle evidence.']

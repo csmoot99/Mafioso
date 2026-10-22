@@ -1,0 +1,13 @@
+### teardown with a torn ledger line
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+teardown: reaping leaked worktree process(es) for lab64c4c132cffb-w2: 2288982 2333702
+teardown: force-killing leaked worktree process(es) for lab64c4c132cffb-w2: 2288982
+Cannot record attempt: Unterminated string starting at: line 1 column 12 (char 11)
+warning: could not record lab64c4c132cffb-w2's attempt; cleanup continues
+
+🌳 Worktree returned to pool.
+teardown lab64c4c132cffb-w2 complete (window firstmate:fm-lab64c4c132cffb-w2, worktree /tmp/fmlab.kw8mXH/treehouse/.treehouse/notes-ab8b79/1/notes)
+Backlog: lab64c4c132cffb-w2 is closed in /tmp/fmlab.kw8mXH/home/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+teardown exit=0
+ls: cannot access '/tmp/fmlab.kw8mXH/home/state/lab64c4c132cffb-w2.meta': No such file or directory
+ledger bytes unchanged (no append over torn data)

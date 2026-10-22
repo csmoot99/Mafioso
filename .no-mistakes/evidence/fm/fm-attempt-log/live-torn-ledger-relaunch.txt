@@ -1,0 +1,12 @@
+### tier-rise relaunch with a torn ledger line
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+Cannot record attempt: Unterminated string starting at: line 1 column 12 (char 11)
+warning: could not record lab64c4c132cffb-w2's previous attempt; relaunch continues
+relaunched lab64c4c132cffb-w2 harness=claude from=claude model=sonnet effort=low backend=tmux endpoint=firstmate:fm-lab64c4c132cffb-w2 worktree=/tmp/fmlab.kw8mXH/treehouse/.treehouse/notes-ab8b79/1/notes
+relaunch exit=0
+tier=T2
+attempt_n=3
+prior_tier=T1
+spawn_gen=s1792701178.2332048.30953
+attempt_id=s1792701178.2332048.30953
+attempt_started_at=2026-10-22T20:32:58.869835Z

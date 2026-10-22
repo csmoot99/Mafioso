@@ -1,0 +1,5 @@
+fm-attempt-record.py against a DB with the installed no-mistakes schema (green run, clean review):
+ gate_result = None | review_model = None | review_findings = {'blocker': None, 'major': None, 'minor': None} | nm_run_ids = None
+ notes: ['No-mistakes lifecycle evidence unavailable or schema unsupported.']
+ underlying query error: ambiguous column name: created_at
+ same query with runs.-qualified columns returns: [('run',)]

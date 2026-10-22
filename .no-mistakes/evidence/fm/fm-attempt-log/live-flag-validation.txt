@@ -1,0 +1,10 @@
+$ fm-spawn.sh labx-w3 projects/notes --mode local-only --yolo on --pool ""
+error: --pool requires a non-empty, single-line value
+exit=1
+$ fm-spawn.sh labx-w3 projects/notes --mode local-only --yolo on --attempt-n 0
+error: --attempt-n must be a positive integer
+exit=1
+$ fm-control.sh labx-w3 exit --pool codex
+error: --harness, --model, --effort, --row, --tier, --pool, --attempt-n, --prior-tier, and --note apply to 'relaunch' only
+exit=1
+no labx-w3 state created

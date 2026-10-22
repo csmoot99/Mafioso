@@ -1,0 +1,18 @@
+$ fm-control.sh r2w1 relaunch --model sonnet --attempt-n 2 --prior-tier T1 --note "lateral: same tier T1"
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+relaunched r2w1 harness=claude from=claude model=sonnet effort=low backend=tmux endpoint=firstmate:fm-r2w1 worktree=/tmp/fmlab.StlURU/treehouse/.treehouse/notes-8c8950/1/notes
+exit=0
+ledger lines: 1
+model=sonnet
+tier=T1
+pool=claude
+attempt_n=2
+prior_tier=T1
+attempt_id=s1792701647.2564918.14806
+attempt_started_at=2026-10-22T20:40:47.399993Z

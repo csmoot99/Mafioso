@@ -1,0 +1,6 @@
+task_id | attempt_n | row | tier | prior_tier | pool | model | outcome | started_at -> ended_at (ts) | in/out/cache_r/cache_w/ctx_peak
+lab64c4c132cffb-w1 | 1 | R2 | T1 | None | claude | haiku | None | 2026-10-22T20:26:01Z -> 2026-10-22T20:26:24.533000Z (2026-10-22T20:28:03.113169Z) | 16/2397/341718/22076/47950
+lab64c4c132cffb-w1 | 2 | R2 | T1 | T1 | claude | sonnet | escalated | 2026-10-22T20:28:03.113169Z -> 2026-10-22T20:28:57.791000Z (2026-10-22T20:29:39.961983Z) | 10/450/176842/34685/44532
+lab64c4c132cffb-w1 | 3 | R2 | T2 | T1 | claude | sonnet | None | 2026-10-22T20:29:39.961983Z -> 2026-10-22T20:30:13.531000Z (2026-10-22T20:30:34.557798Z) | 6/240/111886/16785/44784
+lab64c4c132cffb-w2 | 1 | R1 | T1 | None | claude | haiku | None | 2026-10-22T20:30:47Z -> 2026-10-22T20:31:13.851000Z (2026-10-22T20:32:22.023761Z) | 16/2606/346902/19381/48083
+<torn line kept untouched> {"task_id":"torn

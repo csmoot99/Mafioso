@@ -1,0 +1,15 @@
+$ fm-merge-local.sh r2w1  (lab-only local merge)
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+merged fm/r2w1 into local main (c3cb205 -> db4bf53) in /tmp/fmlab.StlURU/home/projects/notes
+$ fm-teardown.sh r2w1
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+teardown: reaping leaked worktree process(es) for r2w1: 2399920 2612436
+teardown: force-killing leaked worktree process(es) for r2w1: 2399920
+A new version of treehouse is available: v2.3.0 → v3.1.5
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown r2w1 complete (window firstmate:fm-r2w1, worktree /tmp/fmlab.StlURU/treehouse/.treehouse/notes-8c8950/1/notes)
+Backlog: r2w1 is closed in /tmp/fmlab.StlURU/home/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+exit=
+ledger lines: 3

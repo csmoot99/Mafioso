@@ -1,0 +1,7 @@
+$ fm-control.sh r2w1 relaunch --note "same profile handoff"   # harness/model/tier unchanged
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+relaunched r2w1 harness=claude from=claude model=sonnet effort=low backend=tmux endpoint=firstmate:fm-r2w1 worktree=/tmp/fmlab.StlURU/treehouse/.treehouse/notes-8c8950/1/notes
+exit=0
+ledger lines: 1
+attempt_id before: attempt_id=s1792701647.2564918.14806
+attempt_id after:  attempt_id=s1792701647.2564918.14806
