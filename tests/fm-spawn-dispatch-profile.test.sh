@@ -585,6 +585,51 @@ JSON
   pass "codex preserves worker MCP command, args, env and working directories"
 }
 
+test_codex_project_mcp_relaunch_reads_base_commit() {
+  local rec id out base_args relaunch_bin
+  id=codex-mcp-relaunch
+  rec=$(make_spawn_case "$id" codex "$id")
+  read_case_record "$rec"
+  mkdir -p "$WT_DIR/.claude"
+  printf '%s\n' '{"enabledMcpjsonServers":["kg"]}' > "$WT_DIR/.claude/settings.json"
+  printf '%s\n' '{"mcpServers":{"kg":{"command":"node","args":["scripts/kg-mcp.mjs"]}}}' > "$WT_DIR/.mcp.json"
+  git -C "$WT_DIR" add .mcp.json .claude
+  git -C "$WT_DIR" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm 'Declare base MCP server' || fail "could not commit base MCP fixture"
+  git -C "$WT_DIR" push -q origin HEAD:main || fail "could not publish base MCP fixture to its local origin"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  expect_code 0 "$?" "base MCP spawn should succeed: $out"
+  # The worker commits new approvals and a server to its task branch, then
+  # leaves an uncommitted rewrite of the approved server's command.
+  printf '%s\n' '{"enableAllProjectMcpServers":true}' > "$WT_DIR/.claude/settings.json"
+  printf '%s\n' '{"mcpServers":{"kg":{"command":"node"},"extra":{"command":"extra"}}}' > "$WT_DIR/.mcp.json"
+  git -C "$WT_DIR" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qam 'Worker MCP edits' || fail "could not commit worker MCP edits"
+  printf '%s\n' '{"mcpServers":{"kg":{"command":"sh","args":["-c","escape"]},"extra":{"command":"extra"}}}' > "$WT_DIR/.mcp.json"
+  # The relaunch finds the recorded window holding only a shell.
+  relaunch_bin="$CASE_DIR/relaunch-bin"
+  cp -R "$FAKEBIN_DIR" "$relaunch_bin"
+  mv "$relaunch_bin/tmux" "$relaunch_bin/tmux-spawn"
+  cat > "$relaunch_bin/tmux" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+*'#{pane_current_command}'*) printf 'zsh\n'; exit 0 ;;
+*'#{pane_tty}'*) exit 0 ;;
+esac
+[ "\${1:-}" != list-windows ] || { printf '%s\n' 'fm-$id'; exit 0; }
+exec '$relaunch_bin/tmux-spawn' "\$@"
+SH
+  chmod +x "$relaunch_bin/tmux"
+  out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$relaunch_bin" "$LAUNCH_LOG" "$id" --relaunch)
+  expect_code 0 "$?" "MCP relaunch should succeed: $out"
+  fm_test_codex_launch_argv "$LAUNCH_LOG" "$CASE_DIR/argv" || fail "could not capture relaunch argv"
+  base_args='mcp_servers.kg.args=["scripts/kg-mcp.mjs"]'
+  jq -Rse --arg wt "$WT_DIR" --arg args "$base_args" '
+    split("\u0000") | map(select(startswith("mcp_servers."))) | sort ==
+      ([$args, "mcp_servers.kg.command=\"node\"", "mcp_servers.kg.cwd=" + ($wt | tojson),
+        "mcp_servers.kg.enabled=true", "mcp_servers.kg.env={}"] | sort)
+  ' "$CASE_DIR/argv/args" >/dev/null || fail "relaunch did not mirror the base commit's MCP declaration: $(tr '\0' '\n' < "$CASE_DIR/argv/args" | grep '^mcp_servers\.')"
+  pass "codex relaunch mirrors base-commit MCP servers, ignoring worker edits"
+}
+
 test_codex_project_mcp_approval_selection() {
   local approval rec id out expected kind
   for approval in absent empty listed all disabled; do
@@ -2528,6 +2573,7 @@ test_active_dispatch_profile_allows_raw_launch_command
 test_chained_raw_launch_strips_ai_trailer_in_every_step
 test_claude_threads_model_and_effort
 test_codex_project_mcp_preserves_worker_configuration
+test_codex_project_mcp_relaunch_reads_base_commit
 test_codex_project_mcp_approval_selection
 test_codex_project_mcp_invalid_configuration_refuses_launch
 test_codex_threads_model_and_effort

@@ -438,6 +438,11 @@
 #                  ship or scout: busy state, the turn-end notification, and
 #                  the opt-in context handoff (built beside the other harnesses'
 #                  busy wiring below; supplies its own trailing space)
+#     __CODEXMCP__ quoted -c mcp_servers.<name>.* overrides for each stdio
+#                  server the task's base-commit .mcp.json declares and its
+#                  .claude/settings.json approves (codex_project_mcp_flags
+#                  below; each supplies its own trailing space, empty when
+#                  nothing is approved or the base commit cannot be resolved)
 #     __PIBIN__    quoted concrete Pi-family executable path resolved from PATH
 #     __PITUIMODE__ optional --tui-mode regular when that executable advertises it
 #     __PIAPPROVE__ optional --approve on a seeded Pi/pi-signed secondmate when
@@ -3290,14 +3295,26 @@ codex_writable_roots_flag() {  # <state-dir> <data-dir> <task-id>
   printf -- '-c %s ' "$(shell_quote "sandbox_workspace_write.writable_roots=[\"$(json_escape "$state_real/$3.inbox")\",\"$(json_escape "$data_real/$3")\"]")"
 }
 
-# Mirror only project-approved stdio servers from the worker copy. Commands
-# run outside Codex's sandbox, under the same project consent as Claude MCP.
+# Mirror only project-approved stdio servers, reading the declarations and
+# approvals from the task's base commit (where the copy forked from origin's
+# base branch), never from files the sandboxed worker can edit. No resolvable
+# base mirrors nothing. Commands run outside Codex's sandbox, under the same
+# project consent as Claude MCP, with cwd in the worker copy.
 # Emit TOML values inside shell-quoted -c arguments; never evaluate project text.
-codex_project_mcp_flags() {  # <worktree>
-  local wt=$1 settings assignments assignment
-  settings="$wt/.claude/settings.json"
-  [ -f "$wt/.mcp.json" ] && [ -f "$settings" ] || return 0
-  assignments=$(jq -nr --arg wt "$wt" --slurpfile project "$wt/.mcp.json" --slurpfile settings "$settings" '
+codex_project_mcp_flags() {  # <worktree> [<base-branch>]
+  local wt=$1 branch=${2:-} base project settings assignments assignment
+  [ -n "$branch" ] || branch=$(default_branch "$wt") || branch=
+  base=
+  [ -z "$branch" ] || base=$(git -C "$wt" merge-base HEAD "refs/remotes/origin/$branch" 2>/dev/null) || base=
+  [ -n "$base" ] || {
+    echo "notice: could not resolve $wt's base commit; launching codex without project MCP servers" >&2
+    return 0
+  }
+  git -C "$wt" cat-file -e "$base:.mcp.json" 2>/dev/null &&
+    git -C "$wt" cat-file -e "$base:.claude/settings.json" 2>/dev/null || return 0
+  project=$(git -C "$wt" cat-file blob "$base:.mcp.json") || return 1
+  settings=$(git -C "$wt" cat-file blob "$base:.claude/settings.json") || return 1
+  assignments=$(jq -nr --arg wt "$wt" --slurpfile project <(printf '%s' "$project") --slurpfile settings <(printf '%s' "$settings") '
     def strings: type == "array" and all(.[]; type == "string");
     $settings[0] as $s | $project[0].mcpServers as $servers |
     if ($settings | length) != 1 or ($project | length) != 1
@@ -6038,7 +6055,7 @@ case "$LAUNCH" in
 esac
 case "$LAUNCH" in
 *__CODEXMCP__*)
-  CODEX_MCP_FLAGS=$(codex_project_mcp_flags "$WT") || {
+  CODEX_MCP_FLAGS=$(codex_project_mcp_flags "$WT" "$BASE_BRANCH") || {
     echo "error: could not map project MCP servers for $ID's codex launch" >&2
     exit 1
   }
