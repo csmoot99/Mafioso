@@ -398,6 +398,76 @@ $launch") \
   pass "relaunch rebuilds the configured values for the replacement agent in both allowlist postures"
 }
 
+test_codex_task_browser() {
+  local rec out status dir first_session session profile flag
+  rec=$(make_case browser codex browser-a1)
+  read_case "$rec"
+  out=$(run_case_spawn browser-a1 "$PROJ_DIR" --mode no-mistakes --yolo off)
+  expect_code 0 "$?" "browser spawn should succeed: $out"
+  first_session=
+  for status in 0 23; do
+    dir="$CASE_DIR/argv-$status"
+    mkdir -p "$dir/home/.cache/ms-playwright/chromium-999/chrome-linux64"
+    cat > "$dir/home/.cache/ms-playwright/chromium-999/chrome-linux64/chrome" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > "$FM_TEST_CODEX_ARGS.chrome-args"
+printf '%s\n' "$$" > "$FM_TEST_CODEX_ARGS.chrome-pid"
+for arg do
+  case "$arg" in --user-data-dir=*) profile=${arg#*=} ;; esac
+done
+mkdir -p "$profile"
+printf '43210\n/devtools/browser/test\n' > "$profile/DevToolsActivePort"
+# Like Chromium's network service, a helper keeps writing the profile after
+# the main process is gone, until it is signalled itself.
+(
+  trap 'exit 0' TERM
+  while :; do mkdir -p "$profile/Default" && : > "$profile/Default/state.$RANDOM"; sleep 0.02; done
+) &
+printf '%s\n' "$!" > "$FM_TEST_CODEX_ARGS.chrome-helper-pid"
+trap 'exit 0' TERM INT
+while :; do sleep 0.1; done
+SH
+    cat > "$dir/chrome-devtools-axi" <<'SH'
+#!/usr/bin/env bash
+[ "$1" = stop ] || exit 1
+printf '%s\n' "$CHROME_DEVTOOLS_AXI_SESSION" > "$FM_TEST_CODEX_ARGS.stopped"
+SH
+    chmod +x "$dir/home/.cache/ms-playwright/chromium-999/chrome-linux64/chrome" "$dir/chrome-devtools-axi"
+    out=$(FM_TEST_CODEX_EXIT=$status CHROME_DEVTOOLS_AXI_SESSION=unrelated \
+      CHROME_DEVTOOLS_AXI_BROWSER_URL=http://127.0.0.1:1 \
+      fm_test_codex_launch_argv "$LAUNCH_LOG" "$dir" 2>&1)
+    expect_code "$status" "$?" "browser wrapper must preserve Codex's exit status: $out"
+    [ "$(head -1 "$dir/args.browser-env")" = http://127.0.0.1:43210 ] || fail 'Codex did not receive the task CDP URL'
+    session=$(tail -1 "$dir/args.browser-env")
+    case "$session" in fm-codex-browser.*) ;; *) fail 'Codex did not receive an isolated bridge session' ;; esac
+    [ "$session" != "$first_session" ] || fail 'browser session was reused across launches'
+    first_session=$session
+    [ "$(cat "$dir/args.stopped")" = "$session" ] || fail 'cleanup targeted a different bridge session'
+    profile=$(sed -n 's/^--user-data-dir=//p' "$dir/args.chrome-args")
+    [ -n "$profile" ] && [ ! -e "$profile" ] || fail 'scratch browser profile survived cleanup'
+    if kill -0 "$(cat "$dir/args.chrome-pid")" 2>/dev/null; then fail 'task browser survived Codex exit'; fi
+    if kill -0 "$(cat "$dir/args.chrome-helper-pid")" 2>/dev/null; then fail 'task browser helper survived Codex exit'; fi
+    for flag in --headless=new --no-sandbox --remote-debugging-address=127.0.0.1 --remote-debugging-port=0; do
+      grep -Fxq -- "$flag" "$dir/args.chrome-args" || fail "browser missing $flag"
+    done
+    for flag in 'sandbox_mode="workspace-write"' 'approval_policy="on-request"' 'approvals_reviewer="auto_review"' sandbox_workspace_write.network_access=false; do
+      tr '\0' '\n' < "$dir/args" | grep -Fxq -- "$flag" || fail "Codex lost $flag"
+    done
+  done
+  # Installed Chromium dying before readiness must prevent a misleading launch.
+  printf '#!/usr/bin/env bash\nexit 17\n' > "$dir/home/.cache/ms-playwright/chromium-999/chrome-linux64/chrome"
+  rm -f "$dir/args"
+  out=$(fm_test_codex_launch_argv "$LAUNCH_LOG" "$dir" 2>&1)
+  expect_code 1 "$?" "failed Chromium must stop the launch: $out"
+  [ ! -e "$dir/args" ] || fail 'Codex launched after Chromium failed'
+  # A host without Playwright remains usable for work that needs no browser.
+  out=$(fm_test_codex_launch_argv "$LAUNCH_LOG" "$CASE_DIR/no-browser" 2>&1)
+  expect_code 0 "$?" "missing optional Chromium should retain ordinary Codex launch: $out"
+  case "$out" in *'browser setup skipped'*) ;; *) fail 'missing browser was not reported' ;; esac
+  pass 'Codex gets isolated browser environment, unchanged safety flags, and owned cleanup on success/failure'
+}
+
+test_codex_task_browser
 test_ship_allowlist_absent
 test_ship_allowlist_enabled
 test_absent_file_adds_nothing

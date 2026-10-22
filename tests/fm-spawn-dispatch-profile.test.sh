@@ -2184,7 +2184,8 @@ SH
     envelope="$CASE_DIR/prompt-envelope"
     encoded="$CASE_DIR/encoded-prompt"
     prompt="$CASE_DIR/prompt"
-    FM_ROLE_PROMPT="$envelope" PATH="$FAKEBIN_DIR:$PATH" bash -c "$launch" || fail "could not consume $kind launch command"
+    HOME="$HOME_DIR/user-home" XDG_CACHE_HOME="$HOME_DIR/user-home/.cache" \
+      FM_ROLE_PROMPT="$envelope" PATH="$FAKEBIN_DIR:$PATH" bash -c "$launch" || fail "could not consume $kind launch command"
     sed -n '/FIRSTMATE_OP: v1 launch-brief:/,$p' "$envelope" > "$encoded"
     "$ROOT/bin/fm-operational-input.sh" body < "$encoded" > "$prompt" ||
       fail "could not decode $kind launch-brief envelope"
