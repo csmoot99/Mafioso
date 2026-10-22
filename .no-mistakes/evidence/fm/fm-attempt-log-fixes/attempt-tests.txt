@@ -1,0 +1,31 @@
+== fm-attempt-usage
+ok - Claude request ids deduplicate streaming and copies; subagents and replacement sessions sum
+ok - Claude sessions launched in a colliding worktree, and their subagents, are excluded
+ok - Claude counts every in-window record of a session launched in the worktree, whatever its later cwd
+ok - Codex counter deltas exclude earlier tasks, repeated notifications and cached input; context uses last request
+ok - duplicate Codex session ids and events counted once
+ok - launch directory, half-open windows, missing usage and invalid arguments
+ok - partial usage is explicitly unknown and malformed JSONL is noted
+ok - reset, absent baseline and absent cumulative counters have explicit fallback notes
+ok - older Codex logs without cache-write measurements remain unknown
+ok - missing cumulative events or fields do not double-charge later counters or lose last usage
+ok - attempt usage extraction fixtures
+rc=
+== fm-attempt-lifecycle
+ok - green review and exact merge receipt retain pending seven-day acceptance
+ok - repeated findings charge once; native severity labels are never guessed
+ok - failures are explicit; unrelated runs and stale code cannot establish gates
+ok - only a tier rise escalates; lateral switches close with a note; retries share a durable boundary
+ok - a failed record still gives a changed profile its own boundary
+ok - malformed or unavailable optional review evidence stays unknown
+ok - attempt lifecycle evidence
+rc=
+== fm-attempt-record
+ok - replacement sessions sum into one classified private attempt; it ends at its last usage event
+ok - retries preserve exactly one record and its original end time
+ok - concurrent retries serialize; distinct attempts remain distinct
+ok - legacy metadata never invents a time boundary or duplicate retry
+ok - unsupported or unreadable usage stays unknown; invalid interval and corrupt ledger refuse safely
+ok - storage failure returns nonzero without destroying evidence
+ok - attempt record writer
+rc=

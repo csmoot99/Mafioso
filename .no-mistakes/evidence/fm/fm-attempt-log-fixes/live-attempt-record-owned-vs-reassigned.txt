@@ -1,0 +1,97 @@
+## fm-attempt-record.py, slot still owned (teardown passes no extra args)
+rc=0
+{
+    "attempt_id": "live-1",
+    "attempt_n": null,
+    "cache_read_tokens": 157720,
+    "cache_write_tokens": 66921,
+    "context_peak": 35074,
+    "don_minutes": null,
+    "duration_s": 43.71399998664856,
+    "effort": null,
+    "ended_at": "2026-10-22T23:37:30.714000Z",
+    "fix_forward_7d": null,
+    "gate_result": null,
+    "harness": "claude",
+    "input_tokens": 14,
+    "merged": null,
+    "model": "haiku",
+    "notes": [
+        "Acceptance awaits fix_forward_7d; a merge alone is not acceptance.",
+        "No-mistakes attribution needs project, branch and attempt start.",
+        "Validated merge receipt unavailable.",
+        "attempt_n not recorded as a positive integer.",
+        "effort not recorded in task metadata.",
+        "fix_forward_7d and don_minutes not collected yet.",
+        "gate_result not established by lifecycle evidence.",
+        "outcome not established by lifecycle evidence.",
+        "pool not recorded in task metadata.",
+        "prior_tier not recorded in task metadata."
+    ],
+    "outcome": null,
+    "output_tokens": 1008,
+    "pool": null,
+    "prior_tier": null,
+    "review_findings": {
+        "blocker": null,
+        "major": null,
+        "minor": null
+    },
+    "review_model": null,
+    "row": "code",
+    "started_at": "2026-10-22T23:36:47Z",
+    "task_id": "live-task",
+    "tier": "T1",
+    "ts": "2026-10-22T23:37:31Z",
+    "worktree": "/tmp/fmlive.Fxdbo6/fix-foo"
+}
+
+## fm-attempt-record.py --worktree-reassigned (teardown_owns_worktree false)
+rc=0
+{
+    "attempt_id": "live-1",
+    "attempt_n": null,
+    "cache_read_tokens": null,
+    "cache_write_tokens": null,
+    "context_peak": null,
+    "don_minutes": null,
+    "duration_s": 44.0,
+    "effort": null,
+    "ended_at": "2026-10-22T23:37:31Z",
+    "fix_forward_7d": null,
+    "gate_result": null,
+    "harness": "claude",
+    "input_tokens": null,
+    "merged": null,
+    "model": "haiku",
+    "notes": [
+        "Acceptance awaits fix_forward_7d; a merge alone is not acceptance.",
+        "No recorded worker activity; ended_at is the cleanup time.",
+        "No-mistakes attribution needs project, branch and attempt start.",
+        "Validated merge receipt unavailable.",
+        "Worktree slot reassigned to another task; usage and gate-head attribution skipped.",
+        "attempt_n not recorded as a positive integer.",
+        "effort not recorded in task metadata.",
+        "fix_forward_7d and don_minutes not collected yet.",
+        "gate_result not established by lifecycle evidence.",
+        "outcome not established by lifecycle evidence.",
+        "pool not recorded in task metadata.",
+        "prior_tier not recorded in task metadata."
+    ],
+    "outcome": null,
+    "output_tokens": null,
+    "pool": null,
+    "prior_tier": null,
+    "review_findings": {
+        "blocker": null,
+        "major": null,
+        "minor": null
+    },
+    "review_model": null,
+    "row": "code",
+    "started_at": "2026-10-22T23:36:47Z",
+    "task_id": "live-task",
+    "tier": "T1",
+    "ts": "2026-10-22T23:37:31Z",
+    "worktree": "/tmp/fmlive.Fxdbo6/fix-foo"
+}

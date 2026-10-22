@@ -1,0 +1,36 @@
+# Live Claude Code 2.1.307 transcripts (claude -p --model haiku) in /home/work/.claude/projects/-tmp-fmlive-Fxdbo6-fix-foo
+# worktree=/tmp/fmlive.Fxdbo6/fix-foo  collider=/tmp/fmlive.Fxdbo6/fix.foo  window=[1792712207, 1792712251)
+## Per-file assistant records (cwd, msg id, output_tokens):
+06a576e5-fbd3-4a6a-939d-3fba0b36285c.jsonl  first-cwd= /tmp/fmlive.Fxdbo6/fix-foo
+    /tmp/fmlive.Fxdbo6/fix-foo msg_011CgJ9xJ24cDzdiaBkpg22g in=2 out=321
+    /tmp/fmlive.Fxdbo6/fix-foo msg_011CgJ9xJ24cDzdiaBkpg22g in=2 out=321
+    /tmp/fmlive.Fxdbo6/fix-foo msg_011CgJ9xcTad3GAYnMHb1RXJ in=2 out=3
+47550ec7-43db-49ee-9f9d-55ed120ffeab.jsonl  first-cwd= /tmp/fmlive.Fxdbo6/fix-foo
+    /tmp/fmlive.Fxdbo6/fix-foo msg_011CgJ9uyL6sAnm7PHBxnd3g in=2 out=265
+    /tmp/fmlive.Fxdbo6/fix-foo msg_011CgJ9uyL6sAnm7PHBxnd3g in=2 out=265
+    /tmp/fmlive.Fxdbo6/fix-foo/sub msg_011CgJ9v9sMwJwrXDDHYpNdz in=2 out=82
+    /tmp/fmlive.Fxdbo6/fix-foo/sub msg_011CgJ9vGXiKb21aZqqG5Vyp in=2 out=3
+56f68c99-cbd0-4568-9da2-9f32f81e40ea.jsonl  first-cwd= /tmp/fmlive.Fxdbo6/fix.foo
+    /tmp/fmlive.Fxdbo6/fix.foo msg_011CgJ9wYcsVBidYB4KUQ3ma in=2 out=311
+    /tmp/fmlive.Fxdbo6/fix.foo msg_011CgJ9wYcsVBidYB4KUQ3ma in=2 out=311
+    /tmp/fmlive.Fxdbo6/fix.foo msg_011CgJ9x2HWZMpTfysGnSbwD in=2 out=3
+06a576e5-fbd3-4a6a-939d-3fba0b36285c/subagents/agent-afa48ecb8e9f4c816.jsonl  first-cwd= /tmp/fmlive.Fxdbo6/fix-foo
+    /tmp/fmlive.Fxdbo6/fix-foo msg_011CgJ9xRnPKX65My5G1itwc in=2 out=174
+    /tmp/fmlive.Fxdbo6/fix-foo msg_011CgJ9xRnPKX65My5G1itwc in=2 out=174
+    /tmp/fmlive.Fxdbo6/fix-foo msg_011CgJ9xX3PerHKcVd3pdyyG in=2 out=160
+    /tmp/fmlive.Fxdbo6/fix-foo msg_011CgJ9xX3PerHKcVd3pdyyG in=2 out=160
+56f68c99-cbd0-4568-9da2-9f32f81e40ea/subagents/agent-ab13ed574441a0a17.jsonl  first-cwd= /tmp/fmlive.Fxdbo6/fix.foo
+    /tmp/fmlive.Fxdbo6/fix.foo msg_011CgJ9wnTKbgNFD9qBco3A9 in=2 out=86
+    /tmp/fmlive.Fxdbo6/fix.foo msg_011CgJ9wvJbQjiB3gNPaGdnB in=2 out=54
+
+## Ground truth: dedupe by msg id (last wins), sessions LAUNCHED in fix-foo + their subagents
+requests=7 input=14 output=1008
+
+## NEW fm-attempt-usage.py (this change) --worktree fix-foo
+{"cache_read_tokens": 157720, "cache_write_tokens": 66921, "context_peak": 35074, "input_tokens": 14, "last_activity": 1792712250.714, "notes": [], "output_tokens": 1008, "sessions": 2}
+
+## BASE fm-attempt-usage.py (37559885, exact per-record cwd) --worktree fix-foo
+{"cache_read_tokens": 88706, "cache_write_tokens": 66396, "context_peak": 35074, "input_tokens": 10, "last_activity": 1792712250.714, "notes": [], "output_tokens": 923, "sessions": 2}
+
+## NEW --worktree fix.foo (collider's own dir is different: sanitized name collides, so same project dir)
+{"cache_read_tokens": 72120, "cache_write_tokens": 48196, "context_peak": 34961, "input_tokens": 8, "last_activity": 1792712243.146, "notes": [], "output_tokens": 454, "sessions": 1}
