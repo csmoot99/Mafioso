@@ -4703,7 +4703,55 @@ EOF
   pass "answered holds remain durable after Done retention; unresolved and missing entries refuse"
 )
 
+test_archived_reused_call_resolves_newest_row() (
+  local home call origin
+  home=$(make_home archived-reused)
+  call=reused-call
+  printf 'I approve the business card.\n' > "$home/decision.txt"
+  for origin in first-scout second-scout; do
+    tasks_in "$home" add "$origin" "Review the card" --kind scout --repo sample --start >/dev/null \
+      || fail "could not create reused-call origin $origin"
+    write_scout_with_attested_inventory "$home" "$origin" "$call"
+    run_captain "$home" hold "$call" --title "Approve the card" \
+      --reason "card needs approval" --origin "$origin" --repo sample >/dev/null \
+      || fail "could not hold $call for $origin"
+    run_captain "$home" answer "$call" --decision-file "$home/decision.txt" >/dev/null \
+      || fail "could not answer $call for $origin"
+    tasks_in "$home" prune --keep 0 >/dev/null || fail "could not archive $call for $origin"
+  done
+  run_captain "$home" complete second-scout "$call" > "$home/complete.out" 2>&1 \
+    || fail "completion resolved the older archived row: $(cat "$home/complete.out")"
+  run_captain "$home" verify second-scout > "$home/verify.out" 2>&1 \
+    || fail "verification resolved the older archived row: $(cat "$home/verify.out")"
+  if run_captain "$home" verify first-scout > "$home/first.out" 2>&1; then
+    fail "verification accepted the newer row held for another origin"
+  fi
+  pass "a reused captain-call id resolves to its newest archived row"
+)
+
+test_live_legacy_hold_precedes_archived_exact_row() (
+  local home scout call
+  home=$(make_home archived-legacy)
+  scout="legacy-scout"
+  call="legacy-call"
+  tasks_in "$home" add "$call" "Old unanswered call" --repo sample >/dev/null \
+    || fail "could not create archived exact row"
+  tasks_in "$home" "done" "$call" >/dev/null || fail "could not close archived exact row"
+  tasks_in "$home" prune --keep 0 >/dev/null || fail "could not archive exact row"
+  tasks_in "$home" add "$scout" "Review the card" --kind scout --repo sample --start >/dev/null \
+    || fail "could not create legacy origin"
+  write_scout_with_attested_inventory "$home" "$scout" "$call"
+  run_captain "$home" hold "$scout-decision-$call" --title "Approve the card" \
+    --reason "card needs approval" --origin "$scout" --repo sample >/dev/null \
+    || fail "could not create live legacy hold"
+  run_captain "$home" complete "$scout" "$call" > "$home/complete.out" 2>&1 \
+    || fail "an archived exact row shadowed the live legacy hold: $(cat "$home/complete.out")"
+  pass "a live legacy hold takes precedence over an archived exact row"
+)
+
 test_archived_answer_satisfies_completion
+test_archived_reused_call_resolves_newest_row
+test_live_legacy_hold_precedes_archived_exact_row
 test_hold_reason_round_trips_awkward_characters
 test_hold_origins_precede_backend_holds
 test_historical_self_inventory_has_workable_repair

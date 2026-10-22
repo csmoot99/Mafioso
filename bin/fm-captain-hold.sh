@@ -739,13 +739,9 @@ resolve_migrated_entry() {  # <origin-or-empty> <entry>
 # migrated-prefix (with -archive for archived exact or legacy rows).
 # Only completion verification opts into archive reads; answer intake stays live.
 resolve_entry() {  # <origin-or-empty> <entry> [include-archive-0-or-1]
-  local origin=$1 entry=$2 legacy migrated rc include_archive=${3:-0}
+  local origin=$1 entry=$2 legacy='' migrated rc include_archive=${3:-0}
   if task_show "$entry"; then
     printf '%s exact' "$entry"
-    return 0
-  fi
-  if [ "$include_archive" = 1 ] && task_show "$entry" --archive; then
-    printf '%s exact-archive' "$entry"
     return 0
   fi
   if [ -n "$origin" ] && [ "$origin" != "$BINDING_ANY" ]; then
@@ -754,7 +750,13 @@ resolve_entry() {  # <origin-or-empty> <entry> [include-archive-0-or-1]
       printf '%s legacy' "$legacy"
       return 0
     fi
-    if [ "$include_archive" = 1 ] && task_show "$legacy" --archive; then
+  fi
+  if [ "$include_archive" = 1 ]; then
+    if task_show "$entry" --archive; then
+      printf '%s exact-archive' "$entry"
+      return 0
+    fi
+    if [ -n "$legacy" ] && task_show "$legacy" --archive; then
       printf '%s legacy-archive' "$legacy"
       return 0
     fi

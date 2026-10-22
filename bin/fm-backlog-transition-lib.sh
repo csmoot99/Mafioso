@@ -407,7 +407,13 @@ fm_backlog_row_show() {  # <resolved-data-dir> <id> [--archive] [tasks-axi-flag.
       snapshot=$(mktemp) || exit 1
       trap '\''rm -f "$snapshot"'\'' EXIT
       # Archive batches use dated headings, which are not live backlog sections.
-      sed -E '\''s/^## Archived [0-9]{4}-[0-9]{2}-[0-9]{2}$/## Done/'\'' "$archive" > "$snapshot" || exit 1
+      # Batches are appended, so list the newest first for a reused id.
+      LC_ALL=C awk '\''
+        /^## Archived [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$/ { n++; batch[n] = "## Done"; next }
+        n == 0 { print; next }
+        { batch[n] = batch[n] "\n" $0 }
+        END { for (i = n; i >= 1; i--) print batch[i] }
+      '\'' "$archive" > "$snapshot" || exit 1
       tasks-axi show "$@" --file "$snapshot"
     else
       exec tasks-axi show "$@"
