@@ -1164,6 +1164,42 @@ The explicit Codex handoff percentage does not require a launch-env override; wi
 The file is inherited into secondmate homes through the [primary-authoritative configuration contract](../.agents/skills/secondmate-provisioning/SKILL.md), so a secondmate's own Claude and Codex workers hand off the same way.
 Regression coverage runs the real hook commands, spawn wiring, and replacement command in [`tests/fm-context-handoff.test.sh`](../tests/fm-context-handoff.test.sh); the blocking and in-band-notice behaviors are Claude's own and are proven on the installed Claude Code by the opt-in live guard recorded in [`docs/verification/runtime-backends.md`](verification/runtime-backends.md), and the installed Codex's loading of the Codex hooks is checked by [`tests/fm-codex-hook-layer-live-e2e.test.sh`](../tests/fm-codex-hook-layer-live-e2e.test.sh).
 
+## Consigliere review (config/consigliere)
+
+`config/consigliere` is an optional, local, gitignored, single-line switch: `on` enables the Consigliere stage for every PR-based ship owned by this home; `off` or an absent file preserves the existing delivery path.
+Any other value, an empty file, or an unreadable file stops PR readiness rather than silently disabling review.
+Local-only tasks are unaffected, and this switch never grants merge authority.
+Enable it only on the captain's instruction, after configuring the review rules below; there is no tracked default configuration to install.
+Each owning home needs its own explicit setting and review rules; this change does not automatically copy them into secondmate homes.
+
+To enable after installation, write `on` followed by a newline to `$FM_HOME/config/consigliere` and add review-specific rules to that home's existing `config/crew-dispatch.json`, preserving its builder rules and default.
+To disable, write `off` or remove the switch.
+Review rules use the existing `rules[].when` and `use` schema: describe a Consigliere review and the builder tier/model in `when`, and supply an explicit supported reviewer `harness`, `model`, and `effort` in `use`.
+Use installed model catalogs to resolve these policy names to concrete model IDs; the names in the table are not CLI aliases.
+Firstmate must distinguish review rules from builder rules, and must not use a generic default that violates the map.
+
+| Builder | Reviewer |
+| --- | --- |
+| T1 Haiku | T1 Luna |
+| T1 Luna | T1 Haiku |
+| T2 or T3 Sonnet | T3 Sol |
+| T2 or T3 Sol | T3 Sonnet |
+| T4 Opus | T4 Astra; Opus with an independent brief only when the Codex pool is short |
+| T5 Fable | T5 Astra; Fable with an independent brief is the stated fallback |
+
+The usual route crosses provider model families, regardless of which harness launches the model.
+The two same-family exceptions require explicit recorded grounds and an independent review brief; they never arise from an unverified default or an inferred credential shortage.
+The policy supplies no reverse Astra mapping or rule for an unlisted builder; resolve that gap explicitly before launching a reviewer.
+Profile arrays use the existing quota-aware dispatch procedure, not a new selector.
+
+[`ship-landing`](../.agents/skills/ship-landing/SKILL.md#opt-in-consigliere-review) owns gate evidence, launch, one bounded correction and re-review, and verdict reporting.
+The reviewer uses `fm-brief.sh --review` through the existing scout launch path and never edits code.
+Firstmate keeps the stage's head, round, linked reviewer, consumed correction allowances, and evidence under `data/<builder-id>/consigliere.json`; a pending or failed review cannot stand in for a clear verdict.
+[`bin/fm-consigliere-lib.sh`](../bin/fm-consigliere-lib.sh) owns the receipt fields and validation mechanics, including `FM_CONFIG_OVERRIDE` and `FM_DATA_OVERRIDE` for the normal home overrides.
+`fm-pr-check.sh` refuses to announce readiness without a clear receipt for the current PR URL and head, and `fm-pr-merge.sh` checks it again against the head bound to the merge command.
+Changing the head invalidates the receipt; absent, malformed, or stale evidence requires resolution before readiness or merge.
+These guards validate the supervisor's attestation and the presence of its evidence files, not the semantic content of the report or the honesty of a model-family claim; firstmate must check the underlying evidence before writing it.
+
 ## Crew dispatch profiles (config/crew-dispatch.json)
 
 `config/crew-dispatch.json` is an optional local, gitignored file containing natural-language rules that firstmate reads before dispatching a crewmate or scout.

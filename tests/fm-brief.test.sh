@@ -1869,7 +1869,89 @@ EOF
   pass "fm-brief.sh --combine is refused without its done command, beside a plan, or on a malformed combine file"
 }
 
+test_review_brief_is_read_only_and_evidence_based() {
+  local home brief expected forbidden
+  home="$TMP_ROOT/review-home"
+  mkdir -p "$home/config"
+  printf '%s\n' 'A standing home addition.' > "$home/config/brief-include.md"
+  FM_HOME="$home" bash "$ROOT/bin/fm-brief.sh" independent-review some-proj --review --base-branch feature/hub >/dev/null \
+    || fail "review scaffold failed"
+  brief="$home/data/independent-review/brief.md"
+  while IFS= read -r expected; do
+    assert_grep "$expected" "$brief" "review contract missing: $expected"
+  done <<EOF
+This is a REVIEW task
+Base branch: feature/hub
+## Captain's intent
+{TASK}
+## Firstmate spec
+{FIRSTMATE_SPEC}
+The worktree and repository are read-only, including scratch files and Git metadata.
+Never edit code, install dependencies
+Write only
+$home/data/independent-review/report.md
+$home/state/independent-review.status
+$home/state/independent-review.inbox
+every other path is read-only
+green lint, typecheck, and test results belong to that exact commit
+missing, pending, failed, or stale gate evidence
+stop without reviewing
+Read the PR diff at that head
+the surrounding code and relevant callers, and the gate results
+the builder's envelope is context, not the verdict
+Start the report with a short envelope within the cap in rule 4
+full reviewed head SHA
+blocker: N; major: N; minor: N
+include zero counts
+stable ID, severity (blocker, major, or minor), file:line, concrete evidence
+Blocker or major findings mean changes required
+For a re-review, verify the new head and its green gates
+PR head changed during review
+never fix findings yourself
+worktree pool
+Herdr lifecycle - forbidden
+A standing home addition.
+EOF
+  for forbidden in 'make scratch commits freely' 'git checkout -b' 'Delivery contract:' \
+    'promote this task' 'ponytail' 'lavish-axi' 'no-mistakes doctor' 'regenerate the brief with'; do
+    assert_no_grep "$forbidden" "$brief" "review inherited an editing or delivery instruction: $forbidden"
+  done
+  FM_HOME="$home" bash "$ROOT/bin/fm-brief.sh" default-review some-proj --review >/dev/null \
+    || fail "review scaffold without a base branch failed"
+  assert_grep 'clean default branch' "$home/data/default-review/brief.md" "review lost default setup"
+  pass "fm-brief.sh: review is read-only, requires green head-bound evidence, and reports counted findings"
+}
+
+test_review_refuses_conflicting_contracts() {
+  local home flags out rc n=0
+  local -a args
+  home="$TMP_ROOT/review-refusals"
+  while IFS= read -r flags; do
+    n=$((n + 1))
+    read -r -a args <<< "$flags"
+    out=$(FM_HOME="$home" bash "$ROOT/bin/fm-brief.sh" "refused-$n" some-proj "${args[@]}" 2>&1); rc=$?
+    [ "$rc" -ne 0 ] || fail "review accepted incompatible flags: $flags"
+    assert_contains "$out" 'error:' "review refusal did not explain itself: $flags"
+    [ ! -e "$home/data/refused-$n/brief.md" ] || fail "refused review wrote a brief: $flags"
+  done <<'EOF'
+--review --mode direct-PR
+--review --branch-prefix fix/
+--review --forge gerrit
+--review --shape squash
+--review --herdr-lab
+--review --harness qwen
+--review --no-projects
+--review --scout
+--scout --review
+--review --secondmate
+--secondmate --review
+EOF
+  pass "fm-brief.sh: review rejects editing and conflicting role contracts before writing"
+}
+
 test_script_parses
+test_review_brief_is_read_only_and_evidence_based
+test_review_refuses_conflicting_contracts
 test_no_heredoc_in_command_substitution
 test_help_includes_entire_header
 test_ship_modes_generate_clean_briefs

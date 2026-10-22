@@ -18,11 +18,18 @@
 #        fm-brief.sh <task-id> <repo-name> --mode direct-PR --harness qwen --plan <file> --files '<path>...' --done-command '<command>' [--branch-prefix <prefix>] [--base-branch <branch>]
 #        fm-brief.sh <task-id> <repo-name> --mode direct-PR --harness qwen --combine <file> --done-command '<command>' [--branch-prefix <prefix>] [--base-branch <branch>]
 #        fm-brief.sh <task-id> <repo-name> --scout [--base-branch <branch>] [--herdr-lab]
+#        fm-brief.sh <task-id> <repo-name> --review [--base-branch <branch>]
 #        fm-brief.sh <task-id> --secondmate {<project>...|--no-projects}
 #   --scout writes the scout contract instead: the deliverable is a report at
 #   data/<task-id>/report.md (no branch, no push, no PR) and the worktree is scratch.
 #   It offers the Lavish review loop only when `fm-bootstrap.sh lavish-compatible`
 #   confirms the legacy board-compatibility floor; otherwise it asks for a text report.
+#   --review writes a read-only PR review contract using the scout launch path.
+#   Fill Firstmate spec with the PR URL and full head SHA, builder brief path,
+#   green lint/typecheck/test evidence for that head, and specific review questions.
+#   It writes data/<task-id>/report.md with an envelope and blocker/major/minor
+#   counts, never edits project files, and accepts no ship delivery flags or
+#   --herdr-lab. --review, --scout, and --secondmate are mutually exclusive.
 #   --secondmate writes a persistent secondmate charter. The project list
 #   is cloned into the secondmate home, while the natural-language scope
 #   tells the main firstmate when to route work there; routine churn stays in its own home;
@@ -299,8 +306,12 @@ for a in "$@"; do
     continue
   fi
   case "$a" in
-    --scout) KIND=scout ;;
-    --secondmate) KIND=secondmate ;;
+    --scout|--review|--secondmate)
+      if [ "$KIND" != ship ] && [ "$KIND" != "${a#--}" ]; then
+        echo "error: --review, --scout, and --secondmate are mutually exclusive" >&2
+        exit 1
+      fi
+      KIND=${a#--} ;;
     --herdr-lab) HERDR_LAB=1 ;;
     --no-projects) NO_PROJECTS=1 ;;
     --mode) want_value=mode ;;
@@ -384,7 +395,7 @@ elif [ "$FORGE_SET" -eq 1 ] || [ "$SHAPE_SET" -eq 1 ]; then
 fi
 if [ "$BASE_BRANCH_SET" -eq 1 ]; then
   if [ "$KIND" = secondmate ] || [ -z "$BASE_BRANCH" ]; then
-    echo "error: --base-branch takes a branch name and applies only to ship and scout briefs" >&2
+    echo "error: --base-branch takes a branch name and applies only to ship, scout, and review briefs" >&2
     exit 1
   fi
   fm_base_branch_valid "$BASE_BRANCH" "$MODE" "$FORGE" "fm-brief.sh --base-branch" || exit 1
@@ -481,7 +492,7 @@ if ! git check-ref-format --branch "$BRANCH" >/dev/null 2>&1; then
 fi
 printf -v BRANCH_Q '%q' "$BRANCH"
 
-if [ "$KIND" = secondmate ] && [ "$HERDR_LAB" -eq 1 ]; then
+if { [ "$KIND" = secondmate ] || [ "$KIND" = review ]; } && [ "$HERDR_LAB" -eq 1 ]; then
   echo "error: --herdr-lab applies only to crewmate ship or scout briefs" >&2
   exit 1
 fi
@@ -774,11 +785,51 @@ else
   SETUP_BASE="You are in a disposable git worktree of $REPO, at a detached HEAD on a clean default branch."
 fi
 
-if [ "$KIND" = scout ]; then
+if [ "$KIND" = scout ] || [ "$KIND" = review ]; then
+if [ "$KIND" = review ]; then
+  HERDR_SECTION='# Herdr lifecycle - forbidden for this read-only review'
+  REPORT_SETUP='This is a REVIEW task: independently review the specified PR; the deliverable is a written report, not a PR.
+The worktree and repository are read-only, including scratch files and Git metadata.
+Never edit code, install dependencies, run commands that change project files, create branches or commits, push, merge, or post findings to the forge.'
+  REPORT_WRITE_RULE="2. Write only \`$DATA/$ID/report.md\`, append to the status file below, and acknowledge messages in the exact steering inbox below; every other path is read-only."
+  IFS= read -r -d '' REPORT_DOD <<EOF || true
+Write your findings to \`$DATA/$ID/report.md\`.
+Before reviewing, read Firstmate spec for the PR URL, full head SHA, builder brief path, gate evidence, and specific questions to check.
+Verify the PR head and green lint, typecheck, and test results belong to that exact commit; missing, pending, failed, or stale gate evidence means append \`blocked [at=<epoch>]: {missing or non-green review prerequisite}\` and stop without reviewing.
+Read the PR diff at that head, the builder's \`## Captain's intent\`, the surrounding code and relevant callers, and the gate results.
+Review the requirements and the specific questions independently; the builder's envelope is context, not the verdict.
+Cross-family review reduces self-endorsement but does not guarantee independence.
+Check correctness, regressions, scope against the requirements, and whether the green gates cover the changed behavior; do not run a build or test command that writes files.
+Start the report with a short envelope within the cap in rule 4: PR URL, full reviewed head SHA, requirements source, gate evidence, verdict (clear or changes required), and counts in the form \`blocker: N; major: N; minor: N\` (include zero counts).
+Then list each finding with a stable ID, severity (blocker, major, or minor), file:line, concrete evidence, consequence, and recommended correction.
+A blocker prevents safe delivery; a major is a material correctness or requirement failure; a minor is a non-blocking improvement.
+Blocker or major findings mean changes required; minor-only findings may be clear with notes.
+State coverage and uncertainty explicitly; missing evidence is never proof of correctness.
+For a re-review, verify the new head and its green gates, check the prior findings and the correction diff, and record which finding IDs were resolved or remain open.
+Recheck the PR head before reporting done; if it moved, append \`blocked [at=<epoch>]: PR head changed during review\` and stop so firstmate can arrange a fresh review.
+When the report is complete, append \`done [at=<epoch>]: review {verdict}; blocker: N; major: N; minor: N; head={full SHA}; report=$DATA/$ID/report.md\` to the status file and stop.
+Firstmate owns routing findings back to the builder and any landing decision; never fix findings yourself.
+EOF
+else
 if "$SCRIPT_DIR/fm-bootstrap.sh" lavish-compatible >/dev/null 2>&1; then
   LAVISH_LINE='If your deliverable is a visual artifact the captain will review and iterate on, use the lavish-axi rule: arm your board with bin/fm-procevent-lavish.sh arm <artifact.html> --for <task-id>; never run lavish-axi poll yourself. Re-arm with the reply after each nonterminal round to acknowledge it, route the board feedback through your steering inbox, write needs-decision [key=board-review] with the live board URL when the captain owes a decision, and stop at session_ended or an empty End without re-arming - acknowledge that final round with bin/fm-procevent.sh handled <source-id> <sequence> to conclude and retire your board.'
 else
   LAVISH_LINE='Lavish is unavailable (lavish-axi is missing or below its supported version floor), so deliver your findings as a text report without Lavish, even for a visual deliverable.'
+fi
+  REPORT_SETUP='This is a SCOUT task: the deliverable is a written report, not a PR.
+The worktree is your laboratory - install, run, edit, and make scratch commits freely; all of it is discarded at teardown.
+The report is the only thing that survives, so anything worth keeping must be in it.'
+  REPORT_WRITE_RULE='2. Stay inside this worktree; the only files you may write outside it are the report and the status file below.'
+  IFS= read -r -d '' REPORT_DOD <<EOF || true
+Write your findings to \`$DATA/$ID/report.md\`.
+Open the report with a \`## Envelope\` section using the return fields and cap in rule 4, with the findings and recommendation in its outcome so it stands alone.
+Put detailed evidence after the next level-two heading; firstmate reads only the envelope unless it dispatches an extraction worker.
+The report must stand alone: what you did, what you found, the evidence (commands run, output, file:line references), and what you recommend.
+$LAVISH_LINE
+Before reporting done, read and follow \`$FM_ROOT/.agents/skills/captain-hold-lifecycle/SKILL.md\` and pass its shared completion gate for the report and any visual review.
+When the report is complete, append \`done [at=<epoch>]: {return envelope; report path}\` to the status file and stop.
+If your findings reveal work that should ship (e.g. you reproduced a bug and the fix is clear), say so in the report; firstmate may promote this task in place, and you would then receive mode-specific ship instructions as a follow-up message.
+EOF
 fi
 cat > "$BRIEF" <<EOF
 You are a crewmate: an autonomous worker agent managed by firstmate. Work on your own; do not wait for a human.
@@ -789,13 +840,11 @@ $HERDR_SECTION
 
 # Setup
 $SETUP_BASE
-This is a SCOUT task: the deliverable is a written report, not a PR.
-The worktree is your laboratory - install, run, edit, and make scratch commits freely; all of it is discarded at teardown.
-The report is the only thing that survives, so anything worth keeping must be in it.
+$REPORT_SETUP
 
 # Rules
 1. Never push to any remote and never open a PR.
-2. Stay inside this worktree; the only files you may write outside it are the report and the status file below.
+$REPORT_WRITE_RULE
 3. Use gh-axi for GitHub operations and chrome-devtools-axi for browser operations.
 4. Report status by appending one line:
    \`$STATUS_APPEND\`
@@ -819,17 +868,10 @@ $SHARED_INFRA_RULE
 $WAIT_BLOCK$INBOX_SECTION
 
 # Definition of done
-Write your findings to \`$DATA/$ID/report.md\`.
-Open the report with a \`## Envelope\` section using the return fields and cap in rule 4, with the findings and recommendation in its outcome so it stands alone.
-Put detailed evidence after the next level-two heading; firstmate reads only the envelope unless it dispatches an extraction worker.
-The report must stand alone: what you did, what you found, the evidence (commands run, output, file:line references), and what you recommend.
-$LAVISH_LINE
-Before reporting done, read and follow \`$FM_ROOT/.agents/skills/captain-hold-lifecycle/SKILL.md\` and pass its shared completion gate for the report and any visual review.
-When the report is complete, append \`done [at=<epoch>]: {return envelope; report path}\` to the status file and stop.
-If your findings reveal work that should ship (e.g. you reproduced a bug and the fix is clear), say so in the report; firstmate may promote this task in place, and you would then receive mode-specific ship instructions as a follow-up message.
+$REPORT_DOD
 EOF
 append_brief_include
-echo "scaffolded: $BRIEF (scout; replace {TASK} and {FIRSTMATE_SPEC})"
+echo "scaffolded: $BRIEF ($KIND; replace {TASK} and {FIRSTMATE_SPEC})"
 exit 0
 fi
 

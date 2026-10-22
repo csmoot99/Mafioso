@@ -735,6 +735,82 @@ test_direct_pr_unpushed_commit_refuses_registration() {
   pass "fm-pr-check refuses a direct-PR registration while a later commit is only in the copy"
 }
 
+write_review_receipt() { # <case-dir> <url> <head>
+  local dir=$1 url=$2 head=$3 data
+  data="$dir/home/data/task-a"
+  mkdir -p "$data"
+  printf 'verified report\n' > "$data/report.md"
+  printf 'verified green gates\n' > "$data/gates.md"
+  # shellcheck disable=SC2016 # jq expressions, not shell expansion
+  "$REAL_JQ" -n --arg pr "$url" --arg head "$head" --arg data "$data" '
+    {pr: $pr, head: $head, round: 1, verdict: "clear", blocker: 0, major: 0, minor: 1,
+     builder_family: "anthropic", reviewer_family: "openai",
+     report: ($data + "/report.md"), gates: ($data + "/gates.md")}' > "$data/consigliere.json"
+}
+
+test_consigliere_readiness_and_merge() {
+  local dir url head changed provider
+  head=0123456789abcdef0123456789abcdef01234567
+  changed=1123456789abcdef0123456789abcdef01234567
+  url=https://github.com/o/r/pull/4
+  dir=$(make_case consigliere-github)
+  ln -sf "$REAL_JQ" "$dir/fakebin/jq"
+  write_task_meta "$dir"
+  printf 'on\n' > "$dir/home/config/consigliere"
+  if run_check_entry "$dir" task-a "$url" > "$dir/out" 2> "$dir/err"; then
+    fail "PR with no review was registered"
+  fi
+  assert_grep 'Consigliere review pending' "$dir/err" "wrong missing-review refusal"
+  assert_absent "$dir/home/state/task-a.check.sh" "missing review armed readiness"
+  assert_no_grep 'pr=' "$dir/home/state/task-a.meta" "missing review changed PR metadata"
+  if run_merge_entry "$dir" task-a "$url" -- --merge > "$dir/out" 2> "$dir/err"; then
+    fail "merge registration bypassed the missing review"
+  fi
+  assert_grep 'Consigliere review pending' "$dir/err" "wrong merge missing-review refusal"
+  assert_absent "$dir/home/state/task-a.check.sh" "merge registration armed unreviewed readiness"
+  assert_no_grep 'pr=' "$dir/home/state/task-a.meta" "merge registration changed unreviewed metadata"
+  write_review_receipt "$dir" "$url" "$head"
+  run_check_entry "$dir" task-a "$url" > "$dir/out" 2> "$dir/err" \
+    || fail "clear review failed registration: $(cat "$dir/err")"
+  if FM_TEST_GH_HEAD=$changed run_merge_entry "$dir" task-a "$url" -- --merge \
+    > "$dir/out" 2> "$dir/err"; then
+    fail "merge accepted a head newer than its review"
+  fi
+  assert_grep 'Consigliere review pending' "$dir/err" "stale review did not block merge"
+  assert_no_grep 'pr merge ' "$dir/gh.log" "stale review reached the forge merge command"
+  write_review_receipt "$dir" "$url" "$changed"
+  FM_TEST_GH_HEAD=$changed run_merge_entry "$dir" task-a "$url" -- --merge \
+    > "$dir/out" 2> "$dir/err" || fail "current review did not permit merge: $(cat "$dir/err")"
+  assert_grep "--match-head-commit $changed" "$dir/gh.log" "merge was not bound to reviewed head"
+  pass "Consigliere gates PR-ready registration and rechecks the live head before merging"
+
+  for provider in gitlab gerrit; do
+    dir=$(make_case "consigliere-$provider")
+    ln -sf "$REAL_JQ" "$dir/fakebin/jq"
+    write_task_meta "$dir"
+    head=$(git -C "$dir/wt" rev-parse HEAD)
+    printf 'on\n' > "$dir/home/config/consigliere"
+    if [ "$provider" = gitlab ]; then
+      url=https://gitlab.example/group/project/-/merge_requests/4
+      cat > "$dir/fakebin/glab" <<'SH'
+#!/usr/bin/env bash
+printf '{"sha":"%s","draft":false,"work_in_progress":false}\n' "$FM_TEST_GH_HEAD"
+SH
+    else
+      url=https://gerrit.example/c/group/apps/console/+/4201
+    fi
+    write_review_receipt "$dir" "$url" "$changed"
+    if FM_TEST_GH_HEAD=$head FM_TEST_GERRIT_REVISION=$head run_check_entry "$dir" task-a "$url" \
+      > "$dir/out" 2> "$dir/err"; then fail "$provider accepted stale review"; fi
+    assert_grep 'Consigliere review pending' "$dir/err" "$provider wrong stale-review refusal"
+    write_review_receipt "$dir" "$url" "$head"
+    FM_TEST_GH_HEAD=$head FM_TEST_GERRIT_REVISION=$head run_check_entry "$dir" task-a "$url" \
+      > "$dir/out" 2> "$dir/err" || fail "$provider rejected current review: $(cat "$dir/err")"
+    assert_no_grep 'pr_head=' "$dir/home/state/task-a.meta" "$provider changed legacy head metadata"
+  done
+  pass "Consigliere reads fresh GitLab and Gerrit heads without changing legacy metadata"
+}
+
 test_valid_recording_and_merge_derivation() {
   local dir expected sidecar count rc
   dir=$(make_case valid-recording)
@@ -3468,6 +3544,7 @@ test_draft_pull_request_is_not_armed
 test_secondmate_record_refuses_a_pr_watch
 test_unpushed_named_head_refuses_registration
 test_direct_pr_unpushed_commit_refuses_registration
+test_consigliere_readiness_and_merge
 test_valid_recording_and_merge_derivation
 test_rejected_metacharacter_bytes_are_inert
 test_static_poll_contract

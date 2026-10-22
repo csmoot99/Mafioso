@@ -148,6 +148,10 @@
 # optional -- separator, skips this gate for an explicit captain instruction
 # to merge anyway and is refused while the away-posture record exists.
 #
+# When config/consigliere is on, a GitHub or GitLab merge also requires a clear
+# Consigliere receipt for the URL and the verified head before either forge
+# merge; no override skips it (bin/fm-consigliere-lib.sh owns the receipt).
+#
 # Extra args must not include --repo or -R in any form, including a bundled
 # short-option cluster such as -yR, because the repository comes only from the
 # URL, nor --sha or --match-head-commit because the head comes only from the
@@ -180,6 +184,8 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 
 # shellcheck source=bin/fm-pr-lib.sh
 . "$SCRIPT_DIR/fm-pr-lib.sh"
+# shellcheck source=bin/fm-consigliere-lib.sh
+. "$SCRIPT_DIR/fm-consigliere-lib.sh"
 # shellcheck source=bin/fm-backlog-transition-lib.sh
 . "$SCRIPT_DIR/fm-backlog-transition-lib.sh"
 # shellcheck source=bin/fm-merge-outcome-lib.sh
@@ -1550,6 +1556,7 @@ case "$PROVIDER" in
       fi
       exit 1
     fi
+    fm_consigliere_require_review "$FM_HOME" "$ID" "$URL" "$FM_PR_MERGE_HEAD" || exit 1
     refuse_conflicting_siblings || exit 1
     # The away record is locked first, so this last presence and authority read
     # and the forge command below share one live-owner critical section.
@@ -1602,6 +1609,7 @@ case "$PROVIDER" in
     ;;
   gitlab)
     gitlab_verify_mergeable || exit 1
+    fm_consigliere_require_review "$FM_HOME" "$ID" "$URL" "$FM_PR_MERGE_HEAD" || exit 1
     refuse_conflicting_siblings || exit 1
     # --sha binds the merge to the head this run verified, so a push that lands
     # in between is refused by GitLab instead of merged unverified. --yes only
