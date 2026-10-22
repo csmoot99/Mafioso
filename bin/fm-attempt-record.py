@@ -99,8 +99,8 @@ fm_pr_poll_merge_already_notified "$3" "$4" "$FM_PR_META_PROVIDER" \
             # by fm_nm_select_run. Exact repo, branch and start prevent path reuse.
             runs = conn.execute(
                 "SELECT runs.* FROM runs JOIN repos ON runs.repo_id=repos.id "
-                "WHERE repos.working_path=? AND branch=? AND created_at>=? AND created_at<? "
-                "ORDER BY created_at,id", (meta["project"], meta["branch"], start, end)).fetchall()
+                "WHERE repos.working_path=? AND runs.branch=? AND runs.created_at>=? "
+                "AND runs.created_at<? ORDER BY runs.created_at,runs.id", (meta["project"], meta["branch"], start, end)).fetchall()
             if not runs:
                 notes.append("No no-mistakes run attributed to this attempt.")
                 return result
@@ -178,9 +178,6 @@ fm_pr_poll_merge_already_notified "$3" "$4" "$FM_PR_META_PROVIDER" \
     except (OSError, ValueError, TypeError, KeyError, IndexError, sqlite3.Error, subprocess.SubprocessError):
         # Optional evidence cannot make cleanup destroy or invent measurements.
         notes.append("No-mistakes lifecycle evidence unavailable or schema unsupported.")
-    for field in ("gate_result", "outcome"):
-        if result[field] is None:
-            notes.append(f"{field} not established by lifecycle evidence.")
     return result
 
 
@@ -248,6 +245,9 @@ def build_record(args, meta, attempt_id, end):
             else:
                 notes.append(f"Tier changed from {record['tier']} to {tier or 'unknown'} "
                              "without a recorded rise; not an escalation.")
+    for field in ("gate_result", "outcome"):
+        if record[field] is None:
+            notes.append(f"{field} not established by lifecycle evidence.")
     record.update(fix_forward_7d=None, don_minutes=None)
     notes.append("fix_forward_7d and don_minutes not collected yet.")
     record["notes"] = sorted(set(notes))

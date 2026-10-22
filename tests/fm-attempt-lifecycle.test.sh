@@ -23,7 +23,9 @@ nm = work / 'nm'
 nm.mkdir()
 conn = sqlite3.connect(nm / 'state.sqlite')
 conn.executescript('''
-CREATE TABLE repos (id TEXT PRIMARY KEY, working_path TEXT UNIQUE);
+CREATE TABLE repos (id TEXT PRIMARY KEY, working_path TEXT NOT NULL UNIQUE,
+ upstream_url TEXT NOT NULL, fork_url TEXT, default_branch TEXT NOT NULL DEFAULT 'main',
+ created_at INTEGER NOT NULL);
 CREATE TABLE runs (id TEXT PRIMARY KEY, repo_id TEXT, branch TEXT, head_sha TEXT,
  status TEXT, ci_ready_at INTEGER, created_at INTEGER, updated_at INTEGER);
 CREATE TABLE step_results (id TEXT PRIMARY KEY, run_id TEXT, step_name TEXT,
@@ -33,7 +35,8 @@ CREATE TABLE step_rounds (id TEXT PRIMARY KEY, step_result_id TEXT, round INTEGE
 CREATE TABLE agent_invocations (id TEXT PRIMARY KEY, run_id TEXT, step_name TEXT,
  purpose TEXT, model TEXT);
 ''')
-conn.execute('INSERT INTO repos VALUES (?,?)', ('repo', str(repo)))
+conn.execute('INSERT INTO repos VALUES (?,?,?,?,?,?)',
+             ('repo', str(repo), 'https://example.test/repo.git', None, 'main', 100))
 conn.execute('INSERT INTO runs VALUES (?,?,?,?,?,?,?,?)',
              ('run', 'repo', 'task-branch', head, 'completed', 150, 110, 160))
 conn.execute('INSERT INTO step_results VALUES (?,?,?,?,?)',
@@ -126,6 +129,7 @@ record, _ = run('tier-only', ['--relaunch', 'pi', 'old', 'T2'])
 assert record['outcome'] == 'escalated'
 record, _ = run('escalation', ['--relaunch', 'codex', 'astra', 'T4 Heavy'])
 assert record['outcome'] == 'escalated'
+assert 'outcome not established by lifecycle evidence.' not in record['notes']
 record, _ = run('de-escalation', ['--relaunch', 'pi', 'old', 'T0'])
 assert record['outcome'] is None and any('without a recorded rise' in note for note in record['notes'])
 print('ok - only a tier rise escalates; lateral switches close with a note; retries share a durable boundary')
