@@ -148,6 +148,10 @@
 # optional -- separator, skips this gate for an explicit captain instruction
 # to merge anyway and is refused while the away-posture record exists.
 #
+# When config/consigliere is on, a GitHub or GitLab merge also requires a clear
+# Consigliere receipt for the URL and the verified head before either forge
+# merge; no override skips it (bin/fm-consigliere-lib.sh owns the receipt).
+#
 # Extra args must not include --repo or -R in any form, including a bundled
 # short-option cluster such as -yR, because the repository comes only from the
 # URL, nor --sha or --match-head-commit because the head comes only from the
