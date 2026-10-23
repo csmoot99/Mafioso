@@ -908,6 +908,10 @@ test_reassigned_pool_slot_finishes_own_cleanup_without_touching_the_slot() {
   fm_write_meta "$dir/home/state/$id.meta" \
     "window=firstmate:fm-$id" "endpoint_task_id=$id" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
+  printf 'harness=claude\nattempt_started_at=100\nattempt_id=reassigned\nrow=code\ntier=T1\n' >> "$dir/home/state/$id.meta"
+  mkdir -p "$dir/claude/projects/$(printf '%s' "$dir/worktree" | sed 's/[^a-zA-Z0-9]/-/g')"
+  printf '{"type":"assistant","timestamp":200,"cwd":"%s","message":{"id":"borrowed","usage":{"input_tokens":10,"output_tokens":2,"cache_read_input_tokens":3,"cache_creation_input_tokens":4}}}\n' \
+    "$dir/worktree" > "$dir/claude/projects/$(printf '%s' "$dir/worktree" | sed 's/[^a-zA-Z0-9]/-/g')/session.jsonl"
   claim_pool_slot "$dir" "$other" "$dir/other-home"
   # Staged in this shell, not a command substitution: a background child of a
   # $(...) subshell does not outlive it, and the point of this worker is to be
@@ -916,7 +920,7 @@ test_reassigned_pool_slot_finishes_own_cleanup_without_touching_the_slot() {
   worker=$!
 
   set +e
-  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr"
+  CLAUDE_CONFIG_DIR="$dir/claude" run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr"
   rc=$?
   set -e
 
@@ -924,6 +928,20 @@ test_reassigned_pool_slot_finishes_own_cleanup_without_touching_the_slot() {
   kill -0 "$worker" 2>/dev/null || fail "teardown killed the worker holding the reassigned pool slot"
   assert_present "$dir/worktree/sentinel" "teardown reset a pool slot another task had claimed"
   assert_reassigned_slot_left_alone "$dir" "$id" "$other" "dirty reassigned slot with --force"
+  python3 - "$dir/home/data/attempts.jsonl" "$id" "$dir/worktree" <<'PYTEST' || fail "reassigned slot attempt attributed another task's usage or head"
+import json
+import sys
+from pathlib import Path
+record, = [json.loads(line) for line in Path(sys.argv[1]).read_text().splitlines()]
+assert record['task_id'] == sys.argv[2] and record['worktree'] == sys.argv[3]
+assert record['attempt_id'] == 'reassigned' and record['row'] == 'code' and record['tier'] == 'T1'
+for field in ('input_tokens', 'output_tokens', 'cache_read_tokens', 'cache_write_tokens',
+              'context_peak', 'gate_result'):
+    assert record[field] is None, record
+assert any('slot reassigned' in note and 'usage and gate-head attribution skipped' in note
+           for note in record['notes']), record
+PYTEST
+
   assert_contains "$(cat "$dir/stderr")" "$dir/other-home" \
     "the warning should name the claimant's home"
   kill "$worker" 2>/dev/null || true

@@ -1,5 +1,4 @@
 {"type":"assistant","timestamp":"2026-10-22T19:00:59Z","cwd":"/task/worktree","message":{"id":"before","usage":{"input_tokens":900,"output_tokens":900,"cache_read_input_tokens":900,"cache_creation_input_tokens":900}}}
 {"type":"assistant","timestamp":"2026-10-22T19:01:10Z","cwd":"/task/worktree","message":{"id":"m1","usage":{"input_tokens":10,"output_tokens":1,"cache_read_input_tokens":20,"cache_creation_input_tokens":3}}}
 {"type":"assistant","timestamp":"2026-10-22T19:01:11Z","cwd":"/task/worktree","message":{"id":"m1","usage":{"input_tokens":10,"output_tokens":4,"cache_read_input_tokens":20,"cache_creation_input_tokens":3}}}
-{"type":"assistant","timestamp":"2026-10-22T19:01:15Z","cwd":"/task-worktree","message":{"id":"collision","usage":{"input_tokens":900,"output_tokens":900,"cache_read_input_tokens":900,"cache_creation_input_tokens":900}}}
 {"type":"assistant","timestamp":"2026-10-22T19:02:00Z","cwd":"/task/worktree","message":{"id":"end-boundary","usage":{"input_tokens":900,"output_tokens":900,"cache_read_input_tokens":900,"cache_creation_input_tokens":900}}}

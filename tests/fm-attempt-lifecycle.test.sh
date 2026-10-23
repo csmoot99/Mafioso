@@ -68,6 +68,11 @@ assert record['gate_result'] == 'green' and record['outcome'] is None
 assert record['review_model'] == 'review-model'
 assert record['review_findings'] == dict(blocker=0, major=0, minor=0)
 assert record['merged'] is None and record['nm_run_ids'] == ['run']
+record, _ = run('reassigned', ['--worktree-reassigned'])
+assert record['gate_result'] is None
+assert record['review_model'] == 'review-model' and record['nm_run_ids'] == ['run']
+assert record['input_tokens'] is None and record['context_peak'] is None
+assert any('slot reassigned' in note and 'gate-head attribution skipped' in note for note in record['notes'])
 # Use the public merge-receipt writer, rather than bypassing its validation.
 meta.write_text(base + 'pr=https://github.com/example/project/pull/1\n')
 subprocess.run(['bash', '-c', 'source "$1/bin/fm-pr-lib.sh"; '

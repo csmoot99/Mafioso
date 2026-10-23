@@ -38,6 +38,28 @@ expect(result('claude'), 17, 7, 34, 4, 33, 2)
 assert result('claude')['notes'] == []
 assert result('claude')['last_activity'] == 1792695700  # 19:01:40Z, latest in-window request
 print('ok - Claude request ids deduplicate streaming and copies; subagents and replacement sessions sum')
+print('ok - Claude sessions launched in a colliding worktree, and their subagents, are excluded')
+
+# Sessions launched in the worktree stay attributable after changing directory.
+for path in (root / 'claude/-task-worktree').rglob('*.jsonl'):
+    if path.parent.name == 'collision' or path.parent.parent.name == 'collision':
+        continue
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    top_level = path.parent.name == '-task-worktree'
+    for index, row in enumerate(rows):
+        if index or not top_level:
+            row['cwd'] = '/task/worktree/child' if index % 2 else '/elsewhere'
+    path.write_text(''.join(json.dumps(row) + '\n' for row in rows))
+expect(result('claude'), 17, 7, 34, 4, 33, 2)
+assert result('claude')['notes'] == []
+print('ok - Claude counts every in-window record of a session launched in the worktree, whatever its later cwd')
+
+# Codex already attributes through its launch header, not individual event cwd.
+for path in (root / 'codex').glob('*.jsonl'):
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    for row in rows[1:]:
+        row['cwd'] = '/elsewhere'
+    path.write_text(''.join(json.dumps(row) + '\n' for row in rows))
 
 expect(result('codex'), 120, 17, 60, 0, 88, 2)
 assert result('codex')['notes'] == []
@@ -63,7 +85,7 @@ for harness in ('claude', 'codex'):
     assert run(harness, extra=('--worktree', 'relative')).returncode != 0
     expect(result(harness, extra=('--worktree', '/task/worktree/child')),
            None, None, None, None, None, 0)
-print('ok - exact cwd, half-open windows, missing usage and invalid arguments')
+print('ok - launch directory, half-open windows, missing usage and invalid arguments')
 
 # Missing fields must remain unknown; a broken tail does not lose earlier data.
 claude = root / 'claude/-task-worktree/session-b.jsonl'

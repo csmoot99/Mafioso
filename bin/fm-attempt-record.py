@@ -12,6 +12,8 @@ fm-spawn.sh owns attempt_id and attempt_started_at. Same-profile replacements
 retain them and all sessions in [attempt_started_at, end) are counted by
 fm-attempt-usage.py. --end accepts Unix seconds or a timezone-qualified ISO
 timestamp, defaulting to now; --claude-root/--codex-root forward log locations.
+--worktree-reassigned skips usage and gate-head attribution when another task
+owns the recorded worktree, retaining other attempt evidence.
 --end bounds attribution and becomes ts. ended_at and duration_s use the
 attempt's last counted usage event, falling back to --end with a note.
 Older metadata uses spawn_gen (or a metadata digest) for retry identity, but
@@ -112,13 +114,14 @@ fm_pr_poll_merge_already_notified "$3" "$4" "$FM_PR_META_PROVIDER" \
             latest = runs[-1]
             steps = conn.execute("SELECT * FROM step_results WHERE run_id=?",
                                  (latest["id"],)).fetchall()
-            try:
-                shell_read('source "$1/fm-nm-run-lib.sh"; fm_nm_head_matches_worktree "$2" "$3"',
-                           scripts, meta.get("worktree", ""), latest["head_sha"] or "")
-                head_matches = True
-            except (OSError, subprocess.SubprocessError):
-                head_matches = False
-                notes.append("No-mistakes head does not match task code; gate result unknown.")
+            head_matches = False
+            if not args.worktree_reassigned:
+                try:
+                    shell_read('source "$1/fm-nm-run-lib.sh"; fm_nm_head_matches_worktree "$2" "$3"',
+                               scripts, meta.get("worktree", ""), latest["head_sha"] or "")
+                    head_matches = True
+                except (OSError, subprocess.SubprocessError):
+                    notes.append("No-mistakes head does not match task code; gate result unknown.")
             if head_matches:
                 if any(step["status"] == "failed" for step in steps):
                     result["gate_result"] = "red"
@@ -204,7 +207,9 @@ def build_record(args, meta, attempt_id, end):
                     "cache_write_tokens", "context_peak")
     record.update(dict.fromkeys(usage_fields))
     finished = None
-    if start is not None and worktree and os.path.isabs(worktree):
+    if args.worktree_reassigned:
+        notes.append("Worktree slot reassigned to another task; usage and gate-head attribution skipped.")
+    elif start is not None and worktree and os.path.isabs(worktree):
         if record["harness"] in ("claude", "codex"):
             command = [sys.executable, str(Path(__file__).with_name("fm-attempt-usage.py")),
                        "--harness", record["harness"], "--worktree", worktree,
@@ -261,6 +266,7 @@ def main():
     parser.add_argument("--data", required=True, type=Path)
     parser.add_argument("--end", default=str(datetime.now(timezone.utc).timestamp()))
     parser.add_argument("--relaunch", nargs=3, metavar=("HARNESS", "MODEL", "TIER"))
+    parser.add_argument("--worktree-reassigned", action="store_true")
     parser.add_argument("--claude-root")
     parser.add_argument("--codex-root")
     args = parser.parse_args()
