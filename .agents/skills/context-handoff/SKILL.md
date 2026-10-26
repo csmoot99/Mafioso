@@ -29,6 +29,7 @@ Everything you know only from this conversation is about to be lost, and the nex
    The next worker has the same instructions file, the same isolated copy, and the same status log.
    Point at the instructions by path, at commits by SHA, at a PR or report by URL or path, and at a specification or plan by path; copy none of their content.
    Say each fact once: a later section points at the header or at a path rather than repeating it, and plan detail lives once, by path.
+   Never point at an earlier `handoff-*.md`: the replacement reads only this document, so carry forward any fact from an earlier handoff it still needs.
 4. **Open with a `## Continuation header`**, the required first section, at most about 1-2k tokens.
    The replacement starts from it and treats orientation as done, so every line must be exact and current:
    - Branch, HEAD SHA, and dirty files.

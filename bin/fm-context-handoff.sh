@@ -124,9 +124,8 @@
 #       handoff exists and holds more than whitespace; refuses with a precise
 #       message otherwise. Then drives `fm-control.sh <id> relaunch --note`
 #       (the note tells the replacement to start at the handoff's continuation
-#       header and read no earlier handoff unless it names one), which keeps
-#       the same isolated copy and owns its own checkpoint, journal, and
-#       rollback. --harness, --model, and --effort pass through to that
+#       header and read no earlier handoff), which keeps the same isolated
+#       copy and owns its own checkpoint, journal, and rollback. --harness, --model, and --effort pass through to that
 #       relaunch; without them it keeps the same harness, model, and effort.
 #       A marker carrying `reclassify=T2` (the Haiku cap) is refused unless
 #       --model names a model other than Haiku; the refusal names the T2 route
@@ -579,7 +578,7 @@ do_replace() {
         ;;
     esac
   fi
-  note="Context handoff: the previous worker for this task reached its context limit and wrote a handoff document. After reading your steering inbox and confirming isolation as your instructions say, read the Continuation header at the top of $handoff first and start at its next action. Treat orientation as already done unless a fact it names turns out stale, and treat anything it marks as unverified as a claim to check, not a fact. Do not read earlier handoff-*.md files unless this one names one. Rerun only the checks invalidated since its validation receipt or never finished, and load only the skills the next step needs."
+  note="Context handoff: the previous worker for this task reached its context limit and wrote a handoff document. After reading your steering inbox and confirming isolation as your instructions say, read the Continuation header at the top of $handoff first and start at its next action. Treat orientation as already done unless a fact it names turns out stale, and treat anything it marks as unverified as a claim to check, not a fact. Do not read earlier handoff-*.md files. Rerun only the checks invalidated since its validation receipt or never finished, and load only the skills the next step needs."
   out=$("${FM_CONTROL_BIN:-$SCRIPT_DIR/fm-control.sh}" "$ID" relaunch ${profile[@]+"${profile[@]}"} --note "$note" 2>&1); rc=$?
   if [ "$rc" -ne 0 ]; then
     printf '%s\n' "$out" >&2
