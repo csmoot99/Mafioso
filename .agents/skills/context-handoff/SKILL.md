@@ -28,23 +28,27 @@ Everything you know only from this conversation is about to be lost, and the nex
 3. **Reference, do not restate.**
    The next worker has the same instructions file, the same isolated copy, and the same status log.
    Point at the instructions by path, at commits by SHA, at a PR or report by URL or path, and at a specification or plan by path; copy none of their content.
-4. **Carry what only the conversation knows**, in this order:
-   - Current state: where the task stands right now, in two or three sentences.
+   Say each fact once: a later section points at the header or at a path rather than repeating it, and plan detail lives once, by path.
+4. **Open with a `## Continuation header`**, the required first section, at most about 1-2k tokens.
+   The replacement starts from it and treats orientation as done, so every line must be exact and current:
+   - Branch, HEAD SHA, and dirty files.
+   - Next action: the exact file, function or symbol, and edit.
+   - Next command: the exact command to run after that edit.
+   - Validation receipt: the latest test or validation command, its result, the HEAD it ran on, and any pending failure, or none, so the replacement reruns only what later changes invalidated or what never finished.
+   - Open status keys and unhandled inbox message numbers: every `needs-decision` or `blocked` key still open in the status log, with what each waits on, and any `state/<task-id>.inbox/*.msg` not yet moved to `handled/`, or none.
+5. **Then carry what only the conversation knows**, briefly and in this order:
    - Done: what is complete, each with its commit SHA.
-   - Uncommitted: every changed file not yet committed, file by file, and what the change is for.
-   - Next steps: what remains, in the order to do it.
+   - Uncommitted: what each dirty file's change is for.
+   - Remaining steps after the next action, in order.
    - Decisions made and why: choices the next worker must not silently reverse.
    - Dead ends: approaches already tried that failed, and why, so they are not retried.
-   - Open decisions and blockers: every `needs-decision` or `blocked` key still open in the status log, with what each waits on.
-   - Unacknowledged inbox messages: any `state/<task-id>.inbox/*.msg` not yet moved to `handled/`, by number.
-   - Tests that matter: the exact commands to re-run and what they proved last time.
-5. **Separate verified from believed.**
+6. **Separate verified from believed.**
    Keep a `## Verified` list of facts you established by running something, each with how, and a `## Unverified` list for anything you believe but did not check.
    Nothing unverified may appear as a plain statement elsewhere in the document.
-6. **Suggested skills**: name each skill the next worker should load, with its path and the moment to load it.
-7. **Redact secrets.**
+7. **Suggested skills**: name only the skills the next step needs, each with its path and the moment to load it.
+8. **Redact secrets.**
    No API keys, tokens, passwords, or personal data, even when they appeared in a tool result.
-8. **Report it and stop.**
+9. **Report it and stop.**
    Append exactly the `blocked [key=context-handoff-<n>] [at=<epoch>]: context handoff ready at <path>` line the notice gave you to the status file the notice named, with `<epoch>` replaced by what `date +%s` prints.
    Then end your turn and wait.
    Do not keep working, do not run `/compact`, and do not exit: firstmate replaces you, and the replacement continues from the handoff.
