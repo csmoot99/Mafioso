@@ -125,8 +125,9 @@
 #       message otherwise. Then drives `fm-control.sh <id> relaunch --note`
 #       (the note tells the replacement to start at the handoff's continuation
 #       header and read no earlier handoff), which keeps the same isolated
-#       copy and owns its own checkpoint, journal, and rollback. --harness, --model, and --effort pass through to that
-#       relaunch; without them it keeps the same harness, model, and effort.
+#       copy and owns its own checkpoint, journal, and rollback. --harness,
+#       --model, and --effort pass through to that relaunch; without them it
+#       keeps the same harness, model, and effort.
 #       A marker carrying `reclassify=T2` (the Haiku cap) is refused unless
 #       --model names a model other than Haiku; the refusal names the T2 route
 #       from config/crew-dispatch.json, which firstmate picks. The relaunch arms a fresh

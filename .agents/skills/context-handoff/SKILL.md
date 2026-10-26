@@ -66,7 +66,7 @@ Run exactly:
 bin/fm-context-handoff.sh replace <task-id>
 ```
 
-It checks that the named handoff exists, is non-empty, and belongs to the current worker incarnation, refuses with a precise message otherwise, and then drives `bin/fm-control.sh <task-id> relaunch` with a note telling the replacement to read the handoff first.
+It checks that the named handoff exists, is non-empty, and belongs to the current worker incarnation, refuses with a precise message otherwise, and then drives `bin/fm-control.sh <task-id> relaunch` with a note telling the replacement to start at the handoff's continuation header and read no earlier handoff.
 On success it appends the closing `resolved [key=context-handoff-<n>]` event itself, so the open record needs no separate `--resolve-key` steer.
 A Haiku worker that crossed the 80000 prompt-token cap was a misclassified T1 task: its `note: context handoff due` says it must be reclassified to T2, and `replace` refuses to relaunch it on a Haiku model.
 Pick the T2 route from config/crew-dispatch.json and pass it through to the relaunch with `bin/fm-context-handoff.sh replace <task-id> --harness <harness> --model <model> --effort <effort>`.
