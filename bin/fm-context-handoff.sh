@@ -7,12 +7,13 @@
 # The whole feature is off unless the home holds the presence flag
 # config/worker-context-handoff (docs/configuration.md "Worker context
 # handoff"). bin/fm-spawn.sh reads the flag at every claude or codex ship or
-# scout launch and relaunch, validates its optional `fallback-pct=<N>` and
-# `codex-handoff-pct=<P>` lines (see fm-spawn's header for the exact
-# rule), and only then wires the two hook commands below beside the
-# busy-state hooks: into a claude worker's .claude/settings.local.json, and
-# as session-flag hooks on a codex worker's launch command. A secondmate, the
-# primary, and every other harness never get them.
+# scout launch and relaunch, validates its optional `fallback-pct=<N>`,
+# Claude-only `claude-fallback-pct=<N>`, and `codex-handoff-pct=<P>` lines
+# (see fm-spawn's header for the exact rule), and only then wires the two
+# hook commands below beside the busy-state hooks: into a claude worker's
+# .claude/settings.local.json, and as session-flag hooks on a codex worker's
+# launch command. A secondmate, the primary, and every other harness never
+# get them.
 #
 # Codex mode (--codex-threshold-pct P on either hook): Codex's PreCompact
 # cannot block a compaction (codex-cli 0.162.1 reports exit 2 as a failed hook
@@ -70,10 +71,11 @@
 #       sits at the configured percentage P of the window, so the window is
 #       usage * 100 / P and the ceiling is N percent of that (usage * N /
 #       P). N is the --ceiling-pct argument fm-spawn bakes into the hook
-#       command from the flag file's optional `fallback-pct=<N>` line (fm-spawn
-#       validates it; the hook only refuses a value it could never have
-#       baked), and a hook command written without the argument means 80, so
-#       a worker launched before the setting existed keeps its ceiling.
+#       command from the flag file's optional `claude-fallback-pct=<N>` line,
+#       else its `fallback-pct=<N>` line (fm-spawn validates it; the hook
+#       only refuses a value it could never have baked), and a hook command
+#       written without the argument means 80, so a worker launched before
+#       the setting existed keeps its ceiling.
 #       Claude clamps its own threshold near 83 percent because it reserves a
 #       response buffer, so 80 is the highest N and keeps the fallback
 #       compaction inside the space Claude itself treats as safe. The marker
@@ -121,10 +123,11 @@
 #       the marker is bound to the currently armed incarnation, and that the
 #       handoff exists and holds more than whitespace; refuses with a precise
 #       message otherwise. Then drives `fm-control.sh <id> relaunch --note`
-#       (the note tells the replacement to read the handoff first), which keeps
-#       the same isolated copy and owns its own checkpoint, journal, and
-#       rollback. --harness, --model, and --effort pass through to that
-#       relaunch; without them it keeps the same harness, model, and effort.
+#       (the note tells the replacement to start at the handoff's continuation
+#       header and read no earlier handoff), which keeps the same isolated
+#       copy and owns its own checkpoint, journal, and rollback. --harness,
+#       --model, and --effort pass through to that relaunch; without them it
+#       keeps the same harness, model, and effort.
 #       A marker carrying `reclassify=T2` (the Haiku cap) is refused unless
 #       --model names a model other than Haiku; the refusal names the T2 route
 #       from config/crew-dispatch.json, which firstmate picks. The relaunch arms a fresh
@@ -576,7 +579,7 @@ do_replace() {
         ;;
     esac
   fi
-  note="Context handoff: the previous worker for this task reached its context limit and wrote a handoff document. Read $handoff first and continue from it. Treat anything it marks as unverified as a claim to check, not a fact. Earlier handoffs for this task, if any, sit beside it in the same directory."
+  note="Context handoff: the previous worker for this task reached its context limit and wrote a handoff document. After reading your steering inbox and confirming isolation as your instructions say, read the Continuation header at the top of $handoff first and start at its next action. Treat orientation as already done unless a fact it names turns out stale, and treat anything it marks as unverified as a claim to check, not a fact. Do not read earlier handoff-*.md files. Rerun only the checks invalidated since its validation receipt or never finished, and load only the skills the next step needs."
   out=$("${FM_CONTROL_BIN:-$SCRIPT_DIR/fm-control.sh}" "$ID" relaunch ${profile[@]+"${profile[@]}"} --note "$note" 2>&1); rc=$?
   if [ "$rc" -ne 0 ]; then
     printf '%s\n' "$out" >&2

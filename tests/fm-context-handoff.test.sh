@@ -796,6 +796,50 @@ test_bad_fallback_pct_refuses_the_spawn() {
   pass "an invalid, too-high, duplicate, unknown-key, or at-or-below-threshold fallback-pct refuses the spawn and names the value"
 }
 
+test_claude_fallback_pct_sets_the_claude_ceiling_only() {
+  local rec id=sp-claude-fallback out settings rc
+  rec=$(make_spawn_case claude-fallback claude "$id" on); read_spawn_case "$rec"
+  printf "fallback-pct=30\\nclaude-fallback-pct=40\\ncodex-handoff-pct=50\\n" > "$HOME_DIR/config/worker-context-handoff"
+  printf "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=30\\n" > "$HOME_DIR/config/launch-env"
+  out=$(fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --mode no-mistakes --yolo off)
+  expect_code 0 $? "claude-fallback-pct=40 above a 30 threshold must allow fallback-pct=30: $out"
+  settings="$WT_DIR/.claude/settings.local.json"
+  run_flag_precompact "$settings" "$CASE_DIR/transcript.jsonl" 30 60000; rc=$?
+  expect_code 2 "$rc" "the generated PreCompact command must block the first auto compaction at 30"
+  [ "$(marker_field "$HOME_DIR/state" "$id" ceiling_pct)" = 40 ] || fail "a Claude worker must get claude-fallback-pct as its ceiling, got '$(marker_field "$HOME_DIR/state" "$id" ceiling_pct)'"
+  [ "$(marker_field "$HOME_DIR/state" "$id" ceiling)" = 80000 ] \
+    || fail "claude-fallback-pct=40 with a 30 override must put the ceiling at usage times 40 over 30 (80000), got '$(marker_field "$HOME_DIR/state" "$id" ceiling)'"
+  pass "claude-fallback-pct sets a Claude worker's ceiling and lifts the threshold bound off fallback-pct"
+}
+
+test_claude_fallback_pct_leaves_codex_unchanged() {
+  local rec id=sp-claude-fallback-codex out rc
+  rec=$(make_spawn_case claude-fallback-codex codex "$id" on); read_spawn_case "$rec"
+  printf "fallback-pct=30\\nclaude-fallback-pct=40\\ncodex-handoff-pct=50\\n" > "$HOME_DIR/config/worker-context-handoff"
+  printf "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=30\\n" > "$HOME_DIR/config/launch-env"
+  mkdir -p "$CASE_DIR/codex-home"
+  printf '{"models":[{"slug":"gpt-5","context_window":200000,"effective_context_window_percent":100}]}\n' > "$CASE_DIR/codex-home/models_cache.json"
+  out=$(CODEX_HOME="$CASE_DIR/codex-home" FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --model gpt-5 --mode no-mistakes --yolo off); rc=$?
+  expect_code 0 "$rc" "codex spawn beside claude-fallback-pct should succeed: $out"
+  fm_test_codex_hook_command "$CASE_DIR/launch.log" PostToolUse "$CASE_DIR/codex-args" > "$CASE_DIR/post.cmd" || fail "no PostToolUse hook"
+  assert_contains "$(tr '\0' '\n' < "$CASE_DIR/codex-args/args")" 'model_auto_compact_token_limit=60000' "Codex must still compact at fallback-pct=30"
+  assert_contains "$(cat "$CASE_DIR/post.cmd")" '--ceiling-pct 30 --codex-threshold-pct 50' "Codex must keep fallback-pct as its ceiling and codex-handoff-pct as its handoff"
+  pass "claude-fallback-pct leaves Codex's compaction point and handoff threshold unchanged"
+}
+
+test_bad_claude_fallback_pct_refuses_the_spawn() {
+  local rec id=sp-claude-refuse out status config
+  rec=$(make_spawn_case claude-refuse claude "$id" on); read_spawn_case "$rec"
+  printf "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=30\\n" > "$HOME_DIR/config/launch-env"
+  for config in 'fallback-pct=30 claude-fallback-pct=30' 'fallback-pct=40 claude-fallback-pct=25' \
+    'claude-fallback-pct=81' 'claude-fallback-pct=forty' 'claude-fallback-pct=40 claude-fallback-pct=45'; do
+    printf '%s\n' "$config" | tr ' ' '\n' > "$HOME_DIR/config/worker-context-handoff"
+    out=$(fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --mode no-mistakes --yolo off); status=$?
+    assert_flag_refused "$status" "$out" 'claude-fallback-pct' "$id" "invalid Claude ceiling ($config)"
+  done
+  pass "an invalid, duplicate, or at-or-below-threshold claude-fallback-pct refuses the spawn"
+}
+
 # make_relaunch_stub <case-dir>: the pane-lifecycle tmux stub
 # tests/fm-spawn-launch-env.test.sh drives fm-control relaunch with, so the
 # relaunch below runs the operator-facing verb end to end.
@@ -978,6 +1022,8 @@ EOF
   [ "$(sed -n 3p "$home/control.args")" = --note ] || fail "the relaunch must carry a --note, got '$args'"
   assert_contains "$(sed -n 4p "$home/control.args")" "$home/data/$id/handoff-1.md" "the note must tell the replacement to read the handoff"
   assert_contains "$(sed -n 4p "$home/control.args")" "first" "the note must tell the replacement to read the handoff first"
+  assert_contains "$(sed -n 4p "$home/control.args")" "Continuation header" "the note must start the replacement at the continuation header"
+  assert_contains "$(sed -n 4p "$home/control.args")" "Do not read earlier handoff" "the note must keep the replacement off earlier handoffs"
   assert_contains "$out" "$home/data/$id/handoff-1.md" "the outcome must name the handoff used"
   assert_grep "resolved [key=context-handoff-1]" "$home/state/$id.status" "the replacement must close the handoff-ready record"
   pass "replace hands a valid handoff to fm-control relaunch with a read-it-first note and closes the record"
@@ -1057,6 +1103,9 @@ test_bad_codex_handoff_pct_refuses_the_spawn
 test_flag_file_fallback_pct_is_baked_into_the_precompact_command
 test_comment_only_flag_file_keeps_the_default_ceiling
 test_bad_fallback_pct_refuses_the_spawn
+test_claude_fallback_pct_sets_the_claude_ceiling_only
+test_claude_fallback_pct_leaves_codex_unchanged
+test_bad_claude_fallback_pct_refuses_the_spawn
 test_relaunch_starts_with_fresh_handoff_state
 test_replace_refuses_a_missing_empty_or_stale_handoff
 test_replace_hands_a_valid_handoff_to_fm_control

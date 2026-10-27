@@ -507,6 +507,9 @@
 # most 80, and greater than the CLAUDE_AUTOCOMPACT_PCT_OVERRIDE config/launch-env sets,
 # when it sets one; anything else, an unknown key, or a repeated line refuses before
 # launch naming the file and the value.
+# An optional `claude-fallback-pct=<N>` line, validated the same way, replaces
+# fallback-pct as the ceiling of Claude workers only, and then carries the
+# launch-env bound in its place; Codex keeps fallback-pct.
 # An optional `codex-handoff-pct=<P>` line selects compact-first ordering only
 # for Codex: P must be a whole number above fallback-pct (default 80) and at
 # most 80. Codex compacts at fallback-pct every time and hands off only if usage
@@ -1191,17 +1194,18 @@ esac
 # handoff"): a presence flag read at every launch and relaunch. Present, a
 # claude or codex ship or scout also gets the PreCompact and PostToolUse hook
 # commands owned by bin/fm-context-handoff.sh; absent, nothing changes. Its optional
-# `fallback-pct=<N>` line (header above) is validated here, before anything
-# mutates, against the CLAUDE_AUTOCOMPACT_PCT_OVERRIDE config/launch-env
-# gives the worker, so a ceiling the hook could never honor refuses the launch
+# `fallback-pct=<N>` and `claude-fallback-pct=<N>` lines (header above) are
+# validated here, before anything mutates, against the
+# CLAUDE_AUTOCOMPACT_PCT_OVERRIDE config/launch-env gives the worker, so a ceiling the hook could never honor refuses the launch
 # instead of silently falling back to a default.
 if ! CONTEXT_HANDOFF_PRESENT=$(fm_config_source_present "$CONFIG/worker-context-handoff"); then
   exit 1
 fi
 CONTEXT_HANDOFF_CEILING_PCT=
+CONTEXT_HANDOFF_CLAUDE_CEILING_PCT=
 CONTEXT_HANDOFF_CODEX_PCT=
 spawn_context_handoff_load() { # <file>
-  local file=$1 line lineno=0 key value previous threshold='' i=0
+  local file=$1 line lineno=0 key value previous threshold='' i=0 fallback_lineno='' claude_lineno=''
   if [ ! -f "$file" ] || [ ! -r "$file" ]; then
     echo "error: config/worker-context-handoff must be a readable regular file" >&2
     return 1
@@ -1214,15 +1218,16 @@ spawn_context_handoff_load() { # <file>
     lineno=$((lineno + 1))
     case "$line" in
     '' | '#'*) continue ;;
-    fallback-pct=* | codex-handoff-pct=*) ;;
+    fallback-pct=* | claude-fallback-pct=* | codex-handoff-pct=*) ;;
     *)
-      echo "error: config/worker-context-handoff line $lineno is not 'fallback-pct=<N>', 'codex-handoff-pct=<N>', a blank line, or a # comment: '$line'" >&2
+      echo "error: config/worker-context-handoff line $lineno is not 'fallback-pct=<N>', 'claude-fallback-pct=<N>', 'codex-handoff-pct=<N>', a blank line, or a # comment: '$line'" >&2
       return 1
       ;;
     esac
     key=${line%%=*}
     case "$key" in
       fallback-pct) previous=$CONTEXT_HANDOFF_CEILING_PCT ;;
+      claude-fallback-pct) previous=$CONTEXT_HANDOFF_CLAUDE_CEILING_PCT ;;
       codex-handoff-pct) previous=$CONTEXT_HANDOFF_CODEX_PCT ;;
     esac
     if [ -n "$previous" ]; then
@@ -1240,21 +1245,25 @@ spawn_context_handoff_load() { # <file>
       echo "error: config/worker-context-handoff $key must be a whole number from 1 to 80 (Claude keeps its own threshold near 83), got '$value' (line $lineno)" >&2
       return 1
     fi
-    if [ "$key" = codex-handoff-pct ]; then
-      CONTEXT_HANDOFF_CODEX_PCT=$((10#$value))
-      continue
-    fi
-    case "$threshold" in
-    '' | *[!0-9]*) ;;
-    *)
-      if [ "$value" -le "$threshold" ]; then
-        echo "error: config/worker-context-handoff fallback-pct must be greater than the CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=$threshold handoff threshold in config/launch-env, got '$value' (line $lineno)" >&2
-        return 1
-      fi
-      ;;
+    case "$key" in
+      codex-handoff-pct) CONTEXT_HANDOFF_CODEX_PCT=$((10#$value)) ;;
+      claude-fallback-pct) CONTEXT_HANDOFF_CLAUDE_CEILING_PCT=$value claude_lineno=$lineno ;;
+      fallback-pct) CONTEXT_HANDOFF_CEILING_PCT=$value fallback_lineno=$lineno ;;
     esac
-    CONTEXT_HANDOFF_CEILING_PCT=$value
   done <"$file"
+  # The Claude handoff threshold must sit below the ceiling a Claude worker
+  # gets: claude-fallback-pct when set, else fallback-pct.
+  key=fallback-pct value=$CONTEXT_HANDOFF_CEILING_PCT lineno=$fallback_lineno
+  [ -z "$CONTEXT_HANDOFF_CLAUDE_CEILING_PCT" ] || key=claude-fallback-pct value=$CONTEXT_HANDOFF_CLAUDE_CEILING_PCT lineno=$claude_lineno
+  case "$threshold" in
+  '' | *[!0-9]*) ;;
+  *)
+    if [ -n "$value" ] && [ "$value" -le "$threshold" ]; then
+      echo "error: config/worker-context-handoff $key must be greater than the CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=$threshold handoff threshold in config/launch-env, got '$value' (line $lineno)" >&2
+      return 1
+    fi
+    ;;
+  esac
   if [ -n "$CONTEXT_HANDOFF_CODEX_PCT" ] && [ "$CONTEXT_HANDOFF_CODEX_PCT" -le "${CONTEXT_HANDOFF_CEILING_PCT:-80}" ]; then
     echo "error: config/worker-context-handoff codex-handoff-pct must be greater than fallback-pct=${CONTEXT_HANDOFF_CEILING_PCT:-80}, got '$CONTEXT_HANDOFF_CODEX_PCT'" >&2
     return 1
@@ -5352,8 +5361,8 @@ if [ "$KIND" != secondmate ]; then
       case "$MODEL" in
         *[Hh][Aa][Ii][Kk][Uu]*) handoff_suffix="$handoff_suffix --haiku-cap" ;;
       esac
-      handoff_ceiling=
-      [ -z "$CONTEXT_HANDOFF_CEILING_PCT" ] || handoff_ceiling=" --ceiling-pct $(shell_quote "$CONTEXT_HANDOFF_CEILING_PCT")"
+      handoff_ceiling=${CONTEXT_HANDOFF_CLAUDE_CEILING_PCT:-$CONTEXT_HANDOFF_CEILING_PCT}
+      [ -z "$handoff_ceiling" ] || handoff_ceiling=" --ceiling-pct $(shell_quote "$handoff_ceiling")"
       j_precompact=$(json_escape "$handoff_cmd_prefix precompact $handoff_suffix$handoff_ceiling")
       j_posttool=$(json_escape "$handoff_cmd_prefix posttooluse $handoff_suffix 2>/dev/null || true")
       handoff_hooks=",\"PreCompact\":[{\"matcher\":\"auto\",\"hooks\":[{\"type\":\"command\",\"command\":\"$j_precompact\",\"timeout\":30}]}],\"PostToolUse\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_posttool\",\"timeout\":30}]}]"
