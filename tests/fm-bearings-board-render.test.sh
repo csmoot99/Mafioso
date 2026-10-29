@@ -329,6 +329,58 @@ test_an_image_outside_the_board_assets_folder_is_not_rendered() {
   pass "an image src outside the board assets folder is not rendered"
 }
 
+# Two freeform decision cards, enough to deal from one to the next.
+two_cards() {
+  jq -n '[
+    {key:"first",type:"decision",repo:"sample",title:"First call",
+     options:[{value:"yes",label:"Yes"},{value:"approve-with-changes",label:"Approve with changes"}],
+     allow_freeform:true},
+    {key:"second",type:"decision",repo:"sample",title:"Second call",
+     options:[{value:"yes",label:"Yes"}],allow_freeform:true}]'
+}
+
+test_each_summary_card_links_to_and_scrolls_to_its_section() {
+  local home out
+  home=$(make_home stat-links)
+  out=$(render_cards "$home" "$(two_cards)")
+  printf '%s' "$out" | jq -e '
+    [.statLinks[] | {label, href, scrolledTo, prevented}] == [
+      {label:"need you",href:"#bb-sec-call",scrolledTo:["bb-sec-call"],prevented:true},
+      {label:"underway",href:"#bb-sec-underway",scrolledTo:["bb-sec-underway"],prevented:true},
+      {label:"landed recently",href:"#bb-sec-landed",scrolledTo:["bb-sec-landed"],prevented:true},
+      {label:"charted next",href:"#bb-sec-charted",scrolledTo:["bb-sec-charted"],prevented:true}]
+  ' >/dev/null || fail "a summary card did not link and scroll to its section: $out"
+  pass "each summary card is a link that scrolls to its own section"
+}
+
+test_a_note_stops_at_the_cap_while_typing_and_the_cap_leaves_room_for_the_label() {
+  local home out
+  home=$(make_home note-cap)
+  out=$(render_cards "$home" "$(two_cards)")
+  # The answer reaches firstmate as "<title> -> <selection> - <note>" and the answer
+  # path keeps 512 bytes of it: 512 - len("First call -> ") - (len("approve-with-changes") + 3).
+  # build adds the reserved "reconcile" option, so a card of short options reserves 9 + 3.
+  printf '%s' "$out" | jq -e '
+    .cards[0].note
+      | .tag == "textarea" and .maxLength == (512 - 14 - 23)
+        and .bytes <= .maxLength and .bytes >= .maxLength - 1
+        and (.count | test("^[01] left$"))
+  ' >/dev/null || fail "a pasted multi-byte note was not stopped at the label-aware cap: $out"
+  printf '%s' "$out" | jq -e '.cards[1].note.maxLength == (512 - 15 - 12)' >/dev/null \
+    || fail "the second card's cap did not follow its own title and options: $out"
+  pass "a note stops at the cap while typing, counted in bytes against the whole answer label"
+}
+
+test_the_card_arrows_bring_the_new_card_into_view() {
+  local home out
+  home=$(make_home arrows)
+  out=$(render_cards "$home" "$(two_cards)")
+  printf '%s' "$out" | jq -e '
+    .arrow.moved == true and .arrow.scrolled == true and (.arrow.count | test("card 2 of 2"))
+  ' >/dev/null || fail "the next arrow did not deal the next card and scroll its top into view: $out"
+  pass "the next arrow shows the next card and scrolls its top into view"
+}
+
 test_an_underway_row_leads_with_the_task_name_and_keeps_its_run_status
 test_an_underway_identifier_label_is_not_replaced_by_run_status
 test_charted_next_reads_newest_filed_first
@@ -340,3 +392,6 @@ test_omitted_warnings_never_count_as_more_queued
 test_an_omitted_kind_keeps_the_existing_queued_rendering
 test_a_card_with_images_renders_one_lazy_thumbnail_per_image
 test_an_image_outside_the_board_assets_folder_is_not_rendered
+test_each_summary_card_links_to_and_scrolls_to_its_section
+test_a_note_stops_at_the_cap_while_typing_and_the_cap_leaves_room_for_the_label
+test_the_card_arrows_bring_the_new_card_into_view
