@@ -6,7 +6,10 @@
 // Prints one JSON document:
 //   { stats:[{n,label}], underway:[{title,sub,badges}],
 //     charted:[{title,sub,badges,pickable}], empty, more, error,
-//     cards:[{title,images:[{src,alt,lazy}]}] }
+//     cards:[{title,images:[{src,alt,lazy}],note:{tag,maxLength,count,limit}|null}],
+//     statLinks:[{label,href,scrolledTo,prevented}], arrow:{moved,scrolled,count} }
+// The shim records listeners so the harness can drive the page the way a
+// captain does: tap each summary card, type past the note cap, press the arrows.
 import { readFileSync } from "node:fs";
 
 const html = readFileSync(process.argv[2], "utf8");
@@ -21,6 +24,8 @@ class Node {
     this.hidden = false;
     this.disabled = false;
     this.innerHTML = "";
+    this.id = "";
+    this.listeners = {};
     this.parentNode = null;
     this.type = "";
     this.value = "";
@@ -42,7 +47,15 @@ class Node {
   set textContent(v) { this._text = String(v); this.children = []; }
   appendChild(n) { n.parentNode = this; this.children.push(n); return n; }
   setAttribute(k, v) { this.attributes[k] = v; }
-  addEventListener() {}
+  addEventListener(type, fn) { (this.listeners[type] ||= []).push(fn); }
+  dispatch(type, extra = {}) {
+    const ev = { type, target: this, prevented: false, preventDefault() { this.prevented = true; }, ...extra };
+    for (const fn of this.listeners[type] || []) fn(ev);
+    return ev;
+  }
+  getBoundingClientRect() { return { top: -50 }; }
+  scrollIntoView(opts) { scrolls.push({ id: this.id, className: this.className, opts }); }
+  focus() {}
   querySelectorAll(sel) {
     const want = sel.replace(/^\./, "").replace(/:checked$/, "");
     const checkedOnly = sel.endsWith(":checked");
@@ -59,6 +72,7 @@ class Node {
 }
 
 const byId = new Map();
+const scrolls = [];
 const dataNode = new Node("script");
 dataNode.textContent = html
   .split('<script id="bearings-data" type="application/json">')[1]
@@ -72,6 +86,7 @@ globalThis.document = {
   getElementById: (id) => {
     if (!byId.has(id)) {
       const n = new Node("div");
+      n.id = id;
       new Node("div").appendChild(n);
       byId.set(id, n);
     }
@@ -83,7 +98,7 @@ globalThis.document = {
     return byId.get(id);
   },
 };
-globalThis.window = {};
+globalThis.window = { innerHeight: 800 };
 globalThis.TextEncoder = TextEncoder;
 
 const script = html.slice(html.indexOf("<script>") + "<script>".length, html.lastIndexOf("</script>"));
@@ -99,6 +114,16 @@ const stats = strip.children.map((t) => ({
   n: Number(t.children.find((c) => c.className.includes("bb-stat__num"))?.textContent),
   label: t.children.find((c) => c.className.includes("bb-stat__label"))?.textContent,
 }));
+const statLinks = strip.children.map((t) => {
+  const before = scrolls.length;
+  const ev = t.dispatch("click");
+  return {
+    label: t.children.find((c) => c.className.includes("bb-stat__label"))?.textContent,
+    href: t.href,
+    scrolledTo: scrolls.slice(before).map((x) => x.id),
+    prevented: ev.prevented,
+  };
+});
 
 const rowsOf = (container) =>
   container.children
@@ -128,6 +153,20 @@ const empty = ch.children.filter((c) => c.className.includes("bb-empty")).map((c
 const more = ch.children.filter((c) => c.className.includes("bb-morechip")).map((c) => c.textContent);
 
 const call = byId.get("bb-call") || new Node("div");
+// Type a value far past any cap into a card's note field, as a paste would.
+const noteOf = (card, typed) => {
+  const ta = card.querySelectorAll(".bb-freeform")[0];
+  if (!ta) return null;
+  ta.value = typed;
+  ta.dispatch("input");
+  return {
+    tag: ta.tagName,
+    maxLength: ta.maxLength,
+    bytes: new TextEncoder().encode(ta.value).length,
+    count: card.querySelectorAll(".bb-count")[0]?.textContent ?? "",
+    limit: card.querySelectorAll(".bb-limit")[0]?.textContent ?? "",
+  };
+};
 const cards = call.children
   .filter((c) => c.className.split(/\s+/).includes("bb-decision"))
   .map((card) => ({
@@ -135,7 +174,19 @@ const cards = call.children
     images: card.querySelectorAll(".bb-shot__img").map((i) => ({
       src: i.src, alt: i.alt, lazy: i.loading === "lazy",
     })),
+    note: noteOf(card, "\u00e9".repeat(700)),
   }));
+// Press "next" once: the shown card changes and its top is brought into view.
+const nextBtn = byId.get("bb-stack-next");
+const beforeNext = scrolls.length;
+const countText = () => byId.get("bb-stack-count")?.textContent ?? "";
+const countBefore = countText();
+nextBtn?.dispatch("click");
+const arrow = {
+  moved: countText() !== countBefore,
+  scrolled: scrolls.slice(beforeNext).some((x) => x.className.includes("bb-decision")),
+  count: countText(),
+};
 
 process.stdout.write(
-  JSON.stringify({ stats, underway, charted, empty, more, cards, error: errorText }) + "\n");
+  JSON.stringify({ stats, statLinks, underway, charted, empty, more, cards, arrow, error: errorText }) + "\n");
