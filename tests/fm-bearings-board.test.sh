@@ -769,6 +769,142 @@ test_build_refuses_a_nondecision_reconcile_value() {
   pass "build reserves reconcile across non-decision cards"
 }
 
+# --- Captain's Call screenshots ---------------------------------------------
+# build copies each listed file beside the board and serves only a relative src.
+
+make_image() {  # <path> [bytes]
+  mkdir -p "$(dirname "$1")"
+  if [ -n "${2-}" ]; then truncate -s "$2" "$1"; else printf 'not-really-a-png' > "$1"; fi
+}
+
+# A decision card named <key> carrying one image per <path> argument.
+card_with_images() {  # <key> <path>...
+  local key=$1 paths
+  shift
+  paths=$(printf '%s\n' "$@" | jq -R . | jq -s .)
+  jq -n --arg key "$key" --argjson paths "$paths" '
+    {key:$key,type:"decision",repo:"sample",title:"Approve the screens",
+     options:[{value:"yes",label:"Yes"}],
+     images:[$paths | to_entries[] | {path:.value, alt:("screen " + (.key + 1 | tostring))}]}'
+}
+
+payload_with_cards() {  # <home> <cards-json-array>
+  write_valid_payload "$1/payload.json"
+  jq --argjson cards "$2" '.captains_call = $cards' "$1/payload.json" > "$1/payload.tmp" \
+    && mv "$1/payload.tmp" "$1/payload.json"
+}
+
+test_build_copies_card_images_beside_the_board_and_injects_only_relative_srcs() {
+  local home board assets
+  home=$(make_home images-copy)
+  board="$home/.lavish/bearings-board.html"
+  assets="$home/.lavish/bearings-board-assets"
+  make_image "$home/src/Home.PNG"
+  make_image "$home/src/menu.jpeg"
+  make_image "$home/src/report.webp"
+  payload_with_cards "$home" "$(jq -n \
+    --arg a "$home/src/Home.PNG" --arg b "$home/src/menu.jpeg" --arg c "$home/src/report.webp" \
+    '[{key:"screens",type:"decision",repo:"sample",title:"Approve the screens",
+       options:[{value:"yes",label:"Yes"}],
+       images:[{path:$a,alt:"Home",caption:"The home page"},{path:$b,alt:"Menu",caption:""},{path:$c,alt:"Report"}]}]')"
+
+  run_board "$home" build "$home/payload.json" >/dev/null 2>&1 || fail "a payload with images did not build"
+  [ "$(find "$assets" -type f | wc -l | tr -d ' ')" = 3 ] || fail "the images were not copied beside the board"
+  assert_present "$assets/screens/1.png" "the first image was not copied under its card key"
+  assert_present "$assets/screens/2.jpeg" "the second image was not copied under its card key"
+  assert_present "$assets/screens/3.webp" "the third image was not copied under its card key"
+  extract_payload "$board" | jq -e '
+    .captains_call[0].images == [
+      {src:"bearings-board-assets/screens/1.png",alt:"Home",caption:"The home page"},
+      {src:"bearings-board-assets/screens/2.jpeg",alt:"Menu"},
+      {src:"bearings-board-assets/screens/3.webp",alt:"Report"}]' >/dev/null \
+    || fail "the page data does not carry exactly the relative src, alt and caption"
+  grep -qF "$home/src" "$board" && fail "the page leaked a local image path"
+  pass "build copies card images beside the board and injects only relative srcs"
+}
+
+test_build_refuses_a_bad_images_field_before_touching_the_board() {
+  local home good name filter
+  home=$(make_home images-refuse)
+  make_image "$home/src/ok.png"
+  make_image "$home/src/anim.gif"
+  make_image "$home/src/big.png" 5242881
+  make_image "$home/src/exact.png" 5242880
+  mkdir -p "$home/src/dir.png"
+  good=$(card_with_images screens "$home/src/ok.png")
+  payload_with_cards "$home" "[$good]"
+  run_board "$home" build "$home/payload.json" >/dev/null 2>&1 || fail "the baseline image board did not build"
+  cp "$home/.lavish/bearings-board.html" "$home/before.html"
+
+  while IFS='|' read -r name filter; do
+    [ -n "$name" ] || continue
+    jq --arg home "$home" "$filter" "$home/payload.json" > "$home/bad.json"
+    jq empty "$home/bad.json" || fail "the $name case did not produce a payload"
+    if run_board "$home" build "$home/bad.json" >/dev/null 2>&1; then
+      fail "a payload with $name was accepted"
+    fi
+    cmp -s "$home/before.html" "$home/.lavish/bearings-board.html" \
+      || fail "a refused payload with $name changed the existing board"
+    assert_present "$home/.lavish/bearings-board-assets/screens/1.png" \
+      "a refused payload with $name disturbed the existing assets"
+  done <<'CASES'
+a gif|.captains_call[0].images[0].path = ($home + "/src/anim.gif")
+a missing file|.captains_call[0].images[0].path = ($home + "/src/none.png")
+a directory named like an image|.captains_call[0].images[0].path = ($home + "/src/dir.png")
+a file over 5 MB|.captains_call[0].images[0].path = ($home + "/src/big.png")
+a relative path|.captains_call[0].images[0].path = "src/ok.png"
+a missing alt|del(.captains_call[0].images[0].alt)
+an empty alt|.captains_call[0].images[0].alt = ""
+a non-string caption|.captains_call[0].images[0].caption = 3
+images that are not an array|.captains_call[0].images = "x.png"
+25 images|.captains_call[0].images = [range(25) | {path: ($home + "/src/ok.png"), alt: "s"}]
+a dot-leading card key|.captains_call[0].key = ".hidden"
+CASES
+
+  jq --arg home "$home" '.captains_call[0].images = [range(24) | {path: ($home + "/src/ok.png"), alt: "s"}]' \
+    "$home/payload.json" > "$home/max.json"
+  run_board "$home" build "$home/max.json" >/dev/null 2>&1 || fail "24 images were refused"
+  jq --arg home "$home" '.captains_call[0].images = [{path: ($home + "/src/exact.png"), alt: "s"}]' \
+    "$home/payload.json" > "$home/exact.json"
+  run_board "$home" build "$home/exact.json" >/dev/null 2>&1 || fail "an image of exactly 5 MB was refused"
+  pass "build refuses a bad images field before touching the board and accepts the caps themselves"
+}
+
+test_build_clears_stale_images_on_every_rebuild() {
+  local home assets
+  home=$(make_home images-stale)
+  assets="$home/.lavish/bearings-board-assets"
+  make_image "$home/src/a.png"
+  make_image "$home/src/b.png"
+  payload_with_cards "$home" "[$(card_with_images card-a "$home/src/a.png" "$home/src/b.png")]"
+  run_board "$home" build "$home/payload.json" >/dev/null 2>&1 || fail "the first image build failed"
+  assert_present "$assets/card-a/2.png" "the first build did not copy both images"
+  printf 'stray' > "$assets/card-a/stray.png"
+
+  payload_with_cards "$home" "[$(card_with_images card-b "$home/src/a.png")]"
+  run_board "$home" build "$home/payload.json" >/dev/null 2>&1 || fail "the second image build failed"
+  [ "$(find "$assets" -type f | sed "s|^$assets/||")" = "card-b/1.png" ] \
+    || fail "stale images survived a rebuild: $(find "$assets" -type f)"
+
+  payload_with_cards "$home" '[]'
+  run_board "$home" build "$home/payload.json" >/dev/null 2>&1 || fail "the image-free rebuild failed"
+  [ -z "$(find "$assets" -type f)" ] || fail "images survived a rebuild with no image cards"
+  pass "build clears stale images on every rebuild"
+}
+
+test_build_does_not_copy_images_of_a_dropped_landed_card() {
+  local home
+  home=$(make_home images-dropped)
+  make_image "$home/src/a.png"
+  payload_with_cards "$home" "[$(card_with_images landed-by-task "$home/src/a.png")]"
+  jq '.landed = [{"id":"landed-by-task","repo":"sample","what":"shipped it","owner":"crew"}]' \
+    "$home/payload.json" > "$home/payload.tmp" && mv "$home/payload.tmp" "$home/payload.json"
+  run_board "$home" build "$home/payload.json" >/dev/null 2>&1 || fail "the build failed"
+  [ -z "$(find "$home/.lavish/bearings-board-assets" -type f)" ] \
+    || fail "the images of a card the build dropped were still copied"
+  pass "build does not copy the images of a card it dropped as landed"
+}
+
 test_path_is_stable_and_home_scoped
 test_build_refuses_malformed_payloads_before_touching_the_board
 test_charted_kind_is_optional_and_accepts_both_values
@@ -787,3 +923,7 @@ test_build_fails_when_reconcile_cannot_establish_a_listener
 test_every_decision_card_carries_the_reconcile_choice
 test_build_refuses_a_payload_that_occupies_the_reconcile_value
 test_build_refuses_a_nondecision_reconcile_value
+test_build_copies_card_images_beside_the_board_and_injects_only_relative_srcs
+test_build_refuses_a_bad_images_field_before_touching_the_board
+test_build_clears_stale_images_on_every_rebuild
+test_build_does_not_copy_images_of_a_dropped_landed_card

@@ -266,6 +266,69 @@ test_charted_rows_without_a_filed_date_follow_the_dated_rows_in_payload_order() 
   pass "charted rows with no filed date follow the dated rows in payload order"
 }
 
+# Build the board from <cards-json> alone (Captain's Call items whose images
+# already carry the relative src build injects) and return what rendered.
+render_cards() {  # <home> <cards-json>
+  local home=$1 data="$1/payload.json"
+  jq -n --argjson cards "$2" '{
+    schema:"fm-bearings-board.v1", home:"render-home", generated:"2026-08-26T00:00Z",
+    prs_live:false, captains_call:$cards, underway:[], landed:[], charted:[]}' > "$data"
+  PATH="$home/fakebin:$PATH" FM_HOME="$home" \
+    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+    FM_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
+    LAVISH_AXI_STATE_DIR="$home/lavish-state" \
+    "$BOARD" build "$data" >/dev/null || fail "the board did not build"
+  require_listener_reached_poll "$home"
+  node "$HARNESS" "$home/.lavish/bearings-board.html" \
+    || fail "the built board could not be rendered"
+}
+
+test_a_card_with_images_renders_one_lazy_thumbnail_per_image() {
+  local home out src
+  home=$(make_home card-images)
+  mkdir -p "$home/src"
+  src="$home/src/a.png"
+  printf 'x' > "$src"
+  out=$(render_cards "$home" "$(jq -n --arg p "$src" '[
+    {key:"with-shots",type:"decision",repo:"sample",title:"Has screenshots",
+     options:[{value:"yes",label:"Yes"}],
+     images:[{path:$p,alt:"First screen",caption:"Cap"},{path:$p,alt:"Second screen"}]},
+    {key:"no-shots",type:"decision",repo:"sample",title:"Has none",
+     options:[{value:"yes",label:"Yes"}]}]')")
+  printf '%s' "$out" | jq -e '.error == ""' >/dev/null \
+    || fail "the board rendered its fail-closed error instead of the cards: $out"
+  printf '%s' "$out" | jq -e '
+    (.cards | length) == 2
+      and (.cards[0] | .title == "Has screenshots"
+        and .images == [
+          {src:"bearings-board-assets/with-shots/1.png",alt:"First screen",lazy:true},
+          {src:"bearings-board-assets/with-shots/2.png",alt:"Second screen",lazy:true}])
+      and (.cards[1].images == [])
+  ' >/dev/null || fail "a card did not render its screenshots as lazy thumbnails with alt text: $out"
+  pass "a card with images renders one lazy thumbnail per image and a card without renders none"
+}
+
+test_an_image_outside_the_board_assets_folder_is_not_rendered() {
+  local home out board
+  home=$(make_home card-foreign-image)
+  mkdir -p "$home/src"
+  printf 'x' > "$home/src/a.png"
+  render_cards "$home" "$(jq -n --arg p "$home/src/a.png" '[
+    {key:"foreign",type:"decision",repo:"sample",title:"Foreign srcs",
+     options:[{value:"yes",label:"Yes"}],
+     images:[{path:$p,alt:"local"},{path:$p,alt:"remote"},{path:$p,alt:"ours"}]}]')" >/dev/null
+  # build only ever writes relative srcs, so point two of them elsewhere in the
+  # built page, as a tampered board would.
+  board="$home/.lavish/bearings-board.html"
+  sed -i -e 's|bearings-board-assets/foreign/1.png|/etc/passwd|' \
+    -e 's|bearings-board-assets/foreign/2.png|https://example.com/x.png|' "$board"
+  out=$(node "$HARNESS" "$board") || fail "the tampered board could not be rendered"
+  printf '%s' "$out" | jq -e '
+    [.cards[0].images[] | .src] == ["bearings-board-assets/foreign/3.png"]
+  ' >/dev/null || fail "a src outside the board assets folder was rendered: $out"
+  pass "an image src outside the board assets folder is not rendered"
+}
+
 test_an_underway_row_leads_with_the_task_name_and_keeps_its_run_status
 test_an_underway_identifier_label_is_not_replaced_by_run_status
 test_charted_next_reads_newest_filed_first
@@ -275,3 +338,5 @@ test_warnings_are_excluded_from_the_charted_next_count
 test_a_board_of_only_warnings_still_reports_nothing_queued
 test_omitted_warnings_never_count_as_more_queued
 test_an_omitted_kind_keeps_the_existing_queued_rendering
+test_a_card_with_images_renders_one_lazy_thumbnail_per_image
+test_an_image_outside_the_board_assets_folder_is_not_rendered
