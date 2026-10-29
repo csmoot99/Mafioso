@@ -5,7 +5,8 @@
 // Usage: node board-render-harness.mjs <built-board.html>
 // Prints one JSON document:
 //   { stats:[{n,label}], underway:[{title,sub,badges}],
-//     charted:[{title,sub,badges,pickable}], empty, more, error }
+//     charted:[{title,sub,badges,pickable}], empty, more, error,
+//     cards:[{title,images:[{src,alt,lazy}]}] }
 import { readFileSync } from "node:fs";
 
 const html = readFileSync(process.argv[2], "utf8");
@@ -27,6 +28,10 @@ class Node {
     this.classList = {
       add: (c) => { this.className = (this.className + " " + c).trim(); },
       contains: (c) => this.className.split(/\s+/).includes(c),
+      remove: (c) => { this.className = this.className.split(/\s+/).filter((x) => x !== c).join(" "); },
+      toggle: (c, on) => {
+        if (on) this.classList.add(c); else this.classList.remove(c);
+      },
     };
   }
   get textContent() {
@@ -122,5 +127,15 @@ const errorText = [...byId.entries()]
 const empty = ch.children.filter((c) => c.className.includes("bb-empty")).map((c) => c.textContent);
 const more = ch.children.filter((c) => c.className.includes("bb-morechip")).map((c) => c.textContent);
 
+const call = byId.get("bb-call") || new Node("div");
+const cards = call.children
+  .filter((c) => c.className.split(/\s+/).includes("bb-decision"))
+  .map((card) => ({
+    title: card.querySelectorAll(".bb-decision__title")[0]?.textContent ?? "",
+    images: card.querySelectorAll(".bb-shot__img").map((i) => ({
+      src: i.src, alt: i.alt, lazy: i.loading === "lazy",
+    })),
+  }));
+
 process.stdout.write(
-  JSON.stringify({ stats, underway, charted, empty, more, error: errorText }) + "\n");
+  JSON.stringify({ stats, underway, charted, empty, more, cards, error: errorText }) + "\n");

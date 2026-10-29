@@ -72,6 +72,17 @@
 # the template may display the routing id. Anything else refuses before the
 # existing board is touched.
 #
+# A Captain's Call item MAY carry `images`, the screenshots the captain must see
+# to decide: an array of up to 24 `{ "path", "alt", "caption"? }` objects, where `path`
+# is an absolute local file (png, jpg, jpeg or webp, a regular file of at most
+# 5 MB), `alt` is non-empty text, and `caption` is optional text. A card key that
+# starts with `.` cannot carry images. build copies each file into
+# $FM_HOME/.lavish/bearings-board-assets/<card-key>/<n>.<ext>, beside the stable
+# board file where Lavish serves sibling files by relative path, replaces that
+# whole folder on every build so no stale file survives, and injects only the
+# relative `src` into the page data, never the local path. A bad `images` entry
+# refuses before the existing board or its assets are touched.
+#
 # Every Underway row likewise carries a non-empty `name`: the durable task name
 # when known, otherwise its durable identifier.
 # A Charted Next row MAY carry `filed`, the durable filed date (YYYY-MM-DD, or
@@ -95,6 +106,9 @@ FM_HOME="${FM_HOME:-$FM_ROOT}"
 TEMPLATE="${FM_BEARINGS_BOARD_TEMPLATE:-$SCRIPT_DIR/../.agents/skills/bearings/assets/board-template.html}"
 PLACEHOLDER='__FM_BEARINGS_BOARD_DATA__'
 BOARD_SCHEMA=fm-bearings-board.v1
+MAX_IMAGES=24
+MAX_IMAGE_BYTES=5242880
+ASSETS_DIR_NAME=bearings-board-assets
 
 usage() {
   awk '
@@ -112,7 +126,7 @@ fail() {
 board_path() { printf '%s/.lavish/bearings-board.html\n' "$FM_HOME"; }
 
 validate_payload() {  # <data.json>
-  jq -e --arg schema "$BOARD_SCHEMA" '
+  jq -e --arg schema "$BOARD_SCHEMA" --argjson max_images "$MAX_IMAGES" '
     def nonempty_string: type == "string" and length > 0;
     def slug($max): type == "string" and test("^[A-Za-z0-9._-]{1," + ($max | tostring) + "}$");
     def repo_marker: has("repo") and (.repo == null or (.repo | type == "string"));
@@ -141,6 +155,15 @@ validate_payload() {  # <data.json>
           and (keys | sort) == ["artifact", "version"]
           and (.artifact | slug(128))
           and (.version | version));
+    def optional_images:
+      (has("images") | not)
+      or (.images
+        | type == "array" and length <= $max_images
+          and ([.[]
+            | type == "object"
+              and (.path | type == "string" and test("^/[^[:cntrl:]]+\\.(png|jpe?g|webp)$"; "i"))
+              and (.alt | nonempty_string)
+              and optional_string("caption")] | all));
     def call_item:
       type == "object"
       and (.key | slug(128))
@@ -154,6 +177,8 @@ validate_payload() {  # <data.json>
           and (.value | slug(128))
           and (.label | nonempty_string)
           and optional_string("hint")] | all)
+      and optional_images
+      and (if has("images") then (.key | test("^[A-Za-z0-9_-]")) else true end)
       and (optional_string("about"))
       and (optional_string("decide"))
       and (optional_string("detail"))
@@ -202,6 +227,49 @@ validate_payload() {  # <data.json>
     and ([.landed[] | landed_item] | all)
     and ([.charted[] | charted_item] | all)
   ' "$1" >/dev/null
+}
+
+# --- Captain's Call screenshots -----------------------------------------------
+# validate_payload owns the shape; these own the files. Every listed path must
+# be an existing regular file within the size cap before anything is published.
+
+validate_image_files() {  # <data.json>
+  local path size
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    [ -f "$path" ] && [ -r "$path" ] || return 1
+    size=$(wc -c < "$path") || return 1
+    [ "$size" -le "$MAX_IMAGE_BYTES" ] || return 1
+  done < <(jq -r '.captains_call[]? | .images[]?.path' "$1")
+}
+
+# The relative src a copied image is served under; one definition shared by the
+# copy list and the rewrite so they cannot disagree.
+# shellcheck disable=SC2016 # jq program text, not shell expansion
+IMAGE_SRC_DEF='
+  def image_src($key; $n): $dir + "/" + $key + "/" + ($n | tostring) + "." + (
+    ascii_downcase | capture("\\.(?<ext>png|jpe?g|webp)$").ext);
+'
+
+# Copy every surviving card's images into <stage>, laid out as the served
+# <card-key>/<n>.<ext>, and rewrite the payload so a card's `images` carry only
+# the relative src, alt and caption.
+stage_images() {  # <payload.json> <stage-dir> <rewritten.json>
+  local payload=$1 stage=$2 dest=$3 src path rel
+  while IFS=$'\t' read -r src path; do
+    rel=${src#*/}
+    mkdir -p -- "$stage/${rel%/*}" && cp -- "$path" "$stage/$rel" || return 1
+  done < <(jq -r --arg dir "$ASSETS_DIR_NAME" "$IMAGE_SRC_DEF"'
+    .captains_call[]? | select(has("images")) | .key as $key
+    | .images | to_entries[] | .key as $i | .value
+    | [(.path | image_src($key; $i + 1)), .path] | @tsv' "$payload")
+  jq --arg dir "$ASSETS_DIR_NAME" "$IMAGE_SRC_DEF"'
+    .captains_call |= map(if has("images")
+      then .key as $key | .images |= (to_entries | map(
+        .key as $i | .value
+        | {src: (.path | image_src($key; $i + 1)), alt: .alt}
+          + (if (.caption // "") != "" then {caption: .caption} else {} end)))
+      else . end)' "$payload" > "$dest"
 }
 
 # --- Lavish session liveness -------------------------------------------------
@@ -358,12 +426,14 @@ await_source_owner() {  # <source-id>
 }
 
 command_build() {
-  local data=${1-} board json tmp sid extracted effective owner version pre_reopen_owner
+  local data=${1-} board json tmp stage staged assets sid extracted effective owner version pre_reopen_owner
   [ "$#" -eq 1 ] || { usage >&2; exit 2; }
   command -v jq >/dev/null 2>&1 || fail "jq is required"
   [ -f "$data" ] || fail "board data does not exist: $data"
   jq empty "$data" 2>/dev/null || fail "board data is not valid JSON: $data"
   validate_payload "$data" || fail "board data does not satisfy $BOARD_SCHEMA: $data"
+  validate_image_files "$data" \
+    || fail "a Captain's Call image is not a readable regular file of at most $MAX_IMAGE_BYTES bytes: $data"
   [ -f "$TEMPLATE" ] && [ ! -L "$TEMPLATE" ] || fail "board template is missing: $TEMPLATE"
   [ "$(grep -cxF "$PLACEHOLDER" "$TEMPLATE")" -eq 1 ] \
     || fail "board template does not carry exactly one data slot: $TEMPLATE"
@@ -374,21 +444,27 @@ command_build() {
     rm -f -- "$effective"
     fail "cannot reconcile the board payload against landed work"
   fi
-  json=$(jq -c . "$effective") || { rm -f -- "$effective"; fail "cannot compact the board data"; }
-  rm -f -- "$effective"
+  board=$(board_path)
+  (umask 077; mkdir -p "${board%/*}") || fail "cannot create ${board%/*}"
+  stage=$(umask 077; mktemp -d "${board%/*}/.assets.XXXXXX") || fail "cannot stage the board images"
+  staged=$(umask 077; mktemp "${TMPDIR:-/tmp}/fm-bearings-staged.XXXXXX") || fail "cannot stage the board payload"
+  if ! stage_images "$effective" "$stage" "$staged"; then
+    rm -rf -- "$stage" "$staged" "$effective"
+    fail "cannot copy the Captain's Call images beside the board"
+  fi
+  json=$(jq -c . "$staged") || { rm -rf -- "$stage" "$staged" "$effective"; fail "cannot compact the board data"; }
+  rm -f -- "$effective" "$staged"
   # `<` never appears in JSON syntax outside strings, so escaping every
   # occurrence keeps the payload valid JSON while making </script> inert.
   json=${json//</\\u003c}
 
-  board=$(board_path)
-  (umask 077; mkdir -p "${board%/*}") || fail "cannot create ${board%/*}"
-  tmp=$(umask 077; mktemp "${board%/*}/.board.XXXXXX") || fail "cannot stage the board"
+  tmp=$(umask 077; mktemp "${board%/*}/.board.XXXXXX") || { rm -rf -- "$stage"; fail "cannot stage the board"; }
   if ! BOARD_JSON="$json" perl -pe "s/^\\Q$PLACEHOLDER\\E\$/\$ENV{BOARD_JSON}/" "$TEMPLATE" > "$tmp"; then
-    rm -f -- "$tmp"
+    rm -rf -- "$tmp" "$stage"
     fail "cannot inject the board data"
   fi
   if grep -qxF "$PLACEHOLDER" "$tmp"; then
-    rm -f -- "$tmp"
+    rm -rf -- "$tmp" "$stage"
     fail "the board data slot survived injection"
   fi
   # Round-trip the injected payload back out of the built page, so a board that
@@ -396,11 +472,15 @@ command_build() {
   extracted=$(sed -n '/<script id="bearings-data" type="application\/json">/,/<\/script>/p' "$tmp" \
     | sed '1d;$d')
   if ! printf '%s\n' "$extracted" | jq -e --arg schema "$BOARD_SCHEMA" '.schema == $schema' >/dev/null 2>&1; then
-    rm -f -- "$tmp"
+    rm -rf -- "$tmp" "$stage"
     fail "the built board does not carry a readable $BOARD_SCHEMA payload"
   fi
-  if ! { chmod 0600 "$tmp" && mv -f -- "$tmp" "$board"; }; then
-    rm -f -- "$tmp"
+  # The whole assets folder is replaced, never merged, so a screenshot dropped
+  # from a card cannot linger beside the board.
+  assets="${board%/*}/$ASSETS_DIR_NAME"
+  if ! { rm -rf -- "$assets" && mv -- "$stage" "$assets" \
+    && chmod 0600 "$tmp" && mv -f -- "$tmp" "$board"; }; then
+    rm -rf -- "$tmp" "$stage"
     fail "cannot publish the board"
   fi
   printf 'board: %s\n' "$board"
