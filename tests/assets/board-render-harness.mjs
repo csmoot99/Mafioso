@@ -9,7 +9,9 @@
 //     cards:[{title,images:[{src,alt,lazy}],note:{tag,maxLength,count,limit}|null}],
 //     statLinks:[{label,href,scrolledTo,prevented}], arrow:{moved,scrolled,count},
 //     send:{foreign,sent,restored,all,misrouted} } - the board after "fm-board:send"
-//     messages from the Lavish chrome (see sendMessage below)
+//     messages from the Lavish chrome (see sendMessage below),
+//     attach:{...} - the first card's reference-image picker driven through the
+//     chrome's upload messages (see the attach section below)
 // The shim records listeners so the harness can drive the page the way a
 // captain does: tap each summary card, type past the note cap, press the arrows.
 import { readFileSync } from "node:fs";
@@ -58,6 +60,7 @@ class Node {
   getBoundingClientRect() { return { top: -50 }; }
   scrollIntoView(opts) { scrolls.push({ id: this.id, className: this.className, opts }); }
   focus() {}
+  removeChild(n) { this.children = this.children.filter((c) => c !== n); n.parentNode = null; }
   querySelectorAll(sel) {
     const want = sel.replace(/^\./, "").replace(/:checked$/, "");
     const checkedOnly = sel.endsWith(":checked");
@@ -97,10 +100,13 @@ globalThis.document = {
   querySelector: (sel) => {
     const id = "sel:" + sel;
     if (!byId.has(id)) byId.set(id, new Node("div"));
+    // The Lavish SDK script's address carries the load token the chrome expects.
+    if (sel.includes("/sdk.js")) byId.get(id).src = "/sdk.js?key=k&artifact_load_token=tok%2Ben";
     return byId.get(id);
   },
 };
-const parentWindow = { name: "lavish-chrome" };
+const posted = [];
+const parentWindow = { name: "lavish-chrome", postMessage: (m) => posted.push(m) };
 const windowListeners = {};
 globalThis.window = {
   innerHeight: 800,
@@ -108,6 +114,24 @@ globalThis.window = {
   addEventListener: (type, fn) => { (windowListeners[type] ||= []).push(fn); },
 };
 globalThis.TextEncoder = TextEncoder;
+URL.createObjectURL = (f) => "blob:" + f.name;
+URL.revokeObjectURL = () => {};
+const queued = [];
+window.lavish = { queuePrompt: (prompt, opts) => queued.push({ prompt, opts }) };
+// The answer form's values: checked radios and named fields, as the page reads them.
+globalThis.FormData = class {
+  constructor(form) {
+    this.values = {};
+    const walk = (n) => {
+      for (const c of n.children) {
+        if (c.name && (c.type !== "radio" || c.checked)) this.values[c.name] = c.value;
+        walk(c);
+      }
+    };
+    walk(form);
+  }
+  get(k) { return k in this.values ? this.values[k] : null; }
+};
 
 const script = html.slice(html.indexOf("<script>") + "<script>".length, html.lastIndexOf("</script>"));
 new Function(script)();
@@ -217,6 +241,63 @@ const item = (n, title, answer) => ({
   selector: `div#bb-call > div:nth-of-type(${n}) > div > form`,
   text: `${title} -> ${answer}`,
 });
+// Reference images on the first card, driven the way the chrome drives them: the
+// picker posts lavish:uploadAttachment to the parent and the chrome answers with
+// lavish:attachmentResult carrying the same nonce.
+const attach = await (async () => {
+  const card = call.children.find((c) => c.className.split(/\s+/).includes("bb-decision"));
+  if (!card) return { control: false };
+  const walk = (n, fn) => { for (const c of n.children) { fn(c); walk(c, fn); } };
+  let form, radio;
+  walk(card, (n) => { if (n.tagName === "form") form = n; if (n.type === "radio" && !radio) radio = n; });
+  const input = card.querySelectorAll(".bb-attach__input")[0];
+  if (!input) return { control: false };
+  const strip = card.querySelectorAll(".bb-attach__strip")[0];
+  const msg = () => card.querySelectorAll(".bb-attach__msg")[0];
+  const tiles = () => strip.children.map((t) => t.className.replace("bb-thumb ", ""));
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+  const file = (name, type, size = 4) => ({ name, type, size, arrayBuffer: async () => new ArrayBuffer(4) });
+  const pick = async (...files) => { input.files = files; input.dispatch("change"); await flush(); };
+  const reply = (i, extra) => sendMessage({ type: "lavish:attachmentResult", nonce: posted[i].nonce,
+    localId: posted[i].localId, ...extra });
+  const submit = () => { form.dispatch("submit"); return queued.length; };
+  const out = { control: true, accept: input.accept, multiple: input.multiple };
+  radio.checked = true;
+  await pick(file("a.png", "image/png"), file("clip.gif", "image/gif"), file("heic.heic", "image/heic"));
+  out.afterPick = { tiles: tiles(), message: msg().textContent, messageShown: !msg().hidden, stripShown: !strip.hidden,
+    posted: posted.map((p) => ({ type: p.type, name: p.name, mime: p.mime, token: p.artifact_load_token })) };
+  out.queuedWhileUploading = { queued: submit(), message: msg().textContent };
+  sendMessage({ type: "lavish:attachmentResult", nonce: "someone-else", localId: posted[0].localId, ok: true, id: "x.png" });
+  out.foreignNonceIgnored = tiles();
+  sendMessage({ type: "lavish:attachmentResult", nonce: posted[0].nonce, localId: posted[0].localId, ok: true, id: "x.png" },
+    {});
+  out.foreignWindowIgnored = tiles();
+  reply(0, { ok: true, id: "abc.png" });
+  out.afterResult = { tiles: tiles(), message: msg().textContent };
+  out.queued = { count: submit(), attachments: queued[0]?.opts.attachments, tag: queued[0]?.opts.tag,
+    data: queued[0]?.opts.data, text: queued[0]?.opts.text };
+  // a second pick: Lavish refuses it, so the card cannot be queued until it is removed
+  card.classList.remove("is-queued");
+  await pick(file("big.png", "image/png"));
+  reply(1, { ok: false, error: "Image is larger than the 10 MB limit" });
+  out.refused = { tiles: tiles(), message: msg().textContent, queued: submit() };
+  out.blockedMessage = msg().textContent;
+  strip.children[1].children.find((c) => c.className.includes("bb-thumb__x")).dispatch("click");
+  out.afterRemove = { tiles: tiles(), message: msg().textContent };
+  out.queuedAfterRemove = submit();
+  // two large images Lavish accepts one by one but whose total it refuses at send
+  const MB = 1024 * 1024;
+  await pick(file("h1.jpg", "image/jpeg", 13 * MB), file("h2.jpg", "image/jpeg", 13 * MB));
+  reply(2, { ok: true, id: "h1.jpg" });
+  reply(3, { ok: true, id: "h2.jpg" });
+  out.overTotal = { queued: submit(), message: msg().textContent };
+  strip.children[2].children.find((c) => c.className.includes("bb-thumb__x")).dispatch("click");
+  out.underTotal = { queued: submit(), attachments: queued.at(-1)?.opts.attachments.map((a) => a.id) };
+  // the cap
+  await pick(file("1.png", "image/png"), file("2.png", "image/png"), file("3.png", "image/png"), file("4.png", "image/png"));
+  out.cap = { tiles: tiles().length, message: msg().textContent };
+  return out;
+})();
 const first = cards[0]?.title, second = cards[1]?.title;
 const send = {};
 // Another window's message is ignored.
@@ -236,4 +317,4 @@ sendMessage({ type: "fm-board:send", phase: "sent", id: "c", items: [item(1, fir
 send.all = deckState();
 
 process.stdout.write(
-  JSON.stringify({ stats, statLinks, underway, charted, empty, more, cards, arrow, send, error: errorText }) + "\n");
+  JSON.stringify({ stats, statLinks, underway, charted, empty, more, cards, arrow, send, attach, error: errorText }) + "\n");

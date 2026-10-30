@@ -254,6 +254,38 @@ a { color: inherit; text-decoration: none; }
 .bb-count { margin-left: auto; font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-faint); white-space: nowrap; }
 .bb-count.is-full { color: var(--status-danger); font-weight: 700; }
 
+/* Reference images on a decision card. The thumbnail tiles are a fixed square box
+   whatever their upload state, so a tile never changes size as it uploads or
+   fails; the attach control sits above the strip, so it stays under the thumb
+   while tiles appear below it. */
+.bb-attach { display: flex; flex-direction: column; gap: 8px; }
+.bb-attach__add { position: relative; align-self: flex-start; cursor: pointer; min-height: 44px;
+  background: var(--surface-card-warm); color: var(--text-strong); border-color: var(--border-default); }
+.bb-attach__add:hover { border-color: var(--ink-500); }
+.bb-attach__add:focus-within { box-shadow: var(--focus-ring); }
+.bb-attach__add .fm-ico { width: 18px; height: 18px; flex: none; }
+.bb-attach__input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; }
+.bb-attach__strip { display: grid; grid-template-columns: repeat(auto-fill, 88px); gap: 8px; }
+.bb-attach__strip[hidden], .bb-attach__msg[hidden] { display: none; }
+.bb-thumb { position: relative; width: 88px; height: 88px; overflow: hidden; background: var(--paper-200);
+  border: 1.5px solid var(--border-default); border-radius: var(--radius-sm); }
+.bb-thumb__img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.bb-thumb.is-uploading .bb-thumb__img { opacity: 0.55; }
+.bb-thumb.is-error { border-color: var(--status-danger); }
+.bb-thumb__x { position: absolute; top: 0; right: 0; width: 44px; height: 44px; padding: 0; border: 0; margin: 0;
+  background: transparent; cursor: pointer; display: flex; align-items: flex-start; justify-content: flex-end; }
+.bb-thumb__x span { display: grid; place-items: center; width: 24px; height: 24px; margin: 4px;
+  border-radius: 50%; background: rgba(36, 28, 20, 0.78); color: var(--paper-000); }
+.bb-thumb__x svg { width: 14px; height: 14px; }
+.bb-thumb__x:focus-visible { outline: none; box-shadow: inset var(--focus-ring); }
+.bb-thumb__st { position: absolute; left: 0; right: 0; bottom: 0; padding: 3px 6px 2px; margin: 0; border: 0;
+  font: inherit; font-family: var(--font-mono); font-size: var(--fs-2xs); line-height: 1.2; text-align: left;
+  color: var(--paper-000); background: rgba(36, 28, 20, 0.78); }
+.bb-thumb.is-ready .bb-thumb__st { display: none; }
+.bb-thumb.is-error .bb-thumb__st { min-height: 44px; background: var(--status-danger); cursor: pointer; }
+.bb-attach__msg { font-size: var(--fs-xs); font-weight: 700; color: var(--status-danger); }
+.is-queued .bb-attach__add, .is-queued .bb-thumb__x, .is-queued .bb-thumb__st { display: none; }
+
 /* ---- compact rows (Underway / Landed / Charted) ---- */
 .bb-rows { display: flex; flex-direction: column; }
 .bb-row {
@@ -362,6 +394,7 @@ a { color: inherit; text-decoration: none; }
   .bb-opt input { width: 20px; height: 20px; margin: 0; }
   .bb-ff__grow::after, .bb-freeform { min-height: 44px; font-size: 1rem; padding: 10px 12px; }
   .bb-decision__foot .fm-btn { flex: 1 1 100%; }
+  .bb-attach__add { align-self: stretch; }
   .bb-dispatch .fm-btn { flex: 1 1 100%; }
   .fm-btn--sm { min-height: 44px; font-size: var(--fs-sm); }
   .bb-stacknav__btn { width: 44px; height: 44px; }
@@ -739,6 +772,136 @@ __FM_BEARINGS_BOARD_DATA__
     return row;
   }
 
+  /* ---- reference images on a decision card ----
+     The board runs in Lavish's sandboxed frame, which cannot reach the server, so
+     a picked image goes up the way Lavish's own cards send theirs: a
+     "lavish:uploadAttachment" message the chrome uploads, answering with the
+     server-vetted id. The queued answer then carries those ids, and Lavish hands
+     the agent each image as a local file. The chrome enforces the byte limit and
+     answers with its own message; the type list, the per-answer count and the
+     per-answer total below are Lavish's defaults, checked here so an answer the
+     server would refuse at send is never queued. */
+  var ATTACH_MIME = ["image/png", "image/jpeg", "image/webp"];
+  var ATTACH_MAX = 4;
+  var ATTACH_TOTAL_BYTES = 25 * 1024 * 1024;
+  var ATTACH_TYPE_MSG = "Unsupported file type. Use PNG, JPEG, or WebP.";
+  var ATTACH_NONCE = "fm-board-" + Math.random().toString(36).slice(2);
+  var attachSeq = 0;
+  var attachWaiting = {};
+  var IMAGE_SVG = '<svg class="fm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>';
+  var CLOSE_SVG = '<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 3.5l7 7M10.5 3.5l-7 7"/></svg>';
+  /* the load token the chrome expects on every message from this page is the one
+     in the SDK script's own address; that script is appended after this one runs,
+     so it is read when an image is picked, never when the card is built */
+  function attachToken() {
+    var sdk = document.querySelector('script[src*="/sdk.js"]');
+    var m = sdk && /[?&]artifact_load_token=([^&]+)/.exec(sdk.src || "");
+    return m ? decodeURIComponent(m[1]) : "";
+  }
+  window.addEventListener("message", function (ev) {
+    var m = ev.data;
+    if (window.parent === window || ev.source !== window.parent) return;
+    if (!m || m.type !== "lavish:attachmentResult" || m.nonce !== ATTACH_NONCE) return;
+    var waiting = attachWaiting[m.localId];
+    delete attachWaiting[m.localId];
+    if (waiting) waiting(m.ok && m.id ? String(m.id) : "", String(m.error || "Upload failed"));
+  });
+  /* one picker per card: .state() is what the answer may carry (ready images, and
+     why it may not be queued yet), .say() the message line */
+  function attachBlock() {
+    if (window.parent === window) return null;  /* opened outside Lavish: nowhere to upload */
+    var items = [];
+    var box = el("div", "bb-attach");
+    var add = el("label", "fm-btn fm-btn--sm bb-attach__add");
+    add.innerHTML = IMAGE_SVG + "<span>Attach images</span>";
+    var input = document.createElement("input");
+    input.type = "file"; input.className = "bb-attach__input"; input.multiple = true;
+    input.accept = ATTACH_MIME.join(",");
+    input.setAttribute("aria-label", "Attach reference images");
+    add.appendChild(input);
+    var strip = el("div", "bb-attach__strip");
+    strip.hidden = true;
+    var msg = el("div", "bb-attach__msg");
+    msg.setAttribute("role", "alert");
+    msg.hidden = true;
+    box.appendChild(add); box.appendChild(strip); box.appendChild(msg);
+    function say(text) { msg.textContent = text; msg.hidden = !text; }
+    function setState(item, state, text) {
+      item.state = state;
+      item.tile.className = "bb-thumb is-" + state;
+      item.status.textContent = text;
+      item.status.disabled = state !== "error";
+    }
+    function upload(item) {
+      var token = attachToken();
+      if (!token) { setState(item, "error", "Retry"); say("Images can't be attached here."); return; }
+      setState(item, "uploading", "Uploading…");
+      item.file.arrayBuffer().then(function (bytes) {
+        if (items.indexOf(item) < 0) return;
+        var localId = "att-" + (++attachSeq);
+        attachWaiting[localId] = function (id, error) {
+          if (items.indexOf(item) < 0) return;
+          if (id) { item.id = id; setState(item, "ready", ""); return; }
+          setState(item, "error", "Retry");
+          say(error);
+        };
+        window.parent.postMessage({ type: "lavish:uploadAttachment", nonce: ATTACH_NONCE, localId: localId,
+          name: item.name, mime: item.file.type, bytes: bytes, artifact_load_token: token }, "*");
+      }, function () { setState(item, "error", "Retry"); say("Could not read image"); });
+    }
+    function remove(item) {
+      items.splice(items.indexOf(item), 1);
+      strip.removeChild(item.tile);
+      if (item.url && URL.revokeObjectURL) URL.revokeObjectURL(item.url);
+      strip.hidden = !items.length;
+      say("");
+    }
+    function addFiles(list) {
+      var problem = "";
+      Array.prototype.slice.call(list || []).forEach(function (file) {
+        if (ATTACH_MIME.indexOf(file.type) < 0) { problem = ATTACH_TYPE_MSG; return; }
+        if (items.length >= ATTACH_MAX) { problem = "You can attach up to " + ATTACH_MAX + " images."; return; }
+        var name = String(file.name || "image");
+        var item = { file: file, name: name, id: "", state: "uploading", url: URL.createObjectURL(file) };
+        item.tile = el("div", "bb-thumb is-uploading");
+        var img = document.createElement("img");
+        img.className = "bb-thumb__img"; img.src = item.url; img.alt = name;
+        var x = el("button", "bb-thumb__x");
+        x.type = "button"; x.setAttribute("aria-label", "Remove " + name);
+        x.innerHTML = "<span>" + CLOSE_SVG + "</span>";
+        x.addEventListener("click", function () { remove(item); });
+        item.status = el("button", "bb-thumb__st");
+        item.status.type = "button";
+        item.status.addEventListener("click", function () { if (item.state === "error") { say(""); upload(item); } });
+        item.tile.appendChild(img); item.tile.appendChild(x); item.tile.appendChild(item.status);
+        items.push(item);
+        strip.appendChild(item.tile);
+        strip.hidden = false;
+        upload(item);
+      });
+      say(problem);
+    }
+    input.addEventListener("change", function () {
+      addFiles(input.files);
+      input.value = "";  /* the same photo can be picked again after removing it */
+    });
+    return {
+      node: box, say: say, add: addFiles,
+      state: function () {
+        var busy = "", total = 0;
+        items.forEach(function (it) {
+          if (it.state === "uploading") busy = busy || "Waiting for an image to finish uploading…";
+          if (it.state === "error") busy = "An image couldn't be attached. Retry or remove it before queuing.";
+          if (it.state === "ready") total += it.file.size || 0;
+        });
+        if (!busy && total > ATTACH_TOTAL_BYTES)
+          busy = "Images on one answer can total at most 25 MB. Remove one before queuing.";
+        return { busy: busy, ready: items.filter(function (it) { return it.state === "ready"; })
+          .map(function (it) { return { id: it.id, name: it.name }; }) };
+      }
+    };
+  }
+
   data.captains_call.forEach(function (item) {
     var card = el("div", "fm-card fm-card--poster bb-decision");
     var pad = el("div", "bb-decision__pad");
@@ -853,6 +1016,9 @@ __FM_BEARINGS_BOARD_DATA__
       syncNote();
     }
 
+    var attach = attachBlock();
+    if (attach) form.appendChild(attach.node);
+
     var foot = el("div", "bb-decision__foot");
     var btn = el("button", "fm-btn fm-btn--sm " + (item.type === "merge" ? "fm-btn--gold" : "fm-btn--primary"), "Queue answer");
     btn.type = "submit";
@@ -873,7 +1039,12 @@ __FM_BEARINGS_BOARD_DATA__
       var value = fd.get("answer");
       var note = (fd.get("note") || "").trim();
       var displayAnswer = value ? (note ? value + " - " + note : value) : note;
-      if (!displayAnswer) return;
+      var att = attach ? attach.state() : { busy: "", ready: [] };
+      if (att.busy) { attach.say(att.busy); return; }
+      if (!displayAnswer) {
+        if (att.ready.length) attach.say("Pick an option or write a note to send with the images.");
+        return;
+      }
       if (utf8ByteLength(item.title + " -> " + displayAnswer) > ANSWER_LABEL_MAX_BYTES) {
         answerLimit.textContent = "Answer is too long to queue.";
         answerLimit.classList.add("is-visible");
@@ -892,7 +1063,7 @@ __FM_BEARINGS_BOARD_DATA__
         window.lavish.queuePrompt(
           "Captain's Call answer - " + item.title + ": " + displayAnswer,
           { tag: "choice", text: item.title + " -> " + displayAnswer, element: form,
-            data: ctxData }
+            data: ctxData, attachments: att.ready }
         );
       }
       card.classList.add("is-queued");

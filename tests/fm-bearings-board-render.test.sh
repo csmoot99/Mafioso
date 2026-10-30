@@ -408,6 +408,47 @@ test_cards_sent_to_the_agent_leave_the_board_and_a_failed_send_deals_them_back()
   pass "cards sent to the agent leave the board at once, counters follow, and a failed send deals them back"
 }
 
+test_a_card_attaches_reference_images_through_the_chrome_upload_and_queues_their_ids() {
+  local home out
+  home=$(make_home attach)
+  out=$(render_cards "$home" "$(two_cards)")
+  printf '%s' "$out" | jq -e '.error == "" and .attach.control == true' >/dev/null     || fail "the decision card has no image picker: $out"
+  printf '%s' "$out" | jq -e '
+    .attach | .accept == "image/png,image/jpeg,image/webp" and .multiple == true
+      and .afterPick.tiles == ["is-uploading"] and .afterPick.stripShown == true
+      and .afterPick.message == "Unsupported file type. Use PNG, JPEG, or WebP."
+      and .afterPick.messageShown == true
+      and .afterPick.posted == [{type:"lavish:uploadAttachment",name:"a.png",mime:"image/png",token:"tok+en"}]
+  ' >/dev/null || fail "a pick did not upload the supported image through the chrome and refuse the rest: $out"
+  printf '%s' "$out" | jq -e '
+    .attach | .queuedWhileUploading.queued == 0
+      and (.queuedWhileUploading.message | test("Waiting for an image to finish uploading"))
+      and .foreignNonceIgnored == ["is-uploading"] and .foreignWindowIgnored == ["is-uploading"]
+  ' >/dev/null || fail "an answer was queued mid-upload or a stranger's upload result was believed: $out"
+  printf '%s' "$out" | jq -e '
+    .attach | .afterResult.tiles == ["is-ready"]
+      and .queued.count == 1 and .queued.attachments == [{id:"abc.png",name:"a.png"}]
+      and .queued.tag == "choice" and (.queued.text | test(" -> "))
+      and .queued.data.schema == "fm-bearings-answer.v1" and (.queued.data | has("attachments") | not)
+  ' >/dev/null || fail "the queued answer did not carry the uploaded image id, or its keyed context changed: $out"
+  printf '%s' "$out" | jq -e '
+    .attach | .refused.tiles == ["is-ready","is-error"] and .refused.queued == 1
+      and .refused.message == "Image is larger than the 10 MB limit"
+      and (.blockedMessage | test("couldn.t be attached. Retry or remove it"))
+      and .afterRemove.tiles == ["is-ready"] and .afterRemove.message == ""
+      and .queuedAfterRemove == 2
+  ' >/dev/null || fail "a refused image was not shown, did not block the answer, or could not be removed: $out"
+  printf '%s' "$out" | jq -e '
+    .attach | .overTotal.queued == 2
+      and .overTotal.message == "Images on one answer can total at most 25 MB. Remove one before queuing."
+      and .underTotal.queued == 3 and .underTotal.attachments == ["abc.png","h1.jpg"]
+  ' >/dev/null || fail "an answer whose images exceed the Lavish 25 MB per-prompt total was queued: $out"
+  printf '%s' "$out" | jq -e '
+    .attach.cap | .tiles == 4 and .message == "You can attach up to 4 images."
+  ' >/dev/null || fail "a fifth image was not refused: $out"
+  pass "a card uploads images through the chrome, shows Lavish's refusals, and queues the ids with the answer"
+}
+
 test_an_underway_row_leads_with_the_task_name_and_keeps_its_run_status
 test_an_underway_identifier_label_is_not_replaced_by_run_status
 test_charted_next_reads_newest_filed_first
@@ -423,3 +464,4 @@ test_each_summary_card_links_to_and_scrolls_to_its_section
 test_a_note_stops_at_the_cap_while_typing_and_the_cap_leaves_room_for_the_label
 test_the_card_arrows_bring_the_new_card_into_view
 test_cards_sent_to_the_agent_leave_the_board_and_a_failed_send_deals_them_back
+test_a_card_attaches_reference_images_through_the_chrome_upload_and_queues_their_ids
