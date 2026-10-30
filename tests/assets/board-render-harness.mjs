@@ -7,7 +7,9 @@
 //   { stats:[{n,label}], underway:[{title,sub,badges}],
 //     charted:[{title,sub,badges,pickable}], empty, more, error,
 //     cards:[{title,images:[{src,alt,lazy}],note:{tag,maxLength,count,limit}|null}],
-//     statLinks:[{label,href,scrolledTo,prevented}], arrow:{moved,scrolled,count} }
+//     statLinks:[{label,href,scrolledTo,prevented}], arrow:{moved,scrolled,count},
+//     send:{foreign,sent,restored,all,misrouted} } - the board after "fm-board:send"
+//     messages from the Lavish chrome (see sendMessage below)
 // The shim records listeners so the harness can drive the page the way a
 // captain does: tap each summary card, type past the note cap, press the arrows.
 import { readFileSync } from "node:fs";
@@ -98,7 +100,13 @@ globalThis.document = {
     return byId.get(id);
   },
 };
-globalThis.window = { innerHeight: 800 };
+const parentWindow = { name: "lavish-chrome" };
+const windowListeners = {};
+globalThis.window = {
+  innerHeight: 800,
+  parent: parentWindow,
+  addEventListener: (type, fn) => { (windowListeners[type] ||= []).push(fn); },
+};
 globalThis.TextEncoder = TextEncoder;
 
 const script = html.slice(html.indexOf("<script>") + "<script>".length, html.lastIndexOf("</script>"));
@@ -188,5 +196,44 @@ const arrow = {
   count: countText(),
 };
 
+// Deliver a message the way the browser does: to every "message" listener on
+// the window, from <source> (the parent chrome unless told otherwise).
+const sendMessage = (data, source = parentWindow) => {
+  for (const fn of windowListeners.message || []) fn({ data, source });
+};
+const need = () => strip.children.find((t) => t.className.includes("bb-stat--call"))
+  ?.children.find((c) => c.className.includes("bb-stat__num"))?.textContent;
+const deckState = () => ({
+  shown: call.children
+    .filter((c) => c.className.split(/\s+/).includes("bb-decision") && !c.hidden)
+    .map((c) => c.querySelectorAll(".bb-decision__title")[0]?.textContent),
+  count: countText(),
+  need: need(),
+  sub: byId.get("bb-call-sub")?.textContent ?? "",
+  empty: call.className.split(/\s+/).includes("bb-call--empty"),
+  navHidden: byId.get("bb-stack-count")?.parentNode?.hidden ?? false,
+});
+const item = (n, title, answer) => ({
+  selector: `div#bb-call > div:nth-of-type(${n}) > div > form`,
+  text: `${title} -> ${answer}`,
+});
+const first = cards[0]?.title, second = cards[1]?.title;
+const send = {};
+// Another window's message is ignored.
+sendMessage({ type: "fm-board:send", phase: "start", id: "x", items: [item(1, first, "yes")] }, {});
+send.foreign = deckState();
+// A send hides the card it carried: found by its form's position.
+sendMessage({ type: "fm-board:send", phase: "start", id: "a", items: [item(1, first, "yes")] });
+send.sent = deckState();
+// The same send failing deals it back.
+sendMessage({ type: "fm-board:send", phase: "failed", id: "a", items: [item(1, first, "yes")] });
+send.restored = deckState();
+// A selector pointing at the wrong card falls back to the card the text names;
+// a second send then empties the board.
+sendMessage({ type: "fm-board:send", phase: "start", id: "b", items: [item(1, second, "yes")] });
+send.misrouted = deckState();
+sendMessage({ type: "fm-board:send", phase: "sent", id: "c", items: [item(1, first, "yes")] });
+send.all = deckState();
+
 process.stdout.write(
-  JSON.stringify({ stats, statLinks, underway, charted, empty, more, cards, arrow, error: errorText }) + "\n");
+  JSON.stringify({ stats, statLinks, underway, charted, empty, more, cards, arrow, send, error: errorText }) + "\n");
