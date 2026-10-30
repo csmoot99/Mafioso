@@ -573,6 +573,81 @@ cmd_silent() {
   [ "$content_rc" -eq 1 ]
 }
 
+# Lavish frames a queued prompt block as a table (`prompts[N]{field,...}:` plus N
+# CSV rows) only while every prompt is a flat record. One prompt carrying image
+# attachments - a decision card's reference images, say - turns the WHOLE block
+# into list form: `prompts[N]:`, then `  - field: value` per prompt with
+# continuation lines at four spaces, and each prompt's images as a nested
+# `    attachments[M]{id,type,path,mime,...}:` table at six. `answers` and `read`
+# both need that form, and must not mistake a result for empty because an image
+# rode along, so the one list-form reader lives here and is prepended to both
+# perl programs. parse_list_block reads the lines after the header from a file
+# handle and returns one hash per prompt; a nested table becomes an array of
+# hashes, and any other nested value is skipped.
+read -r -d '' TOON_LIST_PERL <<'PERL' || true
+use strict; use warnings;
+sub toon_unescape {
+  my ($s) = @_;
+  $s =~ s/\\(.)/$1 eq "n" ? "\n" : $1 eq "t" ? "\t" : $1 eq "r" ? "\r" : $1/ge;
+  return $s;
+}
+sub toon_value {
+  my ($v) = @_;
+  return $v =~ /\A"((?:[^"\\]|\\.)*)"\z/s ? toon_unescape($1) : $v;
+}
+sub toon_cells {
+  my ($row) = @_;
+  my @vals;
+  while (length $row) {
+    if ($row =~ s/^"((?:[^"\\]|\\.)*)"//) {
+      push @vals, toon_unescape($1);
+    } else {
+      $row =~ s/^([^,]*)//;
+      push @vals, $1;
+    }
+    last unless $row =~ s/^,//;
+  }
+  return @vals;
+}
+sub parse_list_block {
+  my ($fh) = @_;
+  my (@items, $item, $table);
+  while (my $line = <$fh>) {
+    last unless $line =~ /^\s/;
+    chomp $line;
+    if ($table && $table->{left} > 0 && $line =~ /^ {6}\S/) {
+      (my $row = $line) =~ s/^\s+//;
+      my @cells = toon_cells($row);
+      my %rec;
+      $rec{$table->{fields}[$_]} = $cells[$_] for 0 .. $#{ $table->{fields} };
+      push @{ $table->{into} }, \%rec;
+      $table->{left}--;
+      next;
+    }
+    undef $table;
+    my $rest;
+    if ($line =~ /^  - (.*)$/) {
+      $item = {};
+      push @items, $item;
+      $rest = $1;
+    } elsif ($item && $line =~ /^ {4}(\S.*)$/) {
+      $rest = $1;
+    } else {
+      next;
+    }
+    next unless $rest =~ /^([A-Za-z_][A-Za-z0-9_.-]*)(?:\[(\d+)\](?:\{([^}]*)\})?)?:(?: (.*))?$/;
+    my ($key, $count, $fields, $value) = ($1, $2, $3, $4);
+    if (defined $count && defined $fields) {
+      $item->{$key} = [];
+      $table = { fields => [split /,/, $fields], left => $count, into => $item->{$key} };
+    } elsif (!defined $count && defined $value) {
+      $item->{$key} = toon_value($value);
+    }
+  }
+  return @items;
+}
+PERL
+
 # Print `key<TAB>answer<TAB>label[<TAB>mode]` for each non-reconcile structured choice the
 # captain submitted in a captured result; the optional mode column relays the
 # card's declared close mode (`done` or `release`) to the keyed-answer intake. The published response frames queued feedback as
@@ -592,13 +667,19 @@ cmd_choice_rows() {
   local selection=$1 file=${2-}
   [ -n "$file" ] || usage
   [ -f "$file" ] && [ ! -L "$file" ] || die "result file does not exist: $file"
-  perl -MJSON::PP -e '
+  perl -MJSON::PP -e "$TOON_LIST_PERL"'
     use strict; use warnings;
     my ($selection, $path) = @ARGV;
     open my $fh, "<", $path or exit 1;
     my (@fields, $want, @rows);
     while (my $line = <$fh>) {
       if (!@fields) {
+        if ($line =~ /^prompts\[(\d+)\]:\s*$/) {
+          ($want, @fields) = ($1, "list");
+          @rows = parse_list_block($fh);
+          splice @rows, $want if @rows > $want;
+          last;
+        }
         next unless $line =~ /^prompts\[(\d+)\]\{([^}]*)\}:\s*$/;
         ($want, @fields) = ($1, split /,/, $2);
         next;
@@ -612,21 +693,25 @@ cmd_choice_rows() {
     my %seen;
     my @choices;
     for my $row (@rows) {
-      $row =~ s/^\s+//;
-      my @vals;
-      while (length $row) {
-        if ($row =~ s/^"((?:[^"\\]|\\.)*)"//) {
-          my $v = $1;
-          $v =~ s/\\(.)/$1 eq "n" ? "\n" : $1 eq "t" ? "\t" : $1 eq "r" ? "\r" : $1/ge;
-          push @vals, $v;
-        } else {
-          $row =~ s/^([^,]*)//;
-          push @vals, $1;
-        }
-        last unless $row =~ s/^,//;
-      }
       my %f;
-      $f{$fields[$_]} = $vals[$_] for 0 .. $#fields;
+      if (ref $row) {
+        %f = %$row;
+      } else {
+        $row =~ s/^\s+//;
+        my @vals;
+        while (length $row) {
+          if ($row =~ s/^"((?:[^"\\]|\\.)*)"//) {
+            my $v = $1;
+            $v =~ s/\\(.)/$1 eq "n" ? "\n" : $1 eq "t" ? "\t" : $1 eq "r" ? "\r" : $1/ge;
+            push @vals, $v;
+          } else {
+            $row =~ s/^([^,]*)//;
+            push @vals, $1;
+          }
+          last unless $row =~ s/^,//;
+        }
+        $f{$fields[$_]} = $vals[$_] for 0 .. $#fields;
+      }
       next unless defined $f{tag} && $f{tag} eq "choice";
       my $prompt = $f{prompt};
       next unless defined $prompt && $prompt =~ /Context data:\s*(\{.*\})/s;
@@ -713,13 +798,17 @@ cmd_read() {
   [ -f "$file" ] && [ ! -L "$file" ] || die "result file does not exist: $file"
   lifecycle=$(cmd_classify "$file")
   session_ended=$(session_field "$file" session_ended)
-  perl -e '
-    use strict; use warnings;
+  perl -e "$TOON_LIST_PERL"'
     my ($path, $lifecycle, $session_ended) = @ARGV;
     open my $fh, "<", $path or exit 1;
-    my (@fields, $want, @rows);
+    my (@fields, $want, @rows, @listed);
     while (my $line = <$fh>) {
       if (!@fields) {
+        if ($line =~ /^(?:prompts|feedback)\[(\d+)\]:\s*$/) {
+          ($want, @fields) = ($1, "list");
+          @listed = parse_list_block($fh);
+          last;
+        }
         next unless $line =~ /^(?:prompts|feedback)\[(\d+)\]\{([^}]*)\}:\s*$/;
         ($want, @fields) = ($1, split /,/, $2);
         next;
@@ -731,7 +820,7 @@ cmd_read() {
     }
     close $fh;
     $want = 0 unless defined $want;
-    my @parsed;
+    my @parsed = splice @listed, 0, $want;
     my $malformed = 0;
     for my $row (@rows) {
       $row =~ s/^\s+//;
@@ -785,6 +874,26 @@ cmd_read() {
       return if !@lines || (@lines == 1 && $lines[0] eq "");
       print "| $_\n" for @lines;
     }
+    sub attachments_of {
+      my ($f) = @_;
+      return ref $f->{attachments} eq "ARRAY" ? @{ $f->{attachments} } : ();
+    }
+    # Each image the captain attached to an item, as the local file Lavish
+    # stored it. Lines carry the body prefix like any captain-supplied text,
+    # because the file name is captain-supplied.
+    sub emit_attachments {
+      my ($f) = @_;
+      my @list = attachments_of($f);
+      return unless @list;
+      print "attachments: ", scalar(@list), "\n";
+      for my $att (@list) {
+        my @meta = grep { defined && length } ($att->{name}, $att->{mime},
+          ($att->{width} && $att->{height}) ? "$att->{width}x$att->{height}" : "");
+        my $line = (defined $att->{path} ? $att->{path} : "") . " (" . join(", ", @meta) . ")";
+        $line =~ s/[\r\n]+/ /g;
+        print "| $line\n";
+      }
+    }
     my $ended = $session_ended =~ /^(?:true|True|TRUE)$/;
     if (@messages) {
       my $message_label = $ended ? "SESSION-ENDING MESSAGE" : "CAPTAIN MESSAGE";
@@ -795,6 +904,7 @@ cmd_read() {
           ? $messages[$i]{prompt}
           : (defined $messages[$i]{text} ? $messages[$i]{text} : "");
         emit_body($body);
+        emit_attachments($messages[$i]);
       }
       print "END $message_label\n";
     } else {
@@ -810,6 +920,7 @@ cmd_read() {
     print "annotation_count: ", scalar(@annotations), "\n";
     my $message_count_key = $ended ? "session_ending_message_count" : "captain_message_count";
     print "$message_count_key: ", scalar(@messages), "\n";
+    print "attachment_count: ", scalar(map { attachments_of($_) } @parsed), "\n";
     print "\n";
     if (@annotations) {
       print "ANNOTATIONS\n";
@@ -832,6 +943,7 @@ cmd_read() {
           print "prompt:\n";
           emit_body($comment);
         }
+        emit_attachments($f);
       }
       print "END ANNOTATIONS\n";
     } else {

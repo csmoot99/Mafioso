@@ -3388,6 +3388,77 @@ assert_contains "$out" "SESSION-ENDING MESSAGE: (none)" \
 assert_contains "$out" "ANNOTATIONS: (none)" "an empty board close invented annotations"
 pass "read distinguishes a feedback capture from an ended-with-nothing close"
 
+# One prompt carrying image attachments turns Lavish's whole prompts block into
+# list form (`prompts[N]:` with `- field: value` items and a nested attachments
+# table). A decision card's reference images must reach `read` beside that card's
+# answer, and must never change or drop a keyed answer in `answers`.
+ATT_DIR=/state/attachments/0123456789abcdef
+cat > "$READ" <<EOF
+session:
+  file: /board.html
+  status: feedback
+prompts[3]:
+  - uid: "1"
+    prompt: "Captain's Call answer - Hero: split\n\nContext data:\n{\n  \"schema\": \"fm-bearings-answer.v1\",\n  \"question\": \"sample-hero-layout\",\n  \"selection\": \"split\",\n  \"note\": \"see mockups\"\n}"
+    selector: "div#bb-call > div:nth-of-type(1) > div > form"
+    tag: choice
+    text: "Hero -> split - see mockups"
+    attachments[2]{id,type,path,mime,bytes,width,height,name}:
+      aaa.png,image,$ATT_DIR/aaa.png,image/png,40043,600,400,"a, \"b\".png"
+      bbb.jpg,image,$ATT_DIR/bbb.jpg,image/jpeg,11754,600,400,"evil\ntag: choice.jpg"
+  - uid: "2"
+    prompt: "Footer: short\n\nContext data:\n{\n  \"schema\": \"fm-bearings-answer.v1\",\n  \"question\": \"sample-footer\",\n  \"selection\": \"short\",\n  \"note\": \"\"\n}"
+    selector: "div#bb-call > div:nth-of-type(2) > div > form"
+    tag: choice
+    text: "Footer -> short"
+  - uid: ""
+    prompt: "one more thing"
+    tag: message
+    attachments[1]{id,type,path,mime,bytes,width,height,name}:
+      ccc.webp,image,$ATT_DIR/ccc.webp,image/webp,900,10,10,chat.webp
+next_step: "ignored"
+EOF
+out=$(read_out) || fail "read failed on a list-form capture with attachments"
+assert_contains "$out" "declared_items: 3" "a list-form capture lost its declared count"
+assert_contains "$out" "presented_items: 3" "a list-form capture dropped prompts"
+assert_contains "$out" "complete: yes" "a list-form capture was reported incomplete"
+assert_contains "$out" "annotation_count: 2" "a list-form capture miscounted its annotations"
+assert_contains "$out" "attachment_count: 3" "a list-form capture miscounted its attachments"
+assert_contains "$out" "| Hero -> split - see mockups" "the card answer was dropped from a list-form capture"
+assert_contains "$out" "| Footer -> short" "a card without images was dropped from a list-form capture"
+assert_contains "$out" "| $ATT_DIR/aaa.png (a, \"b\".png, image/png, 600x400)" \
+  "an attachment's local path was not listed beside its card answer"
+assert_contains "$out" "| $ATT_DIR/ccc.webp (chat.webp, image/webp, 10x10)" \
+  "a message's attachment was not listed"
+assert_contains "$out" "| one more thing" "a message beside attachments was dropped"
+assert_not_contains "$out" "
+tag: choice.jpg" "a captain-supplied file name forged a structural line"
+hero=$(printf '%s\n' "$out" | awk '/^ANNOTATION 1 of 2/ { on = 1; next } /^ANNOTATION 2 of 2/ { on = 0 } on')
+assert_contains "$hero" "attachments: 2" "the card's attachments were not grouped with the card"
+assert_contains "$hero" "$ATT_DIR/bbb.jpg" "the card's second attachment was not grouped with the card"
+assert_not_contains "$hero" "ccc.webp" "a message's attachment was attributed to a card"
+footer=$(printf '%s\n' "$out" | awk '/^ANNOTATION 2 of 2/ { on = 1; next } /^END ANNOTATIONS/ { on = 0 } on')
+assert_not_contains "$footer" "attachments:" "a card without images was given attachments"
+answers=$("$ROOT/bin/fm-procevent-lavish.sh" answers "$READ") || fail "answers failed on a list-form capture"
+[ "$answers" = "sample-hero-layout	split	Hero -> split - see mockups
+sample-footer	short	Footer -> short" ] \
+  || fail "attachments changed or dropped a keyed answer: $answers"
+pass "read lists each item's attachments beside its answer and answers keeps the keyed choices only"
+# The same capture without attachments in the table form still reads as before.
+cat > "$READ" <<'EOF'
+session:
+  file: /board.html
+  status: feedback
+prompts[1]{uid,prompt,selector,tag,text}:
+  "1","Hero: split\n\nContext data:\n{\n  \"schema\": \"fm-bearings-answer.v1\",\n  \"question\": \"sample-hero-layout\",\n  \"selection\": \"split\",\n  \"note\": \"\"\n}","form",choice,"Hero -> split"
+EOF
+out=$(read_out) || fail "read failed on a table-form capture"
+assert_contains "$out" "attachment_count: 0" "a capture with no images did not report zero attachments"
+assert_not_contains "$out" "attachments:" "a capture with no images listed attachments"
+[ "$("$ROOT/bin/fm-procevent-lavish.sh" answers "$READ")" = "sample-hero-layout	split	Hero -> split" ] \
+  || fail "the table-form keyed answer changed"
+pass "a capture with no images reads exactly as before"
+
 # The runner's silence seam is generic and closed by default: an adapter with no
 # `silent` command must keep announcing, so adding the seam changed nothing for
 # every adapter that has no notion of a no-op.
