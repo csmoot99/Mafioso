@@ -32,7 +32,9 @@
 #            and even when that comment matches the element text, so typed
 #            words are never dropped. Choice Context data is not a comment.
 #            Captain-supplied body lines are visibly prefixed so they cannot
-#            forge structural labels. Empty message and annotation sections
+#            forge structural labels. Images the captain attached to an item
+#            are listed after that item as the local files Lavish stored; they
+#            never enter `answers`. Empty message and annotation sections
 #            are reported explicitly.
 # poll       The registered listener command `arm` publishes, not a command to
 #            run in a conversational turn. It runs the published blocking poll
@@ -652,7 +654,8 @@ PERL
 # captain submitted in a captured result; the optional mode column relays the
 # card's declared close mode (`done` or `release`) to the keyed-answer intake. The published response frames queued feedback as
 # a `prompts[N]{field,...}:` header followed by exactly N indented CSV rows whose
-# quoted fields carry JSON-style escapes, so this reads the declared field ORDER
+# quoted fields carry JSON-style escapes, or in list form when any prompt carries
+# attachments (see TOON_LIST_PERL), so this reads the declared field ORDER
 # rather than assuming a fixed column, and takes only rows whose `tag` field is
 # `choice`. A freeform `message` row is captain prose and is deliberately never a
 # source of decision keys. A row that does not carry both a slug-shaped `question`
