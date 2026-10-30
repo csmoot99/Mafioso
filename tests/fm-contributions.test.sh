@@ -533,7 +533,7 @@ test_watcher_surfaces_new_contribution_once() {
   rc=0
   with_home "$home" env FM_WATCH_HANDLING_SUCCESSOR=1 FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=0 FM_HEARTBEAT=999999 \
     "$ROOT/bin/fm-watch-checkpoint.sh" --seconds 2 > "$home/watcher-repeat.out" 2> "$home/watcher-repeat.err" || rc=$?
-  [ "$rc" -eq 124 ] || fail "an already durable contribution signal re-rang the watcher (rc=$rc): stdout=[$(cat "$home/watcher-repeat.out")] stderr=[$(cat "$home/watcher-repeat.err")]"
+  [ "$rc" -eq 124 ] || fail "an already durable contribution signal re-rang the watcher: $(cat "$home/watcher-repeat.out")"
   rows=$(awk -F '\t' 'NF >= 5 && $3 == "check" { count++ } END { print count + 0 }' "$home/state/.wake-queue")
   [ "$rows" = 1 ] || fail "repeat contribution observation created $rows durable check wakes"
   pass 'watcher surfaces one newly durable contribution signal without re-ringing it'
