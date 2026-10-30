@@ -768,6 +768,7 @@ tests/fm-harness-adapter-instructions-live-e2e.test.sh 112
 tests/fm-harness-adapter-references.test.sh 69
 tests/fm-harness-liveness-drift-live-e2e.test.sh 979
 tests/fm-harness-precedence.test.sh 4716
+tests/fm-herdr-groups.test.sh 5418
 tests/fm-herdr-pi-stale-registration-live-e2e.test.sh 59
 tests/fm-herdr-session-cleanup.test.sh 8357
 tests/fm-herdr-submit-confirm-live-e2e.test.sh 104
