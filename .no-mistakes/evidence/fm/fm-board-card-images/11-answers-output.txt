@@ -1,0 +1,4 @@
+$ bin/fm-procevent-lavish.sh answers <captured result>
+lab-footer^Ishort^IFooter length -> short$
+lab-hero-layout^Isplit^IHero layout for the landing page -> split$
+rc=0

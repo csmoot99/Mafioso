@@ -1,0 +1,9 @@
+board: /tmp/fm-lab-attach.7T6nJn/.lavish/bearings-board.html
+session:
+  file: /tmp/fm-lab-attach.7T6nJn/.lavish/bearings-board.html
+  url: "http://firstmate-wsl.tail3c2a9e.ts.net:4387/session/94040489457985c8"
+  status: opened
+session: live
+served: /tmp/fm-lab-attach.7T6nJn/.lavish/bearings-board.html
+bound: lavish-94040489457985c8
+armed: lavish-94040489457985c8

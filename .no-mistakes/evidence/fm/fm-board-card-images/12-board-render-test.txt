@@ -1,0 +1,16 @@
+ok - an underway row leads with the task name and still reports its run status
+ok - an underway identifier label is not replaced by run status
+ok - charted next renders the most recently filed work first
+ok - charted rows with no filed date follow the dated rows in payload order
+ok - a warning row badges needs repair while queued work keeps waiting
+ok - the charted next count counts queued work only, and still renders warnings
+ok - a warning-only board reports nothing queued and still shows the warning
+ok - omitted warnings remain separate from omitted queued work
+ok - an omitted kind renders exactly as queued work always did
+ok - a card with images renders one lazy thumbnail per image and a card without renders none
+ok - an image src outside the board assets folder is not rendered
+ok - each summary card is a link that scrolls to its own section
+ok - a note stops at the cap while typing, counted in bytes against the whole answer label
+ok - the next arrow shows the next card and scrolls its top into view
+ok - cards sent to the agent leave the board at once, counters follow, and a failed send deals them back
+ok - a card uploads images through the chrome, shows Lavish's refusals, and queues the ids with the answer

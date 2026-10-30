@@ -1,0 +1,33 @@
+$ bin/fm-procevent-lavish.sh read <captured result>
+SESSION-ENDING MESSAGE: (none)
+
+declared_items: 2
+presented_items: 2
+malformed_items: 0
+complete: yes
+lifecycle: feedback
+session_ended: (unset)
+annotation_count: 2
+captain_message_count: 0
+
+ANNOTATIONS
+ANNOTATION 1 of 2
+element_uid: 1
+element_selector: div#bb-call > div:nth-of-type(2) > div > form
+tag: choice
+text:
+| Footer length -> short
+attachments: 1
+| /home/work/.lavish-axi/attachments/94040489457985c8/2063cfcebd1e78faea3d981be0106aa5d9d1b2584c1aae61625700b9cff881a6.png (ref3.png, image/png, 120x80)
+ANNOTATION 2 of 2
+element_uid: 2
+element_selector: div#bb-call > div:nth-of-type(1) > div > form
+tag: choice
+text:
+| Hero layout for the landing page -> split
+attachments: 2
+| /home/work/.lavish-axi/attachments/94040489457985c8/7c79617668c2f3d4ef682b016bb4703da7b6bb83a147911b5c872f9de787b9d4.png (mockup-split-hero.png, image/png, 600x400)
+| /home/work/.lavish-axi/attachments/94040489457985c8/5e85e9fefb417692c1e01e860bd89f756533fa0a1baaebfaa1b152e8c02827bd.png (mockup-full-hero.png, image/png, 600x400)
+END ANNOTATIONS
+END LAVISH RESULT (2 of 2)
+rc=0
