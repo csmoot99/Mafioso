@@ -381,6 +381,33 @@ test_the_card_arrows_bring_the_new_card_into_view() {
   pass "the next arrow shows the next card and scrolls its top into view"
 }
 
+test_cards_sent_to_the_agent_leave_the_board_and_a_failed_send_deals_them_back() {
+  local home out
+  home=$(make_home sent-hide)
+  out=$(render_cards "$home" "$(two_cards)")
+  printf '%s' "$out" | jq -e '
+    .send.foreign.shown == ["Second call"]
+  ' >/dev/null || fail "a message from another window changed the board: $out"
+  printf '%s' "$out" | jq -e '(.send.foreign.count | test("of 2")) and .send.foreign.need == "2"' >/dev/null \
+    || fail "a message from another window changed the card count: $out"
+  printf '%s' "$out" | jq -e '
+    .send.sent | .shown == ["Second call"] and (.count | test("card 1 of 1"))
+      and .need == "1" and .sub == "1 item wait on you" and .empty == false
+  ' >/dev/null || fail "a sent card stayed on the board or the counters did not follow: $out"
+  printf '%s' "$out" | jq -e '
+    .send.restored | (.shown | length) == 1 and (.count | test("of 2")) and .need == "2"
+      and .sub == "2 items wait on you"
+  ' >/dev/null || fail "a failed send did not deal its card back: $out"
+  printf '%s' "$out" | jq -e '
+    .send.misrouted | (.shown | length) == 1 and (.count | test("of 1")) and .need == "1"
+  ' >/dev/null || fail "a send whose selector named the wrong card did not hide the card its text names: $out"
+  printf '%s' "$out" | jq -e '
+    .send.all | .shown == [] and .empty == true and .navHidden == true
+      and .need == "0" and .sub == "nothing needs you"
+  ' >/dev/null || fail "sending every card did not leave the empty board: $out"
+  pass "cards sent to the agent leave the board at once, counters follow, and a failed send deals them back"
+}
+
 test_an_underway_row_leads_with_the_task_name_and_keeps_its_run_status
 test_an_underway_identifier_label_is_not_replaced_by_run_status
 test_charted_next_reads_newest_filed_first
@@ -395,3 +422,4 @@ test_an_image_outside_the_board_assets_folder_is_not_rendered
 test_each_summary_card_links_to_and_scrolls_to_its_section
 test_a_note_stops_at_the_cap_while_typing_and_the_cap_leaves_room_for_the_label
 test_the_card_arrows_bring_the_new_card_into_view
+test_cards_sent_to_the_agent_leave_the_board_and_a_failed_send_deals_them_back

@@ -163,6 +163,7 @@ a { color: inherit; text-decoration: none; }
 .bb-callwrap { display: flex; flex-direction: column; gap: 12px; }
 /* extra top margin clears the pile edges that poke below the active card */
 .bb-stacknav { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.bb-stacknav[hidden] { display: none; }
 .bb-stacknav__count { flex: 1 1 auto; font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-muted); }
 .bb-stacknav__btn {
   display: inline-grid; place-items: center; width: 34px; height: 34px; cursor: pointer;
@@ -702,12 +703,15 @@ __FM_BEARINGS_BOARD_DATA__
     { n: chartedQueued(data.charted).length + chartedMoreQueued, l: "charted next", to: "bb-sec-charted" }
   ];
   var strip = document.getElementById("bb-stats");
+  var needNum = null;
   /* each summary card is a real link to its section; the click handler adds the
      smooth scroll (instant under reduced motion) and moves focus there */
   stats.forEach(function (s) {
     var t = el("a", "bb-stat" + (s.call ? " bb-stat--call" : ""));
     t.href = "#" + s.to;
-    t.appendChild(el("span", "bb-stat__num", String(s.n)));
+    var num = el("span", "bb-stat__num", String(s.n));
+    if (s.call) needNum = num;
+    t.appendChild(num);
     t.appendChild(el("span", "bb-stat__label", s.l));
     t.addEventListener("click", function (ev) {
       var sec = document.getElementById(s.to);
@@ -718,8 +722,13 @@ __FM_BEARINGS_BOARD_DATA__
     });
     strip.appendChild(t);
   });
-  document.getElementById("bb-call-sub").textContent =
-    callTotal ? callTotal + " item" + (callTotal === 1 ? "" : "s") + " wait on you, captain" : "nothing needs you, captain";
+  /* the "need you" count follows the cards still on the board */
+  function showCallCount(n) {
+    needNum.textContent = String(n);
+    document.getElementById("bb-call-sub").textContent =
+      n ? n + " item" + (n === 1 ? "" : "s") + " wait on you" : "nothing needs you";
+  }
+  showCallCount(callTotal);
 
   /* Captain's Call deck: every item renders as the same full card */
   var deck = document.getElementById("bb-call");
@@ -903,17 +912,20 @@ __FM_BEARINGS_BOARD_DATA__
     deck.appendChild(card);
   });
 
-  /* stack navigation: one card at a time, dealt off the pile */
-  var cards = Array.prototype.slice.call(deck.children);
+  /* stack navigation: one card at a time, dealt off the pile; `cards` is the
+     pile still on the board, `allCards` every card in payload order */
+  var allCards = Array.prototype.slice.call(deck.children);
+  var cards = allCards.slice();
   var active = 0;
   var stackCount = document.getElementById("bb-stack-count");
   var stackPrev = document.getElementById("bb-stack-prev");
   var stackNext = document.getElementById("bb-stack-next");
   var stackNav = stackCount.parentNode;
+  var emptyNote = null;
   function showCard(i, reveal) {
     active = Math.max(0, Math.min(cards.length - 1, i));
     cards.forEach(function (c, j) { c.hidden = j !== active; });
-    var answered = deck.querySelectorAll(".is-queued").length;
+    var answered = cards.filter(function (c) { return c.classList.contains("is-queued"); }).length;
     stackCount.textContent = "card " + (active + 1) + " of " + cards.length +
       (answered ? " · " + answered + " answered" : "");
     stackPrev.disabled = active === 0;
@@ -923,15 +935,63 @@ __FM_BEARINGS_BOARD_DATA__
     deck.classList.toggle("bb-call--last", active === cards.length - 1);
     if (reveal) revealTop(cards[active]);
   }
-  if (cards.length) {
-    stackPrev.addEventListener("click", function () { showCard(active - 1, true); });
-    stackNext.addEventListener("click", function () { showCard(active + 1, true); });
-    showCard(0);
-  } else {
-    deck.classList.add("bb-call--empty");
-    deck.appendChild(el("div", "bb-empty", "Nothing needs your action right now."));
-    stackNav.hidden = true;
+  function showDeck(i, reveal) {
+    var none = !cards.length;
+    deck.classList.toggle("bb-call--empty", none);
+    stackNav.hidden = none;
+    if (none && !emptyNote) {
+      emptyNote = el("div", "bb-empty", "Nothing needs your action right now.");
+      deck.appendChild(emptyNote);
+    }
+    if (emptyNote) emptyNote.hidden = !none;
+    showCallCount(cards.length);
+    if (!none) showCard(i, reveal);
   }
+  stackPrev.addEventListener("click", function () { if (cards.length) showCard(active - 1, true); });
+  stackNext.addEventListener("click", function () { if (cards.length) showCard(active + 1, true); });
+  showDeck(0);
+
+  /* Cards sent to the agent leave the board at once. The Lavish chrome posts
+     what it is sending under a send id: "start" (and "sent", should the start
+     have been missed) hides the cards whose answers are in the send, "failed"
+     deals them back. Only the parent chrome is heard. Each queued answer names
+     its card (the selector of the card's form) and carries "<title> -> <answer>";
+     a selector that does not point at the card whose title leads the text falls
+     back to the title. A rebuilt board omits answered cards, so nothing is lost
+     if this page reloads first. */
+  var sentAway = {};
+  function cardsInSend(items) {
+    var found = [];
+    items.forEach(function (it) {
+      var text = String(it && it.text || "");
+      var led = function (c) { return text.indexOf(data.captains_call[allCards.indexOf(c)].title + " -> ") === 0; };
+      var at = /#bb-call > div:nth-of-type\((\d+)\)/.exec(String(it && it.selector || ""));
+      var card = at && allCards[at[1] - 1];
+      if (!card || !led(card)) card = allCards.filter(led)[0];
+      if (card && found.indexOf(card) < 0) found.push(card);
+    });
+    return found;
+  }
+  window.addEventListener("message", function (ev) {
+    var m = ev.data;
+    if (window.parent === window || ev.source !== window.parent) return;
+    if (!m || m.type !== "fm-board:send" || typeof m.id !== "string" || !Array.isArray(m.items)) return;
+    var list = cardsInSend(m.items), mine = sentAway[m.id] || [];
+    if (m.phase === "start" || m.phase === "sent") {
+      sentAway[m.id] = mine.concat(list.filter(function (c) { return mine.indexOf(c) < 0; }));
+    } else if (m.phase === "failed") {
+      sentAway[m.id] = mine.filter(function (c) { return list.indexOf(c) < 0; });
+    } else {
+      return;
+    }
+    var shown = cards[active];
+    cards = allCards.filter(function (c) {
+      return !Object.keys(sentAway).some(function (id) { return sentAway[id].indexOf(c) >= 0; });
+    });
+    allCards.forEach(function (c) { if (cards.indexOf(c) < 0) c.hidden = true; });
+    var at = cards.indexOf(shown);
+    showDeck(at < 0 ? active : at, at < 0);
+  });
 
   /* Underway */
   var uw = document.getElementById("bb-underway");
