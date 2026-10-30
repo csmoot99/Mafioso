@@ -439,6 +439,11 @@ test_a_card_attaches_reference_images_through_the_chrome_upload_and_queues_their
       and .queuedAfterRemove == 2
   ' >/dev/null || fail "a refused image was not shown, did not block the answer, or could not be removed: $out"
   printf '%s' "$out" | jq -e '
+    .attach | .overTotal.queued == 2
+      and .overTotal.message == "Images on one answer can total at most 25 MB. Remove one before queuing."
+      and .underTotal.queued == 3 and .underTotal.attachments == ["abc.png","h1.jpg"]
+  ' >/dev/null || fail "an answer whose images exceed the Lavish 25 MB per-prompt total was queued: $out"
+  printf '%s' "$out" | jq -e '
     .attach.cap | .tiles == 4 and .message == "You can attach up to 4 images."
   ' >/dev/null || fail "a fifth image was not refused: $out"
   pass "a card uploads images through the chrome, shows Lavish's refusals, and queues the ids with the answer"

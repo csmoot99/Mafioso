@@ -698,18 +698,7 @@ cmd_choice_rows() {
         %f = %$row;
       } else {
         $row =~ s/^\s+//;
-        my @vals;
-        while (length $row) {
-          if ($row =~ s/^"((?:[^"\\]|\\.)*)"//) {
-            my $v = $1;
-            $v =~ s/\\(.)/$1 eq "n" ? "\n" : $1 eq "t" ? "\t" : $1 eq "r" ? "\r" : $1/ge;
-            push @vals, $v;
-          } else {
-            $row =~ s/^([^,]*)//;
-            push @vals, $1;
-          }
-          last unless $row =~ s/^,//;
-        }
+        my @vals = toon_cells($row);
         $f{$fields[$_]} = $vals[$_] for 0 .. $#fields;
       }
       next unless defined $f{tag} && $f{tag} eq "choice";
@@ -920,7 +909,6 @@ cmd_read() {
     print "annotation_count: ", scalar(@annotations), "\n";
     my $message_count_key = $ended ? "session_ending_message_count" : "captain_message_count";
     print "$message_count_key: ", scalar(@messages), "\n";
-    print "attachment_count: ", scalar(map { attachments_of($_) } @parsed), "\n";
     print "\n";
     if (@annotations) {
       print "ANNOTATIONS\n";

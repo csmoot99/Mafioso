@@ -3423,7 +3423,6 @@ assert_contains "$out" "declared_items: 3" "a list-form capture lost its declare
 assert_contains "$out" "presented_items: 3" "a list-form capture dropped prompts"
 assert_contains "$out" "complete: yes" "a list-form capture was reported incomplete"
 assert_contains "$out" "annotation_count: 2" "a list-form capture miscounted its annotations"
-assert_contains "$out" "attachment_count: 3" "a list-form capture miscounted its attachments"
 assert_contains "$out" "| Hero -> split - see mockups" "the card answer was dropped from a list-form capture"
 assert_contains "$out" "| Footer -> short" "a card without images was dropped from a list-form capture"
 assert_contains "$out" "| $ATT_DIR/aaa.png (a, \"b\".png, image/png, 600x400)" \
@@ -3453,7 +3452,6 @@ prompts[1]{uid,prompt,selector,tag,text}:
   "1","Hero: split\n\nContext data:\n{\n  \"schema\": \"fm-bearings-answer.v1\",\n  \"question\": \"sample-hero-layout\",\n  \"selection\": \"split\",\n  \"note\": \"\"\n}","form",choice,"Hero -> split"
 EOF
 out=$(read_out) || fail "read failed on a table-form capture"
-assert_contains "$out" "attachment_count: 0" "a capture with no images did not report zero attachments"
 assert_not_contains "$out" "attachments:" "a capture with no images listed attachments"
 [ "$("$ROOT/bin/fm-procevent-lavish.sh" answers "$READ")" = "sample-hero-layout	split	Hero -> split" ] \
   || fail "the table-form keyed answer changed"

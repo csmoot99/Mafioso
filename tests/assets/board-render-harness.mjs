@@ -256,7 +256,7 @@ const attach = await (async () => {
   const msg = () => card.querySelectorAll(".bb-attach__msg")[0];
   const tiles = () => strip.children.map((t) => t.className.replace("bb-thumb ", ""));
   const flush = () => new Promise((r) => setTimeout(r, 0));
-  const file = (name, type) => ({ name, type, arrayBuffer: async () => new ArrayBuffer(4) });
+  const file = (name, type, size = 4) => ({ name, type, size, arrayBuffer: async () => new ArrayBuffer(4) });
   const pick = async (...files) => { input.files = files; input.dispatch("change"); await flush(); };
   const reply = (i, extra) => sendMessage({ type: "lavish:attachmentResult", nonce: posted[i].nonce,
     localId: posted[i].localId, ...extra });
@@ -285,6 +285,14 @@ const attach = await (async () => {
   strip.children[1].children.find((c) => c.className.includes("bb-thumb__x")).dispatch("click");
   out.afterRemove = { tiles: tiles(), message: msg().textContent };
   out.queuedAfterRemove = submit();
+  // two large images Lavish accepts one by one but whose total it refuses at send
+  const MB = 1024 * 1024;
+  await pick(file("h1.jpg", "image/jpeg", 13 * MB), file("h2.jpg", "image/jpeg", 13 * MB));
+  reply(2, { ok: true, id: "h1.jpg" });
+  reply(3, { ok: true, id: "h2.jpg" });
+  out.overTotal = { queued: submit(), message: msg().textContent };
+  strip.children[2].children.find((c) => c.className.includes("bb-thumb__x")).dispatch("click");
+  out.underTotal = { queued: submit(), attachments: queued.at(-1)?.opts.attachments.map((a) => a.id) };
   // the cap
   await pick(file("1.png", "image/png"), file("2.png", "image/png"), file("3.png", "image/png"), file("4.png", "image/png"));
   out.cap = { tiles: tiles().length, message: msg().textContent };

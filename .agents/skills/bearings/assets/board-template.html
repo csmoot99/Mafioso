@@ -778,10 +778,12 @@ __FM_BEARINGS_BOARD_DATA__
      "lavish:uploadAttachment" message the chrome uploads, answering with the
      server-vetted id. The queued answer then carries those ids, and Lavish hands
      the agent each image as a local file. The chrome enforces the byte limit and
-     answers with its own message; the type list and the per-answer count below
-     are Lavish's defaults, checked here only to refuse before reading the file. */
+     answers with its own message; the type list, the per-answer count and the
+     per-answer total below are Lavish's defaults, checked here so an answer the
+     server would refuse at send is never queued. */
   var ATTACH_MIME = ["image/png", "image/jpeg", "image/webp"];
   var ATTACH_MAX = 4;
+  var ATTACH_TOTAL_BYTES = 25 * 1024 * 1024;
   var ATTACH_TYPE_MSG = "Unsupported file type. Use PNG, JPEG, or WebP.";
   var ATTACH_NONCE = "fm-board-" + Math.random().toString(36).slice(2);
   var attachSeq = 0;
@@ -886,11 +888,14 @@ __FM_BEARINGS_BOARD_DATA__
     return {
       node: box, say: say, add: addFiles,
       state: function () {
-        var busy = "";
+        var busy = "", total = 0;
         items.forEach(function (it) {
           if (it.state === "uploading") busy = busy || "Waiting for an image to finish uploading…";
           if (it.state === "error") busy = "An image couldn't be attached. Retry or remove it before queuing.";
+          if (it.state === "ready") total += it.file.size || 0;
         });
+        if (!busy && total > ATTACH_TOTAL_BYTES)
+          busy = "Images on one answer can total at most 25 MB. Remove one before queuing.";
         return { busy: busy, ready: items.filter(function (it) { return it.state === "ready"; })
           .map(function (it) { return { id: it.id, name: it.name }; }) };
       }
