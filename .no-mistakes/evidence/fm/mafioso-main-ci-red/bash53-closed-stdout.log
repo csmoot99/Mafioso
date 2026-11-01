@@ -1,0 +1,6 @@
+$ bash --version: GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)
+$ /tmp/w.sh >&-          # closed stdout (pre-fix test technique)
+script stdout write rc=0
+$ fm_test_unwritable_stdout /tmp/w.sh   # post-fix helper
+/tmp/fm-seqdrv/w.sh: line 2: echo: write error: No space left on device
+script stdout write rc=1

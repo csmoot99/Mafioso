@@ -1,0 +1,12 @@
+lanes base run 1 exit=0
+lanes base run 2 exit=1
+lanes base run 3 exit=1
+lanes base run 4 exit=1
+lanes head run 1 exit=0
+lanes head run 2 exit=0
+lanes head run 3 exit=0
+lanes head run 4 exit=0
+lanes head run 5 exit=0
+lanes head run 6 exit=0
+      3 not ok - concurrent sequence claims were not unique and monotonic: 1
+      6 ok - atomic sequence claims remain unique and reap only after expiry

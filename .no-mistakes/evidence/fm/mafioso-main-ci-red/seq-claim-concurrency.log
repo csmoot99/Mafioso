@@ -1,0 +1,13 @@
+host: GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu); mkdir (uutils coreutils) 0.8.0
+--- base (mkdir claims)
+round 2: NOT unique/monotonic; duplicates: 14 19 25 ; count=40
+round 3: NOT unique/monotonic; duplicates: 1 ; count=40
+round 4: NOT unique/monotonic; duplicates: 11 ; count=40
+round 5: NOT unique/monotonic; duplicates: 2 12 22 26 ; count=40
+round 6: NOT unique/monotonic; duplicates: 1 21 22 ; count=40
+round 8: NOT unique/monotonic; duplicates: 1 25 ; count=40
+round 9: NOT unique/monotonic; duplicates: 29 ; count=40
+round 10: NOT unique/monotonic; duplicates: 1 2 ; count=40
+tree=/tmp/fm-base.T5jamq N=40 rounds=10 bad_rounds=8 allocator_failures=0
+--- head (noclobber file claims)
+tree=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M6CGGNETPXE16Y4T31KN9K3M N=40 rounds=10 bad_rounds=0 allocator_failures=0

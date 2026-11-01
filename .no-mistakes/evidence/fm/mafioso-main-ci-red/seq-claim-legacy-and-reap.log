@@ -1,0 +1,14 @@
+# seed legacy directory claims 1-5 (as an older version made them), drop the seq hint
+20 concurrent allocations returned: 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 
+PASS: legacy directory claims counted as taken; new claims unique 6..25
+claim kinds now on disk: dirs=5 files=20
+# adversarial: next value pre-occupied by a legacy directory while the hint points just below it
+next allocation with legacy dir 26 present: 27
+PASS: skipped occupied legacy claim
+# adversarial: a symlink planted at the next claim slot
+PASS: allocator refused (exit non-zero) with symlink planted at 28; /tmp untouched
+# reaping: expire legacy dir 1 and file claim 6, keep fresh ones
+PASS: expired legacy directory claim reaped
+PASS: expired file claim reaped
+PASS: fresh dir claim 2 and fresh file claim 7 kept
+symlink 28 left in place (not matched by -type f/-type d)
