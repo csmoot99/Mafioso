@@ -132,7 +132,7 @@ SEQ_RESULTS=$(cat "$TMP_ROOT"/seq-* | sort -n)
 SEQ_EXPECTED=$(seq 1 20)
 [ "$SEQ_RESULTS" = "$SEQ_EXPECTED" ] \
   || fail "concurrent sequence claims were not unique and monotonic: $SEQ_RESULTS"
-[ "$(find "$STATE_ROOT/.seq-claims" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')" = 20 ] \
+[ "$(find "$STATE_ROOT/.seq-claims" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')" = 20 ] \
   || fail "concurrent sequence allocations did not retain every durable claim"
 mkdir "$STATE_ROOT/.seq-claims/999998" "$STATE_ROOT/.seq-claims/999999"
 touch -t 200001010000 "$STATE_ROOT/.seq-claims/999998"

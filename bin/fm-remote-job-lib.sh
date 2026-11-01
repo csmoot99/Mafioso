@@ -594,7 +594,7 @@ fm_remote_job_next_seq() { # [stage-dir destination]
       [ "$recovered" -eq 0 ] || return 1
       maximum=0
       for entry in "$FM_REMOTE_JOB_SEQ_CLAIMS"/*; do
-        [ -d "$entry" ] && [ ! -L "$entry" ] || continue
+        { [ -f "$entry" ] || [ -d "$entry" ]; } && [ ! -L "$entry" ] || continue
         entry=${entry##*/}
         case "$entry" in ''|*[!0-9]*|0) continue ;; esac
         [ "$entry" -le "$maximum" ] || maximum=$entry
@@ -606,8 +606,13 @@ fm_remote_job_next_seq() { # [stage-dir destination]
     attempt=$((attempt + 1))
     value=$((value + 1))
     claim="$FM_REMOTE_JOB_SEQ_CLAIMS/$value"
-    if (umask 077; mkdir "$claim") 2>/dev/null; then
-      chmod 700 "$claim" || return 1
+    # The claim is a file created with noclobber (a single O_EXCL open made by
+    # the shell itself), not a directory made by mkdir: uutils coreutils, the
+    # default mkdir on Ubuntu 26.04, checks for the directory and then creates
+    # it, and reports success when a concurrent mkdir wins that gap, so two
+    # callers could be handed the same sequence. Claims an older version made
+    # as directories still count as taken and are still reaped.
+    if (umask 077; set -C; : > "$claim") 2>/dev/null; then
       fm_remote_job_advance_seq_hint "$value" || true
       if [ -n "$stage" ]; then
         if ! fm_remote_job_write_number "$stage" seq "$value" \
@@ -621,7 +626,7 @@ fm_remote_job_next_seq() { # [stage-dir destination]
       printf '%s\n' "$value"
       return 0
     fi
-    [ -d "$claim" ] && [ ! -L "$claim" ] || return 1
+    { [ -f "$claim" ] || [ -d "$claim" ]; } && [ ! -L "$claim" ] || return 1
   done
 }
 
@@ -865,10 +870,11 @@ fm_remote_job_reap_stale() { # <account-home>
         && mv -f -- "$tmp" "$marker"; then
         # One directory walk: ! -newer matches whole-second mtime <= cutoff
         # (the former >= age check). Batched rmdir tolerates concurrent mkdir/rmdir races
-        # and non-empty dirs the same way the old per-claim rmdir || true did.
-        find "$FM_REMOTE_JOB_SEQ_CLAIMS" -mindepth 1 -maxdepth 1 -type d \
+        # and non-empty dirs the same way the old per-claim rmdir || true did;
+        # a claim file is removed outright, and a legacy claim directory with rmdir.
+        find "$FM_REMOTE_JOB_SEQ_CLAIMS" -mindepth 1 -maxdepth 1 \
           -name '[0-9]*' ! -name '*[!0-9]*' ! -name 0 \
-          ! -newer "$ref" -exec rmdir {} + 2>/dev/null || true
+          ! -newer "$ref" \( -type f -exec rm -f -- {} + -o -type d -exec rmdir {} + \) 2>/dev/null || true
       else
         [ -z "$tmp" ] || rm -f -- "$tmp"
       fi

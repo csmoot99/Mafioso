@@ -138,7 +138,7 @@ assert_absent "$STATE_ROOT/.seq-claims/$EXPIRED_COUNT" "the expired boundary cla
 assert_present "$STATE_ROOT/.seq-claims/$FRESH_KEEP" "a fresh sequence claim was reaped"
 assert_present "$STATE_ROOT/.seq-claims/$CLAIM_COUNT" "the freshest seed claim was reaped"
 
-remaining=$(find "$STATE_ROOT/.seq-claims" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')
+remaining=$(find "$STATE_ROOT/.seq-claims" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')
 # Fresh seed ids FRESH_KEEP..CLAIM_COUNT remain, plus the staged job's seq claim.
 expected_fresh=$((CLAIM_COUNT - EXPIRED_COUNT))
 [ "$remaining" -ge "$expected_fresh" ] \
