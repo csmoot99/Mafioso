@@ -19,7 +19,7 @@
 # is exhausted, allocation rescans the claims for the maximum and continues
 # above it. Expired claims are reaped by an independently hourly-rate-limited
 # sweep that remains inline in the worker loop but uses one directory walk
-# with batched rmdir rather than per-claim uname/stat subprocesses.
+# with batched removal rather than per-claim uname/stat subprocesses.
 # seq is the worker's FIFO ordering key within a home, with the job id as the
 # deterministic tiebreak.
 # FIFO is defined over completed stagings: a stage that returns before another
