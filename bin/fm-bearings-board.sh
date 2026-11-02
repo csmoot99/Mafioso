@@ -105,9 +105,10 @@
 # when known, otherwise its durable identifier.
 # An Underway row MAY carry `progress`, which the Underway tab draws as progress
 # bars: `{ "stage", "reached", "pct", "parts"? }`, where `reached` is the run
-# stage reached (planning, building, validating, checks or ready), `stage` is
-# that same value or one of the markers owner or stuck, `pct` is the whole-number
-# fill (0-100) of the reached stage, and `parts`, when the feature has a recorded
+# stage reached (planning, building, validating, checks, ready, or reported for a
+# finished scout), `stage` is that same value or one of the markers owner or
+# stuck, `pct` is the whole-number fill (0-100) of the reached stage, and
+# `parts`, when the feature has a recorded
 # part list, is 1-40 ordered `{ "label", "state" }` objects whose state is
 # merged, current or pending, in that order, with at most one current. The row
 # then shows one bar for the parts merged out of the total and one bar per part:
@@ -242,7 +243,7 @@ validate_payload() {  # <data.json>
       (has("progress") | not)
       or (.progress
         | type == "object"
-          and (.reached | IN("planning", "building", "validating", "checks", "ready"))
+          and (.reached | IN("planning", "building", "validating", "checks", "ready", "reported"))
           and (.stage == .reached or (.stage | IN("owner", "stuck")))
           and (.pct | type == "number" and . >= 0 and . <= 100 and floor == .)
           and ((has("parts") | not) or (.parts | valid_parts)));

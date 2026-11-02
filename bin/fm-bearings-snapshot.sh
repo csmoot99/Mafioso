@@ -37,8 +37,10 @@
 # stage's bar fill `pct`, derived only from the canonical structured current
 # state (run step, parked, blocked, failed or unknown state, open decisions, a
 # paused `-screens` key, the meta pr= and the parts record), never from status
-# prose. `reached` is planning, building, validating, checks (a run at or parked
-# at its ci step) or ready; `stage` equals it except for two markers that keep
+# prose. `reached` is planning (a scout researching), reported (a finished scout),
+# building, validating, checks (a run at or parked at its ci step) or ready; a
+# scout only ever reaches planning or reported. `stage` equals it except for two
+# markers that keep
 # the reached fill: owner (parked, a pending decision or a `-screens` pause) and
 # stuck (failed, blocked, or an unknown state such as a gone worktree or backend
 # or a cancelled run). A marker's reached stage is ready for a done run, the run
@@ -441,15 +443,17 @@ MODEL=$(printf '%s' "$SNAP" | jq \
   # current-state reconciliation (never from status prose), the run stage it
   # reached, and the bar fill of that reached stage. This is the single owner
   # of that ladder; owner and stuck are markers that keep the reached fill.
-  def stage_pct: {planning:10, building:30, validating:75, checks:90, ready:95};
+  def stage_pct: {planning:10, building:30, validating:75, checks:90, ready:95, reported:100};
   def marker_of_state($st):
     if $st == "failed" or $st == "blocked" or $st == "unknown" then "stuck"
     elif $st == "parked" then "owner"
     else null end;
   def progress($marker; $reached):
     {stage:($marker // $reached), reached:$reached, pct:stage_pct[$reached]};
-  def stage_of_state($st):
-    progress(marker_of_state($st); (if $st == "done" then "ready" else "building" end));
+  def scout_reached($st): if $st == "done" then "reported" else "planning" end;
+  def stage_of_state($st; $kind):
+    progress(marker_of_state($st);
+      (if $kind == "scout" then scout_reached($st) elif $st == "done" then "ready" else "building" end));
   def task_stage:
     (.current_state.state // "unknown") as $st
     | (.current_state.source // "none") as $src
@@ -464,10 +468,9 @@ MODEL=$(printf '%s' "$SNAP" | jq \
        // (if $screens or ($h.pending_decision == true) or (($h.open_decisions // []) | length > 0)
            then "owner" else null end)) as $marker
     | progress($marker;
-        if $pr_merged and ($st != "working" or $step == null) then "building"
+        if .kind == "scout" then scout_reached($st)
+        elif $pr_merged and ($st != "working" or $step == null) then "building"
         elif $step != null then $step
-        elif $marker != null then "building"
-        elif .kind == "scout" then "planning"
         else "building" end);
   def projected_deferred_hold:
     .hold_bucket != null and .hold_bucket != "live";
@@ -602,7 +605,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
                   | (if (($name | type) == "string" and ($name | test("[^[:space:]]")))
                      then $name else ($m.id + "/" + .id) end) | trunc(70)),
             doing:((.doing // .state) | trunc(90))}
-           + stage_of_state(.state // "working") ]) as $in_flight_all
+           + stage_of_state(.state // "working"; .kind // "secondmate") ]) as $in_flight_all
   | ([ .backlog.records[]
          | . as $record
          | select(.structured and .hold_bucket != null)

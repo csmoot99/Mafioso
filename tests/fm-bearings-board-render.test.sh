@@ -232,7 +232,11 @@ test_underway_progress_renders_feature_part_and_stage_bars() {
      "progress":{"stage":"checks","reached":"checks","pct":90}},
     {"id":"lost","repo":"sample","name":"Lost worker","state":"unknown","kind":"ship","doing":"worktree gone",
      "progress":{"stage":"stuck","reached":"validating","pct":75}},
-    {"id":"old","repo":"sample","name":"No progress","state":"working","kind":"ship","doing":"x"}
+    {"id":"old","repo":"sample","name":"No progress","state":"working","kind":"ship","doing":"x"},
+    {"id":"look","repo":"sample","name":"A scout","state":"working","kind":"scout","doing":"reading",
+     "progress":{"stage":"planning","reached":"planning","pct":10}},
+    {"id":"found","repo":"sample","name":"A finished scout","state":"done","kind":"scout","doing":"report ready",
+     "progress":{"stage":"owner","reached":"reported","pct":100}}
   ]' '[]')
   printf '%s' "$out" | jq -e '
     .underway[0] as $f | .underway[1] as $o | .underway[2] as $l | .underway[3] as $old
@@ -248,6 +252,8 @@ test_underway_progress_renders_feature_part_and_stage_bars() {
       and ([$l.badges[].text] == ["unknown"] and $l.waiting == []
        and ($l.bars | map([.label, .value, .text, .stuck]) == [["This task","75","Validating · stuck",true]]))
       and ([$old.badges[].text] == ["working"] and $old.bars == [])
+      and (.underway[4].bars | map([.value, .text]) == [["10","Researching · 10%"]])
+      and (.underway[5].bars | map([.value, .text, .owner]) == [["100","Report ready · waiting on owner",true]])
   ' >/dev/null || fail "the Underway progress bars did not render as specified: $out"
   pass "Underway shows a feature bar, one bar per part, marker bars that keep their fill and state pill, and keeps the pill when there is no progress"
 }

@@ -1613,6 +1613,24 @@ test_projection_and_toon_fail_closed() {
 # then finished (done), whose report body reads like that decision, must surface as
 # a report POINTER only - never in decisions_open. Report prose must never open or
 # reopen a pending decision; only the keyed durable state does.
+test_scout_rows_research_then_report_ready() {
+  local home fakebin json
+  home=$(make_home scout-stages); write_fixture "$home"
+  fm_write_meta "$home/state/scout-y.meta" \
+    "window=firstmate:fm-scout-y" "worktree=$home/projects/ship-wt" "project=firstmate" \
+    "harness=claude" "kind=scout" "mode=scout"
+  record_claude_state "$home/state" scout-y busy
+  printf 'working: reading sources\n' > "$home/state/scout-y.status"
+  fakebin=$(make_fakebin "$home")
+  json=$(run "$home" "$fakebin" --json --all-in-flight)
+  printf '%s' "$json" | jq -e '
+    (.in_flight | map({(.id): .}) | add) as $r
+    | ($r["scout-x"] | .state == "done" and .stage == "reported" and .reached == "reported" and .pct == 100)
+      and ($r["scout-y"] | .state == "working" and .stage == "planning" and .reached == "planning" and .pct == 10)
+  ' >/dev/null || fail "a scout row reached a PR stage or the wrong fill: $json"
+  pass "a working scout is researching and a finished scout's report is ready at a full bar"
+}
+
 test_completed_scout_report_not_pending() {
   local home fakebin json
   home=$(make_home completed-scout); write_fixture "$home"
@@ -3549,6 +3567,7 @@ test_underway_markers_keep_the_reached_fill_and_a_merged_pr_restarts_the_part
 test_a_green_run_awaiting_screens_keeps_its_ready_fill
 test_mixed_secondmate_roles_partial_state_and_captain_readiness
 test_main_captain_readiness_matches_secondmate_projection
+test_scout_rows_research_then_report_ready
 test_completed_scout_report_not_pending
 test_open_decision_surfaces_end_to_end
 test_report_pointers_surface

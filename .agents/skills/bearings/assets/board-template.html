@@ -1346,8 +1346,8 @@ __FM_BEARINGS_BOARD_DATA__
      one bar builder. Meaning never rides on colour: every bar has a text label,
      an owner wait is a labelled chip, and the native <progress> carries the
      values for assistive tech. */
-  var STAGE_LABEL = { planning: "Planning", building: "Building", validating: "Validating",
-    checks: "PR checks", ready: "Ready to merge" };
+  var STAGE_LABEL = { planning: "Researching", building: "Building", validating: "Validating",
+    checks: "PR checks", ready: "Ready to merge", reported: "Report ready" };
   var MARKER_LABEL = { owner: "waiting on owner", stuck: "stuck" };
   function progBar(label, now, text, tone, feature) {
     var line = el("div", "bb-barline" + (feature ? " bb-barline--feature" : ""));
