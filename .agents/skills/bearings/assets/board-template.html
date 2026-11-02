@@ -1279,8 +1279,9 @@ __FM_BEARINGS_BOARD_DATA__
      deals them back. Only the parent chrome is heard. Each queued answer names
      its card (the selector of the card's form) and carries "<title> -> <answer>";
      a selector that does not point at the card whose title leads the text falls
-     back to the title. A rebuilt board omits answered cards, so nothing is lost
-     if this page reloads first. */
+     back to the title. The chrome remembers what it confirmed sent and replays
+     it as one "sent" message (id "remembered") each time this page loads, so a
+     reload keeps answered cards removed until a rebuild drops them for good. */
   var sentAway = {};
   function cardsInSend(items) {
     var found = [];

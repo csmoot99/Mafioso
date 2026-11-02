@@ -550,7 +550,10 @@ test_cards_sent_to_the_agent_leave_the_board_and_a_failed_send_deals_them_back()
     .send.all | .shown == [] and .empty == true and .navHidden == true
       and .need == "0" and .sub == "nothing needs you"
   ' >/dev/null || fail "sending every card did not leave the empty board: $out"
-  pass "cards sent to the agent leave the board at once, counters follow, and a failed send deals them back"
+  printf '%s' "$out" | jq -e '
+    .send.replayed | .shown == [] and .empty == true and .need == "0" and .sub == "nothing needs you"
+  ' >/dev/null || fail "a replayed send brought a remembered card back: $out"
+  pass "cards sent to the agent leave the board at once, counters follow, a failed send deals them back, and a replay keeps them gone"
 }
 
 test_a_card_attaches_reference_images_through_the_chrome_upload_and_queues_their_ids() {

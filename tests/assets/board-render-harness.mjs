@@ -15,7 +15,7 @@
 //     charted:[{title,sub,badges,pickable}], empty, more, error,
 //     cards:[{title,images:[{src,alt,lazy}],note:{tag,maxLength,count,limit}|null}],
 //     arrow:{moved,scrolled,count},
-//     send:{foreign,sent,restored,all,misrouted} } - the board after "fm-board:send"
+//     send:{foreign,sent,restored,all,misrouted,replayed} } - the board after "fm-board:send"
 //     messages from the Lavish chrome (see sendMessage below),
 //     attach:{...} - the first card's reference-image picker driven through the
 //     chrome's upload messages (see the attach section below)
@@ -343,6 +343,11 @@ sendMessage({ type: "fm-board:send", phase: "start", id: "b", items: [item(1, se
 send.misrouted = deckState();
 sendMessage({ type: "fm-board:send", phase: "sent", id: "c", items: [item(1, first, "yes")] });
 send.all = deckState();
+// The chrome replays what it confirmed sent each time the page loads: the replay leaves the
+// board empty, and a failure of some unrelated send cannot deal a remembered card back.
+sendMessage({ type: "fm-board:send", phase: "sent", id: "remembered", items: [item(1, first, "yes"), item(2, second, "yes")] });
+sendMessage({ type: "fm-board:send", phase: "failed", id: "unrelated", items: [item(1, first, "yes")] });
+send.replayed = deckState();
 
 // Queuing an answer (the attach section above submitted several) leaves the tab alone.
 const answerKeepsTab = visiblePanels();
