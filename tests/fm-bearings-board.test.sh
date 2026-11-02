@@ -905,6 +905,149 @@ test_build_does_not_copy_images_of_a_dropped_landed_card() {
   pass "build does not copy the images of a card it dropped as landed"
 }
 
+# --- Reports ------------------------------------------------------------------
+# build renders each listed markdown report into an inert page beside the board.
+
+make_report() {  # <path> [markdown]
+  mkdir -p "$(dirname "$1")"
+  printf '%s\n' "${2:-# A report\n\nbody}" > "$1"
+}
+
+payload_with_reports() {  # <home> <reports-json-array>
+  write_valid_payload "$1/payload.json"
+  jq --argjson reports "$2" '.reports = $reports' "$1/payload.json" > "$1/payload.tmp" \
+    && mv "$1/payload.tmp" "$1/payload.json"
+}
+
+report_entry() {  # <title> <path>
+  jq -n --arg title "$1" --arg path "$2" \
+    '{title:$title,repo:"sample",date:"2026-11-02",summary:"One line",path:$path}'
+}
+
+test_a_payload_without_reports_builds_as_before() {
+  local home board
+  home=$(make_home reports-absent)
+  board="$home/.lavish/bearings-board.html"
+  write_valid_payload "$home/payload.json"
+  run_board "$home" build "$home/payload.json" >/dev/null 2>&1 || fail "a payload with no reports did not build"
+  extract_payload "$board" | jq -e 'has("reports") | not' >/dev/null \
+    || fail "a payload with no reports grew a reports field"
+  [ ! -e "$home/.lavish/bearings-board-assets/.reports" ] || fail "a payload with no reports published a reports folder"
+  payload_with_reports "$home" '[]'
+  run_board "$home" build "$home/payload.json" >/dev/null 2>&1 || fail "a payload with an empty reports list did not build"
+  extract_payload "$board" | jq -e '.reports == []' >/dev/null || fail "an empty reports list was not kept as it was"
+  [ ! -e "$home/.lavish/bearings-board-assets/.reports" ] || fail "an empty reports list published a reports folder"
+  pass "a payload without reports builds as before"
+}
+
+test_build_publishes_each_report_beside_the_board_and_injects_only_relative_srcs() {
+  local home board assets
+  home=$(make_home reports-publish)
+  board="$home/.lavish/bearings-board.html"
+  assets="$home/.lavish/bearings-board-assets"
+  make_report "$home/data/scout-a/report.md" '# Scout A\n\nfound it'
+  make_report "$home/data/status-report-2026-11-02.md" '# Status'
+  payload_with_reports "$home" "[$(report_entry "Scout A" "$home/data/scout-a/report.md"),$(report_entry "Status" "$home/data/status-report-2026-11-02.md")]"
+  run_board "$home" build "$home/payload.json" >/dev/null 2>&1 || fail "a payload with reports did not build"
+  [ "$(find "$assets/.reports" -type f | wc -l | tr -d ' ')" = 2 ] || fail "the reports were not published beside the board"
+  assert_present "$assets/.reports/1.html" "the first report was not published"
+  grep -q "Scout A" "$assets/.reports/1.html" || fail "the first published page is not the first report"
+  grep -q "Status" "$assets/.reports/2.html" || fail "the second published page is not the second report"
+  extract_payload "$board" | jq -e '
+    .reports == [
+      {title:"Scout A",repo:"sample",date:"2026-11-02",summary:"One line",src:"bearings-board-assets/.reports/1.html"},
+      {title:"Status",repo:"sample",date:"2026-11-02",summary:"One line",src:"bearings-board-assets/.reports/2.html"}]' >/dev/null \
+    || fail "the page data does not carry exactly the title, project, date, summary and relative src"
+  grep -qF "$home/data" "$board" && fail "the page leaked a local report path"
+  # a rebuild replaces the folder, so a dropped report cannot linger
+  payload_with_reports "$home" "[$(report_entry "Status" "$home/data/status-report-2026-11-02.md")]"
+  run_board "$home" build "$home/payload.json" >/dev/null 2>&1 || fail "the rebuild failed"
+  [ "$(find "$assets/.reports" -type f | wc -l | tr -d ' ')" = 1 ] || fail "a dropped report survived a rebuild"
+  pass "build publishes each report beside the board and injects only relative srcs"
+}
+
+test_build_refuses_a_report_outside_data_a_symlink_or_a_non_markdown_file() {
+  local home name filter out
+  home=$(make_home reports-refuse)
+  make_report "$home/data/ok/report.md"
+  make_report "$home/outside/secret.md"
+  make_report "$home/data/notes.txt"
+  make_report "$home/data/big/report.md"
+  truncate -s 2097153 "$home/data/big/report.md"
+  mkdir -p "$home/data/dir.md"
+  ln -s "$home/data/ok/report.md" "$home/data/link.md"
+  ln -s "$home/outside/secret.md" "$home/data/escape.md"
+  ln -s "$home/outside" "$home/data/outdir"
+  payload_with_reports "$home" "[$(report_entry "Fine" "$home/data/ok/report.md")]"
+  run_board "$home" build "$home/payload.json" >/dev/null 2>&1 || fail "the baseline reports board did not build"
+  cp "$home/.lavish/bearings-board.html" "$home/before.html"
+
+  while IFS='|' read -r name want filter; do
+    [ -n "$name" ] || continue
+    jq --arg home "$home" "$filter" "$home/payload.json" > "$home/bad.json"
+    jq empty "$home/bad.json" || fail "the $name case did not produce a payload"
+    if out=$(run_board "$home" build "$home/bad.json" 2>&1); then
+      fail "a payload with $name was accepted"
+    fi
+    printf '%s' "$out" | grep -qF -- "$want" || fail "the refusal of $name did not say '$want': $out"
+    cmp -s "$home/before.html" "$home/.lavish/bearings-board.html" \
+      || fail "a refused payload with $name changed the existing board"
+    assert_present "$home/.lavish/bearings-board-assets/.reports/1.html" \
+      "a refused payload with $name disturbed the existing assets"
+  done <<'CASES'
+a path outside data|resolves outside|.reports[0].path = ($home + "/outside/secret.md")
+a traversal out of data|resolves outside|.reports[0].path = ($home + "/data/../outside/secret.md")
+a symlink inside data|is a symlink|.reports[0].path = ($home + "/data/link.md")
+a symlink out of data|is a symlink|.reports[0].path = ($home + "/data/escape.md")
+a symlinked folder out of data|resolves outside|.reports[0].path = ($home + "/data/outdir/secret.md")
+a text file|does not end in .md|.reports[0].path = ($home + "/data/notes.txt")
+a directory named like a report|not a readable regular file|.reports[0].path = ($home + "/data/dir.md")
+a missing file|not a readable regular file|.reports[0].path = ($home + "/data/none.md")
+a relative path|not absolute|.reports[0].path = "data/ok/report.md"
+a report over 2 MB|larger than|.reports[0].path = ($home + "/data/big/report.md")
+a bad date||.reports[0].date = "2026-13-40"
+a date with a time||.reports[0].date = "2026-11-02T10:00:00Z"
+an empty title||.reports[0].title = ""
+a multi-line summary||.reports[0].summary = "one\ntwo"
+a missing summary||del(.reports[0].summary)
+a missing repo||del(.reports[0].repo)
+a numeric repo||.reports[0].repo = 4
+reports that are not an array||.reports = {}
+501 reports||.reports[0] as $r | .reports = [range(501) | $r]
+CASES
+  jq --argjson r "$(jq '.reports[0]' "$home/payload.json")" '.reports = [range(500) | $r]' "$home/payload.json" > "$home/max.json"
+  run_board "$home" build "$home/max.json" >/dev/null 2>&1 || fail "500 reports were refused"
+  pass "build refuses a report outside data, a symlink or a non-markdown file before touching the board"
+}
+
+test_a_report_with_script_and_html_is_neutralised_in_the_published_page() {
+  local home page
+  home=$(make_home reports-hostile)
+  page="$home/.lavish/bearings-board-assets/.reports/1.html"
+  make_report "$home/data/evil/report.md" '# Evil <script>fetch("https://evil.example/x")</script>
+
+<img src="https://evil.example/p.png" onerror="alert(1)"> <iframe src="https://evil.example"></iframe>
+
+[js](javascript:alert(1)) ![remote](https://evil.example/i.png) [ok](https://example.com/a?b=1&c=2)
+
+```html
+<script>alert(2)</script>
+```'
+  payload_with_reports "$home" "[$(report_entry "Evil" "$home/data/evil/report.md")]"
+  run_board "$home" build "$home/payload.json" >/dev/null 2>&1 || fail "a hostile report stopped the build"
+  grep -qiE '<(script|iframe|img|object|embed|link|svg|form|base)[ >/]' "$page" \
+    && fail "the published page carries a raw active tag: $(grep -iE '<(script|iframe|img|object|embed)' "$page" | head -3)"
+  grep -qE 'href="javascript:' "$page" && fail "the published page links to a javascript: address"
+  grep -q '&lt;script&gt;' "$page" || fail "the script text was not kept as visible text"
+  grep -q 'Content-Security-Policy" content="default-src '"'"'none'"'"'' "$page" \
+    || fail "the published page does not deny every external request"
+  [ "$(grep -o 'href="[^"]*"' "$page" | grep -vc '^href="https://')" = 0 ] \
+    || fail "the published page has a link that is not https"
+  grep -q 'href="https://example.com/a?b=1&amp;c=2" target="_blank" rel="noopener noreferrer"' "$page" \
+    || fail "an https link did not open as a plain new-tab link"
+  pass "a report with script and HTML is neutralised in the published page"
+}
+
 test_path_is_stable_and_home_scoped
 test_build_refuses_malformed_payloads_before_touching_the_board
 test_charted_kind_is_optional_and_accepts_both_values
@@ -927,3 +1070,7 @@ test_build_copies_card_images_beside_the_board_and_injects_only_relative_srcs
 test_build_refuses_a_bad_images_field_before_touching_the_board
 test_build_clears_stale_images_on_every_rebuild
 test_build_does_not_copy_images_of_a_dropped_landed_card
+test_a_payload_without_reports_builds_as_before
+test_build_publishes_each_report_beside_the_board_and_injects_only_relative_srcs
+test_build_refuses_a_report_outside_data_a_symlink_or_a_non_markdown_file
+test_a_report_with_script_and_html_is_neutralised_in_the_published_page

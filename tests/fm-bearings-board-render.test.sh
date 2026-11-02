@@ -3,7 +3,7 @@
 # (.agents/skills/bearings/assets/board-template.html), exercised through a real
 # `fm-bearings-board.sh build` and then executed under the minimal DOM shim in
 # tests/assets/board-render-harness.mjs. The assertions are on what the page
-# renders - row badges, the stat strip, the empty state - never on the
+# renders - row badges, the tab bar, the empty state - never on the
 # template's source text.
 set -u
 
@@ -117,7 +117,7 @@ render() {  # <home> <charted-json> [charted_more] [charted_warning_more]
 }
 
 charted_next_count() {  # <render-json>
-  printf '%s' "$1" | jq -r '.stats[] | select(.label == "charted next") | .n'
+  printf '%s' "$1" | jq -r '.tabs[] | select(.label == "Charted next") | .n'
 }
 
 test_a_warning_row_reads_as_a_repair_not_as_queued_work() {
@@ -339,18 +339,163 @@ two_cards() {
      options:[{value:"yes",label:"Yes"}],allow_freeform:true}]'
 }
 
-test_each_summary_card_links_to_and_scrolls_to_its_section() {
+test_the_sections_are_tabs_with_counts_and_only_the_selected_one_shows() {
   local home out
-  home=$(make_home stat-links)
+  home=$(make_home tabs)
   out=$(render_cards "$home" "$(two_cards)")
   printf '%s' "$out" | jq -e '
-    [.statLinks[] | {label, href, scrolledTo, prevented}] == [
-      {label:"need you",href:"#bb-sec-call",scrolledTo:["bb-sec-call"],prevented:true},
-      {label:"underway",href:"#bb-sec-underway",scrolledTo:["bb-sec-underway"],prevented:true},
-      {label:"landed recently",href:"#bb-sec-landed",scrolledTo:["bb-sec-landed"],prevented:true},
-      {label:"charted next",href:"#bb-sec-charted",scrolledTo:["bb-sec-charted"],prevented:true}]
-  ' >/dev/null || fail "a summary card did not link and scroll to its section: $out"
-  pass "each summary card is a link that scrolls to its own section"
+    [.tabs[] | {id, label, n, selected, tabindex, role, controls, panelRole, panelLabelledby}] == [
+      {id:"bb-tab-call",label:"Captain'"'"'s Call",n:2,selected:"true",tabindex:0,role:"tab",controls:"bb-sec-call",panelRole:"tabpanel",panelLabelledby:"bb-tab-call"},
+      {id:"bb-tab-underway",label:"Underway",n:0,selected:"false",tabindex:-1,role:"tab",controls:"bb-sec-underway",panelRole:"tabpanel",panelLabelledby:"bb-tab-underway"},
+      {id:"bb-tab-landed",label:"Recently landed",n:0,selected:"false",tabindex:-1,role:"tab",controls:"bb-sec-landed",panelRole:"tabpanel",panelLabelledby:"bb-tab-landed"},
+      {id:"bb-tab-charted",label:"Charted next",n:0,selected:"false",tabindex:-1,role:"tab",controls:"bb-sec-charted",panelRole:"tabpanel",panelLabelledby:"bb-tab-charted"}]
+    and .loaded == ["call"]
+  ' >/dev/null || fail "the board did not open on a Captain's Call tab with a counted, labelled tab per section: $out"
+  printf '%s' "$out" | jq -e '
+    [.tabClicks[] | {id, visible, selected}] == [
+      {id:"bb-tab-call",visible:["call"],selected:["bb-tab-call"]},
+      {id:"bb-tab-underway",visible:["underway"],selected:["bb-tab-underway"]},
+      {id:"bb-tab-landed",visible:["landed"],selected:["bb-tab-landed"]},
+      {id:"bb-tab-charted",visible:["charted"],selected:["bb-tab-charted"]}]
+    and ([.tabClicks[] | .tabindexes | add] | all(. == -3))
+  ' >/dev/null || fail "tapping a tab did not show exactly its own section: $out"
+  printf '%s' "$out" | jq -e '.tabClicks[-1] | .hash == "#charted" and .name == "fm-bearings-tab=charted"' >/dev/null \
+    || fail "the selected tab was not remembered in the address and the frame name: $out"
+  pass "the sections are tabs with counts and only the selected one shows"
+}
+
+test_the_tab_bar_answers_to_the_arrow_home_and_end_keys() {
+  local home out
+  home=$(make_home tab-keys)
+  out=$(render_cards "$home" "$(two_cards)")
+  printf '%s' "$out" | jq -e '
+    .keys.right == {selected:["bb-tab-underway"],visible:["underway"],prevented:true,focused:"bb-tab-underway"}
+    and .keys.left == {selected:["bb-tab-charted"],visible:["charted"],prevented:true,focused:"bb-tab-charted"}
+    and .keys.end.selected == ["bb-tab-charted"] and .keys.home.selected == ["bb-tab-call"]
+    and .keys.other == {selected:["bb-tab-call"],visible:["call"],prevented:false,focused:"bb-tab-call"}
+  ' >/dev/null || fail "the arrow, Home and End keys did not move the selected tab (or a stray key did): $out"
+  pass "the tab bar answers to the arrow, Home and End keys"
+}
+
+test_queuing_an_answer_keeps_the_captains_call_tab_selected() {
+  local home out
+  home=$(make_home tab-answer)
+  out=$(render_cards "$home" "$(two_cards)")
+  printf '%s' "$out" | jq -e '.answerKeepsTab == ["call"]' >/dev/null \
+    || fail "queuing answers changed the visible tab: $out"
+  pass "queuing an answer keeps the Captain's Call tab selected"
+}
+
+# Render the built board for a returning viewer: <hash> <window.name> <localStorage json or blocked>.
+render_returning() {  # <home> <hash> <name> <store> [with-reports]
+  local home=$1
+  if [ "${5-}" = with-reports ]; then
+    render_reports "$home" "$(reports_json "$home")" >/dev/null
+  else
+    render_cards "$home" "$(two_cards)" >/dev/null
+  fi
+  BOARD_HASH=$2 BOARD_NAME=$3 BOARD_STORE=$4 node "$HARNESS" "$home/.lavish/bearings-board.html" | jq -c '.loaded'
+}
+
+test_the_selected_tab_is_restored_from_the_hash_then_storage_then_the_frame_name() {
+  local home
+  home=$(make_home tab-restore)
+  [ "$(render_returning "$home" '#landed' '' '{}')" = '["landed"]' ] || fail "the URL hash did not restore its tab"
+  [ "$(render_returning "$home" '' '' '{"fm-bearings-tab":"charted"}')" = '["charted"]' ] \
+    || fail "the stored tab was not restored without a hash"
+  [ "$(render_returning "$home" '#underway' '' '{"fm-bearings-tab":"charted"}')" = '["underway"]' ] \
+    || fail "storage outranked the URL hash"
+  [ "$(render_returning "$home" '' 'fm-bearings-tab=landed' 'blocked')" = '["landed"]' ] \
+    || fail "a board whose storage is blocked did not restore the tab from the frame name"
+  [ "$(render_returning "$home" '' 'someone-elses-name' 'blocked')" = '["call"]' ] \
+    || fail "a blocked-storage board without a remembered tab did not open on Captain's Call"
+  [ "$(render_returning "$home" '#nonsense' '' '{"fm-bearings-tab":"nope"}')" = '["call"]' ] \
+    || fail "an unknown tab did not fall back to Captain's Call"
+  [ "$(render_returning "$home" '#reports' '' '{}')" = '["call"]' ] \
+    || fail "a remembered Reports tab on a board with no reports did not fall back to Captain's Call"
+  pass "the selected tab is restored from the hash, then storage, then the frame name"
+}
+
+# Two real report files under the home's data directory, plus one in another project.
+reports_json() {  # <home>
+  local home=$1 i
+  mkdir -p "$home/data/r1" "$home/data/r2" "$home/data/r3"
+  for i in 1 2 3; do printf '# Report %s\n\nbody %s\n' "$i" "$i" > "$home/data/r$i/report.md"; done
+  jq -n --arg d "$home/data" '[
+    {title:"Older alpha write-up",repo:"alpha",date:"2026-10-30",summary:"",path:($d + "/r1/report.md")},
+    {title:"Newest sync scout",repo:"alpha",date:"2026-11-02",summary:"Why the sync stalls",path:($d + "/r2/report.md")},
+    {title:"Beta sync status",repo:null,date:"2026-11-01",summary:"Status of the sync work",path:($d + "/r3/report.md")}]'
+}
+
+render_reports() {  # <home> <reports-json>
+  local home=$1 data="$1/payload.json"
+  jq -n --argjson reports "$2" '{
+    schema:"fm-bearings-board.v1", home:"render-home", generated:"2026-08-26T00:00Z",
+    prs_live:false, captains_call:[], underway:[], landed:[], charted:[], reports:$reports}' > "$data"
+  PATH="$home/fakebin:$PATH" FM_HOME="$home" \
+    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+    FM_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
+    LAVISH_AXI_STATE_DIR="$home/lavish-state" \
+    "$BOARD" build "$data" >/dev/null || fail "the board did not build"
+  require_listener_reached_poll "$home"
+  node "$HARNESS" "$home/.lavish/bearings-board.html" \
+    || fail "the built board could not be rendered"
+}
+
+test_a_board_with_reports_gets_a_reports_tab_listing_them_newest_first() {
+  local home out
+  home=$(make_home reports-tab)
+  out=$(render_reports "$home" "$(reports_json "$home")")
+  printf '%s' "$out" | jq -e '.error == ""' >/dev/null || fail "the board rendered its error instead of the reports: $out"
+  printf '%s' "$out" | jq -e '
+    ([.tabs[] | .label] | last) == "Reports" and (.tabs[-1] | .n == 3 and .controls == "bb-sec-reports")
+    and .reports.count == "3 reports"
+    and [.reports.rows[] | .title] == ["Newest sync scout","Beta sync status","Older alpha write-up"]
+    and .reports.rows[0] == {title:"Newest sync scout",meta:"alpha · 2026-11-02",summary:"Why the sync stalls"}
+    and .reports.rows[1].meta == "(no project) · 2026-11-01"
+    and .reports.rows[2].summary == null
+    and [.reports.projects[] | .label] == ["All projects","(no project) (1)","alpha (2)"]
+  ' >/dev/null || fail "the Reports tab did not list the reports newest first with title, project, date and summary: $out"
+  printf '%s' "$out" | jq -e '.tabClicks[-1] | .visible == ["reports"]' >/dev/null \
+    || fail "the Reports tab did not show its own section: $out"
+  pass "a board with reports gets a Reports tab listing them newest first"
+}
+
+test_the_reports_filters_narrow_the_list_by_text_and_project() {
+  local home out
+  home=$(make_home reports-filter)
+  out=$(render_reports "$home" "$(reports_json "$home")")
+  printf '%s' "$out" | jq -e '
+    .reports.byText == {rows:["Newest sync scout","Beta sync status"],status:"2 of 3 reports",empty:false}
+    and .reports.byProject.rows == ["Newest sync scout","Older alpha write-up"]
+    and .reports.byBoth == {rows:["Newest sync scout"],status:"1 of 3 reports",empty:false}
+    and .reports.noMatch == {rows:[],status:"0 of 3 reports",empty:true}
+  ' >/dev/null || fail "the text and project filters did not narrow the reports: $out"
+  pass "the reports filters narrow the list by text and project"
+}
+
+test_a_report_opens_in_a_scriptless_reader_with_a_way_back() {
+  local home out
+  home=$(make_home reports-reader)
+  out=$(render_reports "$home" "$(reports_json "$home")")
+  printf '%s' "$out" | jq -e '
+    .reports.opened == {src:"bearings-board-assets/.reports/2.html",hidden:false,title:"Newest sync scout",locked:true}
+    and .reports.closed == {src:null,hidden:true,locked:false}
+    and .reports.escapeCloses == true
+  ' >/dev/null || fail "a report did not open full screen in the reader and close again: $out"
+  pass "a report opens in a reader with a way back"
+}
+
+test_a_board_without_reports_has_no_reports_tab() {
+  local home out
+  home=$(make_home reports-absent)
+  out=$(render_cards "$home" "$(two_cards)")
+  printf '%s' "$out" | jq -e '([.tabs[] | .label] | index("Reports")) == null and .reports == {rows:[],status:"",moreHidden:false,moreLabel:"",count:"",projects:[]}' >/dev/null \
+    || fail "a board with no reports grew a Reports tab: $out"
+  out=$(render_reports "$home" '[]')
+  printf '%s' "$out" | jq -e '([.tabs[] | .label] | index("Reports")) == null' >/dev/null \
+    || fail "a board with an empty reports list grew a Reports tab: $out"
+  pass "a board without reports has no Reports tab"
 }
 
 test_a_note_stops_at_the_cap_while_typing_and_the_cap_leaves_room_for_the_label() {
@@ -460,7 +605,14 @@ test_omitted_warnings_never_count_as_more_queued
 test_an_omitted_kind_keeps_the_existing_queued_rendering
 test_a_card_with_images_renders_one_lazy_thumbnail_per_image
 test_an_image_outside_the_board_assets_folder_is_not_rendered
-test_each_summary_card_links_to_and_scrolls_to_its_section
+test_the_sections_are_tabs_with_counts_and_only_the_selected_one_shows
+test_the_tab_bar_answers_to_the_arrow_home_and_end_keys
+test_queuing_an_answer_keeps_the_captains_call_tab_selected
+test_the_selected_tab_is_restored_from_the_hash_then_storage_then_the_frame_name
+test_a_board_with_reports_gets_a_reports_tab_listing_them_newest_first
+test_the_reports_filters_narrow_the_list_by_text_and_project
+test_a_report_opens_in_a_scriptless_reader_with_a_way_back
+test_a_board_without_reports_has_no_reports_tab
 test_a_note_stops_at_the_cap_while_typing_and_the_cap_leaves_room_for_the_label
 test_the_card_arrows_bring_the_new_card_into_view
 test_cards_sent_to_the_agent_leave_the_board_and_a_failed_send_deals_them_back

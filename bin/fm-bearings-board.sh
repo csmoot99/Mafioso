@@ -83,6 +83,24 @@
 # relative `src` into the page data, never the local path. A bad `images` entry
 # refuses before the existing board or its assets are touched.
 #
+# The payload MAY carry `reports`, the write-ups firstmate wrote for the captain,
+# shown in the board's Reports tab: an array of up to 500 objects, each
+# `{ "title", "repo", "date", "summary", "path" }`, where `title` is non-empty
+# text, `repo` follows the same string-or-null marker as every other row, `date`
+# is a real YYYY-MM-DD, `summary` is one line of text that may be empty, and
+# `path` is an absolute path to a markdown report. build accepts only a regular
+# file (never a symlink) named *.md, of at most 2 MB, that resolves inside
+# "$FM_HOME/data/", and refuses anything else naming the report, before the
+# existing board or its assets are touched. A report is untrusted text, so build
+# renders it with bin/fm-bearings-md.pl into an inert HTML page (no script, no
+# remote reference) at
+# $FM_HOME/.lavish/bearings-board-assets/.reports/<n>.html, beside the board
+# like a card image: Lavish's sandboxed frame cannot fetch a sibling file, so
+# the board shows that page in an iframe instead. The whole assets folder is
+# replaced on every build, and only the relative `src` reaches the page data,
+# never the local path. A payload with no `reports`, or an empty list, builds
+# exactly as before and the board shows no Reports tab.
+#
 # Every Underway row likewise carries a non-empty `name`: the durable task name
 # when known, otherwise its durable identifier.
 # A Charted Next row MAY carry `filed`, the durable filed date (YYYY-MM-DD, or
@@ -109,6 +127,9 @@ BOARD_SCHEMA=fm-bearings-board.v1
 MAX_IMAGES=24
 MAX_IMAGE_BYTES=5242880
 ASSETS_DIR_NAME=bearings-board-assets
+MAX_REPORTS=500
+MAX_REPORT_BYTES=2097152
+REPORTS_DIR_NAME=.reports
 
 usage() {
   awk '
@@ -126,7 +147,7 @@ fail() {
 board_path() { printf '%s/.lavish/bearings-board.html\n' "$FM_HOME"; }
 
 validate_payload() {  # <data.json>
-  jq -e --arg schema "$BOARD_SCHEMA" --argjson max_images "$MAX_IMAGES" '
+  jq -e --arg schema "$BOARD_SCHEMA" --argjson max_images "$MAX_IMAGES" --argjson max_reports "$MAX_REPORTS" '
     def nonempty_string: type == "string" and length > 0;
     def slug($max): type == "string" and test("^[A-Za-z0-9._-]{1," + ($max | tostring) + "}$");
     def repo_marker: has("repo") and (.repo == null or (.repo | type == "string"));
@@ -141,6 +162,7 @@ validate_payload() {  # <data.json>
         end);
     def optional_filed:
       (has("filed") | not) or (.filed == null) or (.filed | valid_filed);
+    def valid_date: valid_filed and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}$");
     def optional_string($name): (has($name) | not) or (.[$name] | type == "string");
     def optional_https_url($name):
       (has($name) | not)
@@ -209,6 +231,12 @@ validate_payload() {  # <data.json>
       and ((has("kind") | not) or (.kind == "queued" or .kind == "warning"))
       and optional_filed
       and (if .kind == "warning" then .dispatchable == false else true end);
+    def report_item:
+      type == "object" and repo_marker
+      and (.title | nonempty_string)
+      and (.date | valid_date)
+      and (.summary | type == "string" and (test("[\\n\\r]") | not))
+      and (.path | type == "string" and test("^[^[:cntrl:]]+$"));
     type == "object"
     and (.schema == $schema)
     and (.home | nonempty_string)
@@ -222,6 +250,8 @@ validate_payload() {  # <data.json>
       or ((.charted_more | type == "number") and (.charted_more >= 0) and (.charted_more | floor == .)))
     and ((has("charted_warning_more") | not)
       or ((.charted_warning_more | type == "number") and (.charted_warning_more >= 0) and (.charted_warning_more | floor == .)))
+    and ((has("reports") | not)
+      or (.reports | type == "array" and length <= $max_reports and ([.[] | report_item] | all)))
     and ([.captains_call[] | call_item] | all)
     and ([.underway[] | underway_item] | all)
     and ([.landed[] | landed_item] | all)
@@ -270,6 +300,44 @@ stage_images() {  # <payload.json> <stage-dir> <rewritten.json>
         | {src: (.path | image_src($key; $i + 1)), alt: .alt}
           + (if (.caption // "") != "" then {caption: .caption} else {} end)))
       else . end)' "$payload" > "$dest"
+}
+
+# --- Reports ------------------------------------------------------------------
+# validate_payload owns the shape; these own the files. A report is untrusted
+# text from a worker, so only a plain markdown file inside this home's data
+# directory is ever read, and it is rendered, never copied raw, beside the board.
+
+validate_report_files() {  # <data.json>
+  local path root real size
+  [ -n "$(jq -r '.reports[]? | .path' "$1" | head -1)" ] || return 0
+  root=$(board_realpath "$FM_HOME/data") || fail "reports need the data directory, which does not exist: $FM_HOME/data"
+  while IFS= read -r path; do
+    case "$path" in /*) ;; *) fail "report path is not absolute: $path" ;; esac
+    case "$path" in *.md) ;; *) fail "report path does not end in .md: $path" ;; esac
+    [ ! -L "$path" ] || fail "report path is a symlink: $path"
+    [ -f "$path" ] && [ -r "$path" ] || fail "report is not a readable regular file: $path"
+    real=$(board_realpath "$path") || fail "cannot resolve the report path: $path"
+    case "$real" in "$root"/*) ;; *) fail "report resolves outside $root: $path" ;; esac
+    size=$(wc -c < "$path") || fail "cannot read the report: $path"
+    [ "$size" -le "$MAX_REPORT_BYTES" ] || fail "report is larger than $MAX_REPORT_BYTES bytes: $path"
+  done < <(jq -r '.reports[]? | .path' "$1")
+}
+
+# Render every report into <stage>/.reports/<n>.html and rewrite the payload's
+# `reports` to carry only the relative src beside title, repo, date and summary.
+stage_reports() {  # <payload.json> <stage-dir>; rewrites the payload in place
+  local payload=$1 stage=$2 n=0 path
+  while IFS= read -r path; do
+    n=$((n + 1))
+    mkdir -p -- "$stage/$REPORTS_DIR_NAME" \
+      && perl "$SCRIPT_DIR/fm-bearings-md.pl" "$path" > "$stage/$REPORTS_DIR_NAME/$n.html" || return 1
+  done < <(jq -r '.reports[]? | .path' "$payload")
+  [ "$n" -gt 0 ] || return 0
+  jq --arg dir "$ASSETS_DIR_NAME/$REPORTS_DIR_NAME" '
+    .reports |= (to_entries | map(.key as $i | .value
+      | {title, repo, date, summary, src: ($dir + "/" + ($i + 1 | tostring) + ".html")}))
+  ' "$payload" > "$payload.r" || { rm -f -- "$payload.r"; return 1; }
+  mv -f -- "$payload.r" "$payload"
 }
 
 # --- Lavish session liveness -------------------------------------------------
@@ -434,6 +502,7 @@ command_build() {
   validate_payload "$data" || fail "board data does not satisfy $BOARD_SCHEMA: $data"
   validate_image_files "$data" \
     || fail "a Captain's Call image is not a readable regular file of at most $MAX_IMAGE_BYTES bytes: $data"
+  validate_report_files "$data"
   [ -f "$TEMPLATE" ] && [ ! -L "$TEMPLATE" ] || fail "board template is missing: $TEMPLATE"
   [ "$(grep -cxF "$PLACEHOLDER" "$TEMPLATE")" -eq 1 ] \
     || fail "board template does not carry exactly one data slot: $TEMPLATE"
@@ -451,6 +520,10 @@ command_build() {
   if ! stage_images "$effective" "$stage" "$staged"; then
     rm -rf -- "$stage" "$staged" "$effective"
     fail "cannot copy the Captain's Call images beside the board"
+  fi
+  if ! stage_reports "$staged" "$stage"; then
+    rm -rf -- "$stage" "$staged" "$effective"
+    fail "cannot render the reports beside the board"
   fi
   json=$(jq -c . "$staged") || { rm -rf -- "$stage" "$staged" "$effective"; fail "cannot compact the board data"; }
   rm -f -- "$effective" "$staged"
