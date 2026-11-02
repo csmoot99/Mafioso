@@ -2581,6 +2581,52 @@ EOF
   pass "Underway rows carry the durable task name and gates carry their filed date"
 }
 
+test_underway_rows_carry_a_stage_and_the_recorded_parts() {
+  local home fakebin json toon
+  home=$(make_home underway-progress)
+  mkdir -p "$home/projects/main-wt" "$home/data/feat" "$home/data/waiting" "$home/data/linked"
+  cat > "$home/data/backlog.md" <<'EOF'
+## In flight
+- [ ] feat - A three part feature (repo: firstmate) (kind: ship) (since 2026-07-09)
+- [ ] waiting - Screens for the owner (repo: firstmate) (kind: ship) (since 2026-07-09)
+- [ ] linked - Symlinked parts record (repo: firstmate) (kind: ship) (since 2026-07-09)
+
+## Queued
+
+## Done
+EOF
+  for id in feat waiting linked; do
+    fm_write_meta "$home/state/$id.meta" \
+      "window=firstmate:fm-$id" "worktree=$home/projects/main-wt" "project=firstmate" \
+      "harness=claude" "kind=ship" "mode=no-mistakes"
+  done
+  record_claude_state "$home/state" feat busy
+  printf 'working: building\n' > "$home/state/feat.status"
+  printf 'paused [key=waiting-screens] [at=1793000000]: screenshots at /tmp/x\n' > "$home/state/waiting.status"
+  printf 'working: ok\n' > "$home/state/linked.status"
+  printf 'part Source model\npart Poll and confirm\npart  Editor   view\nmerged https://github.com/o/r/pull/1\nnoise line\n' \
+    > "$home/data/feat/parts"
+  printf 'part Real\n' > "$TMP_ROOT/outside-parts"
+  ln -s "$TMP_ROOT/outside-parts" "$home/data/linked/parts"
+
+  fakebin=$(make_fakebin "$home")
+  json=$(run "$home" "$fakebin" --json)
+  printf '%s' "$json" | jq -e '
+    (.in_flight | map({(.id): .}) | add) as $r
+    | ($r.feat | .stage == "building" and .pct == 30)
+      and ($r.waiting | .stage == "owner" and .pct == 45)
+      and ([.parts[] | select(.id == "feat") | [.n, .label, .state]] == [
+        [1, "Source model", "merged"], [2, "Poll and confirm", "current"], [3, "Editor view", "pending"]])
+      and ([.parts[] | select(.id != "feat")] == [])
+  ' >/dev/null || fail "Underway stage or recorded parts are wrong: $json"
+  toon=$(run "$home" "$fakebin")
+  printf '%s\n' "$toon" | grep -q '^in_flight\[[0-9]*\]{id,kind,state,repo,name,doing,stage,pct}:' \
+    || fail "the TOON in_flight header lost its stage and pct columns: $toon"
+  printf '%s\n' "$toon" | grep -q '^parts\[3\]{id,n,label,state}:' \
+    || fail "the TOON output has no parts table: $toon"
+  pass "Underway rows carry a structured stage, and a data/<id>/parts record becomes the part list"
+}
+
 test_mixed_secondmate_roles_partial_state_and_captain_readiness() {
   local home fakebin hibit wheel sshhip ha canonical json
   home=$(make_home mixed-domain-regressions)
@@ -3396,6 +3442,7 @@ test_active_children_project_independent_of_home_captain_hold
 test_nameless_legacy_summary_uses_its_durable_identifier
 test_newest_filed_gates_are_selected_before_snapshot_bounds
 test_underway_and_gate_rows_carry_the_durable_name_and_filed_date
+test_underway_rows_carry_a_stage_and_the_recorded_parts
 test_mixed_secondmate_roles_partial_state_and_captain_readiness
 test_main_captain_readiness_matches_secondmate_projection
 test_completed_scout_report_not_pending

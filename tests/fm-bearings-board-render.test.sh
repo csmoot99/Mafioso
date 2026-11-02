@@ -221,6 +221,33 @@ test_an_underway_row_leads_with_the_task_name_and_keeps_its_run_status() {
   pass "an underway row leads with the task name and still reports its run status"
 }
 
+test_underway_progress_renders_feature_part_and_stage_bars() {
+  local home out
+  home=$(make_home underway-progress)
+  out=$(render_board "$home" '[
+    {"id":"feat","repo":"sample","name":"A feature","state":"working","kind":"ship","doing":"building",
+     "progress":{"stage":"owner","pct":45,"parts":[
+       {"label":"One","state":"merged"},{"label":"Two","state":"current"},{"label":"Three","state":"pending"}]}},
+    {"id":"one","repo":"sample","name":"One-off","state":"working","kind":"ship","doing":"ci",
+     "progress":{"stage":"checks","pct":90}},
+    {"id":"old","repo":"sample","name":"No progress","state":"working","kind":"ship","doing":"x"}
+  ]' '[]')
+  printf '%s' "$out" | jq -e '
+    .underway[0] as $f | .underway[1] as $o | .underway[2] as $old
+    | ($f.badges == [] and $f.waiting == ["Waiting on you"]
+       and ($f.bars | map([.label, .value, .max, .text]) == [
+         ["Feature","33","100","1 of 3 parts merged"],
+         ["Part 1: One","100","100","Merged"],
+         ["Part 2: Two","45","100","Waiting on you · 45%"],
+         ["Part 3: Three","0","100","Not started"]])
+       and ($f.bars[2].owner == true) and ($f.bars[1].owner == false))
+      and ($o.badges == [] and $o.waiting == []
+       and ($o.bars | map([.label, .value, .text]) == [["This task","90","PR checks · 90%"]]))
+      and ([$old.badges[].text] == ["working"] and $old.bars == [])
+  ' >/dev/null || fail "the Underway progress bars did not render as specified: $out"
+  pass "Underway shows a feature bar, one bar per part, a one-off stage bar, and keeps the pill when there is no progress"
+}
+
 test_an_underway_identifier_label_is_not_replaced_by_run_status() {
   local home out
   home=$(make_home underway-identifier)
@@ -595,6 +622,7 @@ test_a_card_attaches_reference_images_through_the_chrome_upload_and_queues_their
 }
 
 test_an_underway_row_leads_with_the_task_name_and_keeps_its_run_status
+test_underway_progress_renders_feature_part_and_stage_bars
 test_an_underway_identifier_label_is_not_replaced_by_run_status
 test_charted_next_reads_newest_filed_first
 test_charted_rows_without_a_filed_date_follow_the_dated_rows_in_payload_order
