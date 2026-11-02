@@ -530,7 +530,7 @@ await_source_owner() {  # <source-id>
 }
 
 command_build() {
-  local data=${1-} board json tmp stage staged assets sid extracted effective owner version pre_reopen_owner
+  local data=${1-} board jsonfile tmp stage staged assets sid extracted effective owner version pre_reopen_owner
   [ "$#" -eq 1 ] || { usage >&2; exit 2; }
   command -v jq >/dev/null 2>&1 || fail "jq is required"
   [ -f "$data" ] || fail "board data does not exist: $data"
@@ -561,17 +561,23 @@ command_build() {
     rm -rf -- "$stage" "$staged" "$effective"
     fail "cannot render the reports beside the board"
   fi
-  json=$(jq -c . "$staged") || { rm -rf -- "$stage" "$staged" "$effective"; fail "cannot compact the board data"; }
-  rm -f -- "$effective" "$staged"
   # `<` never appears in JSON syntax outside strings, so escaping every
-  # occurrence keeps the payload valid JSON while making </script> inert.
-  json=${json//</\\u003c}
+  # occurrence keeps the payload valid JSON while making </script> inert. The
+  # payload goes to perl through a file: with a search index it outgrows the
+  # kernel's limit on one environment string.
+  jsonfile=$(umask 077; mktemp "${TMPDIR:-/tmp}/fm-bearings-json.XXXXXX") || { rm -rf -- "$stage" "$staged" "$effective"; fail "cannot stage the board data"; }
+  if ! jq -c . "$staged" | sed 's/</\\u003c/g' > "$jsonfile"; then
+    rm -rf -- "$stage" "$staged" "$effective" "$jsonfile"
+    fail "cannot compact the board data"
+  fi
+  rm -f -- "$effective" "$staged"
 
-  tmp=$(umask 077; mktemp "${board%/*}/.board.XXXXXX") || { rm -rf -- "$stage"; fail "cannot stage the board"; }
-  if ! BOARD_JSON="$json" perl -pe "s/^\\Q$PLACEHOLDER\\E\$/\$ENV{BOARD_JSON}/" "$TEMPLATE" > "$tmp"; then
-    rm -rf -- "$tmp" "$stage"
+  tmp=$(umask 077; mktemp "${board%/*}/.board.XXXXXX") || { rm -rf -- "$stage" "$jsonfile"; fail "cannot stage the board"; }
+  if ! BOARD_JSON_FILE="$jsonfile" perl -pe 'BEGIN { open(my $fh, "<", $ENV{BOARD_JSON_FILE}) or die; local $/; $j = <$fh>; $j =~ s/\n\z// } s/^\Q'"$PLACEHOLDER"'\E$/$j/' "$TEMPLATE" > "$tmp"; then
+    rm -rf -- "$tmp" "$stage" "$jsonfile"
     fail "cannot inject the board data"
   fi
+  rm -f -- "$jsonfile"
   if grep -qxF "$PLACEHOLDER" "$tmp"; then
     rm -rf -- "$tmp" "$stage"
     fail "the board data slot survived injection"

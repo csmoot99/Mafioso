@@ -34,14 +34,26 @@ my $raw = do {
     defined $c ? $c : '';
 };
 if ($text_mode) {
-    # one line of words for board search: markdown marks dropped, whitespace collapsed
+    # one line of words for board search: markdown syntax dropped, whitespace
+    # collapsed, and capped at $TEXT_CAP characters so the whole board stays small
+    my $TEXT_CAP = 6000;
     my $t = do { open(my $th, '<:encoding(UTF-8)', $file) or die "fm-bearings-md: cannot read $file\n"; local $/; <$th> // '' };
     $t =~ s/\A\x{FEFF}//;
+    $t =~ s/\r\n?/\n/g;
+    my @keep;
+    for my $l (split /\n/, $t) {
+        next if $l =~ /^\s*(```|~~~)/;
+        next if $l =~ /^[\s|:+-]+$/ && $l =~ /-/;
+        $l =~ s/^\s*(?:#{1,6}|>+|[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?//;
+        push @keep, $l;
+    }
+    $t = join(' ', @keep);
     $t =~ s/[\x00-\x1F\x7F]+/ /g;
     $t =~ s/!?\[([^\]]*)\]\([^)]*\)/$1/g;
-    $t =~ s/[`*_~#>|]+/ /g;
+    $t =~ s/[`*_~|]+/ /g;
     $t =~ s/\s+/ /g;
     $t =~ s/^ | $//g;
+    $t = substr($t, 0, $TEXT_CAP) if length($t) > $TEXT_CAP;
     binmode(STDOUT, ':encoding(UTF-8)');
     print $t;
     exit 0;
