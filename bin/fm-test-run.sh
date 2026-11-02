@@ -2087,10 +2087,6 @@ while [ "$#" -gt 0 ]; do
       ONLY_FROM=$2
       shift 2
       ;;
-    --only-from=*)
-      ONLY_FROM=${1#--only-from=}
-      shift
-      ;;
     --json)
       [ "$#" -gt 1 ] || die "--json requires a path"
       JSON_PATH=$2
