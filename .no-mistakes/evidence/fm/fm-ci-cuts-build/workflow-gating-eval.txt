@@ -1,0 +1,18 @@
+job-level `if` (FM_CI_SKIP_PUSH='' / FM_CI_SKIP_MACOS='')  [push with SKIP_PUSH=1 in brackets]
+job                         pull_request        push                schedule            workflow_dispatch   push+SKIP_PUSH=1
+lint                        runs                runs                skipped             skipped             skipped
+test-coverage               runs                runs                skipped             skipped             skipped
+tests-portable-parallel-1   runs                runs                skipped             skipped             skipped
+tests-portable-parallel-2   runs                runs                skipped             skipped             skipped
+tests-portable-serial       runs                runs                skipped             skipped             skipped
+tests-herdr                 runs                runs                skipped             skipped             skipped
+tests-timing-aggregate      runs                runs                skipped             skipped             skipped
+macos-stock-bash            skipped             skipped             runs                runs                skipped
+invariants                  runs                runs                skipped             skipped             skipped
+
+step gating after the select step (run='false' must skip every later step; run='true' must run them)
+  lint                         later steps= 4  violations=none
+  tests-portable-parallel-1    later steps= 6  violations=none
+  tests-portable-parallel-2    later steps= 5  violations=none
+  tests-portable-serial        later steps= 7  violations=none
+  tests-herdr                  later steps= 9  violations=none

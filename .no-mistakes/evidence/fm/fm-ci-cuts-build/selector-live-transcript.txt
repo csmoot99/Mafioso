@@ -1,0 +1,125 @@
+
+=== S1 PR touching one test (tests/fm-ensure-agents-md.test.sh), pull_request event ===
+  portable-parallel-1      run=false list=/tmp/fmlive.MXMxaf/list 
+  portable-parallel-2      run=true list=/tmp/fmlive.MXMxaf/list 
+  portable-serial-1of10    run=false list=/tmp/fmlive.MXMxaf/list 
+  portable-serial-2of10    run=false list=/tmp/fmlive.MXMxaf/list 
+  portable-serial-3of10    run=false list=/tmp/fmlive.MXMxaf/list 
+  portable-serial-4of10    run=false list=/tmp/fmlive.MXMxaf/list 
+  portable-serial-5of10    run=false list=/tmp/fmlive.MXMxaf/list 
+  portable-serial-6of10    run=false list=/tmp/fmlive.MXMxaf/list 
+  portable-serial-7of10    run=false list=/tmp/fmlive.MXMxaf/list 
+  portable-serial-8of10    run=false list=/tmp/fmlive.MXMxaf/list 
+  portable-serial-9of10    run=false list=/tmp/fmlive.MXMxaf/list 
+  portable-serial-10of10   run=false list=/tmp/fmlive.MXMxaf/list 
+  herdr                    run=false list=/tmp/fmlive.MXMxaf/list 
+  lint                     fm-ci-select: complete set: lint input changed: tests/fm-ensure-agents-md.test.sh run=true list= 
+  selected list:
+    tests/fm-ensure-agents-md.test.sh
+  -> running the job's test step exactly as ci.yml does: fm-test-run.sh --lane portable-parallel-2 --only-from <list> --json
+    ok - fm-ensure-agents-md.sh: refuses a case-variant lowercase agents.md (issue #389)
+    FM_TEST_END 2026-11-02T22:19:12Z tests/fm-ensure-agents-md.test.sh exit=0 duration_ms=1020 gate_skip=false
+    FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=1079
+    FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=1 duration_ms=1020 failed=0
+    FM_TEST_SLOWEST rank=1 script=tests/fm-ensure-agents-md.test.sh duration_ms=1020
+    fm-test-run: wrote timing artifact: /tmp/fmlive.MXMxaf/timing-portable-parallel-2.json
+  timing JSON scripts:
+  full lane would have run 8 scripts
+
+=== S2 PR touching a source script (bin/fm-transition-lib.sh) maps to its tests ===
+tests/fm-agy-harness.test.sh
+tests/fm-arm-pretool-check.test.sh
+tests/fm-ask-user-authority.test.sh
+tests/fm-bearings-board.test.sh
+tests/fm-brief.test.sh
+tests/fm-calm-claude-mod.test.sh
+tests/fm-calm-pi-extension.test.sh
+tests/fm-captain-hold-lifecycle.test.sh
+tests/fm-cd-pretool-check.test.sh
+tests/fm-classify-decision-key.test.sh
+tests/fm-composer-ghost.test.sh
+tests/fm-composer-lib.test.sh
+tests/fm-crew-state.test.sh
+tests/fm-devin-harness.test.sh
+tests/fm-documentation-audiences.test.sh
+tests/fm-dod-lib.test.sh
+tests/fm-ensure-agents-md.test.sh
+tests/fm-forge-detect.test.sh
+tests/fm-fork-free-helpers.test.sh
+tests/fm-grok-harness.test.sh
+tests/fm-harness-adapter-references.test.sh
+tests/fm-harness-precedence.test.sh
+tests/fm-herdr-lab.test.sh
+tests/fm-kimi-harness.test.sh
+tests/fm-lint-workflows.test.sh
+tests/fm-lint.test.sh
+tests/fm-muse-harness.test.sh
+tests/fm-omp-harness.test.sh
+tests/fm-operational-input.test.sh
+tests/fm-pi-primary-types.test.sh
+tests/fm-rovo-harness.test.sh
+tests/fm-send-popup-settle.test.sh
+tests/fm-send-settle.test.sh
+tests/fm-subagent-pretool-check.test.sh
+tests/fm-supervision-instructions.test.sh
+tests/fm-task-delivery.test.sh
+tests/fm-test-isolation-proof.test.sh
+tests/fm-test-run.test.sh
+tests/fm-timeout-lib.test.sh
+tests/fm-tmux-submit-busy.test.sh
+tests/fm-trace-context-lib.test.sh
+tests/fm-transition-lib.test.sh
+tests/fm-vendor-auth-probe.test.sh
+  strict rc=0
+  portable-parallel-1      run=true list=/tmp/fmlive.MXMxaf/list 
+  portable-parallel-2      run=true list=/tmp/fmlive.MXMxaf/list 
+  portable-serial-1of10    run=false list=/tmp/fmlive.MXMxaf/list 
+  portable-serial-2of10    run=true list=/tmp/fmlive.MXMxaf/list 
+  portable-serial-3of10    run=true list=/tmp/fmlive.MXMxaf/list 
+  portable-serial-4of10    run=true list=/tmp/fmlive.MXMxaf/list 
+  portable-serial-5of10    run=true list=/tmp/fmlive.MXMxaf/list 
+  portable-serial-6of10    run=true list=/tmp/fmlive.MXMxaf/list 
+  portable-serial-7of10    run=true list=/tmp/fmlive.MXMxaf/list 
+  portable-serial-8of10    run=true list=/tmp/fmlive.MXMxaf/list 
+  portable-serial-9of10    run=true list=/tmp/fmlive.MXMxaf/list 
+  portable-serial-10of10   run=true list=/tmp/fmlive.MXMxaf/list 
+  herdr                    run=false list=/tmp/fmlive.MXMxaf/list 
+  lint                     fm-ci-select: complete set: lint input changed: bin/fm-transition-lib.sh run=true list= 
+
+=== S3 same PR, but event=push to main (backstop): complete set ===
+  portable-parallel-1      run=true list= 
+  portable-parallel-2      run=true list= 
+  portable-serial-1of10    run=true list= 
+  portable-serial-2of10    run=true list= 
+  portable-serial-3of10    run=true list= 
+  portable-serial-4of10    run=true list= 
+  portable-serial-5of10    run=true list= 
+  portable-serial-6of10    run=true list= 
+  portable-serial-7of10    run=true list= 
+  portable-serial-8of10    run=true list= 
+  portable-serial-9of10    run=true list= 
+  portable-serial-10of10   run=true list= 
+  herdr                    run=true list= 
+  lint                     fm-ci-select: complete set: event is push, not a pull request run=true list= 
+  push job step with empty list: fm-test-run.sh --list --lane portable-parallel-1 --only-from '' -> 16 scripts (full lane = 16)
+  schedule parallel-1: fm-ci-select: complete set: event is schedule, not a pull request run=true list= 
+  workflow_dispatch parallel-1: fm-ci-select: complete set: event is workflow_dispatch, not a pull request run=true list= 
+
+=== S4 adversarial: PRs that must never run less ===
+  tests/lib.sh                 fm-test-run: full set required: tests/lib.sh is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) run=true list= 
+  .github/workflows/ci.yml     fm-test-run: full set required: .github/workflows/ci.yml is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) run=true list= 
+  bin/fm-test-run.sh           fm-test-run: full set required: bin/fm-test-run.sh is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) run=true list= 
+  bin/fm-ci-select.sh          fm-test-run: full set required: bin/fm-ci-select.sh is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) run=true list= 
+  bin/brand-new-unmapped.sh    fm-test-run: full set required: no changed-test mapping for source path: bin/brand-new-unmapped.sh fm-ci-select: complete set: no precise test selection (fm-test-run status 3) run=true list= 
+  bogus base sha               fm-ci-select: complete set: base commit deadbeefdeadbeefdeadbeefdeadbeefdeadbeef is not in this checkout run=true list= 
+  missing base sha             fm-ci-select: complete set: no pull request base commit run=true list= 
+  base==HEAD (no diff)         fm-test-run: full set required: no changed paths against 1d7fecef665ea4c2f5187842f87b9662a219e9a5 fm-ci-select: complete set: no precise test selection (fm-test-run status 3) run=true list= 
+  base==HEAD lint              fm-ci-select: complete set: no changed paths against 1d7fecef665ea4c2f5187842f87b9662a219e9a5 run=true list= 
+  PR touching 268 tests        fm-test-run: full set required: the selection covers 268 of 268 scripts fm-ci-select: complete set: no precise test selection (fm-test-run status 3) run=true list= 
+
+=== S5 lint input-change condition ===
+  md-only:       fm-ci-select: lint skipped: only text files changed run=false list= 
+  md + shell:    fm-ci-select: complete set: lint input changed: bin/fm-transition-lib.sh run=true list= 
+  workflow:      fm-ci-select: complete set: lint input changed: .github/workflows/ci.yml run=true list= 
+  asset+license: fm-ci-select: lint skipped: only text files changed run=false list= 
+  md-only, push: fm-ci-select: complete set: event is push, not a pull request run=true list= 

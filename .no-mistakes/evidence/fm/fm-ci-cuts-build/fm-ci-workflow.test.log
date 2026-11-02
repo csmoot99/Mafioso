@@ -1,0 +1,3 @@
+not ok - ruby is required to parse .github/workflows/ci.yml as YAML
+bash tests/fm-ci-workflow.test.sh  0.03s user 0.02s system 59% cpu 0.091 total
+workflow rc=1

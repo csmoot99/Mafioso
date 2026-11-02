@@ -1,0 +1,93 @@
+$ bin/fm-test-run.sh --check-coverage   (test-coverage job, against refreshed hints)
+FM_TEST_COVERAGE ok total=268 parallel=24 parallel_max_ms=1030556 parallel_imbalance_ms=73 parallel_unhinted=0 serial=228 serial_shards=10 serial_unhinted=0 serial_max_ms=1200000 serial_budget_ms=1200000 herdr=16
+[exit 0]
+
+--- aggregate step: one lane JSON at artifact root, Herdr JSON nested under fm-test/ ---
+$RUNNER_TEMP/fm-test-aggregate/fm-test-timing-portable-parallel-1.json
+$RUNNER_TEMP/fm-test-aggregate/fm-herdr/sessions-before.json
+$RUNNER_TEMP/fm-test-aggregate/fm-test/fm-test-timing-herdr.json
+--- step script (extracted verbatim from ci.yml) ---
+set -eu
+mkdir -p "$RUNNER_TEMP/fm-test"
+# Most lanes upload their timing JSON at the artifact root; the Herdr
+# artifact also carries diagnostics from a second directory, so its
+# timing JSON sits under fm-test/. Find them wherever they landed.
+inputs=()
+while IFS= read -r input; do
+  inputs+=("$input")
+done < <(find "$RUNNER_TEMP/fm-test-aggregate" -type f -name 'fm-test-timing-*.json' | LC_ALL=C sort)
+if [ "${#inputs[@]}" -eq 0 ]; then
+  echo "::warning::no per-lane timing JSON found to aggregate"
+  exit 0
+fi
+bin/fm-test-run.sh --aggregate-json \
+  "$RUNNER_TEMP/fm-test/fm-test-timing-aggregate.json" \
+  "${inputs[@]}"
+--- run ---
+FM_TEST_AGGREGATE lanes=2 total=2 failed=0 skipped_gate=0 critical_path_duration_ms=17540
+[exit 0]
+--- aggregate output ---
+{
+  "kind": "aggregate",
+  "lanes": [
+    {
+      "finished_at": "2026-11-02T22:25:53Z",
+      "path": "/tmp/fmagg.7Je5tg/fm-test-aggregate/fm-test-timing-portable-parallel-1.json",
+      "run_id": "fm-test-run-1793658336090-2740559",
+      "selection": "lane=portable-parallel-1",
+      "started_at": "2026-11-02T22:25:36Z",
+      "summary": {
+        "duration_ms": 17540,
+        "failed": 0,
+        "skipped_gate": 0,
+        "total": 1
+      }
+    },
+    {
+      "finished_at": "2026-11-02T22:25:53Z",
+      "path": "/tmp/fmagg.7Je5tg/fm-test-aggregate/fm-test/fm-test-timing-herdr.json",
+      "run_id": "herdr-1",
+      "selection": "family=real-herdr-gated",
+      "started_at": "2026-11-02T22:25:36Z",
+      "summary": {
+        "duration_ms": 17540,
+        "failed": 0,
+        "skipped_gate": 0,
+        "total": 1
+      }
+    }
+  ],
+  "scripts": [
+    {
+      "duration_ms": 17463,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pure-contract-unit",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "lane_run_id": "fm-test-run-1793658336090-2740559",
+      "lane_selection": "lane=portable-parallel-1",
+      "path": "tests/fm-brief.test.sh"
+    },
+    {
+      "duration_ms": 17463,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pure-contract-unit",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "lane_run_id": "herdr-1",
+      "lane_selection": "family=real-herdr-gated",
+      "path": "tests/fm-brief.test.sh"
+    }
+  ],
+  "slowest": [
+    {
+      "duration_ms": 17463,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pure-contract-unit",
+
+--- empty download (PR where no lane selected anything) ---
+::warning::no per-lane timing JSON found to aggregate
+[exit 0]
