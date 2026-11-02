@@ -138,26 +138,42 @@ a { color: inherit; text-decoration: none; }
   padding: 26px 28px 72px; display: flex; flex-direction: column; gap: 22px;
 }
 
-/* stat strip */
-.bb-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
-.bb-stat {
-  display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; min-width: 0;
-  background: var(--surface-card-warm); border: 1px solid var(--border-soft); border-radius: var(--radius-md);
-  cursor: pointer; transition: border-color 120ms, background 120ms;
-}
-.bb-stat:hover { border-color: var(--ink-500); }
-.bb-stat:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.bb-stat--call { background: var(--rust-050); border: 2px solid var(--rust-500); }
-.bb-stat__num { font-family: var(--font-mono); font-size: var(--fs-h3); font-weight: 600; line-height: 1; color: var(--text-strong); }
-.bb-stat--call .bb-stat__num { color: var(--rust-600); }
-.bb-stat__label { font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); }
 
+.bb-section[hidden] { display: none; }
 .bb-section { display: flex; flex-direction: column; gap: 12px; min-width: 0; scroll-margin-top: 12px; }
 .bb-section:focus { outline: none; }
 @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
 .bb-section__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
 .bb-section__head .fm-sign--muted { white-space: normal; line-height: 1.35; min-width: 0; }
-.bb-cols { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 22px; }
+
+/* ---- tab bar: one tab per section, sticky, sideways-scrolling when it does not fit ---- */
+.bb-tabbar {
+  position: sticky; top: 0; z-index: 30;
+  background: var(--paper-100); background-image: var(--texture-paper);
+  border-bottom: 1px solid var(--border-default);
+}
+.bb-tabbar__inner {
+  position: relative; max-width: var(--container-app); margin: 0 auto; padding: 0 22px;
+  display: flex; gap: 4px; overflow-x: auto; overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch; scrollbar-width: none;
+}
+.bb-tabbar__inner::-webkit-scrollbar { display: none; }
+.bb-tab {
+  flex: none; display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 14px; margin: 0;
+  font: inherit; font-family: var(--font-sans); font-size: var(--fs-sm); font-weight: 800; white-space: nowrap;
+  color: var(--text-muted); background: none; border: 0; border-bottom: 3px solid transparent; cursor: pointer;
+}
+.bb-tab:hover { color: var(--text-strong); }
+.bb-tab:focus-visible { outline: none; box-shadow: inset var(--focus-ring); }
+.bb-tab[aria-selected="true"] { color: var(--text-strong); border-bottom-color: var(--rust-500); }
+.bb-tab__n {
+  font-family: var(--font-mono); font-size: var(--fs-2xs); font-weight: 600; line-height: 1;
+  padding: 4px 7px 3px; border-radius: var(--radius-pill);
+  background: var(--paper-200); border: 1px solid var(--border-soft); color: var(--text-muted);
+}
+.bb-tab--call .bb-tab__n { background: var(--rust-050); border-color: var(--rust-500); color: var(--rust-600); }
+.bb-tab--call .bb-tab__n.is-zero { background: var(--paper-200); border-color: var(--border-soft); color: var(--text-muted); }
+#bb-sec-call .bb-callwrap { max-width: 760px; }
 
 /* ---- Captain's Call: one card at a time, dealt off a visible stack ---- */
 .bb-callwrap { display: flex; flex-direction: column; gap: 12px; }
@@ -376,17 +392,6 @@ a { color: inherit; text-decoration: none; }
   color: var(--paper-100); overflow-wrap: anywhere; max-height: 28vh; overflow-y: auto; }
 
 /* ---- Reports: a collapsible list of the write-ups, each opening full screen ---- */
-.bb-rep__toggle {
-  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 12px 18px; margin: 0;
-  font: inherit; text-align: left; cursor: pointer; color: var(--text-strong);
-  background: none; border: 0; border-radius: var(--radius-lg);
-}
-.bb-rep__toggle:focus-visible { outline: none; box-shadow: inset var(--focus-ring); }
-.bb-rep__count { flex: 1 1 auto; text-align: right; font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-muted); }
-.bb-rep__chev { width: 18px; height: 18px; flex: none; transition: transform 120ms; }
-.bb-rep__toggle[aria-expanded="true"] .bb-rep__chev { transform: rotate(180deg); }
-.bb-rep__panel { border-top: 1px solid var(--border-default); }
-.bb-rep__panel[hidden] { display: none; }
 .bb-rep__tools { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 15rem); gap: 10px; padding: 12px 18px 4px; }
 .bb-rep__q, .bb-rep__proj {
   width: 100%; min-width: 0; min-height: 44px; margin: 0; padding: 8px 11px;
@@ -430,15 +435,12 @@ html.bb-noscroll, html.bb-noscroll body { overflow: hidden; }
   line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bb-rv__frame { display: block; flex: 1 1 auto; min-height: 0; width: 100%; border: 0; background: var(--bg-page); }
 
-@media (max-width: 900px) {
-  .bb-cols { grid-template-columns: minmax(0, 1fr); }
-}
 
 /* ---- phone layer: every control is at least 44px, nothing is wider than the screen ---- */
 @media (max-width: 640px) {
   .bb-nav__inner { padding: 0 16px; }
+  .bb-tabbar__inner { padding: 0 10px; }
   .bb-main { padding: 18px 16px 56px; gap: 18px; }
-  .bb-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* a tall card's rotated pile edges grow with its height; keep them inside the gutter */
   .bb-call::before { transform: rotate(0.5deg) translate(3px, 5px); }
   .bb-call::after  { transform: rotate(-0.4deg) translate(-2px, 8px); }
@@ -462,7 +464,6 @@ html.bb-noscroll, html.bb-noscroll body { overflow: hidden; }
   .bb-shots__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .bb-lb__btn--prev { left: 6px; }
   .bb-lb__btn--next { right: 6px; }
-  .bb-rep__toggle { padding: 12px 14px; }
   .bb-rep__tools { grid-template-columns: minmax(0, 1fr); padding: 12px 14px 4px; }
   .bb-rep__status { padding: 6px 14px 8px; }
   .bb-rep__row { padding: 11px 14px; }
@@ -486,11 +487,10 @@ html.bb-noscroll, html.bb-noscroll body { overflow: hidden; }
   </div>
 </header>
 
+<div class="bb-tabbar"><div class="bb-tabbar__inner" id="bb-tabs" role="tablist" aria-label="Board sections"></div></div>
+
 <main class="bb-main">
 
-  <div class="bb-stats" id="bb-stats"></div>
-
-  <div class="bb-cols">
   <section class="bb-section" id="bb-sec-call" tabindex="-1">
     <div class="bb-section__head">
       <span class="fm-sign fm-sign--eyebrow">
@@ -535,9 +535,7 @@ html.bb-noscroll, html.bb-noscroll body { overflow: hidden; }
       </div>
     </div>
   </section>
-  </div>
 
-  <div class="bb-cols">
     <section class="bb-section" id="bb-sec-underway" tabindex="-1">
       <div class="bb-section__head">
         <span class="fm-sign fm-sign--eyebrow">
@@ -557,27 +555,23 @@ html.bb-noscroll, html.bb-noscroll body { overflow: hidden; }
       </div>
       <div class="fm-card"><div class="bb-rows" id="bb-landed"></div></div>
     </section>
-  </div>
 
   <section class="bb-section" id="bb-sec-reports" tabindex="-1" hidden>
+    <div class="bb-section__head">
+      <span class="fm-sign fm-sign--eyebrow">
+        <svg class="fm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+        Reports
+      </span>
+      <span class="fm-sign fm-sign--muted" id="bb-rep-count"></span>
+    </div>
     <div class="fm-card fm-card--warm">
-      <button type="button" class="bb-rep__toggle" id="bb-rep-toggle" aria-expanded="false" aria-controls="bb-rep-panel">
-        <span class="fm-sign fm-sign--eyebrow">
-          <svg class="fm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
-          Reports
-        </span>
-        <span class="bb-rep__count" id="bb-rep-count"></span>
-        <svg class="bb-rep__chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-      </button>
-      <div class="bb-rep__panel" id="bb-rep-panel" hidden>
-        <div class="bb-rep__tools">
-          <input type="search" class="bb-rep__q" id="bb-rep-q" placeholder="Filter reports" aria-label="Filter reports by text" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" />
-          <select class="bb-rep__proj" id="bb-rep-proj" aria-label="Filter reports by project"></select>
-        </div>
-        <div class="bb-rep__status" id="bb-rep-status" aria-live="polite"></div>
-        <div id="bb-rep-list"></div>
-        <button type="button" class="fm-btn fm-btn--sm bb-rep__more" id="bb-rep-more" hidden>Show more</button>
+      <div class="bb-rep__tools">
+        <input type="search" class="bb-rep__q" id="bb-rep-q" placeholder="Filter reports" aria-label="Filter reports by text" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" />
+        <select class="bb-rep__proj" id="bb-rep-proj" aria-label="Filter reports by project"></select>
       </div>
+      <div class="bb-rep__status" id="bb-rep-status" aria-live="polite"></div>
+      <div id="bb-rep-list"></div>
+      <button type="button" class="fm-btn fm-btn--sm bb-rep__more" id="bb-rep-more" hidden>Show more</button>
     </div>
   </section>
 
@@ -831,39 +825,88 @@ __FM_BEARINGS_BOARD_DATA__
 
   document.getElementById("bb-provenance").textContent = data.schema + " · " + data.generated;
 
-  /* stat strip */
+  /* tab bar: one tab per section with its count, only the selected section
+     shown. The selection survives a refresh or rebuild through the URL hash
+     first, then a per-viewer localStorage value; both are best-effort (the
+     sandboxed frame may refuse either) and the board works without them. */
   var callTotal = data.captains_call.length;
-  var stats = [
-    { n: callTotal, l: "need you", call: true, to: "bb-sec-call" },
-    { n: data.underway.length, l: "underway", to: "bb-sec-underway" },
-    { n: data.landed.length, l: "landed recently", to: "bb-sec-landed" },
-    { n: chartedQueued(data.charted).length + chartedMoreQueued, l: "charted next", to: "bb-sec-charted" }
+  var tabDefs = [
+    { id: "call", label: "Captain's Call", n: callTotal },
+    { id: "underway", label: "Underway", n: data.underway.length },
+    { id: "landed", label: "Recently landed", n: data.landed.length },
+    { id: "charted", label: "Charted next", n: chartedQueued(data.charted).length + chartedMoreQueued }
   ];
-  if (reports.length) stats.push({ n: reports.length, l: "reports", to: "bb-sec-reports", before: openReports });
-  var strip = document.getElementById("bb-stats");
+  if (reports.length) tabDefs.push({ id: "reports", label: "Reports", n: reports.length });
+  var TAB_KEY = "fm-bearings-tab";
+  var tabBar = document.getElementById("bb-tabs");
+  var tabIds = tabDefs.map(function (t) { return t.id; });
   var needNum = null;
-  /* each summary card is a real link to its section; the click handler adds the
-     smooth scroll (instant under reduced motion) and moves focus there */
-  stats.forEach(function (s) {
-    var t = el("a", "bb-stat" + (s.call ? " bb-stat--call" : ""));
-    t.href = "#" + s.to;
-    var num = el("span", "bb-stat__num", String(s.n));
-    if (s.call) needNum = num;
-    t.appendChild(num);
-    t.appendChild(el("span", "bb-stat__label", s.l));
-    t.addEventListener("click", function (ev) {
-      if (s.before) s.before();
-      var sec = document.getElementById(s.to);
-      if (!sec || !sec.scrollIntoView) return;
-      ev.preventDefault();
-      sec.scrollIntoView({ block: "start", behavior: reducedMotion() ? "auto" : "smooth" });
-      if (sec.focus) sec.focus({ preventScroll: true });
-    });
-    strip.appendChild(t);
+  tabDefs.forEach(function (t) {
+    var b = el("button", "bb-tab bb-tab--" + t.id);
+    b.type = "button";
+    b.id = "bb-tab-" + t.id;
+    b.setAttribute("role", "tab");
+    b.setAttribute("aria-controls", "bb-sec-" + t.id);
+    b.appendChild(el("span", "bb-tab__label", t.label));
+    var num = el("span", "bb-tab__n", String(t.n));
+    if (t.id === "call") needNum = num;
+    b.appendChild(num);
+    b.addEventListener("click", function () { selectTab(t.id, { persist: true, top: true }); });
+    t.btn = b;
+    tabBar.appendChild(b);
+    var panel = document.getElementById("bb-sec-" + t.id);
+    panel.setAttribute("role", "tabpanel");
+    panel.setAttribute("aria-labelledby", b.id);
   });
+  function savedTab() {
+    var h = String(location.hash || "").replace(/^#/, "");
+    if (tabIds.indexOf(h) >= 0) return h;
+    try { var v = window.localStorage.getItem(TAB_KEY); if (tabIds.indexOf(v) >= 0) return v; } catch (e) { /* storage unavailable */ }
+    /* Lavish's sandboxed frame has no storage and a fresh address on every
+       reload, but the frame itself keeps its name across a rebuild's reload */
+    try { var m = /^fm-bearings-tab=(\w+)$/.exec(window.name || ""); if (m && tabIds.indexOf(m[1]) >= 0) return m[1]; } catch (e) { /* name unavailable */ }
+    return "call";
+  }
+  function rememberTab(id) {
+    try { history.replaceState(null, "", "#" + id); } catch (e) { /* sandboxed frame */ }
+    try { window.localStorage.setItem(TAB_KEY, id); } catch (e) { /* storage unavailable */ }
+    try { if (!window.name || /^fm-bearings-tab=/.test(window.name)) window.name = "fm-bearings-tab=" + id; } catch (e) { /* name unavailable */ }
+  }
+  function selectTab(id, opts) {
+    if (tabIds.indexOf(id) < 0) id = "call";
+    tabDefs.forEach(function (t) {
+      var on = t.id === id;
+      t.btn.setAttribute("aria-selected", on ? "true" : "false");
+      t.btn.tabIndex = on ? 0 : -1;
+      document.getElementById("bb-sec-" + t.id).hidden = !on;
+    });
+    var btn = tabDefs[tabIds.indexOf(id)].btn;
+    var left = btn.offsetLeft, right = left + btn.offsetWidth;
+    if (left < tabBar.scrollLeft) tabBar.scrollLeft = Math.max(0, left - 16);
+    else if (right > tabBar.scrollLeft + tabBar.clientWidth) tabBar.scrollLeft = right - tabBar.clientWidth + 16;
+    if (opts && opts.focus) btn.focus();
+    if (opts && opts.persist) rememberTab(id);
+    if (opts && opts.top && window.scrollTo) window.scrollTo(0, 0);
+  }
+  tabBar.addEventListener("keydown", function (ev) {
+    var i = tabIds.indexOf(String(document.activeElement && document.activeElement.id || "").replace(/^bb-tab-/, ""));
+    if (i < 0) return;
+    var to = ev.key === "ArrowRight" ? (i + 1) % tabIds.length
+      : ev.key === "ArrowLeft" ? (i + tabIds.length - 1) % tabIds.length
+      : ev.key === "Home" ? 0 : ev.key === "End" ? tabIds.length - 1 : -1;
+    if (to < 0) return;
+    ev.preventDefault();
+    selectTab(tabIds[to], { focus: true, persist: true });
+  });
+  window.addEventListener("hashchange", function () {
+    var h = String(location.hash || "").replace(/^#/, "");
+    if (tabIds.indexOf(h) >= 0) selectTab(h, { persist: true });
+  });
+  selectTab(savedTab());
   /* the "need you" count follows the cards still on the board */
   function showCallCount(n) {
     needNum.textContent = String(n);
+    needNum.classList.toggle("is-zero", n === 0);
     document.getElementById("bb-call-sub").textContent =
       n ? n + " item" + (n === 1 ? "" : "s") + " wait on you" : "nothing needs you";
   }
@@ -1390,14 +1433,8 @@ __FM_BEARINGS_BOARD_DATA__
     });
   }
 
-  /* Reports section: a collapsed list with a text filter and a project filter;
+  /* Reports tab: a list with a text filter and a project filter;
      a tap opens the write-up full screen in a script-less frame. */
-  var repToggle = document.getElementById("bb-rep-toggle");
-  var repPanel = document.getElementById("bb-rep-panel");
-  function openReports() {
-    repPanel.hidden = false;
-    repToggle.setAttribute("aria-expanded", "true");
-  }
   if (reports.length) {
     var REP_PAGE = 25;
     var repShown = REP_PAGE;
@@ -1412,7 +1449,6 @@ __FM_BEARINGS_BOARD_DATA__
     var rvBack = document.getElementById("bb-rv-back");
     var rvOpener = null;
     function repProject(r) { return r.repo || NO_PROJECT; }
-    document.getElementById("bb-sec-reports").hidden = false;
     document.getElementById("bb-rep-count").textContent = reports.length + (reports.length === 1 ? " report" : " reports");
     var projCounts = {};
     reports.forEach(function (r) { projCounts[repProject(r)] = (projCounts[repProject(r)] || 0) + 1; });
@@ -1482,12 +1518,6 @@ __FM_BEARINGS_BOARD_DATA__
     repQ.addEventListener("input", repRefilter);
     repProj.addEventListener("change", repRefilter);
     repMore.addEventListener("click", function () { repShown += REP_PAGE; repRender(); });
-    repToggle.addEventListener("click", function () {
-      if (repPanel.hidden) openReports(); else {
-        repPanel.hidden = true;
-        repToggle.setAttribute("aria-expanded", "false");
-      }
-    });
     repRender();
   }
   } catch (e) {
