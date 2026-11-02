@@ -1,0 +1,10 @@
+job pid: 133428
+claude exit 0 after 49s
+--- Bash commands the worker ran:
+$ cd /tmp/tmp.fPhL3ceKlg; pid=$(cat job.pid); echo "pid=$pid"; end=$((SECONDS+570)); until [ -f done ] || [ $SECONDS -ge $end ]; do if ! kill -0 "$pid" 2>/dev/null; then sleep 5; [ -f done ] || { echo "process $pid gone, no done file"; break; }; fi; sleep 5; done; ls -la; [ -f done ] && echo "=== results.txt ===" && cat results.txt | timeout: 600000
+--- final reply: The test run finished. Here is what `results.txt` contains:
+
+```
+12 passed
+```
+--- job still alive after worker returned: no; done-file present: yes

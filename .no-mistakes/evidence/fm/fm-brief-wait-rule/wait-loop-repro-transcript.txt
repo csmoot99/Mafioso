@@ -1,0 +1,19 @@
+### S3a: forbidden shape - no real job is running at all
+real processes matching pattern before loop (excluding this probe): 0
+$ timeout 15 bash -c 'until ! pgrep -f "vitest run scripts/__tests__/shared-node" >/dev/null; do sleep 1; done'
+-> exit 124 after 15s (124 = killed by timeout: the loop matched its own command line and would never end)
+
+### S3b: rule alternative - recorded PID with kill -0, waited from a separate shell
+$ timeout 30 bash -c 'pid=$(cat job.pid); until ! kill -0 "$pid" 2>/dev/null; do sleep 1; done'
+-> exit 0 after 6s (job ran ~6s)
+
+### S3c: rule alternative - done-file the job writes
+$ timeout 30 bash -c 'until [ -e done ]; do sleep 1; done'
+-> exit 0 after 6s (job wrote done after ~5s)
+
+### S3d: every wait has a timeout - a job that never finishes
+$ timeout 4 bash -c 'until ! kill -0 "$pid" ...'  -> exit 124 after 4s (bounded, returns control)
+
+### S3e: why wait "$pid" was dropped (review decision) - PID from another shell call
+$ bash -c 'wait "$pid"'  -> _: line 1: wait: pid 114351 is not a child of this shell
+wait exit=127 after 0s while job still alive: yes
