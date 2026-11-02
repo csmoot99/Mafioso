@@ -98,7 +98,9 @@
 # like a card image: Lavish's sandboxed frame cannot fetch a sibling file, so
 # the board shows that page in an iframe instead. The whole assets folder is
 # replaced on every build, and only the relative `src` reaches the page data,
-# never the local path. A payload with no `reports`, or an empty list, builds
+# never the local path. Each page carries a Download link holding the report's
+# original bytes, saved as <YYYY-MM-DD>-<title-slug>.md, and the payload gains a
+# plain-text `text` of each report for the Reports tab's full-text search. A payload with no `reports`, or an empty list, builds
 # exactly as before and the board shows no Reports tab.
 #
 # Every Underway row likewise carries a non-empty `name`: the durable task name
@@ -356,19 +358,21 @@ validate_report_files() {  # <data.json>
 }
 
 # Render every report into <stage>/.reports/<n>.html and rewrite the payload's
-# `reports` to carry only the relative src beside title, repo, date and summary.
+# `reports` to carry the relative src and a plain-text search index beside title, repo, date and summary.
 stage_reports() {  # <payload.json> <stage-dir>; rewrites the payload in place
-  local payload=$1 stage=$2 n=0 path
-  while IFS= read -r path; do
+  local payload=$1 stage=$2 n=0 path name dir="$2/$REPORTS_DIR_NAME"
+  while IFS=$'\t' read -r path name; do
     n=$((n + 1))
-    mkdir -p -- "$stage/$REPORTS_DIR_NAME" \
-      && perl "$SCRIPT_DIR/fm-bearings-md.pl" "$path" > "$stage/$REPORTS_DIR_NAME/$n.html" || return 1
-  done < <(jq -r '.reports[]? | .path' "$payload")
+    mkdir -p -- "$dir" \
+      && perl "$SCRIPT_DIR/fm-bearings-md.pl" "$path" "$name" > "$dir/$n.html" \
+      && perl "$SCRIPT_DIR/fm-bearings-md.pl" --text "$path" | jq -Rs . >> "$dir/text.jsonl" || return 1
+  done < <(jq -r '.reports[]? | [.path, (.date + "-" + ((.title | ascii_downcase | gsub("[^a-z0-9]+"; "-") | gsub("^-+|-+$"; "")) | if . == "" then "report" else .[0:80] end) + ".md")] | @tsv' "$payload")
   [ "$n" -gt 0 ] || return 0
-  jq --arg dir "$ASSETS_DIR_NAME/$REPORTS_DIR_NAME" '
+  jq --arg dir "$ASSETS_DIR_NAME/$REPORTS_DIR_NAME" --slurpfile texts "$dir/text.jsonl" '
     .reports |= (to_entries | map(.key as $i | .value
-      | {title, repo, date, summary, src: ($dir + "/" + ($i + 1 | tostring) + ".html")}))
+      | {title, repo, date, summary, text: $texts[$i], src: ($dir + "/" + ($i + 1 | tostring) + ".html")}))
   ' "$payload" > "$payload.r" || { rm -f -- "$payload.r"; return 1; }
+  rm -f -- "$dir/text.jsonl"
   mv -f -- "$payload.r" "$payload"
 }
 

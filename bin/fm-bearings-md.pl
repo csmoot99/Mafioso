@@ -1,7 +1,8 @@
 #!/usr/bin/env perl
 # fm-bearings-md.pl - render one untrusted markdown report as an inert HTML page.
 #
-# Usage: fm-bearings-md.pl <report.md>   (HTML page on stdout)
+# Usage: fm-bearings-md.pl <report.md> [download-name.md]   (HTML page on stdout)
+#        fm-bearings-md.pl --text <report.md>               (plain-text search index on stdout)
 #
 # Owned by bin/fm-bearings-board.sh, which publishes the result beside the
 # /bearings lavish board. The report text is written by workers, so the page is
@@ -20,8 +21,32 @@ use warnings;
 use utf8;
 no warnings 'utf8';
 
-my $file = shift(@ARGV);
-defined $file && !@ARGV or die "usage: fm-bearings-md.pl <report.md>\n";
+use MIME::Base64 ();
+
+my $text_mode = @ARGV && $ARGV[0] eq '--text' ? shift(@ARGV) : 0;
+my ($file, $dlname) = @ARGV;
+defined $file && @ARGV <= 2 or die "usage: fm-bearings-md.pl <report.md> [download-name.md]\n";
+$dlname = 'report.md' unless defined $dlname && $dlname =~ /\A[A-Za-z0-9._-]+\z/;
+my $raw = do {
+    open(my $rh, '<:raw', $file) or die "fm-bearings-md: cannot read $file\n";
+    local $/;
+    my $c = <$rh>;
+    defined $c ? $c : '';
+};
+if ($text_mode) {
+    # one line of words for board search: markdown marks dropped, whitespace collapsed
+    my $t = do { open(my $th, '<:encoding(UTF-8)', $file) or die "fm-bearings-md: cannot read $file\n"; local $/; <$th> // '' };
+    $t =~ s/\A\x{FEFF}//;
+    $t =~ s/[\x00-\x1F\x7F]+/ /g;
+    $t =~ s/!?\[([^\]]*)\]\([^)]*\)/$1/g;
+    $t =~ s/[`*_~#>|]+/ /g;
+    $t =~ s/\s+/ /g;
+    $t =~ s/^ | $//g;
+    binmode(STDOUT, ':encoding(UTF-8)');
+    print $t;
+    exit 0;
+}
+my $b64 = MIME::Base64::encode_base64($raw, '');
 
 my $src = do {
     open(my $fh, '<:encoding(UTF-8)', $file) or die "fm-bearings-md: cannot read $file\n";
@@ -230,10 +255,15 @@ table { border-collapse: collapse; font-size: 0.875rem; min-width: 100%; }
 th, td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
 th { background: var(--paper-200); color: var(--ink-900); }
 .empty { color: var(--ink-500); }
+.dl { display: flex; justify-content: flex-end; max-width: 760px; margin: 0 auto 14px; }
+.dl a { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 16px; border-radius: 9px;
+  background: var(--ink-900); color: var(--paper-000); font-weight: 700; font-size: 0.9375rem; text-decoration: none; }
 \@media (max-width: 640px) { pre { white-space: pre-wrap; overflow-wrap: anywhere; } }
 </style>
 </head>
-<body><main>
+<body>
+<div class="dl"><a download="$dlname" href="data:text/markdown;charset=utf-8;base64,$b64">Download report (.md)</a></div>
+<main>
 $body
 </main></body>
 </html>
