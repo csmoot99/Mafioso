@@ -1346,8 +1346,9 @@ __FM_BEARINGS_BOARD_DATA__
      one bar builder. Meaning never rides on colour: every bar has a text label,
      an owner wait is a labelled chip, and the native <progress> carries the
      values for assistive tech. */
-  var STAGE_LABEL = { planning: "Planning", building: "Building", owner: "Waiting on you", tests: "Tests",
-    validating: "Validating", checks: "PR checks", ready: "Ready to merge", stuck: "Stopped - needs attention" };
+  var STAGE_LABEL = { planning: "Planning", building: "Building", validating: "Validating",
+    checks: "PR checks", ready: "Ready to merge" };
+  var MARKER_LABEL = { owner: "waiting on owner", stuck: "stuck" };
   function progBar(label, now, text, tone, feature) {
     var line = el("div", "bb-barline" + (feature ? " bb-barline--feature" : ""));
     line.appendChild(el("span", "bb-barline__label", label));
@@ -1361,9 +1362,8 @@ __FM_BEARINGS_BOARD_DATA__
     return line;
   }
   function stageBar(label, p, feature) {
-    var words = STAGE_LABEL[p.stage] || p.stage;
-    return progBar(label, p.pct, words + " · " + p.pct + "%",
-      p.stage === "owner" ? "owner" : (p.stage === "stuck" ? "stuck" : ""), feature);
+    var words = STAGE_LABEL[p.reached] || p.reached, marker = MARKER_LABEL[p.stage];
+    return progBar(label, p.pct, words + " · " + (marker || p.pct + "%"), marker ? p.stage : "", feature);
   }
   function progressBlock(t) {
     var p = t.progress, block = el("div", "bb-prog");
@@ -1385,7 +1385,7 @@ __FM_BEARINGS_BOARD_DATA__
   }
   data.underway.forEach(function (t) {
     var row = el("div", "bb-row" + (t.progress ? " bb-row--prog" : ""));
-    if (!t.progress) row.appendChild(badge(t.state === "working" ? "online" : "info", t.state));
+    if (!t.progress || MARKER_LABEL[t.progress.stage]) row.appendChild(badge(t.state === "working" ? "online" : "info", t.state));
     var main = el("div", "bb-row__main");
     /* the snapshot's durable name-or-id label leads the row so a scan says
        WHICH task this is; the run status keeps its place on the second line */

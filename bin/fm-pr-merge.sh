@@ -176,8 +176,6 @@
 # destination, normal-case deduplication, and at-least-once recovery.
 # A landed merge whose outcome cannot be written is reported loudly rather than
 # misreported as a failed merge.
-# After a proved merge, when $FM_HOME/data/<task-id>/parts exists, a
-# `merged <pr-url>` line is appended to it once (the bearings Underway part list).
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -1653,15 +1651,6 @@ esac
 # Reached only after the forge confirmed the merge landed: set -e exits on a
 # refused or failed merge above, and a queued forge merge exits without an
 # outcome while its existing poll remains armed.
-# A feature's part list (data/<task-id>/parts, see bin/fm-bearings-snapshot.sh)
-# gains its `merged <pr-url>` line here, once per proved merge, only when that
-# file already exists; a failed append never turns a landed merge into a failure.
-parts_file="$FM_HOME/data/$ID/parts"
-if [ -f "$parts_file" ] && [ ! -L "$parts_file" ] && ! grep -qxF "merged $URL" "$parts_file"; then
-  parts_lead=$(tail -c 1 "$parts_file")
-  { [ -z "$parts_lead" ] || printf '\n'; printf 'merged %s\n' "$URL"; } >> "$parts_file" \
-    || printf 'actionable: merged %s but could not append it to %s\n' "$URL" "$parts_file" >&2
-fi
 outcome_rc=0
 fm_merge_outcome_report "$FM_HOME" "$STATE" "$ID" "$URL" self \
   "${FM_PR_MERGE_AUTHORITY:-}" || outcome_rc=$?

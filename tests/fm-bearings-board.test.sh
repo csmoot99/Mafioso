@@ -929,16 +929,21 @@ test_build_validates_underway_progress() {
   home=$(make_home underway-progress)
   data="$home/payload.json"
   good='{"id":"t","repo":"r","name":"A feature","state":"working","kind":"ship","doing":"building",
-    "progress":{"stage":"tests","pct":60,"parts":[
+    "progress":{"stage":"owner","reached":"checks","pct":90,"parts":[
       {"label":"One","state":"merged"},{"label":"Two","state":"current"},{"label":"Three","state":"pending"}]}}'
   write_valid_payload "$data"
   jq --argjson row "$good" '.underway = [$row]' "$data" > "$data.tmp" && mv "$data.tmp" "$data"
   run_board "$home" build "$data" >/dev/null 2>&1 || fail "a valid progress row did not build"
   extract_payload "$home/.lavish/bearings-board.html" \
-    | jq -e '.underway[0].progress | .stage == "tests" and .pct == 60 and (.parts | length) == 3' >/dev/null \
+    | jq -e '.underway[0].progress | .stage == "owner" and .reached == "checks" and .pct == 90 and (.parts | length) == 3' >/dev/null \
     || fail "the progress row did not reach the built page"
   for bad in \
     '.progress.stage = "napping"' \
+    '.progress.stage = "tests"' \
+    '.progress.reached = "tests"' \
+    '.progress.reached = "owner"' \
+    '.progress.stage = "building"' \
+    '.progress |= del(.reached)' \
     '.progress.pct = 101' \
     '.progress.pct = 12.5' \
     '.progress.pct = "60"' \
@@ -948,7 +953,7 @@ test_build_validates_underway_progress() {
     '.progress.parts = [{"label":"A","state":"pending"},{"label":"B","state":"merged"}]' \
     '.progress.parts = [{"label":"A","state":"current"},{"label":"B","state":"current"}]' \
     '.progress.parts = [range(41) | {label:"p",state:"pending"}]' \
-    '.progress = "tests"'; do
+    '.progress = "owner"'; do
     write_valid_payload "$data"
     jq --argjson row "$good" ".underway = [\$row | $bad]" "$data" > "$data.tmp" && mv "$data.tmp" "$data"
     set +e; run_board "$home" build "$data" >/dev/null 2>&1; rc=$?; set -e

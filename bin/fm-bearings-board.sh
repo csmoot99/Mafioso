@@ -104,19 +104,20 @@
 # Every Underway row likewise carries a non-empty `name`: the durable task name
 # when known, otherwise its durable identifier.
 # An Underway row MAY carry `progress`, which the Underway tab draws as progress
-# bars in place of the state pill: `{ "stage", "pct", "parts"? }`, where `stage`
-# is one of planning, building, owner, tests, validating, checks, ready or stuck,
-# `pct` is the whole-number fill (0-100) that stage stands for, and `parts`, when
-# the feature has a recorded part list, is 1-40 ordered `{ "label", "state" }`
-# objects whose state is merged, current or pending, in that order, with at most
-# one current. The row then shows one bar for the parts merged out of the total
-# and one bar per part: merged parts full, the current part filled to `pct`, later
-# parts empty. A row with no `parts` shows its own stage bar only, and a row with
-# no `progress` keeps the plain state pill. The values come from the bearings
-# snapshot's in_flight `stage` and `pct` and its `parts` rows (bin/fm-bearings-
-# snapshot.sh owns their derivation), so the board is still built by this script
-# with no model step, no worker message and no network call. A stage `owner`
-# means the work waits on the owner and the bars say so in words.
+# bars: `{ "stage", "reached", "pct", "parts"? }`, where `reached` is the run
+# stage reached (planning, building, validating, checks or ready), `stage` is
+# that same value or one of the markers owner or stuck, `pct` is the whole-number
+# fill (0-100) of the reached stage, and `parts`, when the feature has a recorded
+# part list, is 1-40 ordered `{ "label", "state" }` objects whose state is
+# merged, current or pending, in that order, with at most one current. The row
+# then shows one bar for the parts merged out of the total and one bar per part:
+# merged parts full, the current part filled to `pct`, later parts empty. A row
+# with no `parts` shows its own stage bar only. A marker keeps the reached fill
+# and its bar says in words that it waits on the owner or is stuck; such a row,
+# like a row with no `progress`, also keeps its state pill. The values come from
+# the bearings snapshot's in_flight `stage`, `reached` and `pct` and its `parts`
+# rows (bin/fm-bearings-snapshot.sh owns their derivation), so the board is still
+# built by this script with no model step, no worker message and no network call.
 # A Charted Next row MAY carry `filed`, the durable filed date (YYYY-MM-DD, or
 # that date with a UTC timestamp) the template orders the section by, newest
 # first; a row with no comparable date keeps its payload order after every dated
@@ -241,7 +242,8 @@ validate_payload() {  # <data.json>
       (has("progress") | not)
       or (.progress
         | type == "object"
-          and (.stage | IN("planning", "building", "owner", "tests", "validating", "checks", "ready", "stuck"))
+          and (.reached | IN("planning", "building", "validating", "checks", "ready"))
+          and (.stage == .reached or (.stage | IN("owner", "stuck")))
           and (.pct | type == "number" and . >= 0 and . <= 100 and floor == .)
           and ((has("parts") | not) or (.parts | valid_parts)));
     def underway_item:

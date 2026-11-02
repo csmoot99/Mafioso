@@ -225,27 +225,31 @@ test_underway_progress_renders_feature_part_and_stage_bars() {
   local home out
   home=$(make_home underway-progress)
   out=$(render_board "$home" '[
-    {"id":"feat","repo":"sample","name":"A feature","state":"working","kind":"ship","doing":"building",
-     "progress":{"stage":"owner","pct":45,"parts":[
+    {"id":"feat","repo":"sample","name":"A feature","state":"parked","kind":"ship","doing":"parked at ci",
+     "progress":{"stage":"owner","reached":"checks","pct":90,"parts":[
        {"label":"One","state":"merged"},{"label":"Two","state":"current"},{"label":"Three","state":"pending"}]}},
     {"id":"one","repo":"sample","name":"One-off","state":"working","kind":"ship","doing":"ci",
-     "progress":{"stage":"checks","pct":90}},
+     "progress":{"stage":"checks","reached":"checks","pct":90}},
+    {"id":"lost","repo":"sample","name":"Lost worker","state":"unknown","kind":"ship","doing":"worktree gone",
+     "progress":{"stage":"stuck","reached":"validating","pct":75}},
     {"id":"old","repo":"sample","name":"No progress","state":"working","kind":"ship","doing":"x"}
   ]' '[]')
   printf '%s' "$out" | jq -e '
-    .underway[0] as $f | .underway[1] as $o | .underway[2] as $old
-    | ($f.badges == [] and $f.waiting == ["Waiting on you"]
+    .underway[0] as $f | .underway[1] as $o | .underway[2] as $l | .underway[3] as $old
+    | ([$f.badges[].text] == ["parked"] and $f.waiting == ["Waiting on you"]
        and ($f.bars | map([.label, .value, .max, .text]) == [
          ["Feature","33","100","1 of 3 parts merged"],
          ["Part 1: One","100","100","Merged"],
-         ["Part 2: Two","45","100","Waiting on you · 45%"],
+         ["Part 2: Two","90","100","PR checks · waiting on owner"],
          ["Part 3: Three","0","100","Not started"]])
        and ($f.bars[2].owner == true) and ($f.bars[1].owner == false))
       and ($o.badges == [] and $o.waiting == []
        and ($o.bars | map([.label, .value, .text]) == [["This task","90","PR checks · 90%"]]))
+      and ([$l.badges[].text] == ["unknown"] and $l.waiting == []
+       and ($l.bars | map([.label, .value, .text, .stuck]) == [["This task","75","Validating · stuck",true]]))
       and ([$old.badges[].text] == ["working"] and $old.bars == [])
   ' >/dev/null || fail "the Underway progress bars did not render as specified: $out"
-  pass "Underway shows a feature bar, one bar per part, a one-off stage bar, and keeps the pill when there is no progress"
+  pass "Underway shows a feature bar, one bar per part, marker bars that keep their fill and state pill, and keeps the pill when there is no progress"
 }
 
 test_an_underway_identifier_label_is_not_replaced_by_run_status() {

@@ -33,15 +33,23 @@
 # captain_decision because it has an open
 # captain hold still contributes each working child as its own Underway row;
 # the home row on secondmates[] keeps the decision and gate classification.
-# Each Underway row also carries a `stage` (planning, building, owner, validating,
-# checks, ready or stuck) and its bar fill `pct`, derived only from the canonical
-# structured current state (run step, parked or blocked state, open decisions, a
-# paused `-screens` key), never from status prose. No structured signal marks a
-# separate tests stage, so the board vocabulary has one but live rows never emit it.
+# Each Underway row also carries a `stage`, the run stage it `reached` and that
+# stage's bar fill `pct`, derived only from the canonical structured current
+# state (run step, parked, blocked, failed or unknown state, open decisions, a
+# paused `-screens` key, the meta pr= and the parts record), never from status
+# prose. `reached` is planning, building, validating, checks (a run at or parked
+# at its ci step) or ready; `stage` equals it except for two markers that keep
+# the reached fill: owner (parked, a pending decision or a `-screens` pause) and
+# stuck (failed, blocked, or an unknown state such as a gone worktree or backend
+# or a cancelled run). A marker's reached stage is the run step's when the source
+# names one, else building. A worker's own paused wait keeps its stage. When the
+# meta pr= is one of the task's `merged` parts lines, any finished run belongs to
+# the previous part, so the stage is building until a new PR or active run appears.
 # parts[] lists, in order, each part of an in-flight feature recorded in
 # data/<task-id>/parts: `part <label>` lines written once by hand when the feature
-# is planned, and `merged <pr-url>` lines that bin/fm-pr-merge.sh appends per proved
-# merge. A part is merged while the merged count covers it, current next, then pending.
+# is planned, and `merged <pr-url>` lines appended per recorded merge outcome
+# (bin/fm-merge-outcome-lib.sh). A part is merged while the merged count covers
+# it, current next, then pending; at most 40 parts are read.
 # Captain-hold placement follows the canonical snapshot's hold_bucket and
 # nothing else; this wrapper never inspects hold reason or body prose. The
 # buckets are total and mutually exclusive, so every captain hold appears in
@@ -154,7 +162,7 @@ Default collection performs bounded concurrent remote-ledger reads for registere
 remote homes under one shared snapshot budget and may refresh the parent-side cache.
 --include-prs additionally performs live GitHub discovery and checks.
 
-Default fields: schema, home, generated, prs, in_flight{id,kind,state,repo,name,doing,stage,pct},
+Default fields: schema, home, generated, prs, in_flight{id,kind,state,repo,name,doing,stage,reached,pct},
   parts{id,n,label,state} (only in-flight tasks with a data/<id>/parts record),
   secondmates{id,state,doing,provenance,freshness,age_seconds,contradiction,reason},
   secondmate_reconcile{id,spawn_gen,host,kind,ids},
@@ -368,29 +376,29 @@ esac
 # It is read as plain structured lines, never inferred from prose, and only
 # for main-home tasks. Absent, unreadable or oversized files mean the task
 # shows no parts, exactly as before.
-FM_BEARINGS_PARTS_MAX=${FM_BEARINGS_PARTS_MAX:-40}
-validate_bound FM_BEARINGS_PARTS_MAX "$FM_BEARINGS_PARTS_MAX"
-PARTS_ROWS='[]'
+PARTS='{"rows":[],"merged":{}}'
 FM_DATA_DIR=$(printf '%s' "$SNAP" | jq -r '.fm_home + "/data"')
 for parts_file in "$FM_DATA_DIR"/*/parts; do
   [ -f "$parts_file" ] && [ ! -L "$parts_file" ] || continue
   parts_id=${parts_file%/parts}
   parts_id=${parts_id##*/}
-  PARTS_ROWS=$(head -c 65536 "$parts_file" | jq -R -s --arg id "$parts_id" \
-    --argjson max "$FM_BEARINGS_PARTS_MAX" --argjson acc "$PARTS_ROWS" '
+  PARTS=$(head -c 65536 "$parts_file" | jq -R -s --arg id "$parts_id" --argjson acc "$PARTS" '
     split("\n") as $lines
     | [$lines[] | select(startswith("part ")) | .[5:] | gsub("\\s+"; " ") | sub("^ "; "") | sub(" $"; "") | select(length > 0)
-       | if length > 70 then .[:69] + "…" else . end][:$max] as $labels
-    | ([$lines[] | select(test("^merged https://[^ ]+$"))] | length) as $merged
-    | $acc + [$labels | to_entries[]
+       | if length > 70 then .[:69] + "…" else . end][:40] as $labels
+    | [$lines[] | select(test("^merged https://[^ ]+$")) | .[7:]] as $urls
+    | ($urls | length) as $merged
+    | $acc
+    | .merged[$id] = $urls
+    | .rows += [$labels | to_entries[]
         | {id:$id, n:(.key + 1), label:.value,
            state:(if (.key + 1) <= $merged then "merged"
                   elif (.key + 1) == ($merged + 1) then "current" else "pending" end)}]
-  ') || PARTS_ROWS='[]'
+  ') || PARTS='{"rows":[],"merged":{}}'
 done
 
 MODEL=$(printf '%s' "$SNAP" | jq \
-  --argjson parts_rows "$PARTS_ROWS" \
+  --argjson parts "$PARTS" \
   --arg home "$HOME_LABEL" \
   --arg now "$NOW" \
   --arg today "$BEARINGS_TODAY" \
@@ -429,26 +437,37 @@ MODEL=$(printf '%s' "$SNAP" | jq \
       else . end;
   def live_captain_call: .hold_bucket == "live";
   # Underway progress: one stage per row, derived only from the structured
-  # current-state reconciliation (never from status prose), and the bar fill
-  # each stage stands for. This is the single owner of that ladder.
-  def stage_pct: {planning:10, building:30, owner:45, tests:60, validating:75, checks:90, ready:95, stuck:0};
-  def stage_of_state($st):
-    if $st == "failed" or $st == "blocked" then "stuck"
+  # current-state reconciliation (never from status prose), the run stage it
+  # reached, and the bar fill of that reached stage. This is the single owner
+  # of that ladder; owner and stuck are markers that keep the reached fill.
+  def stage_pct: {planning:10, building:30, validating:75, checks:90, ready:95};
+  def marker_of_state($st):
+    if $st == "failed" or $st == "blocked" or $st == "unknown" then "stuck"
     elif $st == "parked" then "owner"
-    elif $st == "done" then "ready"
-    else "building" end;
+    else null end;
+  def progress($marker; $reached):
+    {stage:($marker // $reached), reached:$reached, pct:stage_pct[$reached]};
+  def stage_of_state($st):
+    progress(marker_of_state($st); (if $st == "done" then "ready" else "building" end));
   def task_stage:
     (.current_state.state // "unknown") as $st
     | (.current_state.source // "none") as $src
     | (.current_state.detail // "") as $detail
     | (.hints // {}) as $h
     | (((.paths.status_log.last_event.raw // "") | test("^paused[^:]*\\[key=[^] ]*-screens\\]")) and $st != "working") as $screens
-    | if $st == "failed" or $st == "blocked" then "stuck"
-      elif $st == "parked" or $screens or ($h.pending_decision == true) or (($h.open_decisions // []) | length > 0) then "owner"
-      elif $st == "done" then "ready"
-      elif $src == "run-step" then (if ($detail | test("^ci")) then "checks" else "validating" end)
-      elif .kind == "scout" then "planning"
-      else "building" end;
+    | ((.pr.source == "meta") and (.pr.url as $url | ($parts.merged[.id] // []) | index($url) != null)) as $pr_merged
+    | (if $src == "run-step" then (if ($detail | test("^(parked at )?ci\\b")) then "checks" else "validating" end)
+       else null end) as $step
+    | (marker_of_state($st)
+       // (if $screens or ($h.pending_decision == true) or (($h.open_decisions // []) | length > 0)
+           then "owner" else null end)) as $marker
+    | progress($marker;
+        if $pr_merged and ($st != "working" or $step == null) then "building"
+        elif $marker != null then ($step // "building")
+        elif $st == "done" then "ready"
+        elif $step != null then $step
+        elif .kind == "scout" then "planning"
+        else "building" end);
   def projected_deferred_hold:
     .hold_bucket != null and .hold_bucket != "live";
   def bounded_blocker_note($n):
@@ -570,9 +589,8 @@ MODEL=$(printf '%s' "$SNAP" | jq \
         name:((.backlog.title // "") as $name
               | (if ($name | test("[^[:space:]]")) then $name else .id end) | trunc(70)),
         doing: ((.current_state.detail // "") as $d
-                | (if $d != "" then $d else (.hints.last_event_text // "") end) | trunc(90)),
-        stage: task_stage
-      } | . + {pct: stage_pct[.stage]} ]
+                | (if $d != "" then $d else (.hints.last_event_text // "") end) | trunc(90))
+      } + task_stage ]
      + [ $secondmate_views[] as $m
          | $m.active_children[]?
          | {id:($m.id + "/" + .id),
@@ -582,9 +600,8 @@ MODEL=$(printf '%s' "$SNAP" | jq \
             name:((.name // "") as $name
                   | (if (($name | type) == "string" and ($name | test("[^[:space:]]")))
                      then $name else ($m.id + "/" + .id) end) | trunc(70)),
-            doing:((.doing // .state) | trunc(90)),
-            stage: stage_of_state(.state // "working")}
-         | . + {pct: stage_pct[.stage]} ]) as $in_flight_all
+            doing:((.doing // .state) | trunc(90))}
+           + stage_of_state(.state // "working") ]) as $in_flight_all
   | ([ .backlog.records[]
          | . as $record
          | select(.structured and .hold_bucket != null)
@@ -700,7 +717,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
            captain:[$measured[] as $h | $h.captain[]? | . + {owner:$h.owner}]}),
       in_flight: (if $all_in_flight == 1 then $in_flight_all else $in_flight_all[:$in_flight_n] end),
       parts: ((if $all_in_flight == 1 then $in_flight_all else $in_flight_all[:$in_flight_n] end) as $shown
-              | [$parts_rows[] | select(.id as $id | $shown | any(.id == $id))]),
+              | [$parts.rows[] | select(.id as $id | $shown | any(.id == $id))]),
       secondmates: (if $all_secondmates == 1 then $secondmates_all else $secondmates_all[:$secondmates_n] end),
       secondmate_reconcile: [ (.secondmate_current.records // [])[]
         | select(.reconcile_inventory != null)

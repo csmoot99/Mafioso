@@ -2601,6 +2601,7 @@ EOF
       "harness=claude" "kind=ship" "mode=no-mistakes"
   done
   record_claude_state "$home/state" feat busy
+  record_claude_state "$home/state" waiting idle
   printf 'working: building\n' > "$home/state/feat.status"
   printf 'paused [key=waiting-screens] [at=1793000000]: screenshots at /tmp/x\n' > "$home/state/waiting.status"
   printf 'working: ok\n' > "$home/state/linked.status"
@@ -2613,18 +2614,65 @@ EOF
   json=$(run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
     (.in_flight | map({(.id): .}) | add) as $r
-    | ($r.feat | .stage == "building" and .pct == 30)
-      and ($r.waiting | .stage == "owner" and .pct == 45)
+    | ($r.feat | .stage == "building" and .reached == "building" and .pct == 30)
+      and ($r.waiting | .stage == "owner" and .reached == "building" and .pct == 30)
       and ([.parts[] | select(.id == "feat") | [.n, .label, .state]] == [
         [1, "Source model", "merged"], [2, "Poll and confirm", "current"], [3, "Editor view", "pending"]])
       and ([.parts[] | select(.id != "feat")] == [])
   ' >/dev/null || fail "Underway stage or recorded parts are wrong: $json"
   toon=$(run "$home" "$fakebin")
-  printf '%s\n' "$toon" | grep -q '^in_flight\[[0-9]*\]{id,kind,state,repo,name,doing,stage,pct}:' \
+  printf '%s\n' "$toon" | grep -q '^in_flight\[[0-9]*\]{id,kind,state,repo,name,doing,stage,reached,pct}:' \
     || fail "the TOON in_flight header lost its stage and pct columns: $toon"
   printf '%s\n' "$toon" | grep -q '^parts\[3\]{id,n,label,state}:' \
     || fail "the TOON output has no parts table: $toon"
   pass "Underway rows carry a structured stage, and a data/<id>/parts record becomes the part list"
+}
+
+test_underway_markers_keep_the_reached_fill_and_a_merged_pr_restarts_the_part() {
+  local home fakebin json id n
+  home=$(make_home underway-markers)
+  mkdir -p "$home/projects/main-wt" "$home/data/merged" "$home/data/fresh"
+  cat > "$home/data/backlog.md" <<'EOF'
+## In flight
+- [ ] gone - Worktree torn down (repo: firstmate) (kind: ship) (since 2026-07-09)
+- [ ] broke - Failed worker (repo: firstmate) (kind: ship) (since 2026-07-09)
+- [ ] waits - Worker waiting on its own (repo: firstmate) (kind: ship) (since 2026-07-09)
+- [ ] merged - Part one merged (repo: firstmate) (kind: ship) (since 2026-07-09)
+- [ ] fresh - Part one open (repo: firstmate) (kind: ship) (since 2026-07-09)
+
+## Queued
+
+## Done
+EOF
+  fm_write_meta "$home/state/gone.meta" \
+    "window=firstmate:fm-gone" "worktree=$home/projects/torn-down" "project=firstmate" \
+    "harness=claude" "kind=ship" "mode=no-mistakes"
+  n=10
+  for id in broke waits merged fresh; do
+    n=$((n + 1))
+    fm_write_meta "$home/state/$id.meta" \
+      "window=firstmate:fm-$id" "worktree=$home/projects/main-wt" "project=firstmate" \
+      "harness=claude" "kind=ship" "mode=no-mistakes" "pr=https://github.com/o/r/pull/$n"
+    record_claude_state "$home/state" "$id" idle
+  done
+  printf 'failed: build broke\n' > "$home/state/broke.status"
+  printf 'paused [key=waits-upstream]: waiting for an upstream release\n' > "$home/state/waits.status"
+  printf 'done: part one shipped\n' > "$home/state/merged.status"
+  printf 'done: part one shipped\n' > "$home/state/fresh.status"
+  printf 'part One\npart Two\nmerged https://github.com/o/r/pull/13\n' > "$home/data/merged/parts"
+  printf 'part One\npart Two\nmerged https://github.com/o/r/pull/10\n' > "$home/data/fresh/parts"
+
+  fakebin=$(make_fakebin "$home")
+  json=$(run "$home" "$fakebin" --json)
+  printf '%s' "$json" | jq -e '
+    (.in_flight | map({(.id): .}) | add) as $r
+    | ($r.gone | .state == "unknown" and .stage == "stuck" and .reached == "building" and .pct == 30)
+      and ($r.broke | .state == "failed" and .stage == "stuck" and .reached == "building" and .pct == 30)
+      and ($r.waits | .state == "paused" and .stage == "building" and .reached == "building" and .pct == 30)
+      and ($r.merged | .state == "done" and .stage == "building" and .reached == "building" and .pct == 30)
+      and ($r.fresh | .state == "done" and .stage == "ready" and .reached == "ready" and .pct == 95)
+  ' >/dev/null || fail "Underway markers, paused waits or merged-part restarts are wrong: $json"
+  pass "unknown and failed rows are stuck at their reached fill, a paused wait keeps its stage, and a merged meta PR restarts the current part at building"
 }
 
 test_mixed_secondmate_roles_partial_state_and_captain_readiness() {
@@ -3443,6 +3491,7 @@ test_nameless_legacy_summary_uses_its_durable_identifier
 test_newest_filed_gates_are_selected_before_snapshot_bounds
 test_underway_and_gate_rows_carry_the_durable_name_and_filed_date
 test_underway_rows_carry_a_stage_and_the_recorded_parts
+test_underway_markers_keep_the_reached_fill_and_a_merged_pr_restarts_the_part
 test_mixed_secondmate_roles_partial_state_and_captain_readiness
 test_main_captain_readiness_matches_secondmate_projection
 test_completed_scout_report_not_pending
