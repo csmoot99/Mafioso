@@ -23,7 +23,9 @@ cp "$ROOT/bin/fm-ci-select.sh" "$ROOT/bin/fm-test-run.sh" "$REPO/bin/"
 git -C "$REPO" config user.name tester
 git -C "$REPO" config user.email tester@example.invalid
 git -C "$REPO" add -A
-git -C "$REPO" commit -q -m base || fail "could not commit the base"
+# A clean checkout (CI, or a committed branch) overlays identical files, so the
+# base commit may be empty.
+git -C "$REPO" commit -q --allow-empty -m base || fail "could not commit the base"
 BASE=$(git -C "$REPO" rev-parse HEAD)
 
 # Reset the clone to the base commit, then apply one change as the pull request.
