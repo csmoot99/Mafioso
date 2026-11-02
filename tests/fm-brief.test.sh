@@ -1140,6 +1140,8 @@ test_workers_wait_without_spending_turns() {
     assert_grep "empty \`write_stdin\` polls of up to 300000 ms" "$brief" "$id: the Codex ceiling is missing"
     assert_grep "is the sanctioned foreground wait" "$brief" \
       "$id: the wait a Claude Code worker may use is not named"
+    assert_grep "pattern that also appears in the wait loop's own command line" "$brief" \
+      "$id: a wait loop must not match its own command line"
     assert_grep "reattach with \`no-mistakes axi run --wait\` instead, and never send the same \`respond\` again" "$brief" \
       "$id: a timed-out respond must reattach with axi run, never resend its answer"
     assert_grep "Do not poll or list the inbox while waiting; a waiting instruction rings." "$brief" \
