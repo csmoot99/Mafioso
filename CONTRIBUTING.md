@@ -40,6 +40,10 @@ Add required status checks with `strict_required_status_checks_policy: false`; a
 Bind the checks to the GitHub Actions app already producing them, rather than accepting the same context from any integration.
 No new app installation or manual runner setup is needed for that setting.
 
+On pull requests the lint and test jobs run only what the change touches (`docs/fm-test-portable-shards.md` "Targeted pull-request checks" owns the rule), and the stock-macOS job runs only on the daily schedule and on manual dispatch.
+A job with nothing to run reports success and the macOS job reports skipped on a pull request, so the required contexts below still resolve; main pushes run everything.
+When a hosted check fails on an unchanged head, rerun only the failed jobs with `gh-axi run rerun <run-id> --failed`.
+
 Require the actual job contexts: `Lint 1`, `Lint 2`, `Test coverage guard`, `Repo invariants`, `Stock macOS Bash snapshot compatibility`, `Behavior portable parallel 1`, `Behavior portable parallel 2`, `Behavior portable serial 1` through `Behavior portable serial 10`, `Behavior tests (Herdr)`, `Behavior timing aggregate`, and `PR must be raised via no-mistakes`.
 The last name is the compliance job context, not its workflow title; its existing automation exceptions remain unchanged.
 The timing aggregate is not a substitute for individual jobs because it can succeed while collecting evidence from a failed run.

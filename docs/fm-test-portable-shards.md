@@ -10,7 +10,10 @@ The concurrent isolation proof in [fm-test-isolation-proof.md](fm-test-isolation
 Local timings are not interchangeable with CI timings: platform and machine load can affect each script differently and change their relative weights.
 
 The parallel hint table was refreshed on 2026-09-30 from five Ubuntu CI runs: [36583881812](https://github.com/kunchenguid/firstmate/actions/runs/36583881812), [36658498535](https://github.com/kunchenguid/firstmate/actions/runs/36658498535), [36663947738](https://github.com/kunchenguid/firstmate/actions/runs/36663947738), [36664663190](https://github.com/kunchenguid/firstmate/actions/runs/36664663190), and [36669175457](https://github.com/kunchenguid/firstmate/actions/runs/36669175457).
-The serial hint table was refreshed on 2026-10-19 from fourteen Ubuntu CI runs of this repository's workflow: [38731300165](https://github.com/csmoot99/Mafioso/actions/runs/38731300165), [38745031369](https://github.com/csmoot99/Mafioso/actions/runs/38745031369), [38765867142](https://github.com/csmoot99/Mafioso/actions/runs/38765867142), [38774077300](https://github.com/csmoot99/Mafioso/actions/runs/38774077300), [39178465137](https://github.com/csmoot99/Mafioso/actions/runs/39178465137), [39184321039](https://github.com/csmoot99/Mafioso/actions/runs/39184321039), [39185183061](https://github.com/csmoot99/Mafioso/actions/runs/39185183061), [39188091815](https://github.com/csmoot99/Mafioso/actions/runs/39188091815), [39193629287](https://github.com/csmoot99/Mafioso/actions/runs/39193629287), [39197229834](https://github.com/csmoot99/Mafioso/actions/runs/39197229834), [39208528766](https://github.com/csmoot99/Mafioso/actions/runs/39208528766), [39210206215](https://github.com/csmoot99/Mafioso/actions/runs/39210206215), [39217513387](https://github.com/csmoot99/Mafioso/actions/runs/39217513387), and [39232355362](https://github.com/csmoot99/Mafioso/actions/runs/39232355362).
+The parallel and serial hint tables were refreshed on 2026-11-02 from two green main runs of this repository's workflow, [39876271284](https://github.com/csmoot99/Mafioso/actions/runs/39876271284) and [41377136287](https://github.com/csmoot99/Mafioso/actions/runs/41377136287), keeping the slowest successful `duration_ms` per script across their aggregate timing artifacts; the parallel lanes were re-packed from the refreshed hints.
+The two runs measured `tests/fm-watch-triage.test.sh` at 17.42 and 25.68 minutes, which exceeds the 20-minute packing target by itself.
+Its hint is held at that target (1200000 ms) so the coverage guard still polices the other shards; the script is alone in its shard either way, and the measured figure is the reason to speed it up rather than to repack.
+The earlier serial hint table, whose provenance the next paragraphs still describe for the supervision-host split, was refreshed on 2026-10-19 from fourteen Ubuntu CI runs of this repository's workflow: [38731300165](https://github.com/csmoot99/Mafioso/actions/runs/38731300165), [38745031369](https://github.com/csmoot99/Mafioso/actions/runs/38745031369), [38765867142](https://github.com/csmoot99/Mafioso/actions/runs/38765867142), [38774077300](https://github.com/csmoot99/Mafioso/actions/runs/38774077300), [39178465137](https://github.com/csmoot99/Mafioso/actions/runs/39178465137), [39184321039](https://github.com/csmoot99/Mafioso/actions/runs/39184321039), [39185183061](https://github.com/csmoot99/Mafioso/actions/runs/39185183061), [39188091815](https://github.com/csmoot99/Mafioso/actions/runs/39188091815), [39193629287](https://github.com/csmoot99/Mafioso/actions/runs/39193629287), [39197229834](https://github.com/csmoot99/Mafioso/actions/runs/39197229834), [39208528766](https://github.com/csmoot99/Mafioso/actions/runs/39208528766), [39210206215](https://github.com/csmoot99/Mafioso/actions/runs/39210206215), [39217513387](https://github.com/csmoot99/Mafioso/actions/runs/39217513387), and [39232355362](https://github.com/csmoot99/Mafioso/actions/runs/39232355362).
 Each uses the slowest successful `duration_ms` per script across its runs' uploaded portable timing artifacts and completed `FM_TEST_END` log markers, with the two exceptions below.
 The parallel table's artifact records were cross-checked against the corresponding job's markers.
 This covers all 24 parallel and 220 serial members; an existing live-capability skip is a portable-runner measurement, not a timing claim for the unavailable live integration.
@@ -23,8 +26,20 @@ Collect successful per-script measurements for every member before calculating a
 
 `tests/fm-supervision-host.test.sh` completed in 859697 to 1211223 ms in the serial jobs that passed but in 1623209 to 1762974 ms in all fourteen cancelled ones, with the slowdown spread across its cases rather than concentrated in one, so on those runners the suite alone came within a minute of the cap.
 It is therefore split into `tests/fm-supervision-host.test.sh`, `tests/fm-supervision-host-turns.test.sh`, and `tests/fm-supervision-host-session.test.sh`, which share `tests/supervision-host-helpers.sh` and can run on separate shards.
-Until CI measures the three files, their hints apportion the suite's slowest completed sample, 1762974 ms from run 39188091815, by each file's share of the per-case durations of one of those slow runs (about 35, 32, and 33 percent); replace them with measured maxima once green runs upload them.
+The three files now carry measured maxima from the 2026-11-02 refresh above.
 The native-Windows-only `tests/fm-pi-windows-shell-invocation.test.sh` retains its separate 5121 ms measurement from 2026-09-06T21:02Z instead of a portable capability skip.
+
+## Targeted pull-request checks
+
+A pull request runs only the lint and test scripts its change touches; a push to main always runs everything and is the backstop for what a pull request skipped, so an unrelated break can surface only after the merge.
+`bin/fm-ci-select.sh` makes the decision inside each lint and test job, so every required job context still reports and a job with nothing selected skips its installs and reports success.
+It maps the pull request's changed paths with `bin/fm-test-run.sh --changed --strict`, whose header owns the path-to-test map, and intersects the selection with the job's lane through `--only-from`.
+Anything that map cannot place runs the complete set: a path that maps to no test, the CI workflow, the selector, the runner, the shared test library, and any selection covering more than half of the suite.
+A failure inside the selector, a missing base commit, and every event other than `pull_request` also select the complete set.
+Lint is skipped only when every changed path is Markdown, JSON, a license, or an asset that no shell root names in a `source=` directive; any other path, including a deleted shell root, runs lint.
+`tests/fm-ci-select.test.sh` holds the behavior and `tests/fm-ci-workflow.test.sh` holds the workflow wiring.
+
+The stock-macOS compatibility job runs only on the daily schedule and on manual dispatch, so a pull request or push reports it as skipped, which satisfies a required check context.
 
 ## Parallel lanes
 
@@ -100,6 +115,8 @@ Its hint-coverage and modeled-budget checks are described in [Portable serial CI
 ## Timing artifacts
 
 Portable shards, each portable serial shard, and the Herdr lane upload runner-generated timing JSON.
+The Herdr artifact also carries diagnostics from a second directory, so its timing JSON sits one level down; the aggregate step finds timing JSON anywhere in the downloaded artifacts.
+A pull request lane with nothing selected uploads nothing.
 `bin/fm-test-run.sh --aggregate-json` creates the combined summary artifact.
 `.github/workflows/ci.yml` owns the exact artifact names and aggregation wiring.
 
@@ -109,7 +126,7 @@ Portable shards, each portable serial shard, and the Herdr lane upload runner-ge
 CI requires its per-root bounds, so an unenforceable deadline or address-space limit refuses lint rather than running uncapped; the script header owns the envelope, per-root execution contract, and memory fallback.
 Its `--list-files` interface exposes partition membership; `tests/fm-lint.test.sh` verifies complete/disjoint executed roots, initial analysis flags, and fallback reporting.
 The workflow uploads each partition's quiet telemetry plus its per-root lifecycle sidecar to distinguish analysis cost, memory use, and host contention.
-No fast mode, path skips, or paid runner provisioning is part of this layout.
+No fast mode or paid runner provisioning is part of this layout, and the only path skip is the text-only pull-request condition in [Targeted pull-request checks](#targeted-pull-request-checks).
 
 The longer-term performance objective remains a complete green run under fifteen minutes including start delay, but the current watch-triage floor alone exceeds that objective.
 The immediate packing target is the runner's modeled script budget, not a claim that more shards alone can make an indivisible script faster.

@@ -9,9 +9,13 @@
 # three-tier timeout policy that docs/fm-test-portable-shards.md "Timeouts"
 # owns (fast, normal, heavy), so no job drifts back to a one-off number.
 #
-# They also hold the fork opt-out: the repository variables FM_CI_SKIP_PUSH and
+# They also hold the event policy and the fork opt-out: pull requests and main
+# pushes run every job except macOS, the stock-macOS job runs only on the daily
+# schedule and manual dispatch, and the repository variables FM_CI_SKIP_PUSH and
 # FM_CI_SKIP_MACOS let a fork skip the push run and the macOS job through a
-# job-level condition, while with neither set every job runs exactly as before.
+# job-level condition, while with neither set nothing else changes.
+# The targeted pull-request selection (bin/fm-ci-select.sh) is held here only as
+# workflow wiring; tests/fm-ci-select.test.sh holds its behavior.
 #
 # The workflow is parsed as YAML and its concurrency and job-level `if`
 # expressions are resolved against simulated pull_request and push contexts,
@@ -334,7 +338,7 @@ raise "no run-real-herdr-family step" unless index
 teardown = steps.index { |s| s["id"] == "cleanup-herdr-lab-sessions" }
 raise "no cleanup-herdr-lab-sessions step" unless teardown
 raise "teardown must follow the family-run step" unless teardown > index
-raise "teardown must run under always()" unless steps[teardown]["if"].to_s.strip == "always()"
+raise "teardown must run under always()" unless steps[teardown]["if"].to_s.strip.start_with?("always()")
 puts steps[index].fetch("timeout-minutes", "none")
 ' "$CI_WORKFLOW" tests-herdr) || fail "could not read the Herdr family-run step"
   case "$step" in ''|*[!0-9]*) fail "the Herdr family-run step needs its own timeout-minutes, got $step" ;; esac
@@ -345,9 +349,10 @@ puts steps[index].fetch("timeout-minutes", "none")
   pass "Herdr keeps a $step minute step tripwire under a $heavy minute job backstop"
 }
 
-# The fork opt-out is opt-in: with neither variable set every job runs on both
-# events, FM_CI_SKIP_PUSH=1 empties only the push run, and FM_CI_SKIP_MACOS=1
-# removes only the macOS job. A "-" in the table means the variable is unset.
+# Event policy and the opt-in fork opt-out: pull requests and main pushes run
+# every job but macOS, the schedule and manual dispatch run only macOS,
+# FM_CI_SKIP_PUSH=1 empties only the push run, and FM_CI_SKIP_MACOS=1 removes
+# only the macOS job. A "-" in the table means the variable is unset.
 test_fork_skip_variables_are_opt_in() {
   local all event skip_push skip_macos expected want actual
   all=$(workflow_jobs) || fail "could not list ci.yml jobs"
@@ -357,7 +362,7 @@ test_fork_skip_variables_are_opt_in() {
     [ "$skip_push" != - ] || skip_push=
     [ "$skip_macos" != - ] || skip_macos=
     case $expected in
-      all) want=$all ;;
+      macos-only) want=macos-stock-bash ;;
       none) want= ;;
       all-but-macos) want=$(printf '%s\n' "$all" | grep -vx macos-stock-bash) ;;
       *) fail "unknown expectation $expected" ;;
@@ -367,14 +372,19 @@ test_fork_skip_variables_are_opt_in() {
     [ "$actual" = "$want" ] \
       || fail "$event with FM_CI_SKIP_PUSH=$skip_push FM_CI_SKIP_MACOS=$skip_macos must run $expected jobs"$'\n'"ran: $(printf '%s' "$actual" | tr '\n' ' ')"$'\n'"wanted: $(printf '%s' "$want" | tr '\n' ' ')"
   done <<'TABLE'
-push         - - all
-pull_request - - all
-push         1 - none
-pull_request 1 - all
-pull_request - 1 all-but-macos
-push         - 1 all-but-macos
+push              - - all-but-macos
+pull_request      - - all-but-macos
+push              1 - none
+pull_request      1 - all-but-macos
+pull_request      - 1 all-but-macos
+push              - 1 all-but-macos
+schedule          - - macos-only
+workflow_dispatch - - macos-only
+schedule          1 - macos-only
+schedule          - 1 none
+workflow_dispatch - 1 none
 TABLE
-  pass "the fork skip variables change nothing unless set, and each skips only its own run or job"
+  pass "pull requests and pushes skip macOS, the schedule and dispatch run only macOS, and the fork variables skip only their own run or job"
 }
 
 # Print true or false: whether one job's job-level `if` resolves true under
@@ -405,6 +415,7 @@ test_timing_aggregate_still_runs_after_a_failed_lane() {
 pull_request - true
 push         - true
 push         1 false
+schedule     - false
 TABLE
   pass "the timing aggregate still runs after a failed lane unless the push run is skipped"
 }
@@ -439,6 +450,52 @@ RUBY
   pass "CI matrices cover every executable serial lane and canonical lint root exactly once"
 }
 
+# The lint and test jobs choose their own work through bin/fm-ci-select.sh, so
+# a step that installs or runs anything must wait for that decision; an
+# ungated install would spend the time the selection exists to save.
+test_selecting_jobs_gate_every_later_step() {
+  local reported
+  reported=$(ruby -ryaml -e '
+jobs = YAML.load_file(ARGV[0]).fetch("jobs")
+selecting = %w[lint tests-portable-parallel-1 tests-portable-parallel-2 tests-portable-serial tests-herdr]
+selecting.each do |name|
+  steps = jobs.fetch(name).fetch("steps")
+  index = steps.index { |s| s["id"] == "select" }
+  next puts("#{name}: no select step") unless index
+  next puts("#{name}: checkout must precede select") unless steps.first["uses"].to_s.start_with?("actions/checkout")
+  steps.drop(index + 1).each do |step|
+    puts "#{name}: ungated step #{step["name"]}" unless step["if"].to_s.include?("steps.select.outputs.run == ")
+  end
+end
+' "$CI_WORKFLOW") || fail "could not read the selecting jobs"
+  [ -z "$reported" ] || fail "selecting jobs must gate every step after the selection:"$'\n'"$reported"
+  pass "every step after a job's selection waits for it"
+}
+
+# The aggregate must count the Herdr lane. Its artifact nests the timing JSON
+# under fm-test/ beside diagnostics from another directory, while every other
+# lane uploads at the artifact root, so the step runs here against both layouts.
+test_timing_aggregate_collects_the_nested_herdr_timing() {
+  local tmp step out
+  tmp=$(fm_test_tmproot ci-aggregate)
+  mkdir -p "$tmp/fm-test-aggregate/fm-test" "$tmp/fm-test-aggregate/fm-herdr"
+  "$ROOT/bin/fm-test-run.sh" --json "$tmp/fm-test-aggregate/fm-test-timing-portable-serial-1.json" \
+    tests/fm-transition-lib.test.sh >/dev/null 2>&1 || fail "could not write a root-level lane timing"
+  "$ROOT/bin/fm-test-run.sh" --json "$tmp/fm-test-aggregate/fm-test/fm-test-timing-herdr.json" \
+    tests/fm-transition-lib.test.sh >/dev/null 2>&1 || fail "could not write a nested lane timing"
+  printf '{}\n' >"$tmp/fm-test-aggregate/fm-herdr/sessions-before.json"
+  step=$(ruby -ryaml -e '
+steps = YAML.load_file(ARGV[0]).fetch("jobs").fetch("tests-timing-aggregate").fetch("steps")
+puts steps.find { |s| s["name"] == "Build aggregate timing summary" }.fetch("run")
+' "$CI_WORKFLOW") || fail "could not read the aggregate step"
+  (cd "$ROOT" && RUNNER_TEMP="$tmp" bash -c "$step") >"$tmp/out" 2>&1 \
+    || fail "the aggregate step failed: $(cat "$tmp/out")"
+  out=$(jq -r '.summary.lanes' "$tmp/fm-test/fm-test-timing-aggregate.json") \
+    || fail "the aggregate step wrote no summary"
+  [ "$out" = 2 ] || fail "the aggregate must count both the root-level and the nested Herdr lane, got $out"
+  pass "the timing aggregate collects the nested Herdr timing as well as the root-level lanes"
+}
+
 test_ci_matrices_match_executable_partitions
 test_pr_pushes_supersede_within_one_pr
 test_separate_prs_do_not_cancel_each_other
@@ -450,3 +507,5 @@ test_every_job_belongs_to_exactly_one_timeout_tier
 test_fast_tier_shares_one_short_tripwire
 test_normal_tier_shares_one_budget
 test_heavy_tier_keeps_a_step_tripwire_under_a_job_backstop
+test_selecting_jobs_gate_every_later_step
+test_timing_aggregate_collects_the_nested_herdr_timing

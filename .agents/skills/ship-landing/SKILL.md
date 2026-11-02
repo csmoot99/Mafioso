@@ -40,6 +40,7 @@ Save the head, commands/check names, results, times, and evidence links in `data
 Wait on pending checks using the existing supervised checks path; do not launch a reviewer to diagnose a red build.
 For red gates before the first review, send the builder one bounded correction naming the failed checks; record that allowance as spent before sending it, and escalate if the correction still leaves red gates.
 Use the selected delivery path for the correction: an active no-mistakes run owns its fixes and publishing, while a direct-PR builder fixes and republishes.
+To retry a hosted check on an unchanged head, rerun only the failed jobs with `gh-axi run rerun <run-id> --failed`, never the whole workflow.
 Missing evidence is a blocker to resolve, not permission to waive a gate.
 
 ### Reviewer selection and launch
