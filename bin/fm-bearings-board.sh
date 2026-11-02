@@ -84,7 +84,7 @@
 # refuses before the existing board or its assets are touched.
 #
 # The payload MAY carry `reports`, the write-ups firstmate wrote for the captain,
-# shown in the board's Reports section: an array of up to 500 objects, each
+# shown in the board's Reports tab: an array of up to 500 objects, each
 # `{ "title", "repo", "date", "summary", "path" }`, where `title` is non-empty
 # text, `repo` follows the same string-or-null marker as every other row, `date`
 # is a real YYYY-MM-DD, `summary` is one line of text that may be empty, and
@@ -99,7 +99,7 @@
 # the board shows that page in an iframe instead. The whole assets folder is
 # replaced on every build, and only the relative `src` reaches the page data,
 # never the local path. A payload with no `reports`, or an empty list, builds
-# exactly as before and the board shows no Reports section.
+# exactly as before and the board shows no Reports tab.
 #
 # Every Underway row likewise carries a non-empty `name`: the durable task name
 # when known, otherwise its durable identifier.
