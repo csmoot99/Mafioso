@@ -41,10 +41,11 @@
 # at its ci step) or ready; `stage` equals it except for two markers that keep
 # the reached fill: owner (parked, a pending decision or a `-screens` pause) and
 # stuck (failed, blocked, or an unknown state such as a gone worktree or backend
-# or a cancelled run). A marker's reached stage is the run step's when the source
-# names one, else building. A worker's own paused wait keeps its stage. When the
-# meta pr= is one of the task's `merged` parts lines, any finished run belongs to
-# the previous part, so the stage is building until a new PR or active run appears.
+# or a cancelled run). A marker's reached stage is ready for a done run, the run
+# step's when the source names one, else building. A worker's own paused wait
+# keeps its stage. When the meta pr= is one of the task's `merged` parts lines,
+# any finished run belongs to the previous part, so the stage is building until
+# a new PR or active run appears.
 # parts[] lists, in order, each part of an in-flight feature recorded in
 # data/<task-id>/parts: `part <label>` lines written once by hand when the feature
 # is planned, and `merged <pr-url>` lines appended per recorded merge outcome
@@ -456,16 +457,16 @@ MODEL=$(printf '%s' "$SNAP" | jq \
     | (.hints // {}) as $h
     | (((.paths.status_log.last_event.raw // "") | test("^paused[^:]*\\[key=[^] ]*-screens\\]")) and $st != "working") as $screens
     | ((.pr.source == "meta") and (.pr.url as $url | ($parts.merged[.id] // []) | index($url) != null)) as $pr_merged
-    | (if $src == "run-step" then (if ($detail | test("^(parked at )?ci\\b")) then "checks" else "validating" end)
+    | (if $st == "done" then "ready"
+       elif $src == "run-step" then (if ($detail | test("^(parked at )?ci\\b")) then "checks" else "validating" end)
        else null end) as $step
     | (marker_of_state($st)
        // (if $screens or ($h.pending_decision == true) or (($h.open_decisions // []) | length > 0)
            then "owner" else null end)) as $marker
     | progress($marker;
         if $pr_merged and ($st != "working" or $step == null) then "building"
-        elif $marker != null then ($step // "building")
-        elif $st == "done" then "ready"
         elif $step != null then $step
+        elif $marker != null then "building"
         elif .kind == "scout" then "planning"
         else "building" end);
   def projected_deferred_hold:

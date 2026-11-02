@@ -25,7 +25,8 @@
 # The same operation also appends the merge to the task's optional feature part
 # list, $home/data/<task-id>/parts (see bin/fm-bearings-snapshot.sh), as one
 # `merged <pr-url>` line, only when that file already exists and does not yet
-# hold the line. The append runs before deduplication so a retried outcome also
+# hold the line. The append runs under the per-task outcome lock, before
+# deduplication, so concurrent reports append once and a retried outcome also
 # retries it, and a failed append never turns a landed merge into a failure.
 #
 # Sourced by bin/fm-pr-merge.sh, bin/fm-watch.sh, and tests. No side effects on
@@ -93,7 +94,6 @@ fm_merge_outcome_report() {  # <home> <state> <task-id> <pr-url> <origin> [autho
   path=$FM_PR_PATH
   number=$FM_PR_NUMBER
   [ -d "$state" ] && [ ! -L "$state" ] || return 1
-  fm_merge_outcome_parts_append "$home" "$id" "$FM_PR_URL"
 
   if destination=$(fm_parent_channel_destination "$home" "$state"); then
     line="done [key=merged-$id]: merged $id $FM_PR_URL$suffix"
@@ -108,6 +108,7 @@ fm_merge_outcome_report() {  # <home> <state> <task-id> <pr-url> <origin> [autho
   . "$_FM_MERGE_OUTCOME_LIB_DIR/fm-wake-lib.sh"
   lock="$state/$id.pr-poll-merge-notified.lock"
   fm_lock_acquire_wait "$lock" || return 1
+  fm_merge_outcome_parts_append "$home" "$id" "$FM_PR_URL"
   if fm_pr_poll_merge_already_notified "$state" "$id" \
     "$provider" "$host" "$path" "$number"; then
     # shellcheck disable=SC2034 # Public result consumed by sourcing callers.
