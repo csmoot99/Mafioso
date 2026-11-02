@@ -336,7 +336,8 @@ stage_reports() {  # <payload.json> <stage-dir>; rewrites the payload in place
   jq --arg dir "$ASSETS_DIR_NAME/$REPORTS_DIR_NAME" '
     .reports |= (to_entries | map(.key as $i | .value
       | {title, repo, date, summary, src: ($dir + "/" + ($i + 1 | tostring) + ".html")}))
-  ' "$payload" > "$payload.r" && mv -f -- "$payload.r" "$payload" || { rm -f -- "$payload.r"; return 1; }
+  ' "$payload" > "$payload.r" || { rm -f -- "$payload.r"; return 1; }
+  mv -f -- "$payload.r" "$payload"
 }
 
 # --- Lavish session liveness -------------------------------------------------

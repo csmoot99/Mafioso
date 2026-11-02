@@ -3,11 +3,18 @@
 // asserted through the real template rather than by reading its source.
 //
 // Usage: node board-render-harness.mjs <built-board.html>
+// Environment (all optional) sets what the page finds at load, as a returning
+// viewer would: BOARD_HASH (location.hash), BOARD_NAME (window.name), BOARD_STORE
+// (JSON object for localStorage, or "blocked" to make it throw as the Lavish
+// sandbox does).
 // Prints one JSON document:
-//   { stats:[{n,label}], underway:[{title,sub,badges}],
+//   { tabs:[{id,label,n,selected,tabindex,controls}], loaded:[visible panels at
+//     load], tabClicks/keys/answerKeepsTab (the tab bar driven like a captain),
+//     reports:{...} (the Reports tab: rows, project options, filters, reader),
+//     underway:[{title,sub,badges}],
 //     charted:[{title,sub,badges,pickable}], empty, more, error,
 //     cards:[{title,images:[{src,alt,lazy}],note:{tag,maxLength,count,limit}|null}],
-//     statLinks:[{label,href,scrolledTo,prevented}], arrow:{moved,scrolled,count},
+//     arrow:{moved,scrolled,count},
 //     send:{foreign,sent,restored,all,misrouted} } - the board after "fm-board:send"
 //     messages from the Lavish chrome (see sendMessage below),
 //     attach:{...} - the first card's reference-image picker driven through the
@@ -59,7 +66,9 @@ class Node {
   }
   getBoundingClientRect() { return { top: -50 }; }
   scrollIntoView(opts) { scrolls.push({ id: this.id, className: this.className, opts }); }
-  focus() {}
+  focus() { globalThis.document.activeElement = this; }
+  insertAdjacentHTML() {}
+  removeAttribute(k) { delete this.attributes[k]; if (k === "src") this.src = undefined; }
   removeChild(n) { this.children = this.children.filter((c) => c !== n); n.parentNode = null; }
   querySelectorAll(sel) {
     const want = sel.replace(/^\./, "").replace(/:checked$/, "");
@@ -84,7 +93,15 @@ dataNode.textContent = html
   .split("</script>")[0];
 byId.set("bearings-data", dataNode);
 
+// The Reports panel carries `hidden` in the shipped markup until its tab exists.
+const reportsPanel = new Node("section");
+reportsPanel.id = "bb-sec-reports";
+reportsPanel.hidden = true;
+byId.set("bb-sec-reports", reportsPanel);
+
 globalThis.document = {
+  documentElement: new Node("html"),
+  activeElement: null,
   createElement: (tag) => new Node(tag),
   // Lazily mint any element the page asks for: the shim tracks whatever ids
   // the shipped template actually uses instead of pinning a fixed list.
@@ -108,11 +125,22 @@ globalThis.document = {
 const posted = [];
 const parentWindow = { name: "lavish-chrome", postMessage: (m) => posted.push(m) };
 const windowListeners = {};
+globalThis.location = { hash: process.env.BOARD_HASH || "" };
+globalThis.history = { replaceState: (_s, _t, url) => { location.hash = url; } };
+const store = process.env.BOARD_STORE === "blocked" ? null : JSON.parse(process.env.BOARD_STORE || "{}");
 globalThis.window = {
   innerHeight: 800,
   parent: parentWindow,
+  name: process.env.BOARD_NAME || "",
   addEventListener: (type, fn) => { (windowListeners[type] ||= []).push(fn); },
+  scrollTo: (x, y) => { scrolls.push({ id: "window", className: "", opts: { x, y } }); },
 };
+Object.defineProperty(window, "localStorage", {
+  get() {
+    if (!store) throw new Error("SecurityError");
+    return { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } };
+  },
+});
 globalThis.TextEncoder = TextEncoder;
 URL.createObjectURL = (f) => "blob:" + f.name;
 URL.revokeObjectURL = () => {};
@@ -136,26 +164,27 @@ globalThis.FormData = class {
 const script = html.slice(html.indexOf("<script>") + "<script>".length, html.lastIndexOf("</script>"));
 new Function(script)();
 
+const PANELS = ["call", "underway", "landed", "charted", "reports"];
+const visiblePanels = () => PANELS.filter((p) => !byId.get("bb-sec-" + p)?.hidden);
+const tabBar = byId.get("bb-tabs") || new Node("div");
+const tabButtons = () => tabBar.children;
+const tabs = tabButtons().map((b) => ({
+  id: b.id,
+  label: b.children[0]?.textContent,
+  n: Number(b.children[1]?.textContent),
+  selected: b.attributes["aria-selected"],
+  tabindex: b.tabIndex,
+  role: b.attributes.role,
+  controls: b.attributes["aria-controls"],
+  panelRole: byId.get(b.attributes["aria-controls"])?.attributes.role,
+  panelLabelledby: byId.get(b.attributes["aria-controls"])?.attributes["aria-labelledby"],
+}));
+const loaded = visiblePanels();
+
 const badgesOf = (row) =>
   row.children
     .filter((c) => c.className.includes("fm-badge"))
     .map((c) => ({ tone: c.className.replace(/.*fm-badge--/, "").trim(), text: c.textContent }));
-
-const strip = byId.get("bb-stats") || new Node("div");
-const stats = strip.children.map((t) => ({
-  n: Number(t.children.find((c) => c.className.includes("bb-stat__num"))?.textContent),
-  label: t.children.find((c) => c.className.includes("bb-stat__label"))?.textContent,
-}));
-const statLinks = strip.children.map((t) => {
-  const before = scrolls.length;
-  const ev = t.dispatch("click");
-  return {
-    label: t.children.find((c) => c.className.includes("bb-stat__label"))?.textContent,
-    href: t.href,
-    scrolledTo: scrolls.slice(before).map((x) => x.id),
-    prevented: ev.prevented,
-  };
-});
 
 const rowsOf = (container) =>
   container.children
@@ -225,8 +254,7 @@ const arrow = {
 const sendMessage = (data, source = parentWindow) => {
   for (const fn of windowListeners.message || []) fn({ data, source });
 };
-const need = () => strip.children.find((t) => t.className.includes("bb-stat--call"))
-  ?.children.find((c) => c.className.includes("bb-stat__num"))?.textContent;
+const need = () => tabButtons().find((t) => t.id === "bb-tab-call")?.children[1]?.textContent;
 const deckState = () => ({
   shown: call.children
     .filter((c) => c.className.split(/\s+/).includes("bb-decision") && !c.hidden)
@@ -316,5 +344,73 @@ send.misrouted = deckState();
 sendMessage({ type: "fm-board:send", phase: "sent", id: "c", items: [item(1, first, "yes")] });
 send.all = deckState();
 
+// Queuing an answer (the attach section above submitted several) leaves the tab alone.
+const answerKeepsTab = visiblePanels();
+
+// The Reports tab: rows newest first, the project filter, the text filter, paging, the reader.
+const repList = byId.get("bb-rep-list") || new Node("div");
+const repRows = () => repList.children
+  .filter((c) => c.className.includes("bb-rep__row"))
+  .map((r) => {
+    const main = r.children.find((c) => c.className.includes("bb-rep__main"));
+    const part = (cls) => main?.children.find((c) => c.className.includes(cls))?.textContent;
+    return { title: part("bb-rep__title"), meta: part("bb-rep__meta"), summary: part("bb-rep__sum") ?? null };
+  });
+const repQ = byId.get("bb-rep-q") || new Node("input");
+const repProj = byId.get("bb-rep-proj") || new Node("select");
+const repMore = byId.get("bb-rep-more") || new Node("button");
+const repStatus = () => byId.get("bb-rep-status")?.textContent ?? "";
+const reports = { rows: repRows(), status: repStatus(), moreHidden: repMore.hidden,
+  moreLabel: repMore.textContent, count: byId.get("bb-rep-count")?.textContent ?? "",
+  projects: repProj.children.map((o) => ({ value: o.value, label: o.textContent })) };
+if (reports.rows.length) {
+  const setFilter = (q, proj) => {
+    repQ.value = q; repQ.dispatch("input");
+    repProj.value = proj; repProj.dispatch("change");
+    return { rows: repRows().map((r) => r.title), status: repStatus(), empty: repList.children.some((c) => c.className.includes("bb-empty")) };
+  };
+  reports.byText = setFilter("SYNC", "");
+  reports.byProject = setFilter("", "alpha");
+  reports.byBoth = setFilter("sync", "alpha");
+  reports.noMatch = setFilter("zzz-nothing", "");
+  setFilter("", "");
+  reports.moreClick = (repMore.dispatch("click"), { rows: repRows().length, moreHidden: repMore.hidden });
+  const frame = byId.get("bb-rv-frame") || new Node("iframe");
+  const viewer = byId.get("bb-rv") || new Node("div");
+  setFilter("", "");
+  repList.children.find((c) => c.className.includes("bb-rep__row")).dispatch("click");
+  reports.opened = { src: frame.src, hidden: viewer.hidden, title: byId.get("bb-rv-title")?.textContent,
+    locked: document.documentElement.classList.contains("bb-noscroll") };
+  byId.get("bb-rv-back").dispatch("click");
+  reports.closed = { src: frame.src ?? null, hidden: viewer.hidden,
+    locked: document.documentElement.classList.contains("bb-noscroll") };
+  repList.children.find((c) => c.className.includes("bb-rep__row")).dispatch("click");
+  viewer.dispatch("keydown", { key: "Escape" });
+  reports.escapeCloses = viewer.hidden;
+}
+
+// The tab bar driven like a captain: tap each tab, then the keyboard.
+const selectedTabs = () => tabButtons().filter((b) => b.attributes["aria-selected"] === "true").map((b) => b.id);
+const tabClicks = tabButtons().map((b) => {
+  b.dispatch("click");
+  return { id: b.id, visible: visiblePanels(), selected: selectedTabs(), hash: location.hash, name: window.name,
+    tabindexes: tabButtons().map((x) => x.tabIndex) };
+});
+const press = (fromId, key) => {
+  const from = tabButtons().find((b) => b.id === fromId);
+  from.dispatch("click");
+  from.focus();
+  const ev = tabBar.dispatch("keydown", { key });
+  return { selected: selectedTabs(), visible: visiblePanels(), prevented: ev.prevented, focused: document.activeElement?.id };
+};
+const firstId = tabButtons()[0]?.id, lastId = tabButtons().at(-1)?.id;
+const keys = {
+  right: press(firstId, "ArrowRight"),
+  left: press(firstId, "ArrowLeft"),
+  end: press(firstId, "End"),
+  home: press(lastId, "Home"),
+  other: press(firstId, "a"),
+};
+
 process.stdout.write(
-  JSON.stringify({ stats, statLinks, underway, charted, empty, more, cards, arrow, send, attach, error: errorText }) + "\n");
+  JSON.stringify({ tabs, loaded, tabClicks, keys, answerKeepsTab, reports, underway, charted, empty, more, cards, arrow, send, attach, error: errorText }) + "\n");
