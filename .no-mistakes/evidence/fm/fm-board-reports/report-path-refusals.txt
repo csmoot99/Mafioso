@@ -1,0 +1,12 @@
+$ build with reports[0].path=/tmp/fm-lab-outside-01M6EQ.md
+fm-bearings-board: report resolves outside /tmp/fm-lab.e0BGVM/data: /tmp/fm-lab-outside-01M6EQ.md
+exit= board-exists=no
+$ build with reports[0].path=/tmp/fm-lab.e0BGVM/data/link.md
+fm-bearings-board: report path is a symlink: /tmp/fm-lab.e0BGVM/data/link.md
+exit= board-exists=no
+$ build with reports[0].path=/tmp/fm-lab.e0BGVM/data/../payload.json
+fm-bearings-board: report path does not end in .md: /tmp/fm-lab.e0BGVM/data/../payload.json
+exit= board-exists=no
+$ build with reports[0].path=data/420mia-cost-review/report.md
+fm-bearings-board: report path is not absolute: data/420mia-cost-review/report.md
+exit= board-exists=no

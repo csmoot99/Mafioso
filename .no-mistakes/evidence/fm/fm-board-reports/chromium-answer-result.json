@@ -1,0 +1,340 @@
+{
+ "engine": "chromium",
+ "mode": "answer",
+ "initial": {
+  "tabs": [
+   {
+    "id": "bb-tab-call",
+    "label": "Captain's Call",
+    "n": "2",
+    "sel": "true",
+    "ti": 0
+   },
+   {
+    "id": "bb-tab-underway",
+    "label": "Underway",
+    "n": "3",
+    "sel": "false",
+    "ti": -1
+   },
+   {
+    "id": "bb-tab-landed",
+    "label": "Recently landed",
+    "n": "2",
+    "sel": "false",
+    "ti": -1
+   },
+   {
+    "id": "bb-tab-charted",
+    "label": "Charted next",
+    "n": "2",
+    "sel": "false",
+    "ti": -1
+   },
+   {
+    "id": "bb-tab-reports",
+    "label": "Reports",
+    "n": "15",
+    "sel": "false",
+    "ti": -1
+   }
+  ],
+  "visible": [
+   "bb-sec-call"
+  ],
+  "focused": "",
+  "name": "",
+  "hash": ""
+ },
+ "overflow": {
+  "docScrollW": 390,
+  "docClientW": 390,
+  "pageScrollXAfterTry": 0,
+  "tabbarScrollW": 769,
+  "tabbarClientW": 390
+ },
+ "outerOverflow": {
+  "scrollW": 390,
+  "clientW": 390
+ },
+ "taps": [
+  {
+   "tapped": "underway",
+   "visible": [
+    "bb-sec-underway"
+   ],
+   "selected": [
+    "bb-tab-underway"
+   ],
+   "tabbarScrollLeft": 0,
+   "tabInView": true,
+   "name": "fm-bearings-tab=underway"
+  },
+  {
+   "tapped": "landed",
+   "visible": [
+    "bb-sec-landed"
+   ],
+   "selected": [
+    "bb-tab-landed"
+   ],
+   "tabbarScrollLeft": 88,
+   "tabInView": true,
+   "name": "fm-bearings-tab=landed"
+  },
+  {
+   "tapped": "charted",
+   "visible": [
+    "bb-sec-charted"
+   ],
+   "selected": [
+    "bb-tab-charted"
+   ],
+   "tabbarScrollLeft": 363,
+   "tabInView": true,
+   "name": "fm-bearings-tab=charted"
+  },
+  {
+   "tapped": "reports",
+   "visible": [
+    "bb-sec-reports"
+   ],
+   "selected": [
+    "bb-tab-reports"
+   ],
+   "tabbarScrollLeft": 369,
+   "tabInView": true,
+   "name": "fm-bearings-tab=reports"
+  },
+  {
+   "tapped": "call",
+   "visible": [
+    "bb-sec-call"
+   ],
+   "selected": [
+    "bb-tab-call"
+   ],
+   "tabbarScrollLeft": 0,
+   "tabInView": true,
+   "name": "fm-bearings-tab=call"
+  }
+ ],
+ "keys": [
+  {
+   "key": "ArrowRight",
+   "selected": "bb-tab-underway",
+   "focused": "bb-tab-underway",
+   "visible": [
+    "bb-sec-underway"
+   ]
+  },
+  {
+   "key": "ArrowLeft",
+   "selected": "bb-tab-call",
+   "focused": "bb-tab-call",
+   "visible": [
+    "bb-sec-call"
+   ]
+  },
+  {
+   "key": "ArrowLeft",
+   "selected": "bb-tab-reports",
+   "focused": "bb-tab-reports",
+   "visible": [
+    "bb-sec-reports"
+   ]
+  },
+  {
+   "key": "Home",
+   "selected": "bb-tab-call",
+   "focused": "bb-tab-call",
+   "visible": [
+    "bb-sec-call"
+   ]
+  },
+  {
+   "key": "End",
+   "selected": "bb-tab-reports",
+   "focused": "bb-tab-reports",
+   "visible": [
+    "bb-sec-reports"
+   ]
+  },
+  {
+   "key": "ArrowRight",
+   "selected": "bb-tab-call",
+   "focused": "bb-tab-call",
+   "visible": [
+    "bb-sec-call"
+   ]
+  }
+ ],
+ "sticky": {
+  "scrollY": 1020,
+  "tabbarTop": 0
+ },
+ "filterRows": [
+  "Status report — 2026-11-01"
+ ],
+ "reader": {
+  "open": true,
+  "title": "Status report — 2026-11-01",
+  "frameUrl": "http://firstmate-wsl.tail3c2a9e.ts.net:4387/artifact/cf2b5e83d7b04690/bearings-board-assets/.reports/15.html",
+  "content": {
+   "h1": "Status report — 2026-11-01",
+   "scripts": 0,
+   "imgs": [],
+   "links": [
+    "https://example.com"
+   ],
+   "hasTable": true,
+   "hasPre": true,
+   "scriptTextShownAsText": true
+  }
+ },
+ "afterBack": {
+  "readerHidden": true,
+  "tabs": [
+   {
+    "id": "bb-tab-call",
+    "label": "Captain's Call",
+    "n": "2",
+    "sel": "false",
+    "ti": -1
+   },
+   {
+    "id": "bb-tab-underway",
+    "label": "Underway",
+    "n": "3",
+    "sel": "false",
+    "ti": -1
+   },
+   {
+    "id": "bb-tab-landed",
+    "label": "Recently landed",
+    "n": "2",
+    "sel": "false",
+    "ti": -1
+   },
+   {
+    "id": "bb-tab-charted",
+    "label": "Charted next",
+    "n": "2",
+    "sel": "false",
+    "ti": -1
+   },
+   {
+    "id": "bb-tab-reports",
+    "label": "Reports",
+    "n": "15",
+    "sel": "true",
+    "ti": 0
+   }
+  ],
+  "visible": [
+   "bb-sec-reports"
+  ],
+  "focused": "",
+  "name": "fm-bearings-tab=reports",
+  "hash": "#reports"
+ },
+ "reader2Title": "Menus behind age and location gates: what the gates do, and how the readers should get past them",
+ "afterEscape": {
+  "readerHidden": true
+ },
+ "afterQueue": {
+  "tabs": [
+   {
+    "id": "bb-tab-call",
+    "label": "Captain's Call",
+    "n": "2",
+    "sel": "true",
+    "ti": 0
+   },
+   {
+    "id": "bb-tab-underway",
+    "label": "Underway",
+    "n": "3",
+    "sel": "false",
+    "ti": -1
+   },
+   {
+    "id": "bb-tab-landed",
+    "label": "Recently landed",
+    "n": "2",
+    "sel": "false",
+    "ti": -1
+   },
+   {
+    "id": "bb-tab-charted",
+    "label": "Charted next",
+    "n": "2",
+    "sel": "false",
+    "ti": -1
+   },
+   {
+    "id": "bb-tab-reports",
+    "label": "Reports",
+    "n": "15",
+    "sel": "false",
+    "ti": -1
+   }
+  ],
+  "visible": [
+   "bb-sec-call"
+  ],
+  "focused": "",
+  "name": "fm-bearings-tab=call",
+  "hash": "#call"
+ },
+ "sendVisible": true,
+ "afterSend": {
+  "frameUrl": "http://firstmate-wsl.tail3c2a9e.ts.net:4387/artifact/cf2b5e83d7b04690/index.html?artifact_revision=12&artifact_load_token=O4ebyQzzKwaw5gyGprIFfODg8Kmj6No7#call",
+  "tabs": [
+   {
+    "id": "bb-tab-call",
+    "label": "Captain's Call",
+    "n": "1",
+    "sel": "true",
+    "ti": 0
+   },
+   {
+    "id": "bb-tab-underway",
+    "label": "Underway",
+    "n": "3",
+    "sel": "false",
+    "ti": -1
+   },
+   {
+    "id": "bb-tab-landed",
+    "label": "Recently landed",
+    "n": "2",
+    "sel": "false",
+    "ti": -1
+   },
+   {
+    "id": "bb-tab-charted",
+    "label": "Charted next",
+    "n": "2",
+    "sel": "false",
+    "ti": -1
+   },
+   {
+    "id": "bb-tab-reports",
+    "label": "Reports",
+    "n": "15",
+    "sel": "false",
+    "ti": -1
+   }
+  ],
+  "visible": [
+   "bb-sec-call"
+  ],
+  "focused": "",
+  "name": "fm-bearings-tab=call",
+  "hash": "#call",
+  "callSub": "1 item wait on you"
+ },
+ "dialogs": [],
+ "evilRequests": []
+}
