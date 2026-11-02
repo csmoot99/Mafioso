@@ -132,13 +132,18 @@ SEQ_RESULTS=$(cat "$TMP_ROOT"/seq-* | sort -n)
 SEQ_EXPECTED=$(seq 1 20)
 [ "$SEQ_RESULTS" = "$SEQ_EXPECTED" ] \
   || fail "concurrent sequence claims were not unique and monotonic: $SEQ_RESULTS"
-[ "$(find "$STATE_ROOT/.seq-claims" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')" = 20 ] \
+[ "$(find "$STATE_ROOT/.seq-claims" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')" = 20 ] \
   || fail "concurrent sequence allocations did not retain every durable claim"
 mkdir "$STATE_ROOT/.seq-claims/999998" "$STATE_ROOT/.seq-claims/999999"
 touch -t 200001010000 "$STATE_ROOT/.seq-claims/999998"
+: > "$STATE_ROOT/.seq-claims/999996"
+: > "$STATE_ROOT/.seq-claims/999995"
+touch -t 200001010000 "$STATE_ROOT/.seq-claims/999996"
 fm_remote_job_reap_stale "$ACCOUNT_HOME" || fail "sequence claim reaping failed"
 assert_absent "$STATE_ROOT/.seq-claims/999998" "an expired sequence claim survived stale reaping"
 assert_present "$STATE_ROOT/.seq-claims/999999" "a fresh sequence claim was reaped"
+assert_absent "$STATE_ROOT/.seq-claims/999996" "an expired sequence claim file survived stale reaping"
+assert_present "$STATE_ROOT/.seq-claims/999995" "a fresh sequence claim file was reaped"
 mkdir "$STATE_ROOT/.seq-claims/999997"
 touch -t 200001010000 "$STATE_ROOT/.seq-claims/999997"
 fm_remote_job_reap_stale "$ACCOUNT_HOME" || fail "rate-limited sequence claim reaping failed"
@@ -147,6 +152,7 @@ touch -t 200001010000 "$STATE_ROOT/.seq-claims-reaped"
 fm_remote_job_reap_stale "$ACCOUNT_HOME" || fail "expired sequence claim reaping failed"
 assert_absent "$STATE_ROOT/.seq-claims/999997" "an expired sequence claim survived the next hourly scan"
 rmdir "$STATE_ROOT/.seq-claims/999999"
+rm -f -- "$STATE_ROOT/.seq-claims/999995"
 pass "atomic sequence claims remain unique and reap only after expiry"
 
 fm_on() {

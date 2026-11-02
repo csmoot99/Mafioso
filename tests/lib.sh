@@ -281,6 +281,14 @@ fm_test_cleanup() {
   fi
 }
 
+# Run a command whose every write to stdout fails. A merely closed stdout is
+# not enough: Bash 5.3+ reopens a closed fd 0-2 onto /dev/null when a script
+# starts, so the write would silently succeed. /dev/full fails every write;
+# where it is absent (macOS), the older Bash there still honours a closed fd.
+fm_test_unwritable_stdout() {  # <command> [args...]
+  if [ -c /dev/full ]; then "$@" >/dev/full; else "$@" >&-; fi
+}
+
 fm_test_tmproot() {
   local prefix=${1:-fm-test} root tmp_base
   tmp_base=$(fm_test_tmpdir)

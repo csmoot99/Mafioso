@@ -123,11 +123,11 @@ jobs:
           set -eu
           npm install -g tasks-axi
           tasks-axi --version
-      - name: Install the Pi package for the Pi extension tests
+      - name: Install the Pi package and TypeScript for the Pi extension tests
         run: |
           set -eu
-          npm install -g @earendil-works/pi-coding-agent
-          npm ls -g --depth 0 @earendil-works/pi-coding-agent
+          npm install -g @earendil-works/pi-coding-agent typescript@5.9.3
+          npm ls -g --depth 0 @earendil-works/pi-coding-agent typescript
       - name: Run portable parallel shard 1
         run: |
           set -eu
@@ -227,13 +227,14 @@ jobs:
           npm install -g tasks-axi
           tasks-axi --version
       # The Pi extension tests read the installed Pi package's own types and
-      # runtime, so without it they gate-skip and pass silently. It is a public
-      # npm package and needs no credential, so CI can hold the real thing.
-      - name: Install the Pi package for the Pi extension tests
+      # runtime and typecheck them with tsc, so without either they gate-skip
+      # and pass silently. The runner image does not guarantee tsc. Both are
+      # public npm packages and need no credential, so CI can hold the real thing.
+      - name: Install the Pi package and TypeScript for the Pi extension tests
         run: |
           set -eu
-          npm install -g @earendil-works/pi-coding-agent
-          npm ls -g --depth 0 @earendil-works/pi-coding-agent
+          npm install -g @earendil-works/pi-coding-agent typescript@5.9.3
+          npm ls -g --depth 0 @earendil-works/pi-coding-agent typescript
       - name: Run portable serial shard ${{ matrix.shard }}
         env:
           # job-total rather than a literal, so shrinking or growing the matrix
@@ -244,7 +245,7 @@ jobs:
         run: |
           set -eu
           mkdir -p "$RUNNER_TEMP/fm-test"
-          # The Pi package is installed above and CI provides npm and tsc, so
+          # The Pi package and tsc are installed above, so
           # any missing typecheck prerequisite is a broken lane, not a valid skip.
           bin/fm-test-run.sh --lane "$FM_SERIAL_LANE" \
             --fail-on-gate-skip 'Pi extension typecheck prerequisite not found' \

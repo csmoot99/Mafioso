@@ -2862,6 +2862,33 @@ test_malformed_presentation_lock_reports_acquire_failure() {
   pass "malformed presentation locks report acquire failure instead of contention"
 }
 
+# A queue lock that churns between appenders can leave the drain's final
+# deadline attempt looking at a fresh claim whose pid file is mid-write. That
+# is contention to retry, not an unsafe lock that fails the drain.
+test_mid_claim_queue_lock_at_deadline_is_contention() {
+  local dir state owner out err rc=0
+  dir=$(make_case mid-claim-queue-lock)
+  state="$dir/state"
+  out="$dir/drain.out"
+  err="$dir/drain.err"
+  append_wake "$state" signal task.status "signal: $state/task.status" \
+    || fail "could not seed the mid-claim wake"
+  owner="$(cd "$state" && pwd -P)/.wake-queue.lock.owner.fixture"
+  { mkdir "$owner" && : > "$owner/pid"; } || fail "could not seed the mid-claim owner"
+  ln -s "$owner" "$state/.wake-queue.lock" || fail "could not seed the mid-claim lock"
+
+  FM_STATE_OVERRIDE="$state" FM_STATUS_PRESENTATION_LOCK_TIMEOUT=1 FM_LOCK_STALE_AFTER=60 \
+    "$DRAIN" > "$out" 2> "$err" || rc=$?
+  [ "$rc" -eq 0 ] || fail "a mid-claim queue lock failed the drain (rc=$rc): $(cat "$err")"
+  grep -F 'WAKE DRAIN SKIPPED: queue lock remains held' "$out" >/dev/null \
+    || fail "a mid-claim queue lock was not reported as retryable contention"
+
+  rm -f "$state/.wake-queue.lock" && rm -rf "$owner"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$out" 2> "$err" || fail "drain after the claim cleared failed"
+  grep "$(printf '\tsignal\t')" "$out" >/dev/null || fail "the contended drain lost the durable wake row"
+  pass "a mid-claim queue lock at the drain deadline is retryable contention"
+}
+
 # The owned-append ledger is wake-only: it must never withhold a captain-facing
 # turn-ended annotation. An in-flight watcher classification that commits after
 # this home's own close regresses the classified offset behind the owned bytes -
@@ -3510,6 +3537,7 @@ test_subshell_lock_ownership_without_bashpid
 test_bounded_lock_handoff_after_contention
 test_live_presentation_holder_is_deadlined_without_weakening_ack
 test_malformed_presentation_lock_reports_acquire_failure
+test_mid_claim_queue_lock_at_deadline_is_contention
 test_secondmate_foreign_queue_stall_tracks_progress_and_alerts_once
 test_secondmate_declared_pause_rows_do_not_feed_stall_escalation
 test_secondmate_reprovisioned_queue_starts_a_fresh_interval
