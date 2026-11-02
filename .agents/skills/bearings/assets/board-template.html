@@ -863,7 +863,9 @@ __FM_BEARINGS_BOARD_DATA__
     if (tabIds.indexOf(h) >= 0) return h;
     try { var v = window.localStorage.getItem(TAB_KEY); if (tabIds.indexOf(v) >= 0) return v; } catch (e) { /* storage unavailable */ }
     /* Lavish's sandboxed frame has no storage and a fresh address on every
-       reload, but the frame itself keeps its name across a rebuild's reload */
+       load, so the tab survives an in-place rebuild only through window.name;
+       a full page reload starts a new frame and falls back to Captain's Call,
+       because the Lavish chrome owns the outer page */
     try { var m = /^fm-bearings-tab=(\w+)$/.exec(window.name || ""); if (m && tabIds.indexOf(m[1]) >= 0) return m[1]; } catch (e) { /* name unavailable */ }
     return "call";
   }
