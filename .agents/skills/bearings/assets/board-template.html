@@ -1276,21 +1276,33 @@ __FM_BEARINGS_BOARD_DATA__
   /* Cards sent to the agent leave the board at once. The Lavish chrome posts
      what it is sending under a send id: "start" (and "sent", should the start
      have been missed) hides the cards whose answers are in the send, "failed"
-     deals them back. Only the parent chrome is heard. Each queued answer names
-     its card (the selector of the card's form) and carries "<title> -> <answer>";
-     a selector that does not point at the card whose title leads the text falls
-     back to the title. The chrome remembers what it confirmed sent and replays
-     it as one "sent" message (id "remembered") each time this page loads, so a
-     reload keeps answered cards removed until a rebuild drops them for good. */
+     deals them back. Only the parent chrome is heard. An item carrying `key` names
+     its card by that card's key and matches nothing else. An item without one
+     (an older chrome) names its card by the selector of the card's form and
+     carries "<title> -> <answer>"; a selector that does not point at the card
+     whose title leads the text falls back to the title. On load this page posts
+     "fm-board:ready" with its build stamp (the payload's `generated`). The chrome
+     stores each confirmed send under the stamp of the board it was sent from,
+     replays only the entries for the current stamp as one "sent" message (id
+     "remembered") on every load, and drops entries for any other stamp and
+     anything older than 24 hours. A reload keeps answered cards removed, and a
+     rebuilt board, including one that re-presents a card under the same title,
+     shows every card. */
   var sentAway = {};
+  var callKeys = data.captains_call.map(function (item) { return item.key; });
   function cardsInSend(items) {
     var found = [];
     items.forEach(function (it) {
-      var text = String(it && it.text || "");
-      var led = function (c) { return text.indexOf(data.captains_call[allCards.indexOf(c)].title + " -> ") === 0; };
-      var at = /#bb-call > div:nth-of-type\((\d+)\)/.exec(String(it && it.selector || ""));
-      var card = at && allCards[at[1] - 1];
-      if (!card || !led(card)) card = allCards.filter(led)[0];
+      var card;
+      if (it && typeof it.key === "string") {
+        card = allCards[callKeys.indexOf(it.key)];
+      } else {
+        var text = String(it && it.text || "");
+        var led = function (c) { return text.indexOf(data.captains_call[allCards.indexOf(c)].title + " -> ") === 0; };
+        var at = /#bb-call > div:nth-of-type\((\d+)\)/.exec(String(it && it.selector || ""));
+        card = at && allCards[at[1] - 1];
+        if (!card || !led(card)) card = allCards.filter(led)[0];
+      }
       if (card && found.indexOf(card) < 0) found.push(card);
     });
     return found;
@@ -1315,6 +1327,7 @@ __FM_BEARINGS_BOARD_DATA__
     var at = cards.indexOf(shown);
     showDeck(at < 0 ? active : at, at < 0);
   });
+  if (window.parent !== window) window.parent.postMessage({ type: "fm-board:ready", stamp: data.generated }, "*");
 
   /* Underway */
   var uw = document.getElementById("bb-underway");

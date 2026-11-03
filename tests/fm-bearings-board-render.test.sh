@@ -550,10 +550,54 @@ test_cards_sent_to_the_agent_leave_the_board_and_a_failed_send_deals_them_back()
     .send.all | .shown == [] and .empty == true and .navHidden == true
       and .need == "0" and .sub == "nothing needs you"
   ' >/dev/null || fail "sending every card did not leave the empty board: $out"
+  pass "cards sent to the agent leave the board at once, counters follow, and a failed send deals them back"
+}
+
+test_the_board_tells_the_chrome_its_build_stamp_on_load() {
+  local home out stamp
+  home=$(make_home ready-stamp)
+  out=$(render_cards "$home" "$(two_cards)")
+  stamp=$(jq -r '.generated' "$home/payload.json")
+  printf '%s' "$out" | jq -e --arg stamp "$stamp" '
+    .ready == [{message:{type:"fm-board:ready",stamp:$stamp},origin:"*"}]
+      and .reloaded.ready == .ready
+  ' >/dev/null || fail "the board did not post its build stamp to the chrome on load: $out"
+  pass "the board posts fm-board:ready with its build stamp to the chrome each time it loads"
+}
+
+test_a_reloaded_board_hides_exactly_the_cards_the_chrome_replays() {
+  local home out
+  home=$(make_home replay-reload)
+  out=$(render_cards "$home" "$(two_cards)")
   printf '%s' "$out" | jq -e '
-    .send.replayed | .shown == [] and .empty == true and .need == "0" and .sub == "nothing needs you"
-  ' >/dev/null || fail "a replayed send brought a remembered card back: $out"
-  pass "cards sent to the agent leave the board at once, counters follow, a failed send deals them back, and a replay keeps them gone"
+    .reloaded.loaded | .shown == ["First call"] and (.count | test("card 1 of 2")) and .need == "2"
+  ' >/dev/null || fail "the reloaded board did not start with every card: $out"
+  printf '%s' "$out" | jq -e '
+    .reloaded.replayed | .shown == ["First call"] and .keys == ["first"]
+      and (.count | test("card 1 of 1")) and .need == "1" and .sub == "1 item wait on you"
+  ' >/dev/null || fail "the replay did not hide exactly the remembered card: $out"
+  printf '%s' "$out" | jq -e '
+    .reloaded.unrelatedFailed | .shown == ["First call"] and .need == "1"
+  ' >/dev/null || fail "an unrelated failed send dealt a remembered card back: $out"
+  printf '%s' "$out" | jq -e '
+    .reloaded.otherKey | .shown == ["First call"] and .keys == ["first"] and .need == "1"
+  ' >/dev/null || fail "a remembered answer keyed to a card this board does not carry hid a card: $out"
+  pass "a reloaded board hides exactly the replayed cards and a key no card carries hides nothing"
+}
+
+test_a_keyed_item_hides_only_the_card_with_that_key_when_titles_match() {
+  local home out
+  home=$(make_home replay-same-title)
+  out=$(render_cards "$home" "$(jq -n '[
+    {key:"asked-before",type:"decision",repo:"sample",title:"Same call",options:[{value:"yes",label:"Yes"}]},
+    {key:"asked-again",type:"decision",repo:"sample",title:"Same call",options:[{value:"yes",label:"Yes"}]}]')")
+  printf '%s' "$out" | jq -e '
+    .reloaded.replayed | .keys == ["asked-before"] and .need == "1"
+  ' >/dev/null || fail "a keyed item did not hide only the card carrying its key: $out"
+  printf '%s' "$out" | jq -e '
+    .reloaded.otherKey | .keys == ["asked-before"] and .need == "1"
+  ' >/dev/null || fail "an item keyed to no card hid a card that shares its title: $out"
+  pass "a keyed item hides only the card with that key, even when another card shares its title"
 }
 
 test_a_card_attaches_reference_images_through_the_chrome_upload_and_queues_their_ids() {
@@ -619,4 +663,7 @@ test_a_board_without_reports_has_no_reports_tab
 test_a_note_stops_at_the_cap_while_typing_and_the_cap_leaves_room_for_the_label
 test_the_card_arrows_bring_the_new_card_into_view
 test_cards_sent_to_the_agent_leave_the_board_and_a_failed_send_deals_them_back
+test_the_board_tells_the_chrome_its_build_stamp_on_load
+test_a_reloaded_board_hides_exactly_the_cards_the_chrome_replays
+test_a_keyed_item_hides_only_the_card_with_that_key_when_titles_match
 test_a_card_attaches_reference_images_through_the_chrome_upload_and_queues_their_ids
