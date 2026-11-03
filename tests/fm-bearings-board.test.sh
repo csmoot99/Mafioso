@@ -996,10 +996,12 @@ test_build_publishes_each_report_beside_the_board_and_injects_only_relative_srcs
   grep -q "Scout A" "$assets/.reports/1.html" || fail "the first published page is not the first report"
   grep -q "Status" "$assets/.reports/2.html" || fail "the second published page is not the second report"
   extract_payload "$board" | jq -e '
-    .reports == [
+    (.reports | map(del(.text))) == [
       {title:"Scout A",repo:"sample",date:"2026-11-02",summary:"One line",src:"bearings-board-assets/.reports/1.html"},
       {title:"Status",repo:"sample",date:"2026-11-02",summary:"One line",src:"bearings-board-assets/.reports/2.html"}]' >/dev/null \
     || fail "the page data does not carry exactly the title, project, date, summary and relative src"
+  extract_payload "$board" | jq -e '(.reports[0].text | startswith("Scout A")) and .reports[1].text == "Status"' >/dev/null \
+    || fail "the page data does not carry each report's search text"
   grep -qF "$home/data" "$board" && fail "the page leaked a local report path"
   # a rebuild replaces the folder, so a dropped report cannot linger
   payload_with_reports "$home" "[$(report_entry "Status" "$home/data/status-report-2026-11-02.md")]"
@@ -1083,11 +1085,36 @@ test_a_report_with_script_and_html_is_neutralised_in_the_published_page() {
   grep -q '&lt;script&gt;' "$page" || fail "the script text was not kept as visible text"
   grep -q 'Content-Security-Policy" content="default-src '"'"'none'"'"'' "$page" \
     || fail "the published page does not deny every external request"
-  [ "$(grep -o 'href="[^"]*"' "$page" | grep -vc '^href="https://')" = 0 ] \
-    || fail "the published page has a link that is not https"
+  [ "$(grep -o 'href="[^"]*"' "$page" | grep -vc -e '^href="https://' -e '^href="data:text/markdown;charset=utf-8;base64,')" = 0 ] \
+    || fail "the published page has a link that is neither https nor its own Markdown download"
+  [ "$(grep -o 'href="data:' "$page" | wc -l | tr -d ' ')" = 1 ] || fail "the published page does not have exactly one download link"
   grep -q 'href="https://example.com/a?b=1&amp;c=2" target="_blank" rel="noopener noreferrer"' "$page" \
     || fail "an https link did not open as a plain new-tab link"
   pass "a report with script and HTML is neutralised in the published page"
+}
+
+test_each_report_page_downloads_the_original_and_the_board_carries_a_capped_search_index() {
+  local home board assets href name want
+  home=$(make_home reports-download)
+  board="$home/.lavish/bearings-board.html"
+  assets="$home/.lavish/bearings-board-assets"
+  make_report "$home/data/scout-a/report.md" $'# Scout: Ünï & more!\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n- [link](https://x.test) item\n\n```\ncode\n```'
+  { printf '# Long\n\n'; head -c 300000 /dev/zero | tr '\0' 'w'; printf ' tail-marker\n'; } > "$home/data/long.md"
+  payload_with_reports "$home" "[$(report_entry "Scout: Ünï & more!" "$home/data/scout-a/report.md"),$(report_entry "Long" "$home/data/long.md")]"
+  run_board "$home" build "$home/payload.json" >/dev/null 2>&1 || fail "a payload with a long report did not build"
+  href=$(sed -n 's/.*<a download="[^"]*" href="data:text\/markdown;charset=utf-8;base64,\([^"]*\)".*/\1/p' "$assets/.reports/1.html")
+  [ "$(printf '%s' "$href" | base64 -d)" = "$(cat "$home/data/scout-a/report.md")" ] \
+    || fail "the Download link does not carry the original report bytes"
+  name=$(sed -n 's/.*<a download="\([^"]*\)".*/\1/p' "$assets/.reports/1.html")
+  [ "$name" = "2026-11-02-scout-n-more.md" ] || fail "the download is not named <date>-<title-slug>.md: $name"
+  grep -qiE '<script|https?://[^"]*"? *(src|href)=' "$assets/.reports/1.html" && fail "the report page is not inert"
+  extract_payload "$board" | jq -e '
+    (.reports[0].text | contains("Scout") and (contains("|") | not) and (contains("---") | not) and (contains("```") | not) and contains("link item"))
+    and (.reports[1].text | length == 6000 and (contains("tail-marker") | not))' >/dev/null \
+    || fail "the search index is not plain, capped text"
+  want=$(( $(grep -c . "$board") ))
+  [ "$want" -gt 0 ] || fail "empty board"
+  pass "each report page downloads the original and the board carries a capped search index"
 }
 
 test_path_is_stable_and_home_scoped
@@ -1117,3 +1144,4 @@ test_a_payload_without_reports_builds_as_before
 test_build_publishes_each_report_beside_the_board_and_injects_only_relative_srcs
 test_build_refuses_a_report_outside_data_a_symlink_or_a_non_markdown_file
 test_a_report_with_script_and_html_is_neutralised_in_the_published_page
+test_each_report_page_downloads_the_original_and_the_board_carries_a_capped_search_index
