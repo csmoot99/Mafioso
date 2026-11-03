@@ -100,8 +100,9 @@
 # replaced on every build, and only the relative `src` reaches the page data,
 # never the local path. Each page carries a Download link holding the report's
 # original bytes, saved as <YYYY-MM-DD>-<title-slug>.md, and the payload gains a
-# plain-text `text` of each report for the Reports tab's full-text search. A payload with no `reports`, or an empty list, builds
-# exactly as before and the board shows no Reports tab.
+# plain-text `text` of each report, capped by bin/fm-bearings-md.pl --text, for
+# the Reports tab's full-text search. A payload with no `reports`, or an empty
+# list, builds exactly as before and the board shows no Reports tab.
 #
 # Every Underway row likewise carries a non-empty `name`: the durable task name
 # when known, otherwise its durable identifier.
@@ -358,7 +359,8 @@ validate_report_files() {  # <data.json>
 }
 
 # Render every report into <stage>/.reports/<n>.html and rewrite the payload's
-# `reports` to carry the relative src and a plain-text search index beside title, repo, date and summary.
+# `reports` to carry the relative src and a plain-text search index beside
+# title, repo, date and summary.
 stage_reports() {  # <payload.json> <stage-dir>; rewrites the payload in place
   local payload=$1 stage=$2 n=0 path name dir="$2/$REPORTS_DIR_NAME"
   while IFS=$'\t' read -r path name; do
