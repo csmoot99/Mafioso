@@ -1,0 +1,9 @@
+board: /tmp/fm-lab.zF5kOJ/.lavish/bearings-board.html
+session:
+  file: /tmp/fm-lab.zF5kOJ/.lavish/bearings-board.html
+  url: "http://127.0.0.1:4499/session/88d1bd4048ebc570"
+  status: opened
+session: live
+served: /tmp/fm-lab.zF5kOJ/.lavish/bearings-board.html
+bound: lavish-88d1bd4048ebc570
+armed: lavish-88d1bd4048ebc570

@@ -1,0 +1,28 @@
+board-frame-url: http://127.0.0.1:4499/artifact/88d1bd4048ebc570/index.html?artifact_revision=2&artifact_load_token=AHRAvc3KkWEd_RpZmcE_APO-ou8-DeeT
+rows-no-query: [{"title":"Scout: Checkout latency & Ünïcode","sum":"Gateway retries dominate p99","marks":[]},{"title":"Status report","sum":"All lanes green","marks":[]},{"title":"Big report","sum":"A long one","marks":[]}]
+search[zebrafish]: [{"title":"Scout: Checkout latency & Ünïcode","sum":"…ling. Grafana dashboard shows p99 at 2.4s. Follow up on the zebrafish cache eviction. metric value p50 180ms p99 2400ms SELECT FROM orders WHERE slow…","marks":["zebrafish"]}]
+status[zebrafish]: 1 of 3 reports
+search[FLAMINGO migration]: [{"title":"Status report","sum":"Status report 2026-11-01 All lanes green. The flamingo migration is halfway done.","marks":["flamingo","migration"]}]
+status[FLAMINGO migration]: 1 of 3 reports
+search[filler]: [{"title":"Big report","sum":"Big report line 1 filler words about nothing in particular line 2 filler words about nothing in particul…","marks":["filler","filler"]}]
+status[filler]: 1 of 3 reports
+search[needle-at-the-end]: []
+status[needle-at-the-end]: 0 of 3 reports
+search[p99 gateway]: [{"title":"Scout: Checkout latency & Ünïcode","sum":"Scout: Checkout latency & Ünïcode Findings The payment gateway retries three times before failing. Grafana dashboard shows p99 at 2.4s. Follow…","marks":["gateway","p99"]}]
+status[p99 gateway]: 1 of 3 reports
+search[grafana.example.com]: []
+status[grafana.example.com]: 0 of 3 reports
+search[<script>]: [{"title":"Scout: Checkout latency & Ünïcode","sum":"… 2400ms SELECT FROM orders WHERE slow = true; A quote about <script>alert(1)</script> injection.","marks":["<script>"]}]
+status[<script>]: 1 of 3 reports
+report-frame-url: http://127.0.0.1:4499/artifact/88d1bd4048ebc570/bearings-board-assets/.reports/1.html
+report-frame-sandbox: allow-popups allow-popups-to-escape-sandbox allow-downloads
+console-error: Blocked script execution in 'http://127.0.0.1:4499/artifact/88d1bd4048ebc570/bearings-board-assets/.reports/1.html' because the document's frame is sandboxed and the 'allow-scripts' permission is not set.
+console-error: Blocked script execution in 'http://127.0.0.1:4499/artifact/88d1bd4048ebc570/bearings-board-assets/.reports/1.html' because the document's frame is sandboxed and the 'allow-scripts' permission is not set.
+console-error: Blocked script execution in 'http://127.0.0.1:4499/artifact/88d1bd4048ebc570/bearings-board-assets/.reports/1.html' because the document's frame is sandboxed and the 'allow-scripts' permission is not set.
+console-error: Blocked script execution in 'http://127.0.0.1:4499/artifact/88d1bd4048ebc570/bearings-board-assets/.reports/1.html' because the document's frame is sandboxed and the 'allow-scripts' permission is not set.
+console-error: Blocked script execution in 'http://127.0.0.1:4499/artifact/88d1bd4048ebc570/bearings-board-assets/.reports/1.html' because the document's frame is sandboxed and the 'allow-scripts' permission is not set.
+console-error: Blocked script execution in 'http://127.0.0.1:4499/artifact/88d1bd4048ebc570/bearings-board-assets/.reports/1.html' because the document's frame is sandboxed and the 'allow-scripts' permission is not set.
+download-filename: 2026-11-02-scout-checkout-latency-n-code.md
+download-bytes-identical: true
+download-failure: null
+board-still-showing-report: Scout: Checkout latency & Ünïcode

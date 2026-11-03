@@ -1,0 +1,24 @@
+ERR browserType.launch: 
+╔══════════════════════════════════════════════════════╗
+║ Host system is missing dependencies to run browsers. ║
+║ Missing libraries:                                   ║
+║     libgtk-4.so.1                                    ║
+║     libgraphene-1.0.so.0                             ║
+║     libevent-2.1.so.7                                ║
+║     libgstgl-1.0.so.0                                ║
+║     libgstcodecparsers-1.0.so.0                      ║
+║     libwebpdemux.so.2                                ║
+║     libavif.so.16                                    ║
+║     libharfbuzz-icu.so.0                             ║
+║     libwayland-server.so.0                           ║
+║     libmanette-0.2.so.0                              ║
+║     libenchant-2.so.2                                ║
+║     libhyphen.so.0                                   ║
+║     libsecret-1.so.0                                 ║
+║     libGLESv2.so.2                                   ║
+╚══════════════════════════════════════════════════════╝
+    at /tmp/fmtest-scripts-01M6/drive-wk.cjs:6:28
+    at Object.<anonymous> (/tmp/fmtest-scripts-01M6/drive-wk.cjs:65:3) {
+  log: [],
+  name: 'Error'
+}

@@ -1,0 +1,17 @@
+board: /tmp/fm-lab.zF5kOJ/.lavish/bearings-board.html
+session:
+  file: /tmp/fm-lab.zF5kOJ/.lavish/bearings-board.html
+  url: "http://127.0.0.1:4499/session/88d1bd4048ebc570"
+  status: opened
+session: live
+served: /tmp/fm-lab.zF5kOJ/.lavish/bearings-board.html
+bound: lavish-88d1bd4048ebc570
+already-armed: lavish-88d1bd4048ebc570
+listening: live
+injected JSON bytes: 375897
+{
+  "reports": 63,
+  "text_chars_total": 366382
+}
+count label: 63 reports
+status for "line 77 filler": 61 of 63 reports
