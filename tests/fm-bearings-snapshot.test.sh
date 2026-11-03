@@ -1613,6 +1613,24 @@ test_projection_and_toon_fail_closed() {
 # then finished (done), whose report body reads like that decision, must surface as
 # a report POINTER only - never in decisions_open. Report prose must never open or
 # reopen a pending decision; only the keyed durable state does.
+test_scout_rows_research_then_report_ready() {
+  local home fakebin json
+  home=$(make_home scout-stages); write_fixture "$home"
+  fm_write_meta "$home/state/scout-y.meta" \
+    "window=firstmate:fm-scout-y" "worktree=$home/projects/ship-wt" "project=firstmate" \
+    "harness=claude" "kind=scout" "mode=scout"
+  record_claude_state "$home/state" scout-y busy
+  printf 'working: reading sources\n' > "$home/state/scout-y.status"
+  fakebin=$(make_fakebin "$home")
+  json=$(run "$home" "$fakebin" --json --all-in-flight)
+  printf '%s' "$json" | jq -e '
+    (.in_flight | map({(.id): .}) | add) as $r
+    | ($r["scout-x"] | .state == "done" and .stage == "reported" and .reached == "reported" and .pct == 100)
+      and ($r["scout-y"] | .state == "working" and .stage == "planning" and .reached == "planning" and .pct == 10)
+  ' >/dev/null || fail "a scout row reached a PR stage or the wrong fill: $json"
+  pass "a working scout is researching and a finished scout's report is ready at a full bar"
+}
+
 test_completed_scout_report_not_pending() {
   local home fakebin json
   home=$(make_home completed-scout); write_fixture "$home"
@@ -2581,6 +2599,154 @@ EOF
   pass "Underway rows carry the durable task name and gates carry their filed date"
 }
 
+test_underway_rows_carry_a_stage_and_the_recorded_parts() {
+  local home fakebin json toon
+  home=$(make_home underway-progress)
+  mkdir -p "$home/projects/main-wt" "$home/data/feat" "$home/data/waiting" "$home/data/linked"
+  cat > "$home/data/backlog.md" <<'EOF'
+## In flight
+- [ ] feat - A three part feature (repo: firstmate) (kind: ship) (since 2026-07-09)
+- [ ] waiting - Screens for the owner (repo: firstmate) (kind: ship) (since 2026-07-09)
+- [ ] linked - Symlinked parts record (repo: firstmate) (kind: ship) (since 2026-07-09)
+
+## Queued
+
+## Done
+EOF
+  for id in feat waiting linked; do
+    fm_write_meta "$home/state/$id.meta" \
+      "window=firstmate:fm-$id" "worktree=$home/projects/main-wt" "project=firstmate" \
+      "harness=claude" "kind=ship" "mode=no-mistakes"
+  done
+  record_claude_state "$home/state" feat busy
+  record_claude_state "$home/state" waiting idle
+  printf 'working: building\n' > "$home/state/feat.status"
+  printf 'paused [key=waiting-screens] [at=1793000000]: screenshots at /tmp/x\n' > "$home/state/waiting.status"
+  printf 'working: ok\n' > "$home/state/linked.status"
+  printf 'part Source model\npart Poll and confirm\npart  Editor   view\nmerged https://github.com/o/r/pull/1\nnoise line\n' \
+    > "$home/data/feat/parts"
+  printf 'part Real\n' > "$TMP_ROOT/outside-parts"
+  ln -s "$TMP_ROOT/outside-parts" "$home/data/linked/parts"
+
+  fakebin=$(make_fakebin "$home")
+  json=$(run "$home" "$fakebin" --json)
+  printf '%s' "$json" | jq -e '
+    (.in_flight | map({(.id): .}) | add) as $r
+    | ($r.feat | .stage == "building" and .reached == "building" and .pct == 30)
+      and ($r.waiting | .stage == "owner" and .reached == "building" and .pct == 30)
+      and ([.parts[] | select(.id == "feat") | [.n, .label, .state]] == [
+        [1, "Source model", "merged"], [2, "Poll and confirm", "current"], [3, "Editor view", "pending"]])
+      and ([.parts[] | select(.id != "feat")] == [])
+  ' >/dev/null || fail "Underway stage or recorded parts are wrong: $json"
+  toon=$(run "$home" "$fakebin")
+  printf '%s\n' "$toon" | grep -q '^in_flight\[[0-9]*\]{id,kind,state,repo,name,doing,stage,reached,pct}:' \
+    || fail "the TOON in_flight header lost its stage and pct columns: $toon"
+  printf '%s\n' "$toon" | grep -q '^parts\[3\]{id,n,label,state}:' \
+    || fail "the TOON output has no parts table: $toon"
+  pass "Underway rows carry a structured stage, and a data/<id>/parts record becomes the part list"
+}
+
+test_underway_markers_keep_the_reached_fill_and_a_merged_pr_restarts_the_part() {
+  local home fakebin json id n
+  home=$(make_home underway-markers)
+  mkdir -p "$home/projects/main-wt" "$home/data/merged" "$home/data/fresh"
+  cat > "$home/data/backlog.md" <<'EOF'
+## In flight
+- [ ] gone - Worktree torn down (repo: firstmate) (kind: ship) (since 2026-07-09)
+- [ ] broke - Failed worker (repo: firstmate) (kind: ship) (since 2026-07-09)
+- [ ] waits - Worker waiting on its own (repo: firstmate) (kind: ship) (since 2026-07-09)
+- [ ] merged - Part one merged (repo: firstmate) (kind: ship) (since 2026-07-09)
+- [ ] fresh - Part one open (repo: firstmate) (kind: ship) (since 2026-07-09)
+
+## Queued
+
+## Done
+EOF
+  fm_write_meta "$home/state/gone.meta" \
+    "window=firstmate:fm-gone" "worktree=$home/projects/torn-down" "project=firstmate" \
+    "harness=claude" "kind=ship" "mode=no-mistakes"
+  n=10
+  for id in broke waits merged fresh; do
+    n=$((n + 1))
+    fm_write_meta "$home/state/$id.meta" \
+      "window=firstmate:fm-$id" "worktree=$home/projects/main-wt" "project=firstmate" \
+      "harness=claude" "kind=ship" "mode=no-mistakes" "pr=https://github.com/o/r/pull/$n"
+    record_claude_state "$home/state" "$id" idle
+  done
+  printf 'failed: build broke\n' > "$home/state/broke.status"
+  printf 'paused [key=waits-upstream]: waiting for an upstream release\n' > "$home/state/waits.status"
+  printf 'done: part one shipped\n' > "$home/state/merged.status"
+  printf 'done: part one shipped\n' > "$home/state/fresh.status"
+  printf 'part One\npart Two\nmerged https://github.com/o/r/pull/13\n' > "$home/data/merged/parts"
+  printf 'part One\npart Two\nmerged https://github.com/o/r/pull/10\n' > "$home/data/fresh/parts"
+
+  fakebin=$(make_fakebin "$home")
+  json=$(run "$home" "$fakebin" --json)
+  printf '%s' "$json" | jq -e '
+    (.in_flight | map({(.id): .}) | add) as $r
+    | ($r.gone | .state == "unknown" and .stage == "stuck" and .reached == "building" and .pct == 30)
+      and ($r.broke | .state == "failed" and .stage == "stuck" and .reached == "building" and .pct == 30)
+      and ($r.waits | .state == "paused" and .stage == "building" and .reached == "building" and .pct == 30)
+      and ($r.merged | .state == "done" and .stage == "building" and .reached == "building" and .pct == 30)
+      and ($r.fresh | .state == "done" and .stage == "ready" and .reached == "ready" and .pct == 95)
+  ' >/dev/null || fail "Underway markers, paused waits or merged-part restarts are wrong: $json"
+  pass "unknown and failed rows are stuck at their reached fill, a paused wait keeps its stage, and a merged meta PR restarts the current part at building"
+}
+
+test_a_green_run_awaiting_screens_keeps_its_ready_fill() {
+  local home fakebin wt head json
+  home=$(make_home underway-green-screens)
+  wt="$home/projects/shots"
+  mkdir -p "$wt"
+  git -C "$wt" init -q
+  git -C "$wt" -c user.email=t@example.test -c user.name=t commit -q --allow-empty -m init
+  git -C "$wt" checkout -q -b fm/shots
+  git -C "$wt" update-ref refs/remotes/origin/main "$(git -C "$wt" rev-parse HEAD)"
+  head=$(git -C "$wt" rev-parse HEAD)
+  cat > "$home/data/backlog.md" <<'EOF'
+## In flight
+- [ ] shots - Green run awaiting screenshots (repo: firstmate) (kind: ship) (since 2026-07-09)
+
+## Queued
+
+## Done
+EOF
+  fm_write_meta "$home/state/shots.meta" \
+    "window=firstmate:fm-shots" "worktree=$wt" "project=firstmate" \
+    "harness=claude" "kind=ship" "mode=no-mistakes"
+  record_claude_state "$home/state" shots idle
+  printf 'paused [key=shots-screens] [at=1793000000]: screenshots at /tmp/x\n' > "$home/state/shots.status"
+  fakebin=$(make_fakebin "$home")
+  cat > "$fakebin/no-mistakes" <<SH
+#!/usr/bin/env bash
+case "\$1 \${2:-}" in
+  "axi status"|"axi ") cat <<'RUN'
+run:
+  id: "01RUN"
+  branch: fm/shots
+  status: running
+  head: "$head"
+  pr: "https://github.com/o/r/pull/2"
+  findings: none
+  steps[4]{step,status,findings,duration_ms}:
+    intent,completed,0,0
+    review,completed,0,0
+    push,completed,0,0
+    ci,running,0,0
+RUN
+  ;;
+  "axi logs") printf 'all CI checks passed - still monitoring until merged or closed\n' ;;
+esac
+exit 0
+SH
+  json=$(run "$home" "$fakebin" --json)
+  printf '%s' "$json" | jq -e '
+    .in_flight[] | select(.id == "shots")
+    | .state == "done" and .stage == "owner" and .reached == "ready" and .pct == 95
+  ' >/dev/null || fail "a green run paused for screens lost its ready fill: $json"
+  pass "a green run that pauses for owner screens stays at the ready fill with the owner marker"
+}
+
 test_mixed_secondmate_roles_partial_state_and_captain_readiness() {
   local home fakebin hibit wheel sshhip ha canonical json
   home=$(make_home mixed-domain-regressions)
@@ -3396,8 +3562,12 @@ test_active_children_project_independent_of_home_captain_hold
 test_nameless_legacy_summary_uses_its_durable_identifier
 test_newest_filed_gates_are_selected_before_snapshot_bounds
 test_underway_and_gate_rows_carry_the_durable_name_and_filed_date
+test_underway_rows_carry_a_stage_and_the_recorded_parts
+test_underway_markers_keep_the_reached_fill_and_a_merged_pr_restarts_the_part
+test_a_green_run_awaiting_screens_keeps_its_ready_fill
 test_mixed_secondmate_roles_partial_state_and_captain_readiness
 test_main_captain_readiness_matches_secondmate_projection
+test_scout_rows_research_then_report_ready
 test_completed_scout_report_not_pending
 test_open_decision_surfaces_end_to_end
 test_report_pointers_surface

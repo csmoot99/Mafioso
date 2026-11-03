@@ -103,6 +103,22 @@
 #
 # Every Underway row likewise carries a non-empty `name`: the durable task name
 # when known, otherwise its durable identifier.
+# An Underway row MAY carry `progress`, which the Underway tab draws as progress
+# bars: `{ "stage", "reached", "pct", "parts"? }`, where `reached` is the run
+# stage reached (planning, building, validating, checks, ready, or reported for a
+# finished scout), `stage` is that same value or one of the markers owner or
+# stuck, `pct` is the whole-number fill (0-100) of the reached stage, and
+# `parts`, when the feature has a recorded
+# part list, is 1-40 ordered `{ "label", "state" }` objects whose state is
+# merged, current or pending, in that order, with at most one current. The row
+# then shows one bar for the parts merged out of the total and one bar per part:
+# merged parts full, the current part filled to `pct`, later parts empty. A row
+# with no `parts` shows its own stage bar only. A marker keeps the reached fill
+# and its bar says in words that it waits on the owner or is stuck; such a row,
+# like a row with no `progress`, also keeps its state pill. The values come from
+# the bearings snapshot's in_flight `stage`, `reached` and `pct` and its `parts`
+# rows (bin/fm-bearings-snapshot.sh owns their derivation), so the board is still
+# built by this script with no model step, no worker message and no network call.
 # A Charted Next row MAY carry `filed`, the durable filed date (YYYY-MM-DD, or
 # that date with a UTC timestamp) the template orders the section by, newest
 # first; a row with no comparable date keeps its payload order after every dated
@@ -128,6 +144,7 @@ MAX_IMAGES=24
 MAX_IMAGE_BYTES=5242880
 ASSETS_DIR_NAME=bearings-board-assets
 MAX_REPORTS=500
+MAX_PARTS=40
 MAX_REPORT_BYTES=2097152
 REPORTS_DIR_NAME=.reports
 
@@ -147,7 +164,7 @@ fail() {
 board_path() { printf '%s/.lavish/bearings-board.html\n' "$FM_HOME"; }
 
 validate_payload() {  # <data.json>
-  jq -e --arg schema "$BOARD_SCHEMA" --argjson max_images "$MAX_IMAGES" --argjson max_reports "$MAX_REPORTS" '
+  jq -e --arg schema "$BOARD_SCHEMA" --argjson max_images "$MAX_IMAGES" --argjson max_reports "$MAX_REPORTS" --argjson max_parts "$MAX_PARTS" '
     def nonempty_string: type == "string" and length > 0;
     def slug($max): type == "string" and test("^[A-Za-z0-9._-]{1," + ($max | tostring) + "}$");
     def repo_marker: has("repo") and (.repo == null or (.repo | type == "string"));
@@ -216,9 +233,24 @@ validate_payload() {  # <data.json>
             | ([.options[].value] | index($recommend) != null))))
       and ([.options[].value] | index("reconcile") == null)
       and (if .type == "merge" then (.risk | nonempty_string) else true end);
+    def part_rank: {merged: 0, current: 1, pending: 2}[.state];
+    def valid_parts:
+      type == "array" and length >= 1 and length <= $max_parts
+      and ([.[] | type == "object" and (.label | nonempty_string) and (.state | IN("merged", "current", "pending"))] | all)
+      and ([.[] | part_rank] as $r | $r == ($r | sort))
+      and ([.[] | select(.state == "current")] | length) <= 1;
+    def optional_progress:
+      (has("progress") | not)
+      or (.progress
+        | type == "object"
+          and (.reached | IN("planning", "building", "validating", "checks", "ready", "reported"))
+          and (.stage == .reached or (.stage | IN("owner", "stuck")))
+          and (.pct | type == "number" and . >= 0 and . <= 100 and floor == .)
+          and ((has("parts") | not) or (.parts | valid_parts)));
     def underway_item:
       type == "object" and repo_marker and name_marker and (.id | nonempty_string)
-      and (.state | nonempty_string) and (.doing | nonempty_string) and (.kind | nonempty_string);
+      and (.state | nonempty_string) and (.doing | nonempty_string) and (.kind | nonempty_string)
+      and optional_progress;
     def landed_item:
       type == "object" and repo_marker and (.id | nonempty_string)
       and (.what | nonempty_string) and (.owner | nonempty_string)

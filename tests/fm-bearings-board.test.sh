@@ -924,6 +924,48 @@ report_entry() {  # <title> <path>
     '{title:$title,repo:"sample",date:"2026-11-02",summary:"One line",path:$path}'
 }
 
+test_build_validates_underway_progress() {
+  local home data rc good bad
+  home=$(make_home underway-progress)
+  data="$home/payload.json"
+  good='{"id":"t","repo":"r","name":"A feature","state":"working","kind":"ship","doing":"building",
+    "progress":{"stage":"owner","reached":"checks","pct":90,"parts":[
+      {"label":"One","state":"merged"},{"label":"Two","state":"current"},{"label":"Three","state":"pending"}]}}'
+  write_valid_payload "$data"
+  jq --argjson row "$good" '.underway = [$row]' "$data" > "$data.tmp" && mv "$data.tmp" "$data"
+  run_board "$home" build "$data" >/dev/null 2>&1 || fail "a valid progress row did not build"
+  extract_payload "$home/.lavish/bearings-board.html" \
+    | jq -e '.underway[0].progress | .stage == "owner" and .reached == "checks" and .pct == 90 and (.parts | length) == 3' >/dev/null \
+    || fail "the progress row did not reach the built page"
+  for bad in \
+    '.progress.stage = "napping"' \
+    '.progress.stage = "tests"' \
+    '.progress.reached = "tests"' \
+    '.progress.reached = "owner"' \
+    '.progress.stage = "building"' \
+    '.progress |= del(.reached)' \
+    '.progress.pct = 101' \
+    '.progress.pct = 12.5' \
+    '.progress.pct = "60"' \
+    '.progress.parts = []' \
+    '.progress.parts[1].state = "done"' \
+    '.progress.parts[0].label = ""' \
+    '.progress.parts = [{"label":"A","state":"pending"},{"label":"B","state":"merged"}]' \
+    '.progress.parts = [{"label":"A","state":"current"},{"label":"B","state":"current"}]' \
+    '.progress.parts = [range(41) | {label:"p",state:"pending"}]' \
+    '.progress = "owner"'; do
+    write_valid_payload "$data"
+    jq --argjson row "$good" ".underway = [\$row | $bad]" "$data" > "$data.tmp" && mv "$data.tmp" "$data"
+    set +e; run_board "$home" build "$data" >/dev/null 2>&1; rc=$?; set -e
+    [ "$rc" -ne 0 ] || fail "an invalid progress field was accepted: $bad"
+  done
+  write_valid_payload "$data"
+  jq '.underway = [{"id":"t","repo":"r","name":"No bars","state":"working","kind":"ship","doing":"x"}]' "$data" > "$data.tmp" \
+    && mv "$data.tmp" "$data"
+  run_board "$home" build "$data" >/dev/null 2>&1 || fail "an underway row without progress stopped building"
+  pass "build validates the optional underway progress field and keeps rows without it"
+}
+
 test_a_payload_without_reports_builds_as_before() {
   local home board
   home=$(make_home reports-absent)
@@ -1070,6 +1112,7 @@ test_build_copies_card_images_beside_the_board_and_injects_only_relative_srcs
 test_build_refuses_a_bad_images_field_before_touching_the_board
 test_build_clears_stale_images_on_every_rebuild
 test_build_does_not_copy_images_of_a_dropped_landed_card
+test_build_validates_underway_progress
 test_a_payload_without_reports_builds_as_before
 test_build_publishes_each_report_beside_the_board_and_injects_only_relative_srcs
 test_build_refuses_a_report_outside_data_a_symlink_or_a_non_markdown_file

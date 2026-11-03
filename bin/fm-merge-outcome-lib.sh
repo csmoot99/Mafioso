@@ -22,6 +22,13 @@
 # is committed, so a failed commit stays eligible for at-least-once retry and
 # may rarely duplicate rather than leave a merge silent.
 #
+# The same operation also appends the merge to the task's optional feature part
+# list, $home/data/<task-id>/parts (see bin/fm-bearings-snapshot.sh), as one
+# `merged <pr-url>` line, only when that file already exists and does not yet
+# hold the line. The append runs under the per-task outcome lock, before
+# deduplication, so concurrent reports append once and a retried outcome also
+# retries it, and a failed append never turns a landed merge into a failure.
+#
 # Sourced by bin/fm-pr-merge.sh, bin/fm-watch.sh, and tests. No side effects on
 # source beyond its sourced libraries.
 
@@ -33,6 +40,18 @@ _FM_MERGE_OUTCOME_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # shellcheck disable=SC2034 # Public result consumed by sourcing callers.
 FM_MERGE_OUTCOME_ALREADY_RECORDED=false
+
+fm_merge_outcome_parts_append() {  # <home> <task-id> <pr-url>
+  local parts="$1/data/$2/parts" lead
+  [ -f "$parts" ] && [ ! -L "$parts" ] || return 0
+  if grep -qxF "merged $3" "$parts" 2>/dev/null; then return 0; fi
+  if lead=$(tail -c 1 "$parts" 2>/dev/null) \
+    && { [ -z "$lead" ] || printf '\n'; printf 'merged %s\n' "$3"; } >> "$parts" 2>/dev/null; then
+    return 0
+  fi
+  printf 'actionable: merged %s but could not append it to %s\n' "$3" "$parts" >&2
+  return 0
+}
 
 # fm_merge_outcome_report <home> <state> <task-id> <pr-url> <origin> [authority]
 #
@@ -89,6 +108,7 @@ fm_merge_outcome_report() {  # <home> <state> <task-id> <pr-url> <origin> [autho
   . "$_FM_MERGE_OUTCOME_LIB_DIR/fm-wake-lib.sh"
   lock="$state/$id.pr-poll-merge-notified.lock"
   fm_lock_acquire_wait "$lock" || return 1
+  fm_merge_outcome_parts_append "$home" "$id" "$FM_PR_URL"
   if fm_pr_poll_merge_already_notified "$state" "$id" \
     "$provider" "$host" "$path" "$number"; then
     # shellcheck disable=SC2034 # Public result consumed by sourcing callers.

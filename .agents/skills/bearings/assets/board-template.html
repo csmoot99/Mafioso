@@ -328,6 +328,30 @@ a { color: inherit; text-decoration: none; }
 }
 .bb-empty { padding: 18px; font-size: var(--fs-sm); color: var(--text-muted); }
 
+/* ---- Underway progress bars: native <progress>, no inline styles ---- */
+.bb-row--prog { align-items: flex-start; }
+.bb-prog { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; min-width: 0; }
+.bb-barline { display: grid; grid-template-columns: minmax(0, 1fr) minmax(90px, 40%) 26ch; align-items: center; gap: 10px; min-width: 0; }
+.bb-barline__label { font-size: var(--fs-xs); font-weight: 700; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bb-barline__text { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-muted); white-space: nowrap; text-align: right; }
+.bb-barline--feature .bb-barline__label { font-size: var(--fs-sm); }
+.bb-parts { list-style: none; margin: 0; padding: 0 0 0 14px; display: flex; flex-direction: column; gap: 6px; border-left: 2px solid var(--border-soft); }
+.bb-bar { appearance: none; -webkit-appearance: none; width: 100%; height: 10px; border: 1px solid var(--ink-300); border-radius: var(--radius-pill);
+  background: var(--paper-200); overflow: hidden; display: block; accent-color: var(--sea-500); }
+.bb-bar::-webkit-progress-bar { background: var(--paper-200); }
+.bb-bar::-webkit-progress-value { background: var(--sea-500); }
+.bb-bar::-moz-progress-bar { background: var(--sea-500); }
+.bb-bar--owner::-webkit-progress-value { background: repeating-linear-gradient(135deg, var(--gold-500) 0 6px, var(--gold-300) 6px 12px); }
+.bb-bar--owner::-moz-progress-bar { background: repeating-linear-gradient(135deg, var(--gold-500) 0 6px, var(--gold-300) 6px 12px); }
+.bb-bar--stuck::-webkit-progress-value { background: var(--rust-600); }
+.bb-bar--stuck::-moz-progress-bar { background: var(--rust-600); }
+.bb-wait { align-self: flex-start; font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em; color: var(--navy-700, var(--ink-900));
+  background: var(--status-warn-soft); border: 1.5px solid var(--gold-600); border-radius: var(--radius-xs); padding: 3px 7px 2px; white-space: nowrap; }
+@media (max-width: 640px) {
+  .bb-barline { grid-template-columns: minmax(0, 1fr) auto; }
+  .bb-barline .bb-bar { grid-column: 1 / -1; grid-row: 2; }
+}
+
 /* ---- Charted Next dispatch picker ---- */
 /* margin:0 kills the UA default checkbox margin so picker rows and spacer rows
    share one text left edge */
@@ -1318,9 +1342,50 @@ __FM_BEARINGS_BOARD_DATA__
   /* Underway */
   var uw = document.getElementById("bb-underway");
   if (!data.underway.length) uw.appendChild(el("div", "bb-empty", "Nothing is underway."));
+  /* Underway progress: each stage's words (its fill comes from the payload) and
+     one bar builder. Meaning never rides on colour: every bar has a text label,
+     an owner wait is a labelled chip, and the native <progress> carries the
+     values for assistive tech. */
+  var STAGE_LABEL = { planning: "Researching", building: "Building", validating: "Validating",
+    checks: "PR checks", ready: "Ready to merge", reported: "Report ready" };
+  var MARKER_LABEL = { owner: "waiting on owner", stuck: "stuck" };
+  function progBar(label, now, text, tone, feature) {
+    var line = el("div", "bb-barline" + (feature ? " bb-barline--feature" : ""));
+    line.appendChild(el("span", "bb-barline__label", label));
+    var b = el("progress", "bb-bar" + (tone ? " bb-bar--" + tone : ""));
+    b.setAttribute("max", "100");
+    b.setAttribute("value", String(now));
+    b.setAttribute("aria-label", label);
+    b.setAttribute("aria-valuetext", text);
+    line.appendChild(b);
+    line.appendChild(el("span", "bb-barline__text", text));
+    return line;
+  }
+  function stageBar(label, p, feature) {
+    var words = STAGE_LABEL[p.reached] || p.reached, marker = MARKER_LABEL[p.stage];
+    return progBar(label, p.pct, words + " · " + (marker || p.pct + "%"), marker ? p.stage : "", feature);
+  }
+  function progressBlock(t) {
+    var p = t.progress, block = el("div", "bb-prog");
+    if (p.stage === "owner") block.appendChild(el("span", "bb-wait", "Waiting on you"));
+    if (!p.parts) { block.appendChild(stageBar("This task", p)); return block; }
+    var merged = p.parts.filter(function (x) { return x.state === "merged"; }).length;
+    block.appendChild(progBar("Feature", Math.round(100 * merged / p.parts.length),
+      merged + " of " + p.parts.length + " parts merged", "", true));
+    var list = el("ul", "bb-parts");
+    p.parts.forEach(function (part, i) {
+      var li = el("li", "bb-part"), name = "Part " + (i + 1) + ": " + part.label;
+      if (part.state === "merged") li.appendChild(progBar(name, 100, "Merged", ""));
+      else if (part.state === "current") li.appendChild(stageBar(name, p));
+      else li.appendChild(progBar(name, 0, "Not started", ""));
+      list.appendChild(li);
+    });
+    block.appendChild(list);
+    return block;
+  }
   data.underway.forEach(function (t) {
-    var row = el("div", "bb-row");
-    row.appendChild(badge(t.state === "working" ? "online" : "info", t.state));
+    var row = el("div", "bb-row" + (t.progress ? " bb-row--prog" : ""));
+    if (!t.progress || MARKER_LABEL[t.progress.stage]) row.appendChild(badge(t.state === "working" ? "online" : "info", t.state));
     var main = el("div", "bb-row__main");
     /* the snapshot's durable name-or-id label leads the row so a scan says
        WHICH task this is; the run status keeps its place on the second line */
@@ -1329,6 +1394,7 @@ __FM_BEARINGS_BOARD_DATA__
        no repo is known */
     main.appendChild(el("div", "bb-row__sub",
       t.doing + " · " + t.kind + " · " + (t.repo || t.id)));
+    if (t.progress) main.appendChild(progressBlock(t));
     row.appendChild(main);
     uw.appendChild(row);
   });

@@ -596,6 +596,66 @@ test_github_merged_outcome_is_verified() {
   pass "fm-pr-merge verifies a genuinely merged GitHub pull request"
 }
 
+test_proved_merge_appends_the_merged_line_to_an_existing_parts_file() {
+  local case_dir rc url=https://github.com/example/repo/pull/52
+  case_dir=$(make_case parts-merged-line)
+  mkdir -p "$case_dir/wt" "$case_dir/home/data/task-x1" "$case_dir/home/data/task-none"
+  printf 'part One\npart Two' > "$case_dir/home/data/task-x1/parts"
+  add_gh_mocks "$case_dir" 2020202020202020202020202020202020202020
+  : > "$case_dir/gh-axi.log"
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 0 "$rc" "parts-merged-line: a merged PR should succeed"
+  [ "$(cat "$case_dir/home/data/task-x1/parts")" = "$(printf 'part One\npart Two\nmerged %s' "$url")" ] \
+    || fail "parts-merged-line: the merged line was not appended on its own line: $(cat "$case_dir/home/data/task-x1/parts")"
+  pass "a proved merge appends one merged line to an existing parts file"
+}
+
+test_an_unreadable_parts_file_never_blocks_the_merge_outcome() {
+  local case_dir rc url=https://github.com/example/repo/pull/54
+  case_dir=$(make_case parts-unreadable)
+  mkdir -p "$case_dir/wt" "$case_dir/home/data/task-x1"
+  printf 'part One\n' > "$case_dir/home/data/task-x1/parts"
+  chmod 000 "$case_dir/home/data/task-x1/parts"
+  add_gh_mocks "$case_dir" 4040404040404040404040404040404040404040
+  : > "$case_dir/gh-axi.log"
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  chmod 600 "$case_dir/home/data/task-x1/parts"
+
+  expect_code 0 "$rc" "parts-unreadable: a merged PR should succeed"
+  grep -q "could not append it to" "$case_dir/stderr" \
+    || fail "parts-unreadable: the failed append was not reported: $(cat "$case_dir/stderr")"
+  [ -s "$case_dir/state/task-x1.pr-poll-merge-notified" ] \
+    || fail "parts-unreadable: the merge outcome was not recorded: $(ls "$case_dir/state")"
+  pass "an unreadable parts file is reported but never blocks the recorded merge outcome"
+}
+
+test_a_task_without_a_parts_file_gets_none_created() {
+  local case_dir rc
+  case_dir=$(make_case parts-absent)
+  mkdir -p "$case_dir/wt"
+  add_gh_mocks "$case_dir" 3030303030303030303030303030303030303030
+  : > "$case_dir/gh-axi.log"
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/53 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 0 "$rc" "parts-absent: a merged PR should succeed"
+  [ ! -e "$case_dir/home/data/task-x1/parts" ] || fail "parts-absent: a parts file was created for a task that had none"
+  pass "a merge never creates a parts file"
+}
+
 test_github_verified_merge_requires_poll_recording() {
   local case_dir rc
   case_dir=$(make_case github-poll-recording-fails)
@@ -2400,6 +2460,9 @@ test_github_failed_merge_names_an_observed_landed_state
 test_github_without_gh_still_uses_gh_axi_merge
 test_github_without_gh_failed_read_keeps_bookkeeping
 test_github_merged_outcome_is_verified
+test_proved_merge_appends_the_merged_line_to_an_existing_parts_file
+test_a_task_without_a_parts_file_gets_none_created
+test_an_unreadable_parts_file_never_blocks_the_merge_outcome
 test_github_verified_merge_requires_poll_recording
 test_github_queued_outcome_is_verified
 test_github_queue_required_refusal_names_retry_flags

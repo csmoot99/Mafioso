@@ -11,7 +11,7 @@
 //   { tabs:[{id,label,n,selected,tabindex,controls}], loaded:[visible panels at
 //     load], tabClicks/keys/answerKeepsTab (the tab bar driven like a captain),
 //     reports:{...} (the Reports tab: rows, project options, filters, reader),
-//     underway:[{title,sub,badges}],
+//     underway:[{title,sub,badges,bars:[{label,value,max,text,owner,stuck}],waiting}],
 //     charted:[{title,sub,badges,pickable}], empty, more, error,
 //     cards:[{title,images:[{src,alt,lazy}],note:{tag,maxLength,count,limit}|null}],
 //     arrow:{moved,scrolled,count},
@@ -196,6 +196,15 @@ const rowsOf = (container) =>
         sub: main?.children.find((c) => c.className.includes("bb-row__sub"))?.textContent ?? "",
         badges: badgesOf(row),
         pickable: row.children.some((c) => c.className.includes("bb-pick") && !c.className.includes("spacer")),
+        bars: row.querySelectorAll(".bb-bar").map((b) => ({
+          label: b.attributes["aria-label"],
+          value: b.attributes.value,
+          max: b.attributes.max,
+          text: b.attributes["aria-valuetext"],
+          owner: b.classList.contains("bb-bar--owner"),
+          stuck: b.classList.contains("bb-bar--stuck"),
+        })),
+        waiting: row.querySelectorAll(".bb-wait").map((w) => w.textContent),
       };
     });
 

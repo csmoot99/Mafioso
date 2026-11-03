@@ -3022,6 +3022,24 @@ test_merged_poll_row_names_no_authority_when_no_record_grants_one() {
   pass "poll distinguishes attended authorization from external landing"
 }
 
+test_a_poll_detected_merge_appends_the_merged_line_to_the_parts_file() {
+  local dir state url parts
+  url=https://github.com/o/r/pull/1
+  dir=$(make_case merged-poll-parts)
+  state="$dir/home/state"
+  parts="$dir/home/data/task-a/parts"
+  mkdir -p "$dir/home/data/task-a"
+  printf 'part One\npart Two' > "$parts"
+  write_poll_meta "$state" task-a "$url"
+  seed_canonical_poll "$dir" task-a "$url"
+  run_merged_poll_cycle "$dir"
+  [ "$(merged_ledger_row "$state" task-a)" = "check: merge landed: task-a $url external" ] \
+    || fail "the poll did not record the merge outcome: $(merged_ledger_row "$state" task-a)"
+  [ "$(cat "$parts")" = "$(printf 'part One\npart Two\nmerged %s' "$url")" ] \
+    || fail "a poll-detected merge did not append its merged line: $(cat "$parts")"
+  pass "a merge the poll detects advances the feature part list"
+}
+
 test_authority_persistence_refuses_rebound_metadata() {
   local dir state url_a url_b rc
   url_a=https://github.com/o/r/pull/1
@@ -3527,6 +3545,7 @@ test_merged_poll_retries_a_failed_upward_report
 test_self_merge_and_poll_publish_one_outcome
 test_merged_poll_row_carries_the_merge_authority
 test_merged_poll_row_names_no_authority_when_no_record_grants_one
+test_a_poll_detected_merge_appends_the_merged_line_to_the_parts_file
 test_authority_persistence_refuses_rebound_metadata
 test_authority_persists_before_control_unlock
 test_teardown_cannot_race_authority_consumption
