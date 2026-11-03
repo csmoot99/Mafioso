@@ -178,9 +178,30 @@ test_runner_strict_and_only_from_contracts() {
   pass "--strict exits 3 for unmapped changes and --only-from narrows a selection"
 }
 
+test_board_and_lavish_changes_select_only_the_board_suites() {
+  local path out
+  for path in .agents/skills/bearings/SKILL.md .agents/skills/bearings/assets/board-template.html \
+    bin/fm-bearings-board.sh bin/fm-bearings-md.pl; do
+    change "$path"
+    out=$(cd "$REPO" && bash "$RUNNER" --list --changed --strict --base "$BASE") \
+      || fail "$path must map to the board suites, not the complete set"
+    [ "$out" = "$(printf '%s\n%s' tests/fm-bearings-board.test.sh tests/fm-bearings-board-render.test.sh)" ] \
+      || fail "$path must select exactly the two board suites, got: $out"
+  done
+  change bin/fm-procevent-lavish.sh
+  out=$(cd "$REPO" && bash "$RUNNER" --list --changed --strict --base "$BASE") \
+    || fail "the Lavish adapter must map to its suites, not the complete set"
+  for path in fm-bearings-board fm-procevent fm-captain-hold-lifecycle fm-extension-binding; do
+    assert_contains "$out" "tests/$path.test.sh" "the Lavish adapter must select $path"
+  done
+  [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" -le 6 ] || fail "the Lavish adapter selected too much: $out"
+  pass "board and Lavish changes select only the board and process-event suites"
+}
+
 test_only_pull_requests_may_run_less
 test_a_changed_test_runs_only_in_its_own_job
 test_unmappable_changes_select_the_complete_set
 test_a_base_missing_from_the_checkout_selects_the_complete_set
 test_lint_skips_only_text_inputs_nothing_reads
 test_runner_strict_and_only_from_contracts
+test_board_and_lavish_changes_select_only_the_board_suites

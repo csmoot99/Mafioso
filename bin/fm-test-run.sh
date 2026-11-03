@@ -740,7 +740,7 @@ tests/fm-calm-pi-extension.test.sh 57548
 tests/fm-calm-pi-queue-retention-live-e2e.test.sh 1379
 tests/fm-capacity.test.sh 774
 tests/fm-check-unregister.test.sh 719
-tests/fm-ci-select.test.sh 35000
+tests/fm-ci-select.test.sh 40000
 tests/fm-ci-workflow.test.sh 8958
 tests/fm-classify-corr-token.test.sh 24457
 tests/fm-classify-decision-key.test.sh 5101
@@ -1689,6 +1689,21 @@ families_for_changed_path() {
       printf '%s\n' backend-dispatch
       printf '%s\n' watcher-wake-lock
       printf '%s\n' live-harness-optin
+      ;;
+    .agents/skills/bearings/*|bin/fm-bearings-board.sh|bin/fm-bearings-md.pl)
+      # The Lavish board build and its template. Only the board suites read
+      # them; the live lavish-axi drift guard is a capability skip in CI and
+      # stays opt-in, so a change here never selects it or the wider fleet.
+      printf '%s\n' __script__:fm-bearings-board.test.sh
+      printf '%s\n' __script__:fm-bearings-board-render.test.sh
+      ;;
+    bin/fm-procevent-lavish.sh)
+      # The Lavish procevent adapter: the board build arms it, and the
+      # process-event and captain-hold suites drive it through their own stubs.
+      printf '%s\n' __script__:fm-bearings-board.test.sh
+      printf '%s\n' __script__:fm-procevent.test.sh
+      printf '%s\n' __script__:fm-captain-hold-lifecycle.test.sh
+      printf '%s\n' __script__:fm-extension-binding.test.sh
       ;;
     bin/fm-bearings-snapshot.sh|bin/fm-fleet-snapshot.sh|bin/fm-fleet-view.sh|bin/fm-contributions.sh|bin/fm-contributions.jq|\
     bin/fm-home-summary-refresh.sh)
