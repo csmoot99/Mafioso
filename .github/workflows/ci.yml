@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # The stock-macOS compatibility check runs here and nowhere else.
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -26,19 +30,26 @@ concurrency:
 # tiers and their rationale; tests/fm-ci-workflow.test.sh guards this workflow.
 # Each job comment identifies the tier implemented by its executable value.
 
+# What runs when. A pull request runs only the lint and test scripts its change
+# touches (bin/fm-ci-select.sh decides per job; anything it cannot map runs the
+# whole job), so a main push runs everything and is the backstop for what a pull
+# request skipped. The stock-macOS job runs only on the daily schedule and on
+# manual dispatch, and every other job skips those two events. docs/
+# fm-test-portable-shards.md "Targeted pull-request checks" owns the policy.
+#
 # Fork opt-out: a fork sets the repository variable FM_CI_SKIP_PUSH to 1 to
 # skip the push run, and FM_CI_SKIP_MACOS to 1 to skip the macOS job, without
-# a tracked edit that drifts from upstream; with neither set, every job runs
-# exactly as before. The skip is a job-level condition, repeated per job
-# because workflow syntax has no shared anchor, and never a trigger filter: a
-# job skipped by its condition reports success, while a workflow filtered out
-# at the trigger stays pending and blocks the merge. CONTRIBUTING.md documents
-# the variables.
+# a tracked edit that drifts from upstream; with neither set, a fork runs
+# exactly the jobs upstream runs. The skip is a job-level condition, repeated
+# per job because workflow syntax has no shared anchor, and never a trigger
+# filter: a job skipped by its condition reports success, while a workflow
+# filtered out at the trigger stays pending and blocks the merge.
+# CONTRIBUTING.md documents the variables.
 jobs:
   lint:
     name: Lint ${{ matrix.partition }}
     runs-on: ubuntu-latest
-    if: ${{ !(github.event_name == 'push' && vars.FM_CI_SKIP_PUSH == '1') }}
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && vars.FM_CI_SKIP_PUSH != '1') }}
     # Normal tier (see the timeout policy above).
     timeout-minutes: 30
     strategy:
@@ -47,12 +58,21 @@ jobs:
         partition: [1, 2]
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Select lint for this change
+        id: select
+        env:
+          FM_CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: bin/fm-ci-select.sh lint >> "$GITHUB_OUTPUT"
       - name: Install pinned ShellCheck
+        if: steps.select.outputs.run == 'true'
         run: |
           set -eu
           bin/fm-install-shellcheck.sh "$RUNNER_TEMP/bin"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Install pinned actionlint
+        if: steps.select.outputs.run == 'true'
         run: |
           set -eu
           bin/fm-install-actionlint.sh "$RUNNER_TEMP/bin"
@@ -62,6 +82,7 @@ jobs:
       # and the pre-push gate on this script so a self-broken ci.yml still
       # fails locally before merge.
       - name: Lint canonical partition
+        if: steps.select.outputs.run == 'true'
         env:
           # Fail closed rather than lint uncapped when a configured per-root
           # bound (wall deadline or memory rlimit) cannot be enforced here.
@@ -73,7 +94,7 @@ jobs:
           bin/fm-lint.sh --partition "${{ matrix.partition }}of${{ strategy.job-total }}" \
             --telemetry "$RUNNER_TEMP/fm-lint/partition-${{ matrix.partition }}.tsv"
       - name: Upload lint telemetry
-        if: always()
+        if: always() && steps.select.outputs.run == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: fm-lint-telemetry-${{ matrix.partition }}
@@ -88,7 +109,7 @@ jobs:
   test-coverage:
     name: Test coverage guard
     runs-on: ubuntu-latest
-    if: ${{ !(github.event_name == 'push' && vars.FM_CI_SKIP_PUSH == '1') }}
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && vars.FM_CI_SKIP_PUSH != '1') }}
     # Fast tier: the coverage guard is a seconds-long local computation.
     timeout-minutes: 5
     steps:
@@ -101,42 +122,54 @@ jobs:
   tests-portable-parallel-1:
     name: Behavior portable parallel 1
     runs-on: ubuntu-latest
-    if: ${{ !(github.event_name == 'push' && vars.FM_CI_SKIP_PUSH == '1') }}
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && vars.FM_CI_SKIP_PUSH != '1') }}
     # Normal tier (see the timeout policy above).
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+      - name: Select tests for this change
+        id: select
+        env:
+          FM_CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: bin/fm-ci-select.sh tests --lane portable-parallel-1 >> "$GITHUB_OUTPUT"
       - name: Install pinned ShellCheck
+        if: steps.select.outputs.run == 'true'
         run: |
           set -eu
           bin/fm-install-shellcheck.sh "$RUNNER_TEMP/bin"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Install pinned actionlint
+        if: steps.select.outputs.run == 'true'
         run: |
           set -eu
           bin/fm-install-actionlint.sh "$RUNNER_TEMP/bin"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Install tasks-axi
+        if: steps.select.outputs.run == 'true'
         run: |
           set -eu
           npm install -g tasks-axi
           tasks-axi --version
       - name: Install the Pi package and TypeScript for the Pi extension tests
+        if: steps.select.outputs.run == 'true'
         run: |
           set -eu
           npm install -g @earendil-works/pi-coding-agent typescript@5.9.3
           npm ls -g --depth 0 @earendil-works/pi-coding-agent typescript
       - name: Run portable parallel shard 1
+        if: steps.select.outputs.run == 'true'
+        env:
+          FM_SELECT_LIST: ${{ steps.select.outputs.list }}
         run: |
           set -eu
           mkdir -p "$RUNNER_TEMP/fm-test"
-          bin/fm-test-run.sh --lane portable-parallel-1 \
+          bin/fm-test-run.sh --lane portable-parallel-1 --only-from "$FM_SELECT_LIST" \
             --fail-on-gate-skip 'Pi extension typecheck prerequisite not found' \
             --json "$RUNNER_TEMP/fm-test/fm-test-timing-portable-parallel-1.json"
       - name: Upload shard 1 timing artifact
-        if: always()
+        if: always() && steps.select.outputs.run == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: fm-test-timing-portable-parallel-1
@@ -146,36 +179,47 @@ jobs:
   tests-portable-parallel-2:
     name: Behavior portable parallel 2
     runs-on: ubuntu-latest
-    if: ${{ !(github.event_name == 'push' && vars.FM_CI_SKIP_PUSH == '1') }}
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && vars.FM_CI_SKIP_PUSH != '1') }}
     # Normal tier (see the timeout policy above).
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+      - name: Select tests for this change
+        id: select
+        env:
+          FM_CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: bin/fm-ci-select.sh tests --lane portable-parallel-2 >> "$GITHUB_OUTPUT"
       - name: Install pinned ShellCheck
+        if: steps.select.outputs.run == 'true'
         run: |
           set -eu
           bin/fm-install-shellcheck.sh "$RUNNER_TEMP/bin"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Install pinned actionlint
+        if: steps.select.outputs.run == 'true'
         run: |
           set -eu
           bin/fm-install-actionlint.sh "$RUNNER_TEMP/bin"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Install tasks-axi
+        if: steps.select.outputs.run == 'true'
         run: |
           set -eu
           npm install -g tasks-axi
           tasks-axi --version
       - name: Run portable parallel shard 2
+        if: steps.select.outputs.run == 'true'
+        env:
+          FM_SELECT_LIST: ${{ steps.select.outputs.list }}
         run: |
           set -eu
           mkdir -p "$RUNNER_TEMP/fm-test"
-          bin/fm-test-run.sh --lane portable-parallel-2 \
+          bin/fm-test-run.sh --lane portable-parallel-2 --only-from "$FM_SELECT_LIST" \
             --json "$RUNNER_TEMP/fm-test/fm-test-timing-portable-parallel-2.json"
       - name: Upload shard 2 timing artifact
-        if: always()
+        if: always() && steps.select.outputs.run == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: fm-test-timing-portable-parallel-2
@@ -191,7 +235,7 @@ jobs:
   tests-portable-serial:
     name: Behavior portable serial ${{ matrix.shard }}
     runs-on: ubuntu-latest
-    if: ${{ !(github.event_name == 'push' && vars.FM_CI_SKIP_PUSH == '1') }}
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && vars.FM_CI_SKIP_PUSH != '1') }}
     # Normal tier (see the timeout policy above).
     timeout-minutes: 30
     strategy:
@@ -203,17 +247,26 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+      - name: Select tests for this change
+        id: select
+        env:
+          FM_CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          FM_SERIAL_LANE: portable-serial-${{ matrix.shard }}of${{ strategy.job-total }}
+        run: bin/fm-ci-select.sh tests --lane "$FM_SERIAL_LANE" >> "$GITHUB_OUTPUT"
       - name: Install pinned ShellCheck
+        if: steps.select.outputs.run == 'true'
         run: |
           set -eu
           bin/fm-install-shellcheck.sh "$RUNNER_TEMP/bin"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Install pinned actionlint
+        if: steps.select.outputs.run == 'true'
         run: |
           set -eu
           bin/fm-install-actionlint.sh "$RUNNER_TEMP/bin"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Require tmux for e2e tests
+        if: steps.select.outputs.run == 'true'
         run: |
           set -eu
           command -v tmux >/dev/null || {
@@ -222,6 +275,7 @@ jobs:
           }
           tmux -V
       - name: Install tasks-axi for backlog-handoff delegation
+        if: steps.select.outputs.run == 'true'
         run: |
           set -eu
           npm install -g tasks-axi
@@ -231,27 +285,30 @@ jobs:
       # and pass silently. The runner image does not guarantee tsc. Both are
       # public npm packages and need no credential, so CI can hold the real thing.
       - name: Install the Pi package and TypeScript for the Pi extension tests
+        if: steps.select.outputs.run == 'true'
         run: |
           set -eu
           npm install -g @earendil-works/pi-coding-agent typescript@5.9.3
           npm ls -g --depth 0 @earendil-works/pi-coding-agent typescript
       - name: Run portable serial shard ${{ matrix.shard }}
+        if: steps.select.outputs.run == 'true'
         env:
           # job-total rather than a literal, so shrinking or growing the matrix
           # without matching bin/fm-test-run.sh is refused instead of quietly
           # leaving a shard of the required lane unrun.
           FM_SERIAL_LANE: portable-serial-${{ matrix.shard }}of${{ strategy.job-total }}
           FM_SERIAL_SHARD: ${{ matrix.shard }}
+          FM_SELECT_LIST: ${{ steps.select.outputs.list }}
         run: |
           set -eu
           mkdir -p "$RUNNER_TEMP/fm-test"
           # The Pi package and tsc are installed above, so
           # any missing typecheck prerequisite is a broken lane, not a valid skip.
-          bin/fm-test-run.sh --lane "$FM_SERIAL_LANE" \
+          bin/fm-test-run.sh --lane "$FM_SERIAL_LANE" --only-from "$FM_SELECT_LIST" \
             --fail-on-gate-skip 'Pi extension typecheck prerequisite not found' \
             --json "$RUNNER_TEMP/fm-test/fm-test-timing-portable-serial-${FM_SERIAL_SHARD}.json"
       - name: Upload portable serial shard ${{ matrix.shard }} timing artifact
-        if: always()
+        if: always() && steps.select.outputs.run == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: fm-test-timing-portable-serial-${{ matrix.shard }}
@@ -265,7 +322,7 @@ jobs:
   tests-herdr:
     name: Behavior tests (Herdr)
     runs-on: ubuntu-latest
-    if: ${{ !(github.event_name == 'push' && vars.FM_CI_SKIP_PUSH == '1') }}
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && vars.FM_CI_SKIP_PUSH != '1') }}
     # Heavy tier (see the timeout policy above): the last-resort job backstop.
     # The family-run step below owns the hang tripwire, so a wedged suite fails
     # there with the always() cleanup and timing upload still running.
@@ -274,7 +331,13 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+      - name: Select tests for this change
+        id: select
+        env:
+          FM_CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: bin/fm-ci-select.sh tests --family real-herdr-gated >> "$GITHUB_OUTPUT"
       - name: Require tools for real Herdr
+        if: steps.select.outputs.run == 'true'
         run: |
           set -eu
           command -v jq >/dev/null || { echo "::error::jq is required"; exit 1; }
@@ -284,11 +347,13 @@ jobs:
           jq --version
           python3 --version
       - name: Install pinned Herdr
+        if: steps.select.outputs.run == 'true'
         run: |
           set -eu
           bin/fm-install-herdr.sh "$RUNNER_TEMP/bin"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Install pinned Treehouse
+        if: steps.select.outputs.run == 'true'
         run: |
           set -eu
           # Several real-herdr-gated E2E scripts require treehouse for spawn
@@ -296,6 +361,7 @@ jobs:
           bin/fm-install-treehouse.sh "$RUNNER_TEMP/bin"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Assert Herdr pin and protocol floor
+        if: steps.select.outputs.run == 'true'
         run: |
           set -eu
           command -v herdr >/dev/null || { echo "::error::herdr not on PATH after install"; exit 1; }
@@ -318,6 +384,7 @@ jobs:
             exit 1
           }
       - name: Start default Herdr session for fleet-state tripwire
+        if: steps.select.outputs.run == 'true'
         run: |
           set -eu
           # Lab provision requires exactly one running default session so the
@@ -344,26 +411,30 @@ jobs:
           cat "$RUNNER_TEMP/fm-herdr/default-server.log" || true
           exit 1
       - name: Snapshot pre-suite Herdr sessions
+        if: steps.select.outputs.run == 'true'
         run: |
           set -eu
           mkdir -p "$RUNNER_TEMP/fm-herdr"
           bin/fm-herdr-ci-cleanup.sh snapshot "$RUNNER_TEMP/fm-herdr/sessions-before.json"
       - name: Run real-Herdr family (serial, required)
+        if: steps.select.outputs.run == 'true'
         id: run-real-herdr-family
         # Heavy tier step tripwire: above the healthy 7-10 minute wall and far
         # below the job backstop, so a hang fails this step and cleanup runs.
         timeout-minutes: 20
+        env:
+          FM_SELECT_LIST: ${{ steps.select.outputs.list }}
         run: |
           set -eu
           mkdir -p "$RUNNER_TEMP/fm-test"
           # Serial only. Fail if any script reports herdr not found. Live
           # harness credential tests stay outside this family (opt-in env only).
-          bin/fm-test-run.sh --family real-herdr-gated \
+          bin/fm-test-run.sh --family real-herdr-gated --only-from "$FM_SELECT_LIST" \
             --fail-on-gate-skip 'herdr not found' \
             --json "$RUNNER_TEMP/fm-test/fm-test-timing-herdr.json"
       - name: Cleanup job-owned Herdr lab sessions
         id: cleanup-herdr-lab-sessions
-        if: always()
+        if: always() && steps.select.outputs.run == 'true'
         run: |
           set -eu
           bin/fm-herdr-ci-cleanup.sh teardown "$RUNNER_TEMP/fm-herdr/sessions-before.json" || {
@@ -373,7 +444,7 @@ jobs:
             exit 1
           }
       - name: Upload Herdr timing and diagnostics
-        if: always()
+        if: always() && steps.select.outputs.run == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: fm-test-timing-herdr
@@ -394,10 +465,13 @@ jobs:
       - tests-portable-parallel-2
       - tests-portable-serial
       - tests-herdr
-    if: ${{ always() && !(github.event_name == 'push' && vars.FM_CI_SKIP_PUSH == '1') }}
+    if: ${{ always() && (github.event_name == 'pull_request' || (github.event_name == 'push' && vars.FM_CI_SKIP_PUSH != '1')) }}
     steps:
       - uses: actions/checkout@v6
+      # A pull request whose selected tests land in no lane uploads no timing
+      # artifact; the summary is evidence only, so an empty download is fine.
       - name: Download lane timing artifacts
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           pattern: fm-test-timing-*
@@ -407,8 +481,13 @@ jobs:
         run: |
           set -eu
           mkdir -p "$RUNNER_TEMP/fm-test"
-          shopt -s nullglob
-          inputs=("$RUNNER_TEMP"/fm-test-aggregate/fm-test-timing-*.json)
+          # Most lanes upload their timing JSON at the artifact root; the Herdr
+          # artifact also carries diagnostics from a second directory, so its
+          # timing JSON sits under fm-test/. Find them wherever they landed.
+          inputs=()
+          while IFS= read -r input; do
+            inputs+=("$input")
+          done < <(find "$RUNNER_TEMP/fm-test-aggregate" -type f -name 'fm-test-timing-*.json' | LC_ALL=C sort)
           if [ "${#inputs[@]}" -eq 0 ]; then
             echo "::warning::no per-lane timing JSON found to aggregate"
             exit 0
@@ -427,7 +506,7 @@ jobs:
   macos-stock-bash:
     name: Stock macOS Bash snapshot compatibility
     runs-on: macos-latest
-    if: ${{ !(github.event_name == 'push' && vars.FM_CI_SKIP_PUSH == '1') && vars.FM_CI_SKIP_MACOS != '1' }}
+    if: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && vars.FM_CI_SKIP_MACOS != '1' }}
     # Normal tier (see the timeout policy above).
     timeout-minutes: 30
     steps:
@@ -522,7 +601,7 @@ jobs:
   invariants:
     name: Repo invariants
     runs-on: ubuntu-latest
-    if: ${{ !(github.event_name == 'push' && vars.FM_CI_SKIP_PUSH == '1') }}
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && vars.FM_CI_SKIP_PUSH != '1') }}
     # Fast tier: the invariant checks are seconds-long file comparisons.
     timeout-minutes: 5
     steps:
