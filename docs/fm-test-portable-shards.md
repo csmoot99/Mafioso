@@ -40,8 +40,8 @@ It maps the pull request's changed paths with `bin/fm-test-run.sh --changed --st
 Anything that map cannot place runs the complete set: a path that maps to no test, the CI workflow, the selector, the runner, the shared test library, and any selection covering more than half of the suite.
 A failure inside the selector, a missing base commit, and every event other than `pull_request` also select the complete set.
 Lint is skipped only when every changed path is Markdown, JSON, a license, or an asset that no shell root names in a `source=` directive; any other path, including a deleted shell root, runs lint.
-The Lavish board is mapped on purpose: the bearings skill, the board build and its Markdown renderer select only the two board suites, and the Lavish adapter selects only the board, process-event, captain-hold, and extension-binding suites.
-The live lavish-axi drift guard is a capability skip on hosted runners, so a pull request never selects it.
+The Lavish board paths (the bearings skill, the board build and renderer, and the Lavish adapter) map to their own board and process-event suites instead of the complete set; the runner's map owns the exact suites.
+None of those paths selects the live lavish-axi drift guard, which is a capability skip on hosted runners.
 `tests/fm-ci-select.test.sh` holds the behavior and `tests/fm-ci-workflow.test.sh` holds the workflow wiring.
 
 The stock-macOS compatibility job runs only on the daily schedule and on manual dispatch, so a pull request or push reports it as skipped, which satisfies a required check context.
