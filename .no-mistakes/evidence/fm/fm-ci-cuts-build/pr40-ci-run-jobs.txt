@@ -1,0 +1,23 @@
+# Real GitHub Actions run 41541521896 (PR #40, pull_request event, head cb46773)
+Behavior tests (Herdr)	success
+Lint 2	success
+Test coverage guard	success
+Lint 1	success
+Behavior portable parallel 1	success
+Behavior portable parallel 2	success
+Behavior portable serial 6	success
+Behavior portable serial 3	success
+Behavior portable serial 9	success
+Behavior portable serial 4	success
+Behavior portable serial 8	success
+Behavior portable serial 1	success
+Repo invariants	success
+Behavior portable serial 2	success
+Behavior portable serial 5	success
+Behavior portable serial 7	success
+Behavior portable serial 10	success
+Stock macOS Bash snapshot compatibility	skipped
+Behavior timing aggregate	success
+Lint 1	UNKNOWN STEP	2026-11-02T22:57:25.1138934Z fm-ci-select: complete set: lint input changed: .github/workflows/ci.yml
+Behavior portable serial 3	UNKNOWN STEP	2026-11-02T22:57:26.3623546Z fm-ci-select: complete set: no precise test selection (fm-test-run status 3)
+Behavior tests (Herdr)	UNKNOWN STEP	2026-11-02T22:57:24.9264045Z fm-ci-select: complete set: no precise test selection (fm-test-run status 3)

@@ -1,0 +1,15 @@
+FM_TEST_BEGIN 2026-11-02T23:18:07Z tests/fm-ci-workflow.test.sh family=unclassified expected_gate_skip=none
+ok - CI matrices cover every executable serial lane and canonical lint root exactly once
+ok - a newer push to one PR supersedes that PR's in-flight CI
+ok - distinct PRs get distinct concurrency groups
+ok - every main push keeps its own group and is never cancelled
+ok - pull requests and pushes skip macOS, the schedule and dispatch run only macOS, and the fork variables skip only their own run or job
+ok - the timing aggregate still runs after a failed lane unless the push run is skipped
+ok - every ci.yml job carries a finite timeout
+ok - every ci.yml job belongs to one of the three timeout tiers
+ok - fast tier jobs share one 5 minute tripwire
+ok - normal tier jobs share one 30 minute budget
+ok - Herdr keeps a 20 minute step tripwire under a 75 minute job backstop
+ok - every step after a job's selection waits for it
+ok - the timing aggregate collects the nested Herdr timing as well as the root-level lanes
+FM_TEST_END 2026-11-02T23:18:16Z tests/fm-ci-workflow.test.sh exit=0 duration_ms=9134 gate_skip=false

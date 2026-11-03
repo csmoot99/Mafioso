@@ -1,0 +1,7 @@
+# Generated worker brief: lab home with config/wait-no-turns, `bin/fm-brief.sh ci-rerun-probe Mafioso --mode no-mistakes`
+89:# Waiting
+90-Every turn you take resends your whole context, so a wait must cost no turns.
+91-After you append `needs-decision:` or `blocked:`, end your turn at once: do not check the inbox, the status file, or anything else, because the answer arrives as a terminal message that starts your next turn.
+92-Wait on anything external - a pipeline gate, PR checks, a heavy-test slot - with ONE blocking shell command that returns when the state changes: `no-mistakes axi run` or `respond` with `--wait`, `gh pr checks <pr> --watch`, or `until <condition>; do sleep 30; done` for anything else.
+93-Never spend turns on `sleep` followed by a status check, and never background a command in order to poll it.
+94-When a hosted CI job fails on a head you have not changed and the failure looks transient, rerun only the failed jobs with `gh-axi run rerun <run-id> --failed`, never the whole workflow.

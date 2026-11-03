@@ -1,0 +1,14 @@
+=== A2 PR adds a brand-new test file tests/fm-zz-new.test.sh: per-job decision
+  portable-parallel-1      run=false list=/tmp/fmci-new.lriPzE/l  | unfiltered lane holds new test: no
+  portable-parallel-2      run=false list=/tmp/fmci-new.lriPzE/l  | unfiltered lane holds new test: no
+  portable-serial-1of10    run=false list=/tmp/fmci-new.lriPzE/l  | unfiltered lane holds new test: no
+  portable-serial-2of10    run=false list=/tmp/fmci-new.lriPzE/l  | unfiltered lane holds new test: no
+  portable-serial-3of10    run=false list=/tmp/fmci-new.lriPzE/l  | unfiltered lane holds new test: no
+  portable-serial-4of10    run=false list=/tmp/fmci-new.lriPzE/l  | unfiltered lane holds new test: no
+  portable-serial-5of10    run=false list=/tmp/fmci-new.lriPzE/l  | unfiltered lane holds new test: no
+  portable-serial-6of10    run=true list=/tmp/fmci-new.lriPzE/l  | unfiltered lane holds new test: yes
+  portable-serial-7of10    run=false list=/tmp/fmci-new.lriPzE/l  | unfiltered lane holds new test: no
+  portable-serial-8of10    run=false list=/tmp/fmci-new.lriPzE/l  | unfiltered lane holds new test: no
+  portable-serial-9of10    run=false list=/tmp/fmci-new.lriPzE/l  | unfiltered lane holds new test: no
+  portable-serial-10of10   run=false list=/tmp/fmci-new.lriPzE/l  | unfiltered lane holds new test: no
+  real-herdr-gated         run=false list=/tmp/fmci-new.lriPzE/l  | unfiltered lane holds new test: no

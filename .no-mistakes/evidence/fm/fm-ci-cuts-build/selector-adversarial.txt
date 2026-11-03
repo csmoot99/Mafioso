@@ -1,0 +1,12 @@
+=== A1 PR changes the Lavish board build AND README.md
+  tests serial-4of10: fm-test-run: full set required: README.md maps to no test fm-ci-select: complete set: no precise test selection (fm-test-run status 3) run=true list= 
+=== A2 PR adds a brand-new test file tests/fm-zz-new.test.sh
+  tests parallel-1: fm-ci-select: no selected script belongs to this job run=false list=/tmp/fmci-adv.IH61tJ/l 
+    list: tests/fm-zz-new.test.sh 
+  runner --changed --strict: tests/fm-zz-new.test.sh rc=0
+=== A3 PR deletes tests/fm-bearings-board-render.test.sh
+  tests serial-2of10: fm-test-run: no tests selected for changes vs 3ada7bc26bf8b7bef55f7718fcb9ab0788f8fdb5 (map is conservative; use --all for the complete suite) fm-ci-select: no selected script belongs to this job run=false list=/tmp/fmci-adv.IH61tJ/l 
+  lint: fm-ci-select: complete set: lint input changed: tests/fm-bearings-board-render.test.sh run=true list= 
+=== A4 (driver probe for a source=-named Markdown file matched a template string, not a real path; dropped. tests/fm-ci-select.test.sh covers that lint rule.)
+=== A5 PR edits the Lavish adapter + its own test
+  runner selection: tests/fm-bearings-board.test.sh tests/fm-procevent.test.sh tests/fm-captain-hold-lifecycle.test.sh tests/fm-extension-binding.test.sh 

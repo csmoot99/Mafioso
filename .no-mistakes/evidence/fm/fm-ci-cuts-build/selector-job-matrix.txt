@@ -1,0 +1,178 @@
+Note: switching to '3ada7bc26bf8b7bef55f7718fcb9ab0788f8fdb5'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+clone of 3ada7bc at /tmp/fmci-live.rdPEP3/repo; base=3ada7bc26bf8b7bef55f7718fcb9ab0788f8fdb5
+
+=== S1 PR edits only tests/fm-pr-merge.test.sh (pull_request)
+  lint                       FULL job                                         | fm-ci-select: complete set: lint input changed: tests/fm-pr-merge.test.sh 
+  portable-parallel-1        RUNS: tests/fm-pr-merge.test.sh                  | fm-ci-select: 1 of this job's scripts selected 
+  portable-parallel-2        skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-1of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-2of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-3of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-4of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-5of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-6of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-7of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-8of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-9of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-10of10     skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  real-herdr-gated           skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+
+=== S2 PR edits bin/fm-bearings-board.sh (Lavish board build)
+  lint                       FULL job                                         | fm-ci-select: complete set: lint input changed: bin/fm-bearings-board.sh 
+  portable-parallel-1        skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-parallel-2        skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-1of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-2of10      RUNS: tests/fm-bearings-board-render.test.sh     | fm-ci-select: 1 of this job's scripts selected 
+  portable-serial-3of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-4of10      RUNS: tests/fm-bearings-board.test.sh            | fm-ci-select: 1 of this job's scripts selected 
+  portable-serial-5of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-6of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-7of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-8of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-9of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-10of10     skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  real-herdr-gated           skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+
+=== S3 PR edits .agents/skills/bearings/SKILL.md (Markdown inside the board skill)
+  lint                       skipped (run=false)                              | fm-ci-select: lint skipped: only text files changed 
+  portable-parallel-1        skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-parallel-2        skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-1of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-2of10      RUNS: tests/fm-bearings-board-render.test.sh     | fm-ci-select: 1 of this job's scripts selected 
+  portable-serial-3of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-4of10      RUNS: tests/fm-bearings-board.test.sh            | fm-ci-select: 1 of this job's scripts selected 
+  portable-serial-5of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-6of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-7of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-8of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-9of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-10of10     skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  real-herdr-gated           skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+
+=== S4 PR edits bin/fm-procevent-lavish.sh (Lavish adapter)
+  lint                       FULL job                                         | fm-ci-select: complete set: lint input changed: bin/fm-procevent-lavish.sh 
+  portable-parallel-1        skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-parallel-2        RUNS: tests/fm-captain-hold-lifecycle.test.sh    | fm-ci-select: 1 of this job's scripts selected 
+  portable-serial-1of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-2of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-3of10      RUNS: tests/fm-extension-binding.test.sh         | fm-ci-select: 1 of this job's scripts selected 
+  portable-serial-4of10      RUNS: tests/fm-bearings-board.test.sh            | fm-ci-select: 1 of this job's scripts selected 
+  portable-serial-5of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-6of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-7of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-8of10      RUNS: tests/fm-procevent.test.sh                 | fm-ci-select: 1 of this job's scripts selected 
+  portable-serial-9of10      skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  portable-serial-10of10     skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+  real-herdr-gated           skipped (run=false)                              | fm-ci-select: no selected script belongs to this job 
+
+=== S5 PR edits README.md only (text-only change)
+  lint                       skipped (run=false)                              | fm-ci-select: lint skipped: only text files changed 
+  portable-parallel-1        FULL job                                         | fm-test-run: full set required: README.md maps to no test fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-parallel-2        FULL job                                         | fm-test-run: full set required: README.md maps to no test fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-1of10      FULL job                                         | fm-test-run: full set required: README.md maps to no test fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-2of10      FULL job                                         | fm-test-run: full set required: README.md maps to no test fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-3of10      FULL job                                         | fm-test-run: full set required: README.md maps to no test fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-4of10      FULL job                                         | fm-test-run: full set required: README.md maps to no test fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-5of10      FULL job                                         | fm-test-run: full set required: README.md maps to no test fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-6of10      FULL job                                         | fm-test-run: full set required: README.md maps to no test fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-7of10      FULL job                                         | fm-test-run: full set required: README.md maps to no test fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-8of10      FULL job                                         | fm-test-run: full set required: README.md maps to no test fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-9of10      FULL job                                         | fm-test-run: full set required: README.md maps to no test fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-10of10     FULL job                                         | fm-test-run: full set required: README.md maps to no test fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  real-herdr-gated           FULL job                                         | fm-test-run: full set required: README.md maps to no test fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+
+=== S6 PR edits .github/workflows/ci.yml
+  lint                       FULL job                                         | fm-ci-select: complete set: lint input changed: .github/workflows/ci.yml 
+  portable-parallel-1        FULL job                                         | fm-test-run: full set required: .github/workflows/ci.yml is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-parallel-2        FULL job                                         | fm-test-run: full set required: .github/workflows/ci.yml is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-1of10      FULL job                                         | fm-test-run: full set required: .github/workflows/ci.yml is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-2of10      FULL job                                         | fm-test-run: full set required: .github/workflows/ci.yml is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-3of10      FULL job                                         | fm-test-run: full set required: .github/workflows/ci.yml is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-4of10      FULL job                                         | fm-test-run: full set required: .github/workflows/ci.yml is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-5of10      FULL job                                         | fm-test-run: full set required: .github/workflows/ci.yml is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-6of10      FULL job                                         | fm-test-run: full set required: .github/workflows/ci.yml is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-7of10      FULL job                                         | fm-test-run: full set required: .github/workflows/ci.yml is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-8of10      FULL job                                         | fm-test-run: full set required: .github/workflows/ci.yml is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-9of10      FULL job                                         | fm-test-run: full set required: .github/workflows/ci.yml is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-10of10     FULL job                                         | fm-test-run: full set required: .github/workflows/ci.yml is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  real-herdr-gated           FULL job                                         | fm-test-run: full set required: .github/workflows/ci.yml is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+
+=== S7 PR edits tests/lib.sh (shared test library)
+  lint                       FULL job                                         | fm-ci-select: complete set: lint input changed: tests/lib.sh 
+  portable-parallel-1        FULL job                                         | fm-test-run: full set required: tests/lib.sh is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-parallel-2        FULL job                                         | fm-test-run: full set required: tests/lib.sh is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-1of10      FULL job                                         | fm-test-run: full set required: tests/lib.sh is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-2of10      FULL job                                         | fm-test-run: full set required: tests/lib.sh is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-3of10      FULL job                                         | fm-test-run: full set required: tests/lib.sh is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-4of10      FULL job                                         | fm-test-run: full set required: tests/lib.sh is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-5of10      FULL job                                         | fm-test-run: full set required: tests/lib.sh is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-6of10      FULL job                                         | fm-test-run: full set required: tests/lib.sh is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-7of10      FULL job                                         | fm-test-run: full set required: tests/lib.sh is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-8of10      FULL job                                         | fm-test-run: full set required: tests/lib.sh is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-9of10      FULL job                                         | fm-test-run: full set required: tests/lib.sh is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  portable-serial-10of10     FULL job                                         | fm-test-run: full set required: tests/lib.sh is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+  real-herdr-gated           FULL job                                         | fm-test-run: full set required: tests/lib.sh is shared by the CI layout or the test harness fm-ci-select: complete set: no precise test selection (fm-test-run status 3) 
+
+=== S8 same lavish change but event=push (post-merge backstop)
+  lint                       FULL job                                         | fm-ci-select: complete set: event is push, not a pull request 
+  portable-parallel-1        FULL job                                         | fm-ci-select: complete set: event is push, not a pull request 
+  portable-parallel-2        FULL job                                         | fm-ci-select: complete set: event is push, not a pull request 
+  portable-serial-1of10      FULL job                                         | fm-ci-select: complete set: event is push, not a pull request 
+  portable-serial-2of10      FULL job                                         | fm-ci-select: complete set: event is push, not a pull request 
+  portable-serial-3of10      FULL job                                         | fm-ci-select: complete set: event is push, not a pull request 
+  portable-serial-4of10      FULL job                                         | fm-ci-select: complete set: event is push, not a pull request 
+  portable-serial-5of10      FULL job                                         | fm-ci-select: complete set: event is push, not a pull request 
+  portable-serial-6of10      FULL job                                         | fm-ci-select: complete set: event is push, not a pull request 
+  portable-serial-7of10      FULL job                                         | fm-ci-select: complete set: event is push, not a pull request 
+  portable-serial-8of10      FULL job                                         | fm-ci-select: complete set: event is push, not a pull request 
+  portable-serial-9of10      FULL job                                         | fm-ci-select: complete set: event is push, not a pull request 
+  portable-serial-10of10     FULL job                                         | fm-ci-select: complete set: event is push, not a pull request 
+  real-herdr-gated           FULL job                                         | fm-ci-select: complete set: event is push, not a pull request 
+
+=== S9 same lavish change, event=pull_request but base commit missing from checkout
+  lint                       FULL job                                         | fm-ci-select: complete set: base commit 0123456789abcdef0123456789abcdef01234567 is not in this checkout 
+  portable-parallel-1        FULL job                                         | fm-ci-select: complete set: base commit 0123456789abcdef0123456789abcdef01234567 is not in this checkout 
+  portable-parallel-2        FULL job                                         | fm-ci-select: complete set: base commit 0123456789abcdef0123456789abcdef01234567 is not in this checkout 
+  portable-serial-1of10      FULL job                                         | fm-ci-select: complete set: base commit 0123456789abcdef0123456789abcdef01234567 is not in this checkout 
+  portable-serial-2of10      FULL job                                         | fm-ci-select: complete set: base commit 0123456789abcdef0123456789abcdef01234567 is not in this checkout 
+  portable-serial-3of10      FULL job                                         | fm-ci-select: complete set: base commit 0123456789abcdef0123456789abcdef01234567 is not in this checkout 
+  portable-serial-4of10      FULL job                                         | fm-ci-select: complete set: base commit 0123456789abcdef0123456789abcdef01234567 is not in this checkout 
+  portable-serial-5of10      FULL job                                         | fm-ci-select: complete set: base commit 0123456789abcdef0123456789abcdef01234567 is not in this checkout 
+  portable-serial-6of10      FULL job                                         | fm-ci-select: complete set: base commit 0123456789abcdef0123456789abcdef01234567 is not in this checkout 
+  portable-serial-7of10      FULL job                                         | fm-ci-select: complete set: base commit 0123456789abcdef0123456789abcdef01234567 is not in this checkout 
+  portable-serial-8of10      FULL job                                         | fm-ci-select: complete set: base commit 0123456789abcdef0123456789abcdef01234567 is not in this checkout 
+  portable-serial-9of10      FULL job                                         | fm-ci-select: complete set: base commit 0123456789abcdef0123456789abcdef01234567 is not in this checkout 
+  portable-serial-10of10     FULL job                                         | fm-ci-select: complete set: base commit 0123456789abcdef0123456789abcdef01234567 is not in this checkout 
+  real-herdr-gated           FULL job                                         | fm-ci-select: complete set: base commit 0123456789abcdef0123456789abcdef01234567 is not in this checkout 
+
+=== S10 same lavish change, event=pull_request, empty base
+  lint                       FULL job                                         | fm-ci-select: complete set: no pull request base commit 
+  portable-parallel-1        FULL job                                         | fm-ci-select: complete set: no pull request base commit 
+  portable-parallel-2        FULL job                                         | fm-ci-select: complete set: no pull request base commit 
+  portable-serial-1of10      FULL job                                         | fm-ci-select: complete set: no pull request base commit 
+  portable-serial-2of10      FULL job                                         | fm-ci-select: complete set: no pull request base commit 
+  portable-serial-3of10      FULL job                                         | fm-ci-select: complete set: no pull request base commit 
+  portable-serial-4of10      FULL job                                         | fm-ci-select: complete set: no pull request base commit 
+  portable-serial-5of10      FULL job                                         | fm-ci-select: complete set: no pull request base commit 
+  portable-serial-6of10      FULL job                                         | fm-ci-select: complete set: no pull request base commit 
+  portable-serial-7of10      FULL job                                         | fm-ci-select: complete set: no pull request base commit 
+  portable-serial-8of10      FULL job                                         | fm-ci-select: complete set: no pull request base commit 
+  portable-serial-9of10      FULL job                                         | fm-ci-select: complete set: no pull request base commit 
+  portable-serial-10of10     FULL job                                         | fm-ci-select: complete set: no pull request base commit 
+  real-herdr-gated           FULL job                                         | fm-ci-select: complete set: no pull request base commit 

@@ -1,0 +1,20 @@
+# Lane coverage at 3ada7bc
+test files: 268
+scheduled in portable lanes (with duplicates): 252  unique: 252
+real-herdr-gated family: 16
+duplicated across portable lanes:
+test files in no portable lane and not in herdr family:
+portable lane scripts missing from disk:
+per-lane expected ms (hint sum):
+  portable-parallel-1       1030556 ms (17 min)
+  portable-parallel-2       1030483 ms (17 min)
+  portable-serial-1of10     1200000 ms (20 min)
+  portable-serial-2of10     1140459 ms (19 min)
+  portable-serial-3of10     1140470 ms (19 min)
+  portable-serial-4of10     1140453 ms (19 min)
+  portable-serial-5of10     1140453 ms (19 min)
+  portable-serial-6of10     1140439 ms (19 min)
+  portable-serial-7of10     1140438 ms (19 min)
+  portable-serial-8of10     1140452 ms (19 min)
+  portable-serial-9of10     1140448 ms (19 min)
+  portable-serial-10of10    1140466 ms (19 min)
