@@ -17,6 +17,9 @@
 //     arrow:{moved,scrolled,count},
 //     send:{foreign,sent,restored,all,misrouted} } - the board after "fm-board:send"
 //     messages from the Lavish chrome (see sendMessage below),
+//     ready:[{message,origin}] - what the page posted to the chrome at load,
+//     reloaded:{ready,loaded,replayed,unrelatedFailed,otherKey} - the page loaded
+//     afresh and handed the chrome's replay (see the reload section below),
 //     attach:{...} - the first card's reference-image picker driven through the
 //     chrome's upload messages (see the attach section below)
 // The shim records listeners so the harness can drive the page the way a
@@ -87,17 +90,23 @@ class Node {
 
 const byId = new Map();
 const scrolls = [];
-const dataNode = new Node("script");
-dataNode.textContent = html
+const payloadText = html
   .split('<script id="bearings-data" type="application/json">')[1]
   .split("</script>")[0];
-byId.set("bearings-data", dataNode);
-
-// The Reports panel carries `hidden` in the shipped markup until its tab exists.
-const reportsPanel = new Node("section");
-reportsPanel.id = "bb-sec-reports";
-reportsPanel.hidden = true;
-byId.set("bb-sec-reports", reportsPanel);
+const payload = JSON.parse(payloadText);
+// The elements the shipped markup carries before the script runs.
+const seedPage = () => {
+  byId.clear();
+  const dataNode = new Node("script");
+  dataNode.textContent = payloadText;
+  byId.set("bearings-data", dataNode);
+  // The Reports panel carries `hidden` in the shipped markup until its tab exists.
+  const reportsPanel = new Node("section");
+  reportsPanel.id = "bb-sec-reports";
+  reportsPanel.hidden = true;
+  byId.set("bb-sec-reports", reportsPanel);
+};
+seedPage();
 
 globalThis.document = {
   documentElement: new Node("html"),
@@ -123,7 +132,8 @@ globalThis.document = {
   },
 };
 const posted = [];
-const parentWindow = { name: "lavish-chrome", postMessage: (m) => posted.push(m) };
+const postedOrigins = [];
+const parentWindow = { name: "lavish-chrome", postMessage: (m, origin) => { posted.push(m); postedOrigins.push(origin); } };
 const windowListeners = {};
 globalThis.location = { hash: process.env.BOARD_HASH || "" };
 globalThis.history = { replaceState: (_s, _t, url) => { location.hash = url; } };
@@ -162,7 +172,13 @@ globalThis.FormData = class {
 };
 
 const script = html.slice(html.indexOf("<script>") + "<script>".length, html.lastIndexOf("</script>"));
-new Function(script)();
+// Run the page script and return what it posted to the chrome while loading.
+const loadPage = () => {
+  new Function(script)();
+  const origins = postedOrigins.splice(0);
+  return posted.splice(0).map((message, i) => ({ message, origin: origins[i] }));
+};
+const ready = loadPage();
 
 const PANELS = ["call", "underway", "landed", "charted", "reports"];
 const visiblePanels = () => PANELS.filter((p) => !byId.get("bb-sec-" + p)?.hidden);
@@ -222,7 +238,8 @@ const errorText = [...byId.entries()]
 const empty = ch.children.filter((c) => c.className.includes("bb-empty")).map((c) => c.textContent);
 const more = ch.children.filter((c) => c.className.includes("bb-morechip")).map((c) => c.textContent);
 
-const call = byId.get("bb-call") || new Node("div");
+const callNode = () => byId.get("bb-call") || new Node("div");
+const call = callNode();
 // Type a value far past any cap into a card's note field, as a paste would.
 const noteOf = (card, typed) => {
   const ta = card.querySelectorAll(".bb-freeform")[0];
@@ -263,17 +280,27 @@ const arrow = {
 const sendMessage = (data, source = parentWindow) => {
   for (const fn of windowListeners.message || []) fn({ data, source });
 };
-const need = () => tabButtons().find((t) => t.id === "bb-tab-call")?.children[1]?.textContent;
-const deckState = () => ({
-  shown: call.children
-    .filter((c) => c.className.split(/\s+/).includes("bb-decision") && !c.hidden)
-    .map((c) => c.querySelectorAll(".bb-decision__title")[0]?.textContent),
-  count: countText(),
-  need: need(),
-  sub: byId.get("bb-call-sub")?.textContent ?? "",
-  empty: call.className.split(/\s+/).includes("bb-call--empty"),
-  navHidden: byId.get("bb-stack-count")?.parentNode?.hidden ?? false,
-});
+const need = () => (byId.get("bb-tabs") || new Node("div")).children
+  .find((t) => t.id === "bb-tab-call")?.children[1]?.textContent;
+const formOf = (card) => {
+  let form;
+  const walk = (n) => { for (const c of n.children) { if (!form && c.tagName === "form") form = c; walk(c); } };
+  walk(card);
+  return form;
+};
+const deckState = () => {
+  const shownCards = callNode().children
+    .filter((c) => c.className.split(/\s+/).includes("bb-decision") && !c.hidden);
+  return {
+    shown: shownCards.map((c) => c.querySelectorAll(".bb-decision__title")[0]?.textContent),
+    keys: shownCards.map((c) => formOf(c)?.attributes["data-lavish-question"]),
+    count: countText(),
+    need: need(),
+    sub: byId.get("bb-call-sub")?.textContent ?? "",
+    empty: callNode().className.split(/\s+/).includes("bb-call--empty"),
+    navHidden: byId.get("bb-stack-count")?.parentNode?.hidden ?? false,
+  };
+};
 const item = (n, title, answer) => ({
   selector: `div#bb-call > div:nth-of-type(${n}) > div > form`,
   text: `${title} -> ${answer}`,
@@ -421,5 +448,28 @@ const keys = {
   other: press(firstId, "a"),
 };
 
+// The page loaded afresh, as a reload or a rebuild does: nothing is hidden until the
+// chrome replays what it remembers. The replay names the second card by its key while
+// its selector points at the first card, so only the key can pick the right one.
+for (const k of Object.keys(windowListeners)) delete windowListeners[k];
+posted.length = 0;
+postedOrigins.length = 0;
+seedPage();
+const reloaded = { ready: loadPage(), loaded: deckState() };
+const callKeys = (payload.captains_call || []).map((c) => c.key);
+const callTitles = (payload.captains_call || []).map((c) => c.title);
+const keyed = (key, n, title) => ({ key, ...item(n, title, "yes") });
+if (callKeys.length >= 2) {
+  sendMessage({ type: "fm-board:send", phase: "sent", id: "remembered", items: [keyed(callKeys[1], 1, callTitles[1])] });
+  reloaded.replayed = deckState();
+  // A failure of some other send does not deal a remembered card back.
+  sendMessage({ type: "fm-board:send", phase: "failed", id: "unrelated", items: [keyed(callKeys[1], 1, callTitles[1])] });
+  reloaded.unrelatedFailed = deckState();
+  // A remembered answer for a card this board no longer carries hides nothing, even
+  // where its title and selector still point at a card on the board.
+  sendMessage({ type: "fm-board:send", phase: "sent", id: "remembered", items: [keyed("not-on-this-board", 1, callTitles[0])] });
+  reloaded.otherKey = deckState();
+}
+
 process.stdout.write(
-  JSON.stringify({ tabs, loaded, tabClicks, keys, answerKeepsTab, reports, underway, charted, empty, more, cards, arrow, send, attach, error: errorText }) + "\n");
+  JSON.stringify({ tabs, loaded, tabClicks, keys, answerKeepsTab, reports, underway, charted, empty, more, cards, arrow, send, attach, ready, reloaded, error: errorText }) + "\n");
