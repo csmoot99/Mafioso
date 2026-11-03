@@ -1,0 +1,2 @@
+ok - staged self-merge and poll interleavings are never silent
+ok - a merge the poll detects advances the feature part list

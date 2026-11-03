@@ -1,0 +1,17 @@
+# every model-CLI / GitHub / curl / tmux invocation made by snapshot + board build:
+      1 tmux capture-pane -p -t firstmate:fm-broke -S -40
+      1 tmux capture-pane -p -t firstmate:fm-feat -S -40
+      1 tmux capture-pane -p -t firstmate:fm-merged -S -40
+      1 tmux capture-pane -p -t firstmate:fm-scout-a -S -40
+      1 tmux capture-pane -p -t firstmate:fm-scout-b -S -40
+      2 tmux display-message -p -t firstmate:fm-broke #{pane_id}
+      2 tmux display-message -p -t firstmate:fm-feat #{pane_id}
+      1 tmux display-message -p -t firstmate:fm-gone #{pane_id}
+      2 tmux display-message -p -t firstmate:fm-merged #{pane_id}
+      2 tmux display-message -p -t firstmate:fm-scout-a #{pane_id}
+      2 tmux display-message -p -t firstmate:fm-scout-b #{pane_id}
+      1 tmux display-message -p -t firstmate:fm-shots #{pane_id}
+# model CLI calls: 0
+# GitHub calls: 0
+# tmux send-keys / paste-buffer (worker messages): 0
+# curl/wget calls to non-local hosts: 0

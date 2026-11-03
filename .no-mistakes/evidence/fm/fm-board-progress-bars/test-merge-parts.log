@@ -1,0 +1,4 @@
+ok - a proved merge appends one merged line to an existing parts file
+ok - a merge never creates a parts file
+ok - an unreadable parts file is reported but never blocks the recorded merge outcome
+ok - fm-pr-merge verifies a genuinely merged GitHub pull request

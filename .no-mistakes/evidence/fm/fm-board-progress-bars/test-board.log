@@ -1,0 +1,27 @@
+ok - path prints the stable home-scoped board location
+ok - build refuses malformed payloads before touching the board
+ok - charted kind is optional and accepts queued and warning
+ok - build injects the payload, binds any-origin, then arms the source
+ok - registration can consume answers only after any-origin binding exists
+ok - build establishes the Lavish session before binding and arming
+ok - rebuild refreshes the board in place without double-arming
+ok - build refuses a template without exactly one data slot
+ok - a board build reopens a session the captain ended instead of arming a dead one
+ok - build reopens a session that ends between establish and listing
+ok - build refuses to arm a poll on a session that stays ended
+ok - a rebuild starts a listener when an already-armed board has none
+ok - build drops decision cards whose subject already landed and keeps open ones
+ok - build keeps remote decisions absent from the main backlog
+ok - build fails when reconcile cannot prove a live listener
+ok - every decision card carries exactly one reconcile choice
+ok - build refuses a payload that occupies the reserved reconcile value
+ok - build reserves reconcile across non-decision cards
+ok - build copies card images beside the board and injects only relative srcs
+ok - build refuses a bad images field before touching the board and accepts the caps themselves
+ok - build clears stale images on every rebuild
+ok - build does not copy the images of a card it dropped as landed
+ok - build validates the optional underway progress field and keeps rows without it
+ok - a payload without reports builds as before
+ok - build publishes each report beside the board and injects only relative srcs
+ok - build refuses a report outside data, a symlink or a non-markdown file before touching the board
+ok - a report with script and HTML is neutralised in the published page

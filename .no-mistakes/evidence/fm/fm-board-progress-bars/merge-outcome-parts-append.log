@@ -1,0 +1,18 @@
+## parts file before
+part Source model
+part Poll and confirm
+part Editor view
+merged https://github.com/o/r/pull/1
+report rc=0
+repeat (poll) rc=0 already=true
+no-parts task rc=0
+## parts file after
+part Source model
+part Poll and confirm
+part Editor view
+merged https://github.com/o/r/pull/1
+merged https://github.com/o/r/pull/2
+## scout-a parts file exists?
+no
+## concurrent duplicate reports for PR 3
+count of pull/3 lines: 1

@@ -1,0 +1,12 @@
+41 parts (over the fixed 40 cap)             rc=1  fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /tmp/fm-lab.1cWOCM/bad.json
+40 parts (at the cap)                        rc=0  board: /tmp/fm-lab.1cWOCM/.lavish/bearings-board.html
+removed tests stage                          rc=1  fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /tmp/fm-lab.1cWOCM/bad.json
+parts out of order (pending before merged)   rc=1  fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /tmp/fm-lab.1cWOCM/bad.json
+two current parts                            rc=1  fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /tmp/fm-lab.1cWOCM/bad.json
+pct 101                                      rc=1  fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /tmp/fm-lab.1cWOCM/bad.json
+fractional pct                               rc=1  fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /tmp/fm-lab.1cWOCM/bad.json
+stage neither reached nor a marker           rc=1  fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /tmp/fm-lab.1cWOCM/bad.json
+empty parts list                             rc=1  fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /tmp/fm-lab.1cWOCM/bad.json
+41 parts with FM_BEARINGS_PARTS_MAX=100 set  rc=1  fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /tmp/fm-lab.1cWOCM/bad.json
+snapshot parts emitted for a 45-part record with FM_BEARINGS_PARTS_MAX=100: 40
+board file unchanged by the refused build

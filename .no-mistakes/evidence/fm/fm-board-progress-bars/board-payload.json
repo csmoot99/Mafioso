@@ -1,0 +1,126 @@
+{
+  "schema": "fm-bearings-board.v1",
+  "home": "fm-lab",
+  "generated": "2026-11-02T12:00Z",
+  "prs_live": false,
+  "captains_call": [],
+  "landed": [],
+  "charted": [],
+  "underway": [
+    {
+      "id": "broke",
+      "name": "Flaky importer fix",
+      "state": "failed",
+      "doing": "importer build broke on CI",
+      "kind": "ship",
+      "repo": "firstmate",
+      "progress": {
+        "stage": "stuck",
+        "reached": "building",
+        "pct": 30
+      }
+    },
+    {
+      "id": "feat",
+      "name": "Saved searches feature",
+      "state": "working",
+      "doing": "harness busy (claude-hook)",
+      "kind": "ship",
+      "repo": "firstmate",
+      "progress": {
+        "stage": "building",
+        "reached": "building",
+        "pct": 30,
+        "parts": [
+          {
+            "label": "Source model",
+            "state": "merged"
+          },
+          {
+            "label": "Poll and confirm",
+            "state": "current"
+          },
+          {
+            "label": "Editor view",
+            "state": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gone",
+      "name": "Torn-down worktree task",
+      "state": "unknown",
+      "doing": "worktree gone (torn down?)",
+      "kind": "ship",
+      "repo": "firstmate",
+      "progress": {
+        "stage": "stuck",
+        "reached": "building",
+        "pct": 30
+      }
+    },
+    {
+      "id": "merged",
+      "name": "Billing export",
+      "state": "done",
+      "doing": "part one shipped",
+      "kind": "ship",
+      "repo": "firstmate",
+      "progress": {
+        "stage": "building",
+        "reached": "building",
+        "pct": 30,
+        "parts": [
+          {
+            "label": "Export API",
+            "state": "merged"
+          },
+          {
+            "label": "Export UI",
+            "state": "current"
+          }
+        ]
+      }
+    },
+    {
+      "id": "scout-a",
+      "name": "Research caching options",
+      "state": "working",
+      "doing": "harness busy (claude-hook)",
+      "kind": "scout",
+      "repo": "firstmate",
+      "progress": {
+        "stage": "planning",
+        "reached": "planning",
+        "pct": 10
+      }
+    },
+    {
+      "id": "scout-b",
+      "name": "Survey auth providers",
+      "state": "done",
+      "doing": "report ready",
+      "kind": "scout",
+      "repo": "firstmate",
+      "progress": {
+        "stage": "reported",
+        "reached": "reported",
+        "pct": 100
+      }
+    },
+    {
+      "id": "shots",
+      "name": "Settings page polish",
+      "state": "done",
+      "doing": "checks green: PR ready for review (still monitoring for merge/close): https://github.com/o…",
+      "kind": "ship",
+      "repo": "firstmate",
+      "progress": {
+        "stage": "owner",
+        "reached": "ready",
+        "pct": 95
+      }
+    }
+  ]
+}

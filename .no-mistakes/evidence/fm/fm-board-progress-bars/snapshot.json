@@ -1,0 +1,179 @@
+{
+  "schema": "fm-bearings.v1",
+  "home": "tmp/fm-lab.1cWOCM",
+  "generated": "2026-11-03T00:08:13Z",
+  "prs": "not_requested (run: /bearings include PRs)",
+  "contributions": {
+    "scope": "owned contributions per home",
+    "known": 2,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 2,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "complete": false,
+    "proven_clear": false,
+    "unmeasured_homes": 0,
+    "unreadable_records": 0,
+    "unmeasured": 0,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "captain_omitted": 0,
+    "captain": []
+  },
+  "in_flight": [
+    {
+      "id": "broke",
+      "kind": "ship",
+      "state": "failed",
+      "repo": "firstmate",
+      "name": "Flaky importer fix",
+      "doing": "importer build broke on CI",
+      "stage": "stuck",
+      "reached": "building",
+      "pct": 30
+    },
+    {
+      "id": "feat",
+      "kind": "ship",
+      "state": "working",
+      "repo": "firstmate",
+      "name": "Saved searches feature",
+      "doing": "harness busy (claude-hook)",
+      "stage": "building",
+      "reached": "building",
+      "pct": 30
+    },
+    {
+      "id": "gone",
+      "kind": "ship",
+      "state": "unknown",
+      "repo": "firstmate",
+      "name": "Torn-down worktree task",
+      "doing": "worktree gone (torn down?)",
+      "stage": "stuck",
+      "reached": "building",
+      "pct": 30
+    },
+    {
+      "id": "merged",
+      "kind": "ship",
+      "state": "done",
+      "repo": "firstmate",
+      "name": "Billing export",
+      "doing": "part one shipped",
+      "stage": "building",
+      "reached": "building",
+      "pct": 30
+    },
+    {
+      "id": "scout-a",
+      "kind": "scout",
+      "state": "working",
+      "repo": "firstmate",
+      "name": "Research caching options",
+      "doing": "harness busy (claude-hook)",
+      "stage": "planning",
+      "reached": "planning",
+      "pct": 10
+    },
+    {
+      "id": "scout-b",
+      "kind": "scout",
+      "state": "done",
+      "repo": "firstmate",
+      "name": "Survey auth providers",
+      "doing": "report ready",
+      "stage": "reported",
+      "reached": "reported",
+      "pct": 100
+    },
+    {
+      "id": "shots",
+      "kind": "ship",
+      "state": "done",
+      "repo": "firstmate",
+      "name": "Settings page polish",
+      "doing": "checks green: PR ready for review (still monitoring for merge/close): https://github.com/o…",
+      "stage": "owner",
+      "reached": "ready",
+      "pct": 95
+    }
+  ],
+  "parts": [
+    {
+      "id": "feat",
+      "n": 1,
+      "label": "Source model",
+      "state": "merged"
+    },
+    {
+      "id": "feat",
+      "n": 2,
+      "label": "Poll and confirm",
+      "state": "current"
+    },
+    {
+      "id": "feat",
+      "n": 3,
+      "label": "Editor view",
+      "state": "pending"
+    },
+    {
+      "id": "merged",
+      "n": 1,
+      "label": "Export API",
+      "state": "merged"
+    },
+    {
+      "id": "merged",
+      "n": 2,
+      "label": "Export UI",
+      "state": "current"
+    }
+  ],
+  "secondmates": [],
+  "secondmate_reconcile": [],
+  "decisions_open": [],
+  "landed": [],
+  "gates": [],
+  "reports": [],
+  "recorded_prs": [
+    {
+      "id": "broke",
+      "url": "https://github.com/o/r/pull/11"
+    },
+    {
+      "id": "merged",
+      "url": "https://github.com/o/r/pull/13"
+    }
+  ],
+  "omitted": [
+    {
+      "surface": "backlog item bodies",
+      "reveal": "--fields bodies"
+    },
+    {
+      "surface": "task paths",
+      "reveal": "--fields paths"
+    },
+    {
+      "surface": "watch/steer actions",
+      "reveal": "--fields actions"
+    },
+    {
+      "surface": "healthy endpoint detail",
+      "reveal": "--fields endpoints"
+    },
+    {
+      "surface": "full scout-report inventory",
+      "reveal": "--all-reports"
+    },
+    {
+      "surface": "live PR discovery + checks",
+      "reveal": "--include-prs"
+    }
+  ]
+}

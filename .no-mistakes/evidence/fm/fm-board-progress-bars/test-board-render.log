@@ -1,0 +1,25 @@
+ok - an underway row leads with the task name and still reports its run status
+ok - Underway shows a feature bar, one bar per part, marker bars that keep their fill and state pill, and keeps the pill when there is no progress
+ok - an underway identifier label is not replaced by run status
+ok - charted next renders the most recently filed work first
+ok - charted rows with no filed date follow the dated rows in payload order
+ok - a warning row badges needs repair while queued work keeps waiting
+ok - the charted next count counts queued work only, and still renders warnings
+ok - a warning-only board reports nothing queued and still shows the warning
+ok - omitted warnings remain separate from omitted queued work
+ok - an omitted kind renders exactly as queued work always did
+ok - a card with images renders one lazy thumbnail per image and a card without renders none
+ok - an image src outside the board assets folder is not rendered
+ok - the sections are tabs with counts and only the selected one shows
+ok - the tab bar answers to the arrow, Home and End keys
+ok - queuing an answer keeps the Captain's Call tab selected
+ok - the selected tab is restored from the hash, then storage, then the frame name
+ok - a board with reports gets a Reports tab listing them newest first
+ok - the reports filters narrow the list by text and project
+ok - a report opens in a reader with a way back
+ok - a board without reports has no Reports tab
+ok - a note stops at the cap while typing, counted in bytes against the whole answer label
+ok - the next arrow shows the next card and scrolls its top into view
+ok - cards sent to the agent leave the board at once, counters follow, and a failed send deals them back
+ok - a card uploads images through the chrome, shows Lavish's refusals, and queues the ids with the answer
+bash tests/fm-bearings-board-render.test.sh  29.06s user 16.92s system 74% cpu 1:02.06 total
