@@ -1,0 +1,62 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chrome stand-in (fm-board protocol)</title>
+<style>
+ body{margin:0;font:13px system-ui;display:flex;flex-direction:column;height:100vh}
+ #bar{padding:6px;background:#222;color:#eee;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+ #bar button{font:inherit}
+ iframe{flex:1;border:0;width:100%}
+ #log{max-height:90px;overflow:auto;background:#111;color:#9f9;font:11px monospace;padding:4px;margin:0}
+</style></head>
+<body>
+<div id="bar">
+ <b>stand-in chrome</b>
+ <button id="send">Send to Agent (keys: <span id="k"></span>)</button>
+ <button id="reload">Reload frame</button>
+ <span id="stamp"></span>
+</div>
+<iframe id="f"></iframe>
+<pre id="log"></pre>
+<script>
+// Stand-in for the private Lavish overlay, implementing the protocol documented
+// in board-template.html: remember confirmed sends under the board stamp, replay
+// only the current stamp's entries as one "sent" message (id "remembered") on
+// every fm-board:ready, drop other stamps and anything older than 24 hours.
+var q = new URLSearchParams(location.search);
+var board = q.get("board") || "board-a.html";
+var sendKeys = (q.get("send") || "").split(",").filter(Boolean);
+document.getElementById("k").textContent = sendKeys.join(",") || "-";
+var f = document.getElementById("f"), logEl = document.getElementById("log");
+function log(s){ logEl.textContent += s + "\n"; window.__log = (window.__log||[]).concat([s]); }
+var STORE = "fm-board-sent";
+function load(){ try { return JSON.parse(localStorage.getItem(STORE)) || []; } catch(e){ return []; } }
+var currentStamp = null;
+window.addEventListener("message", function(ev){
+  if (ev.source !== f.contentWindow) return;
+  var m = ev.data || {};
+  if (m.type !== "fm-board:ready") return;
+  currentStamp = m.stamp;
+  document.getElementById("stamp").textContent = "stamp " + m.stamp;
+  var now = Date.now();
+  var kept = load().filter(function(e){ return e.stamp === m.stamp && now - e.at < 864e5; });
+  localStorage.setItem(STORE, JSON.stringify(kept));
+  var items = [].concat.apply([], kept.map(function(e){ return e.items; }));
+  log("ready stamp=" + m.stamp + " replaying " + items.length + " item(s): " + items.map(function(i){return i.key;}).join(","));
+  if (items.length) f.contentWindow.postMessage({type:"fm-board:send", phase:"sent", id:"remembered", items:items}, "*");
+});
+document.getElementById("send").onclick = function(){
+  var id = "send-" + Date.now();
+  var items = sendKeys.map(function(k){ return {key:k, text:"(answered) -> yes"}; });
+  f.contentWindow.postMessage({type:"fm-board:send", phase:"start", id:id, items:items}, "*");
+  log("start " + id + " " + sendKeys.join(","));
+  setTimeout(function(){
+    f.contentWindow.postMessage({type:"fm-board:send", phase:"sent", id:id, items:items}, "*");
+    var all = load(); all.push({stamp: currentStamp, at: Date.now(), items: items});
+    localStorage.setItem(STORE, JSON.stringify(all));
+    log("sent (confirmed) " + id + " stored under " + currentStamp);
+  }, 300);
+};
+document.getElementById("reload").onclick = function(){ f.contentWindow.location.reload(); log("frame reload"); };
+f.src = board;
+</script>
+</body></html>

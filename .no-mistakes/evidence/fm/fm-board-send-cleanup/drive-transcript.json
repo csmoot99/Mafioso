@@ -1,0 +1,116 @@
+{
+ "s0_fresh": {
+  "state": {
+   "shown": [
+    "Ship the pricing page?"
+   ],
+   "keys": [
+    "ship-pricing"
+   ],
+   "count": "card 1 of 3",
+   "tabN": "3",
+   "footer": "2026-11-02T09:00Z"
+  },
+  "log": [
+   "ready stamp=2026-11-02T09:00Z replaying 0 item(s): "
+  ]
+ },
+ "s1_afterStart": {
+  "shown": [
+   "Merge the docs rewrite?"
+  ],
+  "keys": [
+   "merge-docs"
+  ],
+  "count": "card 1 of 1",
+  "tabN": "1",
+  "footer": "2026-11-02T09:00Z"
+ },
+ "s1_afterSent": {
+  "state": {
+   "shown": [
+    "Merge the docs rewrite?"
+   ],
+   "keys": [
+    "merge-docs"
+   ],
+   "count": "card 1 of 1",
+   "tabN": "1",
+   "footer": "2026-11-02T09:00Z"
+  },
+  "store": "[{\"stamp\":\"2026-11-02T09:00Z\",\"at\":1793670168999,\"items\":[{\"key\":\"ship-pricing\",\"text\":\"(answered) -> yes\"},{\"key\":\"rename-cli\",\"text\":\"(answered) -> yes\"}]}]"
+ },
+ "s2_frameReload": {
+  "state": {
+   "shown": [
+    "Merge the docs rewrite?"
+   ],
+   "keys": [
+    "merge-docs"
+   ],
+   "count": "card 1 of 1",
+   "tabN": "1",
+   "footer": "2026-11-02T09:00Z"
+  },
+  "log": [
+   "ready stamp=2026-11-02T09:00Z replaying 0 item(s): ",
+   "start send-1793670168699 ship-pricing,rename-cli",
+   "sent (confirmed) send-1793670168699 stored under 2026-11-02T09:00Z",
+   "frame reload",
+   "ready stamp=2026-11-02T09:00Z replaying 2 item(s): ship-pricing,rename-cli"
+  ]
+ },
+ "s3_reopen": {
+  "state": {
+   "shown": [
+    "Merge the docs rewrite?"
+   ],
+   "keys": [
+    "merge-docs"
+   ],
+   "count": "card 1 of 1",
+   "tabN": "1",
+   "footer": "2026-11-02T09:00Z"
+  },
+  "log": [
+   "ready stamp=2026-11-02T09:00Z replaying 2 item(s): ship-pricing,rename-cli"
+  ]
+ },
+ "s5_adversarial": {
+  "shown": [
+   "Merge the docs rewrite?"
+  ],
+  "keys": [
+   "merge-docs"
+  ],
+  "count": "card 1 of 1",
+  "tabN": "1",
+  "footer": "2026-11-02T09:00Z"
+ },
+ "s4_rebuild": {
+  "state": {
+   "shown": [
+    "Ship the pricing page?"
+   ],
+   "keys": [
+    "ship-pricing-v2"
+   ],
+   "count": "card 1 of 3",
+   "tabN": "3",
+   "footer": "2026-11-02T10:30Z"
+  },
+  "log": [
+   "ready stamp=2026-11-02T10:30Z replaying 0 item(s): "
+  ],
+  "store": "[]"
+ },
+ "s6_centre": {
+  "wrapLeft": 526.5,
+  "wrapRight": 1073.5,
+  "panelLeft": 238,
+  "panelRight": 1362,
+  "leftGap": 288.5,
+  "rightGap": 288.5,
+  "standalonePostedReady": false
+ }
+}

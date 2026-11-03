@@ -1,0 +1,1545 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bearings - fleet board</title>
+<style>
+/* ============================================================
+   Bearings board - Firstmate Design System, inlined for portability.
+   Tokens copied verbatim from myfirstmate priv/static/assets/app.css
+   (the compiled adoption of .agents/skills/firstmate-design).
+   ============================================================ */
+@import url("https://fonts.googleapis.com/css2?family=Chango&family=Jost:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
+
+:root {
+  --rust-700: #8f2f17; --rust-600: #a93a1f; --rust-500: #c0452a;
+  --rust-400: #d35f3f; --rust-300: #e08365; --rust-100: #f4d8c9; --rust-050: #fbece3;
+  --navy-700: #1a2238; --navy-600: #222c49; --navy-500: #2a3656;
+  --navy-300: #6c7796; --navy-100: #d9deea;
+  --gold-600: #b5791c; --gold-500: #e0a52e; --gold-300: #f0d38c; --gold-100: #f8ecc9;
+  --ocean-600: #2f6688; --ocean-500: #3c7ea6; --ocean-200: #b6d4e2; --ocean-050: #e8f1f5;
+  --sea-700: #234e3a; --sea-500: #2f6b4f; --sea-200: #b9d4c5; --sea-050: #e9f2ec;
+  --paper-000: #fbf4e2; --paper-100: #f6ecd3; --paper-200: #f0e3c4; --paper-300: #e7d6ae;
+  --cream-line: #ddc89c;
+  --ink-900: #241c14; --ink-700: #3f3224; --ink-500: #6f5e46; --ink-300: #9c8a6c;
+  --white: #fffdf7;
+  --bg-page: var(--paper-100);
+  --surface-card: var(--white);
+  --surface-card-warm: var(--paper-000);
+  --text-strong: var(--ink-900); --text-body: var(--ink-700);
+  --text-muted: var(--ink-500); --text-faint: var(--ink-300);
+  --border-default: var(--cream-line); --border-soft: var(--paper-300);
+  --status-online: var(--sea-500); --status-online-soft: var(--sea-050);
+  --status-warn: var(--gold-600); --status-warn-soft: var(--gold-100);
+  --status-danger: var(--rust-600); --status-danger-soft: var(--rust-050);
+  --status-info: var(--ocean-500); --status-info-soft: var(--ocean-050);
+  --font-display: "Chango", "Cooper Black", Rockwell, Georgia, serif;
+  --font-sans: "Jost", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --fs-h3: 1.4rem; --fs-h4: 1.15rem; --fs-base: 1rem; --fs-sm: 0.9375rem;
+  --fs-xs: 0.8125rem; --fs-2xs: 0.6875rem;
+  --ls-caps: 0.16em;
+  --radius-xs: 6px; --radius-sm: 9px; --radius-md: 12px; --radius-banner: 7px;
+  --radius-lg: 18px; --radius-pill: 999px;
+  --shadow-sm: 0 1px 2px rgba(36, 28, 20, 0.06), 0 4px 10px rgba(36, 28, 20, 0.06);
+  --shadow-hard: 4px 4px 0 var(--ink-900);
+  --shadow-hard-sm: 3px 3px 0 var(--ink-900);
+  --texture-paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
+  --focus-ring: 0 0 0 3px var(--gold-300);
+  --container-app: 1180px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-sans);
+  color: var(--text-body);
+  background: var(--bg-page);
+  background-image: var(--texture-paper);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; text-decoration: none; }
+
+/* ---- fm-badge (enamel sign-pin), verbatim contract ---- */
+.fm-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--fs-2xs); font-weight: 800; line-height: 1;
+  padding: 5px 9px 4px; text-transform: uppercase; letter-spacing: 0.07em;
+  border-radius: var(--radius-xs); border: 1.5px solid var(--ink-900);
+  box-shadow: 2px 2px 0 var(--ink-900); white-space: nowrap;
+}
+.fm-badge--online  { background: var(--sea-500);  color: var(--paper-000); }
+.fm-badge--warn    { background: var(--gold-500); color: var(--navy-700); }
+.fm-badge--danger  { background: var(--rust-600); color: var(--paper-000); }
+.fm-badge--info    { background: var(--ocean-500); color: var(--paper-000); }
+.fm-badge--neutral { background: var(--paper-000); color: var(--ink-900); }
+.fm-badge--solid   { background: var(--rust-500); color: var(--paper-000); }
+
+/* ---- fm-btn ---- */
+.fm-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font-family: var(--font-sans); font-weight: 800; line-height: 1; white-space: nowrap;
+  border: 2px solid transparent; border-radius: var(--radius-banner); cursor: pointer;
+  text-decoration: none; transition: background 120ms, border-color 120ms, transform 120ms, box-shadow 120ms;
+}
+.fm-btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.fm-btn:active { transform: translateY(1px); }
+.fm-btn--sm { font-size: var(--fs-xs); padding: 8px 16px; }
+.fm-btn--primary { background: var(--rust-500); color: var(--white); border-color: var(--ink-900); box-shadow: var(--shadow-hard-sm); }
+.fm-btn--primary:hover { background: var(--rust-600); }
+.fm-btn--gold { background: var(--gold-500); color: var(--navy-700); border-color: var(--ink-900); box-shadow: var(--shadow-hard-sm); }
+.fm-btn--gold:hover { background: var(--gold-600); color: var(--white); }
+.fm-btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+/* ---- fm-card ---- */
+.fm-card {
+  background: var(--surface-card); border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); overflow: hidden;
+}
+.fm-card--poster { border: 2px solid var(--ink-900); box-shadow: var(--shadow-hard); border-radius: var(--radius-md); }
+.fm-card--warm { background: var(--surface-card-warm); }
+
+/* ---- fm-sign (eyebrow section label) ---- */
+.fm-sign {
+  display: inline-flex; align-items: center; gap: 8px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: var(--ls-caps); font-size: var(--fs-xs);
+  line-height: 1; white-space: nowrap;
+}
+.fm-sign--eyebrow { color: var(--rust-500); }
+.fm-sign--muted { color: var(--ink-500); }
+.fm-sign svg { width: 14px; height: 14px; }
+.fm-ico { width: 1.15em; height: 1.15em; flex: none; vertical-align: -0.18em; }
+
+/* ============================================================
+   Board chrome (bb-*) - built on the same tokens
+   ============================================================ */
+.bb-nav {
+  background: var(--paper-100);
+  border-bottom: 1px solid var(--border-default);
+}
+.bb-nav__inner {
+  max-width: var(--container-app); margin: 0 auto; padding: 0 28px; height: 64px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.bb-brand { display: inline-flex; align-items: center; gap: 12px; }
+.bb-brand__disc {
+  display: grid; place-items: center; width: 34px; height: 34px; flex: none;
+  border-radius: 999px; background: var(--rust-500); color: var(--paper-000);
+  border: 2px solid var(--ink-900); box-shadow: var(--shadow-hard-sm);
+}
+.bb-brand__disc svg { width: 60%; height: 60%; }
+.bb-brand__wm { font-family: var(--font-display); font-size: 23px; color: var(--text-strong); line-height: 1; }
+.bb-meta-mono { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-faint); overflow-wrap: anywhere; }
+
+.bb-main {
+  max-width: var(--container-app); margin: 0 auto;
+  padding: 26px 28px 72px; display: flex; flex-direction: column; gap: 22px;
+}
+
+
+.bb-section[hidden] { display: none; }
+.bb-section { display: flex; flex-direction: column; gap: 12px; min-width: 0; scroll-margin-top: 12px; }
+.bb-section:focus { outline: none; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+.bb-section__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.bb-section__head .fm-sign--muted { white-space: normal; line-height: 1.35; min-width: 0; }
+
+/* ---- tab bar: one tab per section, sticky, sideways-scrolling when it does not fit ---- */
+.bb-tabbar {
+  position: sticky; top: 0; z-index: 30;
+  background: var(--paper-100); background-image: var(--texture-paper);
+  border-bottom: 1px solid var(--border-default);
+}
+.bb-tabbar__inner {
+  position: relative; max-width: var(--container-app); margin: 0 auto; padding: 0 22px;
+  display: flex; gap: 4px; overflow-x: auto; overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch; scrollbar-width: none;
+}
+.bb-tabbar__inner::-webkit-scrollbar { display: none; }
+.bb-tab {
+  flex: none; display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 14px; margin: 0;
+  font: inherit; font-family: var(--font-sans); font-size: var(--fs-sm); font-weight: 800; white-space: nowrap;
+  color: var(--text-muted); background: none; border: 0; border-bottom: 3px solid transparent; cursor: pointer;
+}
+.bb-tab:hover { color: var(--text-strong); }
+.bb-tab:focus-visible { outline: none; box-shadow: inset var(--focus-ring); }
+.bb-tab[aria-selected="true"] { color: var(--text-strong); border-bottom-color: var(--rust-500); }
+.bb-tab__n {
+  font-family: var(--font-mono); font-size: var(--fs-2xs); font-weight: 600; line-height: 1;
+  padding: 4px 7px 3px; border-radius: var(--radius-pill);
+  background: var(--paper-200); border: 1px solid var(--border-soft); color: var(--text-muted);
+}
+.bb-tab--call .bb-tab__n { background: var(--rust-050); border-color: var(--rust-500); color: var(--rust-600); }
+.bb-tab--call .bb-tab__n.is-zero { background: var(--paper-200); border-color: var(--border-soft); color: var(--text-muted); }
+#bb-sec-call .bb-callwrap { max-width: 760px; margin: 0 auto; }
+
+/* ---- Captain's Call: one card at a time, dealt off a visible stack ---- */
+.bb-callwrap { display: flex; flex-direction: column; gap: 12px; }
+/* extra top margin clears the pile edges that poke below the active card */
+.bb-stacknav { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.bb-stacknav[hidden] { display: none; }
+.bb-stacknav__count { flex: 1 1 auto; font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-muted); }
+.bb-stacknav__btn {
+  display: inline-grid; place-items: center; width: 34px; height: 34px; cursor: pointer;
+  background: var(--surface-card); color: var(--text-strong);
+  border: 1.5px solid var(--border-default); border-radius: var(--radius-sm);
+  transition: background 120ms, border-color 120ms;
+}
+.bb-stacknav__btn:hover { background: var(--paper-100); border-color: var(--ink-500); }
+.bb-stacknav__btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.bb-stacknav__btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+.bb-stacknav__btn svg { width: 16px; height: 16px; }
+/* the stack: a squared-up paper pile - solid card faces at slight opposing
+   rotations, like dealt cards, not translucent offset rectangles. The pile
+   thins as cards are answered: two edges, then one, then none on the last. */
+.bb-call { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); }
+.bb-call::before, .bb-call::after {
+  content: ""; position: absolute; inset: 0; z-index: 0;
+  background: var(--surface-card); border: 2px solid var(--ink-900);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-hard-sm);
+}
+.bb-call::before { transform: rotate(1.3deg) translate(4px, 5px); }
+.bb-call::after  { transform: rotate(-1.1deg) translate(-3px, 9px); }
+.bb-call--penult::after { display: none; }
+.bb-call--last::before, .bb-call--last::after,
+.bb-call--empty::before, .bb-call--empty::after { display: none; }
+.bb-call > .bb-decision { grid-area: 1 / 1; z-index: 1; scroll-margin-top: 12px; }
+.bb-call > .bb-decision[hidden] { display: none; }
+.bb-decision { display: flex; flex-direction: column; }
+.bb-decision__pad { padding: 18px 20px 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+.bb-decision__top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; }
+.bb-decision__repo { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-faint); overflow-wrap: anywhere; }
+.bb-decision__title { margin: 0; font-size: var(--fs-h4); font-weight: 800; color: var(--text-strong); line-height: 1.25; overflow-wrap: anywhere; }
+.bb-decision__detail { margin: 0; font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.45; overflow-wrap: anywhere; }
+/* about / decide / recommended - three scannable context rows */
+.bb-ctx { display: flex; flex-direction: column; gap: 6px; }
+.bb-ctx__row { display: grid; grid-template-columns: 78px minmax(0,1fr); gap: 8px; align-items: baseline; }
+.bb-ctx__k { font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--text-faint); white-space: nowrap; }
+.bb-ctx__v { font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.4; min-width: 0; overflow-wrap: anywhere; }
+.bb-decision__link { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--ocean-600); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.bb-decision__link:hover { text-decoration: underline; }
+/* One rhythm owner: the answer form is a flex column with the same 12px gap as
+   the card pad, and the foot rides margin-top:auto so every Queue answer button
+   sits on the same baseline with identical breathing room. */
+.bb-decision form { display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto; }
+.bb-opts { display: flex; flex-direction: column; gap: 7px; }
+.bb-opt {
+  display: flex; align-items: flex-start; gap: 10px; padding: 9px 12px; cursor: pointer;
+  background: var(--surface-card-warm); border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-sm); transition: border-color 120ms, background 120ms;
+}
+.bb-opt:hover { border-color: var(--ink-300); }
+.bb-opt input { accent-color: var(--rust-500); margin-top: 3px; flex: none; }
+.bb-opt__body { min-width: 0; flex: 1 1 auto; }
+.bb-opt__label { display: block; font-size: var(--fs-sm); font-weight: 700; color: var(--text-strong); line-height: 1.3; overflow-wrap: anywhere; }
+.bb-opt__hint { display: block; font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.35; margin-top: 1px; overflow-wrap: anywhere; }
+.bb-opt__rec { flex: none; align-self: center; font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.07em; color: var(--navy-700); background: var(--gold-300);
+  border: 1px solid var(--gold-600); border-radius: var(--radius-xs); padding: 3px 7px 2px; }
+.bb-opt:has(input:checked) { border-color: var(--rust-500); background: var(--rust-050); box-shadow: inset 0 0 0 1px var(--rust-500); }
+.bb-decision__foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: auto; }
+.bb-queued {
+  display: none; align-items: center; gap: 6px;
+  font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em;
+  color: var(--sea-700); background: var(--sea-050); border: 1.5px solid var(--sea-200);
+  border-radius: var(--radius-xs); padding: 5px 9px 4px;
+}
+.is-queued .bb-queued { display: inline-flex; }
+.bb-limit { display: none; font-size: var(--fs-xs); font-weight: 700; color: var(--status-danger); }
+.bb-limit.is-visible { display: inline; }
+/* A note that outgrows its box scrolls inside it. The hidden mirror (::after)
+   carries the same text in the same grid cell, so the field grows with its text
+   without its height ever being reset (a reset collapses the page for a frame
+   and makes it jump), and max-height caps both so the textarea scrolls. */
+.bb-ff { display: flex; flex-direction: column; gap: 4px; }
+.bb-ff__grow { display: grid; }
+.bb-ff__grow::after, .bb-freeform {
+  grid-area: 1 / 1; width: 100%; min-width: 0; max-height: 8.5rem; margin: 0;
+  font: inherit; font-family: var(--font-sans); font-size: var(--fs-sm); line-height: 1.4;
+  padding: 8px 11px; border: 1.5px solid transparent; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.bb-ff__grow::after { content: attr(data-replicated-value) " "; visibility: hidden; overflow: hidden; pointer-events: none; }
+.bb-freeform { color: var(--text-strong); background: var(--surface-card); border-color: var(--border-default);
+  border-radius: var(--radius-sm); resize: none; overflow-y: auto; overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch; }
+.bb-freeform:focus { outline: none; border-color: var(--rust-400); box-shadow: var(--focus-ring); }
+.bb-ff__meta { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; min-height: 1.2em; }
+.bb-count { margin-left: auto; font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-faint); white-space: nowrap; }
+.bb-count.is-full { color: var(--status-danger); font-weight: 700; }
+
+/* Reference images on a decision card. The thumbnail tiles are a fixed square box
+   whatever their upload state, so a tile never changes size as it uploads or
+   fails; the attach control sits above the strip, so it stays under the thumb
+   while tiles appear below it. */
+.bb-attach { display: flex; flex-direction: column; gap: 8px; }
+.bb-attach__add { position: relative; align-self: flex-start; cursor: pointer; min-height: 44px;
+  background: var(--surface-card-warm); color: var(--text-strong); border-color: var(--border-default); }
+.bb-attach__add:hover { border-color: var(--ink-500); }
+.bb-attach__add:focus-within { box-shadow: var(--focus-ring); }
+.bb-attach__add .fm-ico { width: 18px; height: 18px; flex: none; }
+.bb-attach__input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; }
+.bb-attach__strip { display: grid; grid-template-columns: repeat(auto-fill, 88px); gap: 8px; }
+.bb-attach__strip[hidden], .bb-attach__msg[hidden] { display: none; }
+.bb-thumb { position: relative; width: 88px; height: 88px; overflow: hidden; background: var(--paper-200);
+  border: 1.5px solid var(--border-default); border-radius: var(--radius-sm); }
+.bb-thumb__img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.bb-thumb.is-uploading .bb-thumb__img { opacity: 0.55; }
+.bb-thumb.is-error { border-color: var(--status-danger); }
+.bb-thumb__x { position: absolute; top: 0; right: 0; width: 44px; height: 44px; padding: 0; border: 0; margin: 0;
+  background: transparent; cursor: pointer; display: flex; align-items: flex-start; justify-content: flex-end; }
+.bb-thumb__x span { display: grid; place-items: center; width: 24px; height: 24px; margin: 4px;
+  border-radius: 50%; background: rgba(36, 28, 20, 0.78); color: var(--paper-000); }
+.bb-thumb__x svg { width: 14px; height: 14px; }
+.bb-thumb__x:focus-visible { outline: none; box-shadow: inset var(--focus-ring); }
+.bb-thumb__st { position: absolute; left: 0; right: 0; bottom: 0; padding: 3px 6px 2px; margin: 0; border: 0;
+  font: inherit; font-family: var(--font-mono); font-size: var(--fs-2xs); line-height: 1.2; text-align: left;
+  color: var(--paper-000); background: rgba(36, 28, 20, 0.78); }
+.bb-thumb.is-ready .bb-thumb__st { display: none; }
+.bb-thumb.is-error .bb-thumb__st { min-height: 44px; background: var(--status-danger); cursor: pointer; }
+.bb-attach__msg { font-size: var(--fs-xs); font-weight: 700; color: var(--status-danger); }
+.is-queued .bb-attach__add, .is-queued .bb-thumb__x, .is-queued .bb-thumb__st { display: none; }
+
+/* ---- compact rows (Underway / Landed / Charted) ---- */
+.bb-rows { display: flex; flex-direction: column; }
+.bb-row {
+  display: flex; align-items: center; gap: 12px; padding: 11px 18px;
+  border-top: 1px solid var(--border-soft); min-width: 0;
+}
+.bb-row:first-child { border-top: none; }
+.bb-row__main { min-width: 0; flex: 1 1 auto; }
+.bb-row__title { font-size: var(--fs-sm); font-weight: 700; color: var(--text-strong); line-height: 1.3;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bb-row__sub { font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.3; margin-top: 1px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bb-row__id { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-faint); white-space: nowrap; }
+.bb-row__pr { font-family: var(--font-mono); font-size: var(--fs-xs); font-weight: 600; color: var(--ocean-600); white-space: nowrap; }
+.bb-row__pr:hover { text-decoration: underline; }
+.bb-row__check { width: 26px; height: 26px; border-radius: var(--radius-sm); display: grid; place-items: center; flex: none;
+  background: var(--status-online-soft); color: var(--status-online); border: 1.5px solid var(--sea-200); }
+.bb-row__check svg { width: 15px; height: 15px; }
+.bb-morechip {
+  display: inline-flex; align-items: center; gap: 6px; margin: 10px 18px 12px;
+  font-size: var(--fs-xs); font-weight: 800; color: var(--text-muted);
+  border: 1.5px dashed var(--ink-300); border-radius: var(--radius-pill); padding: 5px 12px; width: fit-content;
+  max-width: calc(100% - 36px);
+}
+.bb-empty { padding: 18px; font-size: var(--fs-sm); color: var(--text-muted); }
+
+/* ---- Charted Next dispatch picker ---- */
+/* margin:0 kills the UA default checkbox margin so picker rows and spacer rows
+   share one text left edge */
+.bb-pick { accent-color: var(--rust-500); width: 16px; height: 16px; flex: none; cursor: pointer; margin: 0; }
+.bb-pick-spacer { width: 16px; flex: none; }
+.bb-dispatch {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 18px;
+  border-top: 1.5px solid var(--border-default); background: var(--paper-100);
+}
+.bb-dispatch__count { flex: 1 1 auto; font-size: var(--fs-xs); font-weight: 800; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.07em; }
+
+.bb-foot { display: flex; justify-content: flex-end; border-top: 1px solid var(--border-default); padding-top: 14px; }
+
+/* ---- screenshots on a Captain's Call card ---- */
+.bb-shots { display: flex; flex-direction: column; gap: 6px; }
+.bb-shots__k { font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--text-faint); }
+.bb-shots__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+/* the fixed aspect box reserves each thumbnail's space before it loads, so a
+   card never jumps while its images arrive */
+.bb-shot {
+  position: relative; display: block; width: 100%; aspect-ratio: 3 / 4; padding: 0; margin: 0;
+  overflow: hidden; cursor: zoom-in; font: inherit; color: var(--text-muted);
+  background: var(--paper-200); border: 1.5px solid var(--border-default); border-radius: var(--radius-sm);
+}
+.bb-shot:hover { border-color: var(--ink-500); }
+.bb-shot:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.bb-shot__img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top center; }
+.bb-shot__n {
+  position: absolute; left: 6px; bottom: 6px; font-family: var(--font-mono); font-size: var(--fs-2xs);
+  line-height: 1; padding: 3px 6px 2px; color: var(--paper-000); background: rgba(36, 28, 20, 0.78);
+  border-radius: var(--radius-xs);
+}
+.bb-shot__missing { display: grid; place-items: center; height: 100%; padding: 8px; text-align: center;
+  font-size: var(--fs-xs); overflow-wrap: anywhere; }
+
+/* ---- full-screen screenshot viewer ---- */
+.bb-lb {
+  position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column;
+  background: #14100c; color: var(--paper-000);
+  overscroll-behavior: contain; padding-bottom: env(safe-area-inset-bottom);
+}
+.bb-lb[hidden] { display: none; }
+.bb-lb__bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 8px 6px 16px; }
+.bb-lb__count { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--paper-300); }
+.bb-lb__stage { position: relative; flex: 1 1 auto; min-height: 0; display: grid; place-items: center;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr); padding: 0 8px; overflow: hidden; }
+.bb-lb__img { display: block; max-width: 100%; max-height: 100%; min-height: 0; object-fit: contain; border-radius: var(--radius-xs); background: var(--navy-700); }
+.bb-lb__btn {
+  display: inline-grid; place-items: center; width: 48px; height: 48px; cursor: pointer; flex: none;
+  color: var(--paper-000); background: rgba(36, 28, 20, 0.72); border: 1.5px solid var(--paper-300); border-radius: var(--radius-pill);
+}
+.bb-lb__btn:hover { background: var(--ink-700); }
+.bb-lb__btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.bb-lb__btn[disabled] { opacity: 0.35; cursor: not-allowed; }
+.bb-lb__btn svg { width: 22px; height: 22px; }
+.bb-lb__btn--prev, .bb-lb__btn--next { position: absolute; top: 50%; transform: translateY(-50%); z-index: 1; }
+.bb-lb__btn--prev { left: 10px; }
+.bb-lb__btn--next { right: 10px; }
+.bb-lb__caption { margin: 0; padding: 10px 16px 14px; text-align: center; font-size: var(--fs-sm); line-height: 1.4;
+  color: var(--paper-100); overflow-wrap: anywhere; max-height: 28vh; overflow-y: auto; }
+
+/* ---- Reports: a collapsible list of the write-ups, each opening full screen ---- */
+.bb-rep__tools { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 15rem); gap: 10px; padding: 12px 18px 4px; }
+.bb-rep__q, .bb-rep__proj {
+  width: 100%; min-width: 0; min-height: 44px; margin: 0; padding: 8px 11px;
+  font: inherit; font-family: var(--font-sans); font-size: 1rem; color: var(--text-strong);
+  background: var(--surface-card); border: 1.5px solid var(--border-default); border-radius: var(--radius-sm);
+}
+.bb-rep__q:focus, .bb-rep__proj:focus { outline: none; border-color: var(--rust-400); box-shadow: var(--focus-ring); }
+.bb-rep__status { padding: 6px 18px 8px; font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-muted); }
+.bb-rep__row {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 11px 18px; margin: 0;
+  font: inherit; text-align: left; cursor: pointer; color: inherit; background: none;
+  border: 0; border-top: 1px solid var(--border-soft);
+}
+.bb-rep__row:hover { background: var(--paper-100); }
+.bb-rep__row:focus-visible { outline: none; box-shadow: inset var(--focus-ring); }
+.bb-rep__main { min-width: 0; flex: 1 1 auto; }
+.bb-rep__title { font-size: var(--fs-sm); font-weight: 700; color: var(--text-strong); line-height: 1.3; overflow-wrap: anywhere; }
+.bb-rep__meta { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-faint); margin-top: 2px; overflow-wrap: anywhere; }
+.bb-rep__sum { font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.4; margin-top: 2px; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.bb-rep__go { width: 16px; height: 16px; flex: none; color: var(--text-faint); }
+.bb-rep__more { margin: 12px 18px 14px; }
+.bb-rep__more[hidden] { display: none; }
+
+/* ---- full-screen report viewer ---- */
+html.bb-noscroll, html.bb-noscroll body { overflow: hidden; }
+.bb-rv {
+  position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column;
+  background: var(--bg-page); padding-bottom: env(safe-area-inset-bottom);
+}
+.bb-rv[hidden] { display: none; }
+.bb-rv__bar {
+  display: flex; align-items: center; gap: 12px; flex: none; padding: 8px 12px 8px 12px;
+  padding-top: max(8px, env(safe-area-inset-top));
+  background: var(--paper-100); border-bottom: 1px solid var(--border-default);
+}
+.bb-rv__back { flex: none; min-height: 44px; background: var(--surface-card); color: var(--text-strong); border-color: var(--border-default); }
+.bb-rv__back:hover { border-color: var(--ink-500); }
+.bb-rv__back svg { width: 16px; height: 16px; }
+.bb-rv__title { min-width: 0; flex: 1 1 auto; font-size: var(--fs-sm); font-weight: 800; color: var(--text-strong);
+  line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bb-rv__frame { display: block; flex: 1 1 auto; min-height: 0; width: 100%; border: 0; background: var(--bg-page); }
+
+
+/* ---- phone layer: every control is at least 44px, nothing is wider than the screen ---- */
+@media (max-width: 640px) {
+  .bb-nav__inner { padding: 0 16px; }
+  .bb-tabbar__inner { padding: 0 10px; }
+  .bb-main { padding: 18px 16px 56px; gap: 18px; }
+  /* a tall card's rotated pile edges grow with its height; keep them inside the gutter */
+  .bb-call::before { transform: rotate(0.5deg) translate(3px, 5px); }
+  .bb-call::after  { transform: rotate(-0.4deg) translate(-2px, 8px); }
+  .bb-decision__pad { padding: 16px 14px 14px; }
+  .bb-ctx { gap: 8px; }
+  .bb-ctx__row { grid-template-columns: minmax(0, 1fr); gap: 1px; }
+  .bb-opt { align-items: center; min-height: 44px; padding: 10px 12px; }
+  .bb-opt input { width: 20px; height: 20px; margin: 0; }
+  .bb-ff__grow::after, .bb-freeform { min-height: 44px; font-size: 1rem; padding: 10px 12px; }
+  .bb-decision__foot .fm-btn { flex: 1 1 100%; }
+  .bb-attach__add { align-self: stretch; }
+  .bb-dispatch .fm-btn { flex: 1 1 100%; }
+  .fm-btn--sm { min-height: 44px; font-size: var(--fs-sm); }
+  .bb-stacknav__btn { width: 44px; height: 44px; }
+  .bb-row { padding: 11px 14px; min-height: 44px; }
+  .bb-row__title, .bb-row__sub { white-space: normal; overflow-wrap: anywhere; }
+  .bb-pick { width: 24px; height: 24px; }
+  .bb-pick-spacer { width: 24px; }
+  .bb-dispatch { padding: 12px 14px; }
+  .bb-morechip { margin: 10px 14px 12px; max-width: calc(100% - 28px); }
+  .bb-shots__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bb-lb__btn--prev { left: 6px; }
+  .bb-lb__btn--next { right: 6px; }
+  .bb-rep__tools { grid-template-columns: minmax(0, 1fr); padding: 12px 14px 4px; }
+  .bb-rep__status { padding: 6px 14px 8px; }
+  .bb-rep__row { padding: 11px 14px; }
+  .bb-rep__more { margin: 12px 14px 14px; width: calc(100% - 28px); }
+  .bb-rv__bar { padding: 8px 10px; padding-top: max(8px, env(safe-area-inset-top)); }
+}
+</style>
+</head>
+<body>
+
+<header class="bb-nav">
+  <div class="bb-nav__inner">
+    <span class="bb-brand">
+      <span class="bb-brand__disc">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 6v16"/><path d="m19 13 2-1a9 9 0 0 1-18 0l2 1"/><path d="M9 11h6"/><circle cx="12" cy="4" r="2"/>
+        </svg>
+      </span>
+      <span class="bb-brand__wm">bearings</span>
+    </span>
+  </div>
+</header>
+
+<div class="bb-tabbar"><div class="bb-tabbar__inner" id="bb-tabs" role="tablist" aria-label="Board sections"></div></div>
+
+<main class="bb-main">
+
+  <section class="bb-section" id="bb-sec-call" tabindex="-1">
+    <div class="bb-section__head">
+      <span class="fm-sign fm-sign--eyebrow">
+        <svg class="fm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>
+        Captain's Call
+      </span>
+      <span class="fm-sign fm-sign--muted" id="bb-call-sub"></span>
+    </div>
+    <div class="bb-callwrap">
+      <div class="bb-call" id="bb-call"></div>
+      <!-- nav sits under the stack so the active card's top edge aligns with
+           the Charted Next card across the row -->
+      <div class="bb-stacknav">
+        <span class="bb-stacknav__count" id="bb-stack-count">-</span>
+        <button type="button" class="bb-stacknav__btn" id="bb-stack-prev" aria-label="Previous card">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <button type="button" class="bb-stacknav__btn" id="bb-stack-next" aria-label="Next card">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <section class="bb-section" id="bb-sec-charted" tabindex="-1">
+    <div class="bb-section__head">
+      <span class="fm-sign fm-sign--eyebrow">
+        <svg class="fm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+        Charted Next
+      </span>
+      <span class="fm-sign fm-sign--muted" id="bb-charted-sub"></span>
+    </div>
+    <div class="fm-card fm-card--warm">
+      <div class="bb-rows" id="bb-charted"></div>
+      <div class="bb-dispatch" id="bb-dispatch" hidden>
+        <span class="bb-dispatch__count" id="bb-dispatch-count">nothing picked</span>
+        <span class="bb-queued" id="bb-dispatch-queued">
+          <svg class="fm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          queued
+        </span>
+        <button type="button" class="fm-btn fm-btn--sm fm-btn--gold" id="bb-dispatch-btn">Queue dispatch order</button>
+      </div>
+    </div>
+  </section>
+
+    <section class="bb-section" id="bb-sec-underway" tabindex="-1">
+      <div class="bb-section__head">
+        <span class="fm-sign fm-sign--eyebrow">
+          <svg class="fm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10.189V14"/><path d="M12 2v3"/><path d="M19 13V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v6"/><path d="M19.38 20A11.6 11.6 0 0 0 21 14l-8.188-3.639a2 2 0 0 0-1.624 0L3 14a11.6 11.6 0 0 0 2.81 7.76"/><path d="M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1s1.2 1 2.5 1c2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/></svg>
+          Underway
+        </span>
+      </div>
+      <div class="fm-card"><div class="bb-rows" id="bb-underway"></div></div>
+    </section>
+
+    <section class="bb-section" id="bb-sec-landed" tabindex="-1">
+      <div class="bb-section__head">
+        <span class="fm-sign fm-sign--eyebrow">
+          <svg class="fm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg>
+          Recently Landed
+        </span>
+      </div>
+      <div class="fm-card"><div class="bb-rows" id="bb-landed"></div></div>
+    </section>
+
+  <section class="bb-section" id="bb-sec-reports" tabindex="-1" hidden>
+    <div class="bb-section__head">
+      <span class="fm-sign fm-sign--eyebrow">
+        <svg class="fm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+        Reports
+      </span>
+      <span class="fm-sign fm-sign--muted" id="bb-rep-count"></span>
+    </div>
+    <div class="fm-card fm-card--warm">
+      <div class="bb-rep__tools">
+        <input type="search" class="bb-rep__q" id="bb-rep-q" placeholder="Filter reports" aria-label="Filter reports by text" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" />
+        <select class="bb-rep__proj" id="bb-rep-proj" aria-label="Filter reports by project"></select>
+      </div>
+      <div class="bb-rep__status" id="bb-rep-status" aria-live="polite"></div>
+      <div id="bb-rep-list"></div>
+      <button type="button" class="fm-btn fm-btn--sm bb-rep__more" id="bb-rep-more" hidden>Show more</button>
+    </div>
+  </section>
+
+  <footer class="bb-foot">
+    <span class="bb-meta-mono" id="bb-provenance">-</span>
+  </footer>
+
+</main>
+
+<div class="bb-lb" id="bb-lb" role="dialog" aria-modal="true" aria-label="Screenshot viewer" hidden>
+  <div class="bb-lb__bar">
+    <span class="bb-lb__count" id="bb-lb-count" aria-live="polite"></span>
+    <button type="button" class="bb-lb__btn" id="bb-lb-close" aria-label="Close screenshot">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+    </button>
+  </div>
+  <div class="bb-lb__stage" id="bb-lb-stage">
+    <img class="bb-lb__img" id="bb-lb-img" alt="" />
+    <button type="button" class="bb-lb__btn bb-lb__btn--prev" id="bb-lb-prev" aria-label="Previous screenshot">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+    </button>
+    <button type="button" class="bb-lb__btn bb-lb__btn--next" id="bb-lb-next" aria-label="Next screenshot">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+    </button>
+  </div>
+  <p class="bb-lb__caption" id="bb-lb-caption"></p>
+</div>
+
+<div class="bb-rv" id="bb-rv" role="dialog" aria-modal="true" aria-label="Report" hidden>
+  <div class="bb-rv__bar">
+    <button type="button" class="fm-btn fm-btn--sm bb-rv__back" id="bb-rv-back" aria-label="Back to reports">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+      Reports
+    </button>
+    <span class="bb-rv__title" id="bb-rv-title"></span>
+  </div>
+  <iframe class="bb-rv__frame" id="bb-rv-frame" title="Report" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer"></iframe>
+</div>
+
+<!-- ONE SLOT. bin/fm-bearings-board.sh build injects the fresh
+     fm-bearings-board.v1 payload in place of the placeholder below; everything
+     above and below is the shipped template and is never regenerated per run. -->
+<script id="bearings-data" type="application/json">
+{"schema":"fm-bearings-board.v1","home":"live-lab","generated":"2026-11-02T10:30Z","prs_live":false,"captains_call":[{"key":"ship-pricing-v2","type":"decision","repo":"sample","title":"Ship the pricing page?","options":[{"value":"yes","label":"Yes"},{"value":"no","label":"No"},{"value":"reconcile","label":"Reconcile","hint":"Re-check the latest state, then close this with evidence or keep it open with a note"}],"allow_freeform":true},{"key":"rename-cli","type":"decision","repo":"sample","title":"Rename the CLI flag?","options":[{"value":"yes","label":"Yes"},{"value":"no","label":"No"},{"value":"reconcile","label":"Reconcile","hint":"Re-check the latest state, then close this with evidence or keep it open with a note"}]},{"key":"merge-docs","type":"decision","repo":"sample","title":"Merge the docs rewrite?","options":[{"value":"yes","label":"Yes"},{"value":"reconcile","label":"Reconcile","hint":"Re-check the latest state, then close this with evidence or keep it open with a note"}]}],"underway":[],"landed":[],"charted":[]}
+</script>
+
+<script>
+(function () {
+  "use strict";
+
+  /* Fail closed: a board with unreadable or wrong-schema data says so plainly
+     instead of rendering an empty page that looks like an empty fleet. */
+  function renderBoardError(msg) {
+    var main = document.querySelector(".bb-main");
+    main.innerHTML = "";
+    var card = document.createElement("div");
+    card.className = "fm-card fm-card--poster bb-decision";
+    var pad = document.createElement("div");
+    pad.className = "bb-decision__pad";
+    var h = document.createElement("h3");
+    h.className = "bb-decision__title";
+    h.textContent = "This board could not load";
+    var d = document.createElement("p");
+    d.className = "bb-decision__detail";
+    d.textContent = msg + " - ask firstmate to rebuild the board.";
+    pad.appendChild(h);
+    pad.appendChild(d);
+    card.appendChild(pad);
+    main.appendChild(card);
+  }
+
+  var data;
+  try {
+    data = JSON.parse(document.getElementById("bearings-data").textContent);
+  } catch (e) {
+    renderBoardError("The board data is not valid JSON");
+    return;
+  }
+  if (!data || data.schema !== "fm-bearings-board.v1") {
+    renderBoardError("Unsupported board data schema: " + (data && data.schema ? data.schema : "(none)"));
+    return;
+  }
+  var fleetLists = [data.captains_call, data.underway, data.landed, data.charted];
+  var callItemsValid = Array.isArray(data.captains_call) && data.captains_call.every(function (item) {
+    return item && typeof item === "object" &&
+      typeof item.key === "string" && item.key.length > 0 &&
+      typeof item.type === "string" && item.type.length > 0 &&
+      typeof item.title === "string" && item.title.length > 0 &&
+      Array.isArray(item.options);
+  });
+  if (!fleetLists.every(Array.isArray) || !callItemsValid) {
+    renderBoardError("The board data does not have the required structure");
+    return;
+  }
+
+  try {
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function badge(tone, text) { return el("span", "fm-badge fm-badge--" + tone, text); }
+  /* Warnings ride the charted feed for layout only; they are alarms, not work,
+     so every count of queued work excludes them. */
+  function isWarning(t) { return t && t.kind === "warning"; }
+  function chartedQueued(rows) { return (rows || []).filter(function (t) { return !isWarning(t); }); }
+  /* Charted Next reads newest filed first, so the most recently filed upcoming
+     work is at the top. ISO filed dates compare as text; a row with no
+     comparable date keeps its payload order after every dated row. */
+  function chartedOrder(rows) {
+    var dated = [], undated = [];
+    (rows || []).forEach(function (t) {
+      if (t && typeof t.filed === "string" && t.filed) dated.push(t); else undated.push(t);
+    });
+    dated.sort(function (a, b) { return a.filed < b.filed ? 1 : (a.filed > b.filed ? -1 : 0); });
+    return dated.concat(undated);
+  }
+  /* Reports: build renders each write-up to an inert page beside the board and
+     injects only that relative src; anything else is not one of ours. Newest
+     first, payload order within a day. */
+  var REPORT_SRC = "bearings-board-assets/.reports/";
+  var reports = (Array.isArray(data.reports) ? data.reports : []).filter(function (r) {
+    return r && typeof r === "object" && typeof r.title === "string" && typeof r.src === "string" &&
+      r.src.indexOf(REPORT_SRC) === 0 && typeof r.date === "string" && typeof r.summary === "string";
+  }).map(function (r, i) { return { r: r, i: i }; }).sort(function (a, b) {
+    return a.r.date < b.r.date ? 1 : (a.r.date > b.r.date ? -1 : a.i - b.i);
+  }).map(function (x) { return x.r; });
+  var chartedMoreQueued = data.charted_more || 0;
+  var chartedMoreWarnings = data.charted_warning_more || 0;
+  function utf8ByteLength(text) { return new TextEncoder().encode(text).length; }
+  /* The captain's answer reaches firstmate as the Lavish chip text
+     "<title> -> <selection> - <note>", and the answer path keeps at most 512
+     bytes of it. The cap is counted on that whole string, so a note typed to the
+     cap arrives whole. */
+  var ANSWER_LABEL_MAX_BYTES = 512;
+  function reducedMotion() {
+    return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }
+  /* bring the top of an element into view only when it is not already there */
+  function revealTop(node) {
+    if (!node.scrollIntoView || !node.getBoundingClientRect) return;
+    var top = node.getBoundingClientRect().top;
+    if (top < 0 || top > (window.innerHeight || 0) * 0.6) {
+      node.scrollIntoView({ block: "start", behavior: reducedMotion() ? "auto" : "smooth" });
+    }
+  }
+  var CHECK_SVG = '<svg class="fm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+
+  /* ---- screenshots: thumbnails on the card, one shared full-screen viewer ---- */
+  var lb = document.getElementById("bb-lb");
+  var lbImg = document.getElementById("bb-lb-img");
+  var lbCount = document.getElementById("bb-lb-count");
+  var lbCaption = document.getElementById("bb-lb-caption");
+  var lbClose = document.getElementById("bb-lb-close");
+  var lbPrev = document.getElementById("bb-lb-prev");
+  var lbNext = document.getElementById("bb-lb-next");
+  var lbState = { list: [], i: 0, opener: null };
+  /* build copies each screenshot beside the board and injects only this
+     relative src; anything else is not one of ours and is not rendered */
+  function cardImages(item) {
+    return (Array.isArray(item.images) ? item.images : []).filter(function (im) {
+      return im && typeof im.src === "string" && im.src.indexOf("bearings-board-assets/") === 0 &&
+        typeof im.alt === "string";
+    });
+  }
+  function lbShow(i) {
+    var n = lbState.list.length;
+    lbState.i = Math.max(0, Math.min(n - 1, i));
+    var im = lbState.list[lbState.i];
+    lbImg.src = im.src;
+    lbImg.alt = im.alt;
+    lbCaption.textContent = im.caption || im.alt;
+    lbCount.textContent = "Screenshot " + (lbState.i + 1) + " of " + n;
+    lbPrev.hidden = lbNext.hidden = n < 2;
+    lbPrev.disabled = lbState.i === 0;
+    lbNext.disabled = lbState.i === n - 1;
+    /* a button that just disabled itself would drop focus out of the dialog */
+    if (document.activeElement === lbPrev && lbPrev.disabled) lbClose.focus();
+    if (document.activeElement === lbNext && lbNext.disabled) lbClose.focus();
+  }
+  function lbOpen(list, i, opener) {
+    lbState.list = list;
+    lbState.opener = opener;
+    lb.hidden = false;
+    lbShow(i);
+    lbClose.focus();
+  }
+  function lbDismiss() {
+    lb.hidden = true;
+    lbImg.removeAttribute("src");
+    if (lbState.opener && lbState.opener.focus) lbState.opener.focus({ preventScroll: true });
+    lbState.opener = null;
+  }
+  lbClose.addEventListener("click", lbDismiss);
+  lbPrev.addEventListener("click", function () { lbShow(lbState.i - 1); });
+  lbNext.addEventListener("click", function () { lbShow(lbState.i + 1); });
+  /* a tap on the dark backdrop (not the image or a control) closes it */
+  lb.addEventListener("click", function (ev) {
+    if (ev.target === lb || ev.target === document.getElementById("bb-lb-stage")) lbDismiss();
+  });
+  lb.addEventListener("keydown", function (ev) {
+    if (ev.key === "Escape") { ev.preventDefault(); lbDismiss(); return; }
+    if (ev.key === "ArrowLeft") { ev.preventDefault(); lbShow(lbState.i - 1); return; }
+    if (ev.key === "ArrowRight") { ev.preventDefault(); lbShow(lbState.i + 1); return; }
+    if (ev.key !== "Tab") return;
+    /* keep Tab inside the dialog while it is open */
+    var ring = [lbClose, lbPrev, lbNext].filter(function (b) { return !b.hidden && !b.disabled; });
+    var at = ring.indexOf(document.activeElement);
+    ev.preventDefault();
+    ring[at < 0 ? 0 : (at + (ev.shiftKey ? ring.length - 1 : 1)) % ring.length].focus();
+  });
+  var swipeFrom = null;
+  lb.addEventListener("touchstart", function (ev) {
+    var t = ev.changedTouches && ev.changedTouches[0];
+    swipeFrom = t ? { x: t.clientX, y: t.clientY } : null;
+  }, { passive: true });
+  lb.addEventListener("touchend", function (ev) {
+    var t = ev.changedTouches && ev.changedTouches[0];
+    if (!swipeFrom || !t) return;
+    var dx = t.clientX - swipeFrom.x, dy = t.clientY - swipeFrom.y;
+    swipeFrom = null;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) lbShow(lbState.i + (dx < 0 ? 1 : -1));
+  }, { passive: true });
+
+  function shotsBlock(list) {
+    var wrap = el("div", "bb-shots");
+    wrap.appendChild(el("div", "bb-shots__k", "screenshots · " + list.length));
+    var grid = el("div", "bb-shots__grid");
+    list.forEach(function (im, i) {
+      var b = el("button", "bb-shot");
+      b.type = "button";
+      b.setAttribute("aria-haspopup", "dialog");
+      var img = el("img", "bb-shot__img");
+      img.loading = "lazy";
+      img.decoding = "async";
+      img.alt = im.alt;
+      img.src = im.src;
+      img.addEventListener("error", function () {
+        if (!img.parentNode) return;
+        img.parentNode.replaceChild(el("span", "bb-shot__missing", im.alt), img);
+      });
+      b.appendChild(img);
+      b.appendChild(el("span", "bb-shot__n", String(i + 1)));
+      b.addEventListener("click", function () { lbOpen(list, i, b); });
+      grid.appendChild(b);
+    });
+    wrap.appendChild(grid);
+    return wrap;
+  }
+
+  document.getElementById("bb-provenance").textContent = data.schema + " · " + data.generated;
+
+  /* tab bar: one tab per section with its count, only the selected section
+     shown. The selection survives a refresh or rebuild through the URL hash
+     first, then a per-viewer localStorage value; both are best-effort (the
+     sandboxed frame may refuse either) and the board works without them. */
+  var callTotal = data.captains_call.length;
+  var tabDefs = [
+    { id: "call", label: "Captain's Call", n: callTotal },
+    { id: "underway", label: "Underway", n: data.underway.length },
+    { id: "landed", label: "Recently landed", n: data.landed.length },
+    { id: "charted", label: "Charted next", n: chartedQueued(data.charted).length + chartedMoreQueued }
+  ];
+  if (reports.length) tabDefs.push({ id: "reports", label: "Reports", n: reports.length });
+  var TAB_KEY = "fm-bearings-tab";
+  var tabBar = document.getElementById("bb-tabs");
+  var tabIds = tabDefs.map(function (t) { return t.id; });
+  var needNum = null;
+  tabDefs.forEach(function (t) {
+    var b = el("button", "bb-tab bb-tab--" + t.id);
+    b.type = "button";
+    b.id = "bb-tab-" + t.id;
+    b.setAttribute("role", "tab");
+    b.setAttribute("aria-controls", "bb-sec-" + t.id);
+    b.appendChild(el("span", "bb-tab__label", t.label));
+    var num = el("span", "bb-tab__n", String(t.n));
+    if (t.id === "call") needNum = num;
+    b.appendChild(num);
+    b.addEventListener("click", function () { selectTab(t.id, { persist: true, top: true }); });
+    t.btn = b;
+    tabBar.appendChild(b);
+    var panel = document.getElementById("bb-sec-" + t.id);
+    panel.setAttribute("role", "tabpanel");
+    panel.setAttribute("aria-labelledby", b.id);
+  });
+  function savedTab() {
+    var h = String(location.hash || "").replace(/^#/, "");
+    if (tabIds.indexOf(h) >= 0) return h;
+    try { var v = window.localStorage.getItem(TAB_KEY); if (tabIds.indexOf(v) >= 0) return v; } catch (e) { /* storage unavailable */ }
+    /* Lavish's sandboxed frame has no storage and a fresh address on every
+       load, so the tab survives an in-place rebuild only through window.name;
+       a full page reload starts a new frame and falls back to Captain's Call,
+       because the Lavish chrome owns the outer page */
+    try { var m = /^fm-bearings-tab=(\w+)$/.exec(window.name || ""); if (m && tabIds.indexOf(m[1]) >= 0) return m[1]; } catch (e) { /* name unavailable */ }
+    return "call";
+  }
+  function rememberTab(id) {
+    try { history.replaceState(null, "", "#" + id); } catch (e) { /* sandboxed frame */ }
+    try { window.localStorage.setItem(TAB_KEY, id); } catch (e) { /* storage unavailable */ }
+    try { if (!window.name || /^fm-bearings-tab=/.test(window.name)) window.name = "fm-bearings-tab=" + id; } catch (e) { /* name unavailable */ }
+  }
+  function selectTab(id, opts) {
+    if (tabIds.indexOf(id) < 0) id = "call";
+    tabDefs.forEach(function (t) {
+      var on = t.id === id;
+      t.btn.setAttribute("aria-selected", on ? "true" : "false");
+      t.btn.tabIndex = on ? 0 : -1;
+      document.getElementById("bb-sec-" + t.id).hidden = !on;
+    });
+    var btn = tabDefs[tabIds.indexOf(id)].btn;
+    var left = btn.offsetLeft, right = left + btn.offsetWidth;
+    if (left < tabBar.scrollLeft) tabBar.scrollLeft = Math.max(0, left - 16);
+    else if (right > tabBar.scrollLeft + tabBar.clientWidth) tabBar.scrollLeft = right - tabBar.clientWidth + 16;
+    if (opts && opts.focus) btn.focus();
+    if (opts && opts.persist) rememberTab(id);
+    if (opts && opts.top && window.scrollTo) window.scrollTo(0, 0);
+  }
+  tabBar.addEventListener("keydown", function (ev) {
+    var i = tabIds.indexOf(String(document.activeElement && document.activeElement.id || "").replace(/^bb-tab-/, ""));
+    if (i < 0) return;
+    var to = ev.key === "ArrowRight" ? (i + 1) % tabIds.length
+      : ev.key === "ArrowLeft" ? (i + tabIds.length - 1) % tabIds.length
+      : ev.key === "Home" ? 0 : ev.key === "End" ? tabIds.length - 1 : -1;
+    if (to < 0) return;
+    ev.preventDefault();
+    selectTab(tabIds[to], { focus: true, persist: true });
+  });
+  window.addEventListener("hashchange", function () {
+    var h = String(location.hash || "").replace(/^#/, "");
+    if (tabIds.indexOf(h) >= 0) selectTab(h, { persist: true });
+  });
+  selectTab(savedTab());
+  /* the "need you" count follows the cards still on the board */
+  function showCallCount(n) {
+    needNum.textContent = String(n);
+    needNum.classList.toggle("is-zero", n === 0);
+    document.getElementById("bb-call-sub").textContent =
+      n ? n + " item" + (n === 1 ? "" : "s") + " wait on you" : "nothing needs you";
+  }
+  showCallCount(callTotal);
+
+  /* Captain's Call deck: every item renders as the same full card */
+  var deck = document.getElementById("bb-call");
+  function ctxRow(k, v, rec) {
+    var row = el("div", "bb-ctx__row" + (rec ? " bb-ctx__row--rec" : ""));
+    row.appendChild(el("span", "bb-ctx__k", k));
+    row.appendChild(el("span", "bb-ctx__v", v));
+    return row;
+  }
+
+  /* ---- reference images on a decision card ----
+     The board runs in Lavish's sandboxed frame, which cannot reach the server, so
+     a picked image goes up the way Lavish's own cards send theirs: a
+     "lavish:uploadAttachment" message the chrome uploads, answering with the
+     server-vetted id. The queued answer then carries those ids, and Lavish hands
+     the agent each image as a local file. The chrome enforces the byte limit and
+     answers with its own message; the type list, the per-answer count and the
+     per-answer total below are Lavish's defaults, checked here so an answer the
+     server would refuse at send is never queued. */
+  var ATTACH_MIME = ["image/png", "image/jpeg", "image/webp"];
+  var ATTACH_MAX = 4;
+  var ATTACH_TOTAL_BYTES = 25 * 1024 * 1024;
+  var ATTACH_TYPE_MSG = "Unsupported file type. Use PNG, JPEG, or WebP.";
+  var ATTACH_NONCE = "fm-board-" + Math.random().toString(36).slice(2);
+  var attachSeq = 0;
+  var attachWaiting = {};
+  var IMAGE_SVG = '<svg class="fm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>';
+  var CLOSE_SVG = '<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 3.5l7 7M10.5 3.5l-7 7"/></svg>';
+  /* the load token the chrome expects on every message from this page is the one
+     in the SDK script's own address; that script is appended after this one runs,
+     so it is read when an image is picked, never when the card is built */
+  function attachToken() {
+    var sdk = document.querySelector('script[src*="/sdk.js"]');
+    var m = sdk && /[?&]artifact_load_token=([^&]+)/.exec(sdk.src || "");
+    return m ? decodeURIComponent(m[1]) : "";
+  }
+  window.addEventListener("message", function (ev) {
+    var m = ev.data;
+    if (window.parent === window || ev.source !== window.parent) return;
+    if (!m || m.type !== "lavish:attachmentResult" || m.nonce !== ATTACH_NONCE) return;
+    var waiting = attachWaiting[m.localId];
+    delete attachWaiting[m.localId];
+    if (waiting) waiting(m.ok && m.id ? String(m.id) : "", String(m.error || "Upload failed"));
+  });
+  /* one picker per card: .state() is what the answer may carry (ready images, and
+     why it may not be queued yet), .say() the message line */
+  function attachBlock() {
+    if (window.parent === window) return null;  /* opened outside Lavish: nowhere to upload */
+    var items = [];
+    var box = el("div", "bb-attach");
+    var add = el("label", "fm-btn fm-btn--sm bb-attach__add");
+    add.innerHTML = IMAGE_SVG + "<span>Attach images</span>";
+    var input = document.createElement("input");
+    input.type = "file"; input.className = "bb-attach__input"; input.multiple = true;
+    input.accept = ATTACH_MIME.join(",");
+    input.setAttribute("aria-label", "Attach reference images");
+    add.appendChild(input);
+    var strip = el("div", "bb-attach__strip");
+    strip.hidden = true;
+    var msg = el("div", "bb-attach__msg");
+    msg.setAttribute("role", "alert");
+    msg.hidden = true;
+    box.appendChild(add); box.appendChild(strip); box.appendChild(msg);
+    function say(text) { msg.textContent = text; msg.hidden = !text; }
+    function setState(item, state, text) {
+      item.state = state;
+      item.tile.className = "bb-thumb is-" + state;
+      item.status.textContent = text;
+      item.status.disabled = state !== "error";
+    }
+    function upload(item) {
+      var token = attachToken();
+      if (!token) { setState(item, "error", "Retry"); say("Images can't be attached here."); return; }
+      setState(item, "uploading", "Uploading…");
+      item.file.arrayBuffer().then(function (bytes) {
+        if (items.indexOf(item) < 0) return;
+        var localId = "att-" + (++attachSeq);
+        attachWaiting[localId] = function (id, error) {
+          if (items.indexOf(item) < 0) return;
+          if (id) { item.id = id; setState(item, "ready", ""); return; }
+          setState(item, "error", "Retry");
+          say(error);
+        };
+        window.parent.postMessage({ type: "lavish:uploadAttachment", nonce: ATTACH_NONCE, localId: localId,
+          name: item.name, mime: item.file.type, bytes: bytes, artifact_load_token: token }, "*");
+      }, function () { setState(item, "error", "Retry"); say("Could not read image"); });
+    }
+    function remove(item) {
+      items.splice(items.indexOf(item), 1);
+      strip.removeChild(item.tile);
+      if (item.url && URL.revokeObjectURL) URL.revokeObjectURL(item.url);
+      strip.hidden = !items.length;
+      say("");
+    }
+    function addFiles(list) {
+      var problem = "";
+      Array.prototype.slice.call(list || []).forEach(function (file) {
+        if (ATTACH_MIME.indexOf(file.type) < 0) { problem = ATTACH_TYPE_MSG; return; }
+        if (items.length >= ATTACH_MAX) { problem = "You can attach up to " + ATTACH_MAX + " images."; return; }
+        var name = String(file.name || "image");
+        var item = { file: file, name: name, id: "", state: "uploading", url: URL.createObjectURL(file) };
+        item.tile = el("div", "bb-thumb is-uploading");
+        var img = document.createElement("img");
+        img.className = "bb-thumb__img"; img.src = item.url; img.alt = name;
+        var x = el("button", "bb-thumb__x");
+        x.type = "button"; x.setAttribute("aria-label", "Remove " + name);
+        x.innerHTML = "<span>" + CLOSE_SVG + "</span>";
+        x.addEventListener("click", function () { remove(item); });
+        item.status = el("button", "bb-thumb__st");
+        item.status.type = "button";
+        item.status.addEventListener("click", function () { if (item.state === "error") { say(""); upload(item); } });
+        item.tile.appendChild(img); item.tile.appendChild(x); item.tile.appendChild(item.status);
+        items.push(item);
+        strip.appendChild(item.tile);
+        strip.hidden = false;
+        upload(item);
+      });
+      say(problem);
+    }
+    input.addEventListener("change", function () {
+      addFiles(input.files);
+      input.value = "";  /* the same photo can be picked again after removing it */
+    });
+    return {
+      node: box, say: say, add: addFiles,
+      state: function () {
+        var busy = "", total = 0;
+        items.forEach(function (it) {
+          if (it.state === "uploading") busy = busy || "Waiting for an image to finish uploading…";
+          if (it.state === "error") busy = "An image couldn't be attached. Retry or remove it before queuing.";
+          if (it.state === "ready") total += it.file.size || 0;
+        });
+        if (!busy && total > ATTACH_TOTAL_BYTES)
+          busy = "Images on one answer can total at most 25 MB. Remove one before queuing.";
+        return { busy: busy, ready: items.filter(function (it) { return it.state === "ready"; })
+          .map(function (it) { return { id: it.id, name: it.name }; }) };
+      }
+    };
+  }
+
+  data.captains_call.forEach(function (item) {
+    var card = el("div", "fm-card fm-card--poster bb-decision");
+    var pad = el("div", "bb-decision__pad");
+
+    var top = el("div", "bb-decision__top");
+    if (item.type === "merge") {
+      top.appendChild(badge("online", "checks green"));
+      top.appendChild(badge(item.risk === "low" ? "neutral" : "warn", "risk " + item.risk));
+    } else {
+      top.appendChild(badge("solid", "decision"));
+      top.appendChild(el("span", "bb-decision__repo", item.repo));
+    }
+    pad.appendChild(top);
+
+    pad.appendChild(el("h3", "bb-decision__title", item.title));
+
+    if (item.type === "merge") {
+      if (item.detail) pad.appendChild(el("p", "bb-decision__detail", item.detail));
+      if (item.pr_url) {
+        var pr = el("a", "bb-decision__link", item.pr_url);
+        pr.href = item.pr_url; pr.target = "_blank"; pr.rel = "noopener";
+        pad.appendChild(pr);
+      }
+    } else {
+      /* the rec marker on the option itself carries the recommendation */
+      var ctx = el("div", "bb-ctx");
+      if (item.about) ctx.appendChild(ctxRow("about", item.about));
+      if (item.decide) ctx.appendChild(ctxRow("decide", item.decide));
+      pad.appendChild(ctx);
+    }
+
+    var shots = cardImages(item);
+    if (shots.length) pad.appendChild(shotsBlock(shots));
+
+    var form = document.createElement("form");
+    form.setAttribute("data-lavish-question", item.key);
+    var opts = el("div", "bb-opts");
+    item.options.forEach(function (o) {
+      var lab = el("label", "bb-opt");
+      var input = document.createElement("input");
+      input.type = "radio"; input.name = "answer"; input.value = o.value;
+      lab.appendChild(input);
+      var body = el("span", "bb-opt__body");
+      body.appendChild(el("span", "bb-opt__label", o.label));
+      if (o.hint) body.appendChild(el("span", "bb-opt__hint", o.hint));
+      lab.appendChild(body);
+      if (item.recommend_value && o.value === item.recommend_value) {
+        lab.appendChild(el("span", "bb-opt__rec", "rec"));
+      }
+      opts.appendChild(lab);
+    });
+    form.appendChild(opts);
+
+    /* the note's budget is the label cap less the fixed "<title> -> " lead and the
+       longest " - <selection>" any option can add, so it never shifts as the
+       captain picks an option and what is typed never has to be cut afterwards */
+    var noteMax = 0;
+    var noteCount = null, answerLimit = null;
+    if (item.allow_freeform) {
+      var longestValue = item.options.reduce(function (m, o) { return Math.max(m, utf8ByteLength(String(o.value))); }, 0);
+      noteMax = Math.max(0, ANSWER_LABEL_MAX_BYTES - utf8ByteLength(item.title + " -> ") -
+        (longestValue ? longestValue + 3 : 0));
+      var ffWrap = el("div", "bb-ff");
+      var grow = el("div", "bb-ff__grow");
+      var ff = document.createElement("textarea");
+      ff.name = "note"; ff.className = "bb-freeform"; ff.rows = 1;
+      ff.maxLength = noteMax;
+      ff.placeholder = item.freeform_hint || "or answer in your own words…";
+      ff.setAttribute("enterkeyhint", "done");
+      grow.appendChild(ff);
+      ffWrap.appendChild(grow);
+      var meta = el("div", "bb-ff__meta");
+      answerLimit = el("span", "bb-limit");
+      answerLimit.setAttribute("role", "alert");
+      noteCount = el("span", "bb-count");
+      noteCount.id = "bb-count-" + item.key;
+      ff.setAttribute("aria-describedby", noteCount.id);
+      meta.appendChild(answerLimit);
+      meta.appendChild(noteCount);
+      ffWrap.appendChild(meta);
+      form.appendChild(ffWrap);
+      /* maxLength stops ASCII at the cap natively; this also stops multi-byte text,
+         counted in bytes, and trims a paste or an IME commit that overshoots */
+      var syncNote = function () {
+        var v = ff.value;
+        if (utf8ByteLength(v) > noteMax) {
+          var cps = Array.from(v), used = 0, keep = 0;
+          while (keep < cps.length && used + utf8ByteLength(cps[keep]) <= noteMax) {
+            used += utf8ByteLength(cps[keep]); keep++;
+          }
+          v = cps.slice(0, keep).join("");
+          ff.value = v;
+        }
+        var left = noteMax - utf8ByteLength(v);
+        noteCount.textContent = left + " left";
+        noteCount.classList.toggle("is-full", left <= 0);
+        answerLimit.textContent = left <= 0 ? "Limit reached." : "";
+        answerLimit.classList.toggle("is-visible", left <= 0);
+        grow.setAttribute("data-replicated-value", v);
+      };
+      var composing = false;
+      ff.addEventListener("compositionstart", function () { composing = true; });
+      ff.addEventListener("compositionend", function () { composing = false; syncNote(); });
+      ff.addEventListener("input", function () { if (!composing) syncNote(); });
+      /* Enter writes a new line (the answer path flattens it); Ctrl/Cmd+Enter queues */
+      ff.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey) && form.requestSubmit) {
+          ev.preventDefault();
+          form.requestSubmit();
+        }
+      });
+      syncNote();
+    }
+
+    var attach = attachBlock();
+    if (attach) form.appendChild(attach.node);
+
+    var foot = el("div", "bb-decision__foot");
+    var btn = el("button", "fm-btn fm-btn--sm " + (item.type === "merge" ? "fm-btn--gold" : "fm-btn--primary"), "Queue answer");
+    btn.type = "submit";
+    foot.appendChild(btn);
+    var q = el("span", "bb-queued");
+    q.innerHTML = CHECK_SVG + " queued";
+    foot.appendChild(q);
+    if (!answerLimit) {
+      answerLimit = el("span", "bb-limit");
+      answerLimit.setAttribute("role", "alert");
+      foot.appendChild(answerLimit);
+    }
+    form.appendChild(foot);
+
+    form.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var fd = new FormData(form);
+      var value = fd.get("answer");
+      var note = (fd.get("note") || "").trim();
+      var displayAnswer = value ? (note ? value + " - " + note : value) : note;
+      var att = attach ? attach.state() : { busy: "", ready: [] };
+      if (att.busy) { attach.say(att.busy); return; }
+      if (!displayAnswer) {
+        if (att.ready.length) attach.say("Pick an option or write a note to send with the images.");
+        return;
+      }
+      if (utf8ByteLength(item.title + " -> " + displayAnswer) > ANSWER_LABEL_MAX_BYTES) {
+        answerLimit.textContent = "Answer is too long to queue.";
+        answerLimit.classList.add("is-visible");
+        return;
+      }
+      if (window.lavish && window.lavish.queuePrompt) {
+        /* The versioned context keeps the selected option separate from its
+           note, while close carries the composer-declared completion mode. */
+        var ctxData = {
+          schema: "fm-bearings-answer.v1",
+          question: item.key,
+          selection: value || "",
+          note: note
+        };
+        if (item.close) ctxData.close = item.close;
+        window.lavish.queuePrompt(
+          "Captain's Call answer - " + item.title + ": " + displayAnswer,
+          { tag: "choice", text: item.title + " -> " + displayAnswer, element: form,
+            data: ctxData, attachments: att.ready }
+        );
+      }
+      card.classList.add("is-queued");
+      /* deal the next card once this one is answered */
+      setTimeout(function () {
+        if (cards[active] !== card) return;  /* the captain already moved on */
+        showCard(active < cards.length - 1 ? active + 1 : active, true);
+        if (cards[active] !== card) {
+          cards[active].tabIndex = -1;
+          cards[active].focus({ preventScroll: true });  /* the Queue button just hid */
+        }
+      }, 450);
+    });
+
+    pad.appendChild(form);
+    card.appendChild(pad);
+    deck.appendChild(card);
+  });
+
+  /* stack navigation: one card at a time, dealt off the pile; `cards` is the
+     pile still on the board, `allCards` every card in payload order */
+  var allCards = Array.prototype.slice.call(deck.children);
+  var cards = allCards.slice();
+  var active = 0;
+  var stackCount = document.getElementById("bb-stack-count");
+  var stackPrev = document.getElementById("bb-stack-prev");
+  var stackNext = document.getElementById("bb-stack-next");
+  var stackNav = stackCount.parentNode;
+  var emptyNote = null;
+  function showCard(i, reveal) {
+    active = Math.max(0, Math.min(cards.length - 1, i));
+    cards.forEach(function (c, j) { c.hidden = j !== active; });
+    var answered = cards.filter(function (c) { return c.classList.contains("is-queued"); }).length;
+    stackCount.textContent = "card " + (active + 1) + " of " + cards.length +
+      (answered ? " · " + answered + " answered" : "");
+    stackPrev.disabled = active === 0;
+    stackNext.disabled = active === cards.length - 1;
+    /* the pile thins as the deal approaches the bottom */
+    deck.classList.toggle("bb-call--penult", active === cards.length - 2);
+    deck.classList.toggle("bb-call--last", active === cards.length - 1);
+    if (reveal) revealTop(cards[active]);
+  }
+  function showDeck(i, reveal) {
+    var none = !cards.length;
+    deck.classList.toggle("bb-call--empty", none);
+    stackNav.hidden = none;
+    if (none && !emptyNote) {
+      emptyNote = el("div", "bb-empty", "Nothing needs your action right now.");
+      deck.appendChild(emptyNote);
+    }
+    if (emptyNote) emptyNote.hidden = !none;
+    showCallCount(cards.length);
+    if (!none) showCard(i, reveal);
+  }
+  stackPrev.addEventListener("click", function () { if (cards.length) showCard(active - 1, true); });
+  stackNext.addEventListener("click", function () { if (cards.length) showCard(active + 1, true); });
+  showDeck(0);
+
+  /* Cards sent to the agent leave the board at once. The Lavish chrome posts
+     what it is sending under a send id: "start" (and "sent", should the start
+     have been missed) hides the cards whose answers are in the send, "failed"
+     deals them back. Only the parent chrome is heard. An item carrying `key` names
+     its card by that card's key and matches nothing else. An item without one
+     (an older chrome) names its card by the selector of the card's form and
+     carries "<title> -> <answer>"; a selector that does not point at the card
+     whose title leads the text falls back to the title. On load this page posts
+     "fm-board:ready" with its build stamp (the payload's `generated`). The chrome
+     stores each confirmed send under the stamp of the board it was sent from,
+     replays only the entries for the current stamp as one "sent" message (id
+     "remembered") on every load, and drops entries for any other stamp and
+     anything older than 24 hours. A reload keeps answered cards removed, and a
+     rebuilt board, including one that re-presents a card under the same title,
+     shows every card. */
+  var sentAway = {};
+  var callKeys = data.captains_call.map(function (item) { return item.key; });
+  function cardsInSend(items) {
+    var found = [];
+    items.forEach(function (it) {
+      var card;
+      if (it && typeof it.key === "string") {
+        card = allCards[callKeys.indexOf(it.key)];
+      } else {
+        var text = String(it && it.text || "");
+        var led = function (c) { return text.indexOf(data.captains_call[allCards.indexOf(c)].title + " -> ") === 0; };
+        var at = /#bb-call > div:nth-of-type\((\d+)\)/.exec(String(it && it.selector || ""));
+        card = at && allCards[at[1] - 1];
+        if (!card || !led(card)) card = allCards.filter(led)[0];
+      }
+      if (card && found.indexOf(card) < 0) found.push(card);
+    });
+    return found;
+  }
+  window.addEventListener("message", function (ev) {
+    var m = ev.data;
+    if (window.parent === window || ev.source !== window.parent) return;
+    if (!m || m.type !== "fm-board:send" || typeof m.id !== "string" || !Array.isArray(m.items)) return;
+    var list = cardsInSend(m.items), mine = sentAway[m.id] || [];
+    if (m.phase === "start" || m.phase === "sent") {
+      sentAway[m.id] = mine.concat(list.filter(function (c) { return mine.indexOf(c) < 0; }));
+    } else if (m.phase === "failed") {
+      sentAway[m.id] = mine.filter(function (c) { return list.indexOf(c) < 0; });
+    } else {
+      return;
+    }
+    var shown = cards[active];
+    cards = allCards.filter(function (c) {
+      return !Object.keys(sentAway).some(function (id) { return sentAway[id].indexOf(c) >= 0; });
+    });
+    allCards.forEach(function (c) { if (cards.indexOf(c) < 0) c.hidden = true; });
+    var at = cards.indexOf(shown);
+    showDeck(at < 0 ? active : at, at < 0);
+  });
+  if (window.parent !== window) window.parent.postMessage({ type: "fm-board:ready", stamp: data.generated }, "*");
+
+  /* Underway */
+  var uw = document.getElementById("bb-underway");
+  if (!data.underway.length) uw.appendChild(el("div", "bb-empty", "Nothing is underway."));
+  data.underway.forEach(function (t) {
+    var row = el("div", "bb-row");
+    row.appendChild(badge(t.state === "working" ? "online" : "info", t.state));
+    var main = el("div", "bb-row__main");
+    /* the snapshot's durable name-or-id label leads the row so a scan says
+       WHICH task this is; the run status keeps its place on the second line */
+    main.appendChild(el("div", "bb-row__title", t.name));
+    /* captain-facing rows name the repo; the internal task id shows only when
+       no repo is known */
+    main.appendChild(el("div", "bb-row__sub",
+      t.doing + " · " + t.kind + " · " + (t.repo || t.id)));
+    row.appendChild(main);
+    uw.appendChild(row);
+  });
+
+  /* Landed */
+  var ld = document.getElementById("bb-landed");
+  if (!data.landed.length) ld.appendChild(el("div", "bb-empty", "No recent completions are in the current baseline."));
+  data.landed.forEach(function (t) {
+    var row = el("div", "bb-row");
+    var chk = el("span", "bb-row__check");
+    chk.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+    row.appendChild(chk);
+    var main = el("div", "bb-row__main");
+    main.appendChild(el("div", "bb-row__title", t.what));
+    main.appendChild(el("div", "bb-row__sub", (t.repo || t.id) + " · " + t.owner));
+    row.appendChild(main);
+    if (t.pr_url) {
+      var a = el("a", "bb-row__pr", "#" + t.pr_url.split("/").pop());
+      a.href = t.pr_url; a.title = t.pr_url; a.target = "_blank"; a.rel = "noopener";
+      row.appendChild(a);
+    }
+    ld.appendChild(row);
+  });
+
+  /* Charted Next + dispatch picker */
+  var ch = document.getElementById("bb-charted");
+  var bar = document.getElementById("bb-dispatch");
+  var barCount = document.getElementById("bb-dispatch-count");
+  var barBtn = document.getElementById("bb-dispatch-btn");
+  var anyPickable = false;
+
+  function pickedIds() {
+    return Array.prototype.map.call(ch.querySelectorAll(".bb-pick:checked"), function (c) { return c.value; });
+  }
+  function refreshBar(limitMessage) {
+    var n = pickedIds().length;
+    barCount.textContent = limitMessage || (n ? n + " picked for dispatch" : "pick queued work to dispatch");
+    barBtn.disabled = !n;
+  }
+
+  if (!chartedQueued(data.charted).length && !chartedMoreQueued) {
+    ch.appendChild(el("div", "bb-empty", "Nothing is queued."));
+  }
+  chartedOrder(data.charted).forEach(function (t) {
+    var row = el("div", "bb-row");
+    if (t.dispatchable && !isWarning(t)) {
+      anyPickable = true;
+      var pick = document.createElement("input");
+      pick.type = "checkbox"; pick.className = "bb-pick"; pick.value = t.id;
+      pick.setAttribute("aria-label", "Pick " + t.id + " for dispatch");
+      pick.addEventListener("change", function () {
+        if (pick.checked && utf8ByteLength(pickedIds().join(",")) > 512) {
+          pick.checked = false;
+          refreshBar("Selection limit reached (512 bytes maximum). ");
+          return;
+        }
+        refreshBar();
+      });
+      row.appendChild(pick);
+    } else {
+      row.appendChild(el("span", "bb-pick-spacer"));
+    }
+    var main = el("div", "bb-row__main");
+    main.appendChild(el("div", "bb-row__title", t.title));
+    /* second line keeps the title uncrowded in the half-width column */
+    var chSub = t.repo || t.id;
+    main.appendChild(el("div", "bb-row__sub", t.reason ? t.reason + " · " + chSub : chSub));
+    row.appendChild(main);
+    if (isWarning(t)) row.appendChild(badge("danger", "needs repair"));
+    else if (t.reason) row.appendChild(badge("warn", "waiting"));
+    ch.appendChild(row);
+  });
+  var chartedShown = chartedQueued(data.charted).length;
+  var chartedTotal = chartedShown + chartedMoreQueued;
+  document.getElementById("bb-charted-sub").textContent =
+    chartedMoreQueued ? "showing " + chartedShown + " of " + chartedTotal : "";
+  if (chartedMoreQueued) {
+    ch.appendChild(el("span", "bb-morechip", "+" + chartedMoreQueued + " more queued - ask firstmate for the full chart"));
+  }
+  if (chartedMoreWarnings) {
+    ch.appendChild(el("span", "bb-morechip", "+" + chartedMoreWarnings + " more repair warning" + (chartedMoreWarnings === 1 ? "" : "s") + " - ask firstmate for the full chart"));
+  }
+
+  if (anyPickable) {
+    bar.hidden = false;
+    refreshBar();
+    barBtn.addEventListener("click", function () {
+      var ids = pickedIds();
+      var dispatchAnswer = ids.join(",");
+      if (!ids.length) return;
+      if (utf8ByteLength(dispatchAnswer) > 512) {
+        refreshBar("Selection is too long to queue (512 bytes maximum). ");
+        return;
+      }
+      if (window.lavish && window.lavish.queuePrompt) {
+        window.lavish.queuePrompt(
+          "Dispatch order - start this queued work now: " + ids.join(", "),
+          { tag: "choice", text: "Dispatch: " + ids.join(", "), element: bar,
+            queueKey: "dispatch.charted",
+            data: { question: "dispatch.charted", answer: dispatchAnswer } }
+        );
+      }
+      bar.classList.add("is-queued");
+    });
+  }
+
+  /* Reports tab: a list with a text filter and a project filter;
+     a tap opens the write-up full screen in a script-less frame. */
+  if (reports.length) {
+    var REP_PAGE = 25;
+    var repShown = REP_PAGE;
+    var repList = document.getElementById("bb-rep-list");
+    var repQ = document.getElementById("bb-rep-q");
+    var repProj = document.getElementById("bb-rep-proj");
+    var repStatus = document.getElementById("bb-rep-status");
+    var repMore = document.getElementById("bb-rep-more");
+    var NO_PROJECT = "(no project)";
+    var rv = document.getElementById("bb-rv");
+    var rvFrame = document.getElementById("bb-rv-frame");
+    var rvBack = document.getElementById("bb-rv-back");
+    var rvOpener = null;
+    function repProject(r) { return r.repo || NO_PROJECT; }
+    document.getElementById("bb-rep-count").textContent = reports.length + (reports.length === 1 ? " report" : " reports");
+    var projCounts = {};
+    reports.forEach(function (r) { projCounts[repProject(r)] = (projCounts[repProject(r)] || 0) + 1; });
+    var allOpt = el("option", null, "All projects");
+    allOpt.value = "";
+    repProj.appendChild(allOpt);
+    Object.keys(projCounts).sort().forEach(function (name) {
+      var o = el("option", null, name + " (" + projCounts[name] + ")");
+      o.value = name;
+      repProj.appendChild(o);
+    });
+    function repMatches() {
+      var words = repQ.value.toLowerCase().split(/\s+/).filter(Boolean);
+      var proj = repProj.value;
+      return reports.filter(function (r) {
+        if (proj && repProject(r) !== proj) return false;
+        var hay = (r.title + " " + repProject(r) + " " + r.summary + " " + r.date).toLowerCase();
+        return words.every(function (w) { return hay.indexOf(w) >= 0; });
+      });
+    }
+    function repOpen(r, opener) {
+      rvOpener = opener;
+      document.getElementById("bb-rv-title").textContent = r.title;
+      rv.setAttribute("aria-label", r.title);
+      rvFrame.title = r.title;
+      rvFrame.src = r.src;
+      rv.hidden = false;
+      document.documentElement.classList.add("bb-noscroll");
+      rvBack.focus();
+    }
+    function repClose() {
+      rv.hidden = true;
+      rvFrame.removeAttribute("src");
+      document.documentElement.classList.remove("bb-noscroll");
+      if (rvOpener && rvOpener.focus) rvOpener.focus({ preventScroll: true });
+      rvOpener = null;
+    }
+    rvBack.addEventListener("click", repClose);
+    rv.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape") { ev.preventDefault(); repClose(); }
+    });
+    var GO_SVG = '<svg class="bb-rep__go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>';
+    function repRender() {
+      var hits = repMatches();
+      var filtered = repQ.value.trim() !== "" || repProj.value !== "";
+      repList.textContent = "";
+      hits.slice(0, repShown).forEach(function (r) {
+        var row = el("button", "bb-rep__row");
+        row.type = "button";
+        var main = el("span", "bb-rep__main");
+        main.appendChild(el("div", "bb-rep__title", r.title));
+        main.appendChild(el("div", "bb-rep__meta", repProject(r) + " · " + r.date));
+        if (r.summary) main.appendChild(el("div", "bb-rep__sum", r.summary));
+        row.appendChild(main);
+        row.insertAdjacentHTML("beforeend", GO_SVG);
+        row.addEventListener("click", function () { repOpen(r, row); });
+        repList.appendChild(row);
+      });
+      if (!hits.length) repList.appendChild(el("div", "bb-empty", "No reports match."));
+      repStatus.textContent = filtered ? hits.length + " of " + reports.length + " reports"
+        : "newest first · " + Math.min(repShown, hits.length) + " of " + hits.length;
+      var left = hits.length - repShown;
+      repMore.hidden = left <= 0;
+      repMore.textContent = "Show " + Math.min(REP_PAGE, Math.max(left, 0)) + " more";
+    }
+    function repRefilter() { repShown = REP_PAGE; repRender(); }
+    repQ.addEventListener("input", repRefilter);
+    repProj.addEventListener("change", repRefilter);
+    repMore.addEventListener("click", function () { repShown += REP_PAGE; repRender(); });
+    repRender();
+  }
+  } catch (e) {
+    renderBoardError("The board data could not be rendered");
+  }
+})();
+</script>
+</body>
+</html>
