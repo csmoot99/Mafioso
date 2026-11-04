@@ -52,6 +52,12 @@ heavy_group() {  # <home> <lock> args...
   FM_HOME="$home" FM_HEAVY_LOCK="$lock" setsid env --default-signal=INT "$HEAVY" "$@" &
 }
 
+# Starts a slot holder in the background; $! is the flock parent. Killing that
+# leaves its sleep running, which must not keep the test's output open.
+hold_lock() {  # <lock> <seconds>
+  flock -o "$1" sleep "$2" >/dev/null 2>&1 &
+}
+
 wait_for_lock_held() {  # <lock>
   local tries=0
   while flock -n "$1" true; do
@@ -138,7 +144,7 @@ test_killed_while_queued() {
   fakebin=$(make_unscoped_systemd_run "$TMP_ROOT/queued-bin")
   log="$home/state/heavy-jobs.jsonl"
   lock="$TMP_ROOT/queued.lock"
-  flock -o "$lock" sleep 60 &
+  hold_lock "$lock" 60
   holder=$!
   wait_for_lock_held "$lock"
 
@@ -159,12 +165,12 @@ test_killed_while_queued() {
   for slots in 1 2; do
     printf '%s\n' "$slots" > "$home/config/host-test-slots"
     if [ "$slots" -eq 2 ]; then
-      flock -o "$lock.2" sleep 60 &
+      hold_lock "$lock.2" 60
       holder="$holder $!"
       wait_for_lock_held "$lock.2"
     fi
     : > "$log"
-    PATH="$fakebin:$PATH" heavy "$home" "$lock" --class test --task "alone-$slots" -- \
+    PATH="$fakebin:$PATH" FM_HOME="$home" FM_HEAVY_LOCK="$lock" "$HEAVY" --class test --task "alone-$slots" -- \
       touch "$TMP_ROOT/queued-alone.ran" &
     pid=$!
     sleep 0.5
@@ -238,7 +244,7 @@ test_wait_is_measured_and_slots_setting() {
   home=$(make_home wait)
   fakebin=$(make_unscoped_systemd_run "$TMP_ROOT/wait-bin")
   log="$home/state/heavy-jobs.jsonl"
-  flock -o "$TMP_ROOT/wait.lock" sleep 3 &
+  hold_lock "$TMP_ROOT/wait.lock" 3
   holder=$!
   sleep 0.5
   PATH="$fakebin:$PATH" heavy "$home" "$TMP_ROOT/wait.lock" --class test -- true || fail "queued command failed"
@@ -246,7 +252,7 @@ test_wait_is_measured_and_slots_setting() {
   jq -e '.wait_s >= 2 and .slot == 1' "$log" >/dev/null || fail "a held slot must show as wait: $(cat "$log")"
 
   printf '2\n' > "$home/config/host-test-slots"
-  flock -o "$TMP_ROOT/wait.lock" sleep 3 &
+  hold_lock "$TMP_ROOT/wait.lock" 3
   holder=$!
   sleep 0.5
   PATH="$fakebin:$PATH" heavy "$home" "$TMP_ROOT/wait.lock" --class test -- true || fail "second-slot command failed"
