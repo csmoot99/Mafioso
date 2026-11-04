@@ -11,6 +11,8 @@
 # memory in MiB, and unknown (jobs with no peak memory reading). Averages and
 # maxima use only the jobs that have the value; a column with no values prints
 # "unknown", and a job without a task or project is grouped under "unknown".
+# A job killed while queued has a wait but null run time and exit: it counts in
+# jobs and in the wait columns, and not as failed.
 # --since keeps jobs whose slot request is at or after that epoch.
 #
 # Exit status: 0 on a report (also an empty one), 2 on a usage error.
@@ -45,12 +47,12 @@ jq -r --argjson since "$since" -s '
   | group_by([(.project // "unknown"), .class])
   | map(. as $g | {
       project: ($g[0].project // "unknown"), class: $g[0].class, jobs: ($g | length),
-      failed: ($g | map(select(.exit != 0)) | length),
-      wait_avg: ($g | map(.wait_s) | avg), wait_max: ($g | map(.wait_s) | max_or),
-      run_avg: ($g | map(.run_s) | avg), run_max: ($g | map(.run_s) | max_or),
-      wait_pct: (($g | map(.wait_s) | add) as $w | ($g | map(.run_s) | add) as $r
+      failed: ($g | map(.exit | values | select(. != 0)) | length),
+      wait_avg: ($g | map(.wait_s | values) | avg), wait_max: ($g | map(.wait_s | values) | max_or),
+      run_avg: ($g | map(.run_s | values) | avg), run_max: ($g | map(.run_s | values) | max_or),
+      wait_pct: (($g | map(.wait_s | values) | add // 0) as $w | ($g | map(.run_s | values) | add // 0) as $r
         | if ($w + $r) == 0 then "unknown" else ($w * 100 / ($w + $r) | round) end),
-      peak_mib: ($g | map(.peak_memory_bytes | select(. != null)) | if length == 0 then "unknown" else (max / 1048576 | round) end),
+      peak_mib: ($g | map(.peak_memory_bytes | values) | if length == 0 then "unknown" else (max / 1048576 | round) end),
       unknown: ($g | map(select(.peak_memory_bytes == null)) | length)})
   | (["project","class","jobs","failed","wait_avg_s","wait_max_s","run_avg_s","run_max_s","wait_pct","peak_mib","unknown_peak"] | @tsv),
     (.[] | [.project, .class, .jobs, .failed, .wait_avg, .wait_max, .run_avg, .run_max, .wait_pct, .peak_mib, .unknown] | @tsv)

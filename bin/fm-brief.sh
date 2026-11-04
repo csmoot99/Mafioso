@@ -698,10 +698,15 @@ REPO=${POS[1]}
 
 # How a worker runs heavy commands on this machine's shared slot. The wrapper
 # (bin/fm-heavy.sh) owns the lock, the memory scope and the job record; this
-# section only tells the worker to use it. Emitted only when config/heavy-commands
-# is present (docs/configuration.md "Heavy commands and concurrency").
+# section only tells the worker to use it. Emitted in ship and scout briefs only
+# when config/heavy-commands is present in the root home, because the slot and
+# the job log are machine-wide (docs/configuration.md "Heavy commands and
+# concurrency"). A read-only review runs no heavy commands.
 HEAVY_BLOCK=
-if [ -e "$CONFIG/heavy-commands" ] && [ "$KIND" != secondmate ]; then
+# shellcheck source=bin/fm-wake-lib.sh
+if [ "$KIND" != review ] \
+  && HEAVY_ROOT=$(. "$SCRIPT_DIR/fm-wake-lib.sh" && fm_firstmate_root_home "$FM_HOME") \
+  && [ -e "$HEAVY_ROOT/config/heavy-commands" ]; then
 IFS= read -r -d '' HEAVY_SECTION <<EOF || true
 # Heavy commands
 Run full or multi-file test suites, production builds, image builds, e2e runs, and every \`no-mistakes axi run\` or \`respond\` drive call that will execute a local test step, build or e2e through the machine's shared slot, one heavy command at a time under a 6 GB memory cap:

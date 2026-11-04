@@ -1180,11 +1180,16 @@ Three separate limits bound test load, and none stands in for another.
 | Heavy commands at once on this machine (host test slots) | `config/host-test-slots` | 1 |
 | Test-runner workers inside one job | each project's own runner flag (for example Vitest `--maxWorkers`, Playwright workers) | the project's own setting |
 
-Firstmate enforces only the first two; the third is documented here and never enforced.
-Raising agents does not raise test concurrency, because every heavy command queues for a slot.
+Firstmate enforces only the first, at spawn.
+The host limit is cooperative: it binds only commands a worker runs through `bin/fm-heavy.sh`, and briefs tell workers to do that only when `config/heavy-commands` is present.
+The third is documented here and never enforced.
+With the flag set, raising agents does not raise test concurrency, because those heavy commands queue for a slot.
+Without it, more agents can mean more test runs at once, so set the flag before raising project capacity on a machine that must run one heavy command at a time.
 
 [`bin/fm-heavy.sh`](../bin/fm-heavy.sh) runs a heavy command on the slot under the standing 6 GB memory scope with no swap, exactly as `flock -o /tmp/fm-heavy.lock systemd-run --user --scope -q -p MemoryMax=6G -p MemorySwapMax=0 <command>` did, and appends one record per job to `state/heavy-jobs.jsonl` in the root home.
 A record holds the task, project, command class (test, build, e2e or image), the wait for the slot, start and end, exit status, and peak memory and CPU time read from the job's own scope; a value that is not available is `null`, never an estimate.
+A job stopped by TERM, INT or HUP is recorded too: while running, once its scope ends, with exit 128+n; while queued, with its wait so far and `started_at`, `ended_at`, `run_s`, `exit` and `slot` all `null`.
+The command's exit status passes through, so 137 means the memory cap killed the command itself; when the cap kills one of its child processes, systemd stops the whole scope and the status is usually 143, with the peak still recorded.
 [`bin/fm-heavy-summary.sh`](../bin/fm-heavy-summary.sh) prints queue wait against run time and peak memory per project and class.
 The wrapper needs Linux with `flock`, `systemd-run` and `jq`; elsewhere it refuses without running anything.
 
@@ -1193,6 +1198,7 @@ Absent means 1, the single machine-wide lock; a malformed file refuses the run.
 The default is the owner's standing PC rule of one heavy command at a time, so change it only from measured peaks in the log.
 
 The optional presence flag `config/heavy-commands` makes `bin/fm-brief.sh` add a "Heavy commands" rule to ship and scout briefs that points workers at the wrapper.
+The flag is machine-wide like the slot and the log: it is read from the root home, so it covers workers spawned by every local secondmate, and a copy in a secondmate home has no effect.
 A drive call holds the slot only while it runs a local test step, build or e2e, and the pipeline agent never takes the slot again inside that hold.
 
 ## Launch environment values (config/launch-env)
