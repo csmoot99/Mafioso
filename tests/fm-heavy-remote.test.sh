@@ -8,7 +8,7 @@
 # Every failure case must leave the wrapper's status non-zero and the record's
 # outcome something other than pass; a local run never happens behind a job that
 # may still be running.
-# shellcheck disable=SC2016 # single-quoted scripts expand inside their own shells
+# shellcheck disable=SC2016,SC2029 # single-quoted scripts expand inside their own shells, and the fake ssh command is built here
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -136,6 +136,7 @@ test_pass_and_record() {
     and .started_at >= .requested_at and .ended_at >= .started_at
     and .peak_memory_bytes == null and (.cpu_usec | type) == \"number\"" "remote record"
   expect_host_clean "scratch must be removed after a collected result"
+  [ -z "$(ls -A "$HOME_FM/state/heavy-remote/unknown-fake-mac")" ] || fail "a finished job must leave no open record"
   assert_present "$HOME_FM/state/heavy-remote/$(last_record | jq -r .job)/result.json" "the result copy is kept locally"
   pass "fm-heavy --remote: the exact candidate runs on the host and the record has every stage"
 }
@@ -269,6 +270,7 @@ test_unreachable_job_is_unknown() {
   heavy --remote >"$CASE/out" 2>&1; expect_code 75 "$?" "a job that cannot be reached again"
   expect_record '.outcome == "unknown" and .exit == 75 and .host == "fake-mac" and (.job | type) == "string"' "unknown record"
   assert_present "$REMOTE_HOME/.fm-heavy-remote/$(last_record | jq -r .job)" "an unknown job's scratch is kept for reconciliation"
+  assert_present "$HOME_FM/state/heavy-remote/unknown-fake-mac/$(last_record | jq -r .job).json" "an unknown job's record stays open"
   [ "$(wc -l < "$LOG")" -eq 1 ] || fail "an unknown job must not be retried locally: $(cat "$LOG")"
   sleep 2.5
   pass "fm-heavy --remote: a job that cannot be reached is unknown, kept, and never retried"
@@ -296,32 +298,147 @@ test_bad_results_are_rejected() {
 }
 
 test_duplicate_delivery() {
-  local job d
+  local stage=$TMP_ROOT/dupstage rdir=.fm-heavy-remote/delivered deliver
   setup dupstart 'echo run >> "$HOME/runs"'
-  heavy --remote >/dev/null 2>&1 || fail "first run failed"
-  job=$(last_record | jq -r .job)
-  # The same job id delivered again is refused before it can run or count a second time.
-  (cd "$REPO" && PATH="$FAKEBIN:$PATH" FAKE_SSH_CTL="$CTL" FAKE_SSH_HOME="$REMOTE_HOME" \
-    "$ROOT/bin/fm-heavy-remote.sh" --host fake-mac --timeout 30 --sample "$CASE/sample" \
-    --state-dir "$HOME_FM/state/heavy-remote" --job-id "$job" -- bash t/job.sh) >/dev/null 2>&1
-  expect_code 65 "$?" "a job id delivered twice"
-  grep -qx 'outcome=rejected' "$CASE/sample" || fail "duplicate delivery must be rejected: $(cat "$CASE/sample")"
-  [ "$(wc -l < "$REMOTE_HOME/runs")" -eq 1 ] || fail "a duplicate delivery must not run the job again"
-
-  # The host itself refuses to start one job twice.
-  d=$REMOTE_HOME/.fm-heavy-remote/start-twice
-  mkdir -p "$d"
-  git -C "$REPO" bundle create "$d/src.bundle" HEAD >/dev/null 2>&1
-  cp "$RUNNER" "$d/runner.py"
-  jq -n --arg sha "$SHA" --arg bs "$(sha256sum "$d/src.bundle" | cut -d' ' -f1)" \
+  mkdir -p "$stage"
+  git -C "$REPO" bundle create "$stage/src.bundle" HEAD >/dev/null 2>&1
+  cp "$RUNNER" "$stage/runner.py"
+  jq -n --arg sha "$SHA" --arg bs "$(sha256sum "$stage/src.bundle" | cut -d' ' -f1)" \
     --arg cs "$(printf 'bash\0t/job.sh\0' | sha256sum | cut -d' ' -f1)" \
-    '{id: "start-twice", sha: $sha, command_sha256: $cs, bundle_sha256: $bs, timeout_s: 20, argv: ["bash", "t/job.sh"]}' > "$d/manifest.json"
-  [ "$(HOME="$REMOTE_HOME" python3 "$d/runner.py" start "$d")" = started ] || fail "the first start must launch the job"
-  HOME="$REMOTE_HOME" python3 "$d/runner.py" start "$d" >/dev/null 2>&1; expect_code 10 "$?" "a second start of one job"
-  HOME="$REMOTE_HOME" python3 "$d/runner.py" wait "$d" 20 >/dev/null
-  [ "$(wc -l < "$REMOTE_HOME/runs")" -eq 2 ] || fail "the job must have run exactly once more, not twice"
-  HOME="$REMOTE_HOME" python3 "$d/runner.py" cleanup "$d"
-  pass "fm-heavy --remote: a duplicate delivery or a second start never runs or counts twice"
+    '{id: "delivered", sha: $sha, command_sha256: $cs, bundle_sha256: $bs, timeout_s: 20, argv: ["bash", "t/job.sh"]}' > "$stage/manifest.json"
+  # The one stream the driver sends, delivered twice: the host's started marker refuses the second.
+  deliver="mkdir -p $rdir && tar -xf - -C $rdir && python3 $rdir/runner.py start $rdir"
+  [ "$(tar -cf - -C "$stage" runner.py manifest.json src.bundle | PATH="$FAKEBIN:$PATH" FAKE_SSH_CTL="$CTL" FAKE_SSH_HOME="$REMOTE_HOME" ssh fake-mac "$deliver")" = started ] \
+    || fail "the first delivery must launch the job"
+  HOME="$REMOTE_HOME" python3 "$RUNNER" wait "$REMOTE_HOME/$rdir" 20 >/dev/null
+  tar -cf - -C "$stage" runner.py manifest.json src.bundle | PATH="$FAKEBIN:$PATH" FAKE_SSH_CTL="$CTL" FAKE_SSH_HOME="$REMOTE_HOME" ssh fake-mac "$deliver" >/dev/null 2>&1
+  expect_code 10 "$?" "a second delivery of one job"
+  [ "$(wc -l < "$REMOTE_HOME/runs")" -eq 1 ] || fail "a duplicate delivery must not run the job again"
+  HOME="$REMOTE_HOME" python3 "$RUNNER" cleanup "$REMOTE_HOME/$rdir"
+  pass "fm-heavy --remote: a duplicate delivery is refused by the host's started marker and never runs twice"
+}
+
+# unknown_job <name> <job script> <regex of the calls that drop>: leave one job
+# unknown, then restore the connection. JOB is its id, JOB_DIR its local directory.
+unknown_job() {
+  setup "$1" "$2"
+  rule gone drop "$3" -1
+  heavy --remote >/dev/null 2>&1; expect_code 75 "$?" "the job that ends unknown"
+  rm "$CTL/rules/gone"
+  JOB=$(last_record | jq -r .job)
+  JOB_DIR=$HOME_FM/state/heavy-remote/$JOB
+  OPEN=$HOME_FM/state/heavy-remote/unknown-fake-mac/$JOB.json
+  assert_present "$OPEN" "an unknown job must leave a durable local record"
+}
+new_candidate() {  # <job script body>
+  printf '%s\n' "$1" > "$REPO/t/job.sh"
+  git -C "$REPO" commit -q -am next
+}
+remote_starts() { grep -c 'runner.py start' "$CTL/log"; }
+wait_for() {  # <file>
+  local n=0
+  until [ -e "$1" ]; do n=$((n + 1)); [ "$n" -le 100 ] || fail "never appeared: $1"; sleep 0.1; done
+}
+
+test_unknown_job_blocks_until_reconciled() {
+  local first_sha second_sha
+  unknown_job longjob 'echo $$ > "$HOME/job.pid"; until [ -e "$HOME/release" ]; do sleep 0.1; done' 'runner.py (wait|status)'
+  first_sha=$SHA
+  wait_for "$REMOTE_HOME/job.pid"
+  new_candidate "echo ran >> $TMP_ROOT/longjob/second; exit 7"
+  second_sha=$(git -C "$REPO" rev-parse HEAD)
+
+  # The connection is back and the first job still runs: no second job beside it.
+  heavy --remote >/dev/null 2>&1; expect_code 7 "$?" "a request behind a running unknown job runs locally"
+  expect_record '.host == "local" and .fallback == "unknown-job-running" and .slot == 1 and .exit == 7' "still-running fallback"
+  [ "$(remote_starts)" -eq 1 ] || fail "no second remote job may start while the first runs: $(cat "$CTL/log")"
+  [ "$(ls "$REMOTE_HOME/.fm-heavy-remote")" = "$JOB" ] || fail "only the first job may be on the host"
+  pid_alive "$(cat "$REMOTE_HOME/job.pid")" || fail "reconciling must leave a running job alone"
+  assert_present "$OPEN" "the record stays open while the job runs"
+
+  # The host cannot be reached: the record stays and the request runs locally.
+  rule down drop . -1
+  heavy --remote >/dev/null 2>&1; expect_code 7 "$?" "a request with the host gone runs locally"
+  expect_record '.host == "local" and .fallback == "unreachable"' "unreachable fallback"
+  assert_present "$OPEN" "an unreachable job's record stays open"
+  rm "$CTL/rules/down"
+
+  # The first job finishes as a pass. The new candidate still fails: the old pass stands for nothing here.
+  : > "$REMOTE_HOME/release"
+  wait_for "$REMOTE_HOME/.fm-heavy-remote/$JOB/result.json"
+  heavy --remote >/dev/null 2>&1; expect_code 7 "$?" "the new candidate's own failure, not the old job's pass"
+  expect_record ".host == \"fake-mac\" and .outcome == \"failed\" and .exit == 7 and .candidate == \"$second_sha\" and .job != \"$JOB\"" "the new job's record"
+  [ "$(remote_starts)" -eq 2 ] || fail "the new job starts once the first is reconciled: $(cat "$CTL/log")"
+  jq -e --arg job "$JOB" --arg sha "$first_sha" '.job == $job and .candidate == $sha and .outcome == "pass"' "$JOB_DIR/reconciled.json" >/dev/null \
+    || fail "the closed record must carry the first job's own outcome: $(cat "$JOB_DIR/reconciled.json")"
+  jq -e '.exit_code == 0' "$JOB_DIR/result.json" >/dev/null || fail "the finished job's result is collected"
+  assert_absent "$OPEN" "the record closes after reconciliation"
+  expect_host_clean "a reconciled job's scratch is removed"
+  pass "fm-heavy --remote: an unknown job blocks a second job while it runs, then is collected for its own record and cleaned up"
+}
+
+test_unknown_job_other_endings() {
+  # Collection drops: the result is not lost and the record stays for the next request.
+  unknown_job dropped 'echo run' 'runner.py (wait|status)'
+  HOME="$REMOTE_HOME" python3 "$RUNNER" wait "$REMOTE_HOME/.fm-heavy-remote/$JOB" 20 >/dev/null
+  new_candidate 'echo next'
+  rule collect drop 'tar -cf - result.json' 1
+  heavy --remote >/dev/null 2>&1 || fail "a dropped collection falls back to a local run"
+  expect_record '.host == "local" and .fallback == "unreachable"' "dropped collection fallback"
+  assert_present "$OPEN" "a dropped collection leaves the record open"
+  assert_present "$REMOTE_HOME/.fm-heavy-remote/$JOB/result.json" "a dropped collection must keep the result on the host"
+  heavy --remote >/dev/null 2>&1 || fail "the next request reconciles and passes"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "the request after a dropped collection"
+  jq -e '.outcome == "pass"' "$JOB_DIR/reconciled.json" >/dev/null || fail "the retried collection closes the record: $(cat "$JOB_DIR/reconciled.json")"
+  expect_host_clean "scratch after a retried collection"
+
+  # The result fails its checks: it closes as rejected and scratch still goes.
+  unknown_job tampered 'echo run' 'runner.py (wait|status)'
+  HOME="$REMOTE_HOME" python3 "$RUNNER" wait "$REMOTE_HOME/.fm-heavy-remote/$JOB" 20 >/dev/null
+  new_candidate 'echo next'
+  rule t pre 'tar -cf - result.json' 1 'f=$(ls .fm-heavy-remote/*/result.json); jq ".sha=\"0000000000000000000000000000000000000000\"" "$f" > "$f.n" && mv "$f.n" "$f"'
+  heavy --remote >/dev/null 2>&1 || fail "a rejected old result does not stop the new job"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "the job after a rejected old result"
+  jq -e '.outcome == "rejected"' "$JOB_DIR/reconciled.json" >/dev/null || fail "a bad result closes as rejected: $(cat "$JOB_DIR/reconciled.json")"
+  assert_absent "$OPEN" "a rejected result closes the record"
+  expect_host_clean "scratch after a rejected old result"
+
+  # The job never reached the host: there is nothing to wait for.
+  unknown_job neverarrived 'echo run' 'runner.py (start|status)'
+  new_candidate 'echo next'
+  heavy --remote >/dev/null 2>&1 || fail "the request after a job that never arrived"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "the job after one that never arrived"
+  jq -e '.outcome == "absent"' "$JOB_DIR/reconciled.json" >/dev/null || fail "a job that never arrived closes as absent: $(cat "$JOB_DIR/reconciled.json")"
+  assert_absent "$OPEN" "a job that never arrived closes its record"
+
+  # The supervisor died and the job's group lives on, so nothing would ever stop it.
+  unknown_job orphan 'sleep 300 & echo $! > "$HOME/child.pid"; echo $PPID > "$HOME/supervisor.pid"; sleep 300' 'runner.py (wait|status)'
+  wait_for "$REMOTE_HOME/supervisor.pid"
+  kill -9 "$(cat "$REMOTE_HOME/supervisor.pid")"
+  wait_gone "$(cat "$REMOTE_HOME/supervisor.pid")" || fail "the supervisor must be gone"
+  new_candidate 'echo next'
+  heavy --remote >/dev/null 2>&1 || fail "a request behind an orphaned group runs locally"
+  expect_record '.host == "local" and .fallback == "unknown-job-running"' "orphaned group fallback"
+  [ "$(remote_starts)" -eq 1 ] || fail "no second job may start beside an orphaned group: $(cat "$CTL/log")"
+  wait_gone "$(cat "$REMOTE_HOME/child.pid")" || fail "the orphaned group must be stopped"
+  heavy --remote >/dev/null 2>&1 || fail "the next request closes the record and runs remotely"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "the job after an orphaned group"
+  jq -e '.outcome == "lost"' "$JOB_DIR/reconciled.json" >/dev/null || fail "an orphaned job closes as lost: $(cat "$JOB_DIR/reconciled.json")"
+  expect_host_clean "scratch after an orphaned job"
+  pass "fm-heavy --remote: dropped collections, bad results, jobs that never arrived and orphaned groups all reconcile safely"
+}
+
+test_runner_reconcile_ages_out_a_dead_start() {
+  local d
+  setup deadstart 'true'
+  d=$REMOTE_HOME/.fm-heavy-remote/deadstart
+  mkdir -p "$d"
+  printf '{"timeout_s": 60}' > "$d/manifest.json"
+  : > "$d/started"
+  [ "$(HOME="$REMOTE_HOME" python3 "$RUNNER" reconcile "$d")" = preparing ] || fail "a recent start may still be in flight"
+  touch -d '2 minutes ago' "$d/started"
+  [ "$(HOME="$REMOTE_HOME" python3 "$RUNNER" reconcile "$d")" = lost ] || fail "a start with no owner past the job's timeout is dead"
+  pass "fm-heavy-remote-runner: a start that died before recording an owner cannot hold the destination for ever"
 }
 
 test_runner_refuses_bad_input() {
@@ -384,6 +501,9 @@ test_connection_lost_is_reconciled
 test_unreachable_job_is_unknown
 test_bad_results_are_rejected
 test_duplicate_delivery
+test_unknown_job_blocks_until_reconciled
+test_unknown_job_other_endings
+test_runner_reconcile_ages_out_a_dead_start
 test_signalled_wrapper_stops_only_its_job
 test_runner_refuses_bad_input
 test_summary_compares_hosts

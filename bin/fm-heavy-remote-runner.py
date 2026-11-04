@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Remote half of bin/fm-heavy-remote.sh: run one transferred job and report it.
 
-Usage: fm-heavy-remote-runner.py start|supervise|status|wait|cancel|cleanup <jobdir> [seconds]
+Usage: fm-heavy-remote-runner.py start|supervise|status|reconcile|wait|cancel|cleanup <jobdir> [seconds]
 
 The client ships this file with each job, so nothing is installed on the remote
 host. It needs only python3 (stdlib), git and ps, and runs on macOS and Linux.
@@ -23,6 +23,9 @@ supervise Runs the command in its own process group with cwd the checkout, outpu
           sha256 of run.log).
 status    Prints absent, preparing, running, done, or lost (the supervisor died
           without publishing a result).
+reconcile status, for a job its client lost touch with: lost becomes orphaned when
+          the command group outlived its supervisor, and preparing becomes lost
+          when a start recorded no owner within the job's timeout, since it died.
 wait      status, polled until it stops being running or preparing or the seconds
           given elapse.
 cancel    Asks the supervisor to stop the job's own group and waits for the result.
@@ -88,10 +91,27 @@ def alive(pid, start):
     return bool(start) and proc_start(pid) == start
 
 
+def owned_group(owner):
+    """The command's process group id, unless its pid now belongs to someone else."""
+    group = owner.get("group")
+    return group if group and proc_start(group) in ("", owner.get("group_start")) else None
+
+
+def group_alive(owner):
+    group = owned_group(owner)
+    if not group:
+        return False
+    try:
+        os.killpg(group, 0)
+    except (ProcessLookupError, PermissionError):  # macOS answers EPERM for a group of zombies
+        return False
+    return True
+
+
 def kill_group(owner, proc=None):
     """Stop the command's process group; a reused pid is left alone."""
-    group = owner.get("group")
-    if not group or proc_start(group) not in ("", owner.get("group_start")):
+    group = owned_group(owner)
+    if not group:
         return
     for sig, patience in ((signal.SIGTERM, 3.0), (signal.SIGKILL, 0.0)):
         try:
@@ -128,6 +148,17 @@ def status(jdir):
         return "running"
     # The supervisor may have published its result between the two checks.
     return "done" if os.path.exists(os.path.join(jdir, "result.json")) else "lost"
+
+
+def reconcile_state(jdir):
+    state = status(jdir)
+    if state == "lost" and group_alive(read_json(os.path.join(jdir, "owner.json")) or {}):
+        return "orphaned"
+    if state == "preparing":
+        manifest = read_json(os.path.join(jdir, "manifest.json")) or {}
+        if time.time() - os.path.getmtime(os.path.join(jdir, "started")) > manifest.get("timeout_s", 0):
+            return "lost"
+    return state
 
 
 def git(*args):
@@ -257,11 +288,13 @@ def cmd_cleanup(jdir):
 
 
 def main():
-    if len(sys.argv) < 3 or sys.argv[1] not in ("start", "supervise", "status", "wait", "cancel", "cleanup"):
-        die(2, "usage: fm-heavy-remote-runner.py start|supervise|status|wait|cancel|cleanup <jobdir> [seconds]")
+    if len(sys.argv) < 3 or sys.argv[1] not in ("start", "supervise", "status", "reconcile", "wait", "cancel", "cleanup"):
+        die(2, "usage: fm-heavy-remote-runner.py start|supervise|status|reconcile|wait|cancel|cleanup <jobdir> [seconds]")
     action, jdir = sys.argv[1], job_dir(sys.argv[2])
     if action == "status":
         print(status(jdir))
+    elif action == "reconcile":
+        print(reconcile_state(jdir))
     elif action == "wait":
         cmd_wait(jdir, float(sys.argv[3]) if len(sys.argv) > 3 else 0)
     else:

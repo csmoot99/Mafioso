@@ -46,12 +46,13 @@
 #                         process group when it runs longer
 # and a '#' line is a comment. A missing or malformed file, a command that is not
 # the approved one, or a class other than test refuses with status 2. The
-# destination takes one job at a time; when it is busy, unreachable or cannot
-# prepare the job, or the working tree is not a clean repository root, the command
-# runs locally under the normal slot rule and the record's fallback says why.
-# bin/fm-heavy-remote.sh owns the transfer, the completion record, the failure
-# outcomes and their exit statuses. Its job copies are kept in
-# state/heavy-remote/<job> in the root home.
+# destination takes one job at a time; when it is busy, unreachable, still running
+# a job that ended unknown here or cannot prepare the job, or the working tree is
+# not a clean repository root, the command runs locally under the normal slot rule
+# and the record's fallback says why. bin/fm-heavy-remote.sh owns the transfer, the
+# completion record, the failure outcomes and their exit statuses, and reconciling
+# unknown jobs. Its job copies are kept in state/heavy-remote/<job> in the root
+# home, and its open unknown-job records in state/heavy-remote/unknown-<host>.
 #
 # A remote job's record has the same fields plus: host (the alias, "local" for a
 # local run), prepare_s (bundle, transfer and checkout until the job started) and

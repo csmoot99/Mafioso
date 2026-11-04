@@ -1230,7 +1230,11 @@ It names the SSH alias of the destination, the one portable command approved to 
 A worker or firstmate passes `--remote` for that command only, and the job then runs on the destination's own capacity instead of the shared slot.
 The destination takes one job at a time; when it is busy or unreachable, or the working tree is not a clean repository root, the command runs locally under the normal slot rule instead of blocking.
 A lost connection never leads to a second run of a job that may still be running: the job is reconciled against its record on the destination first, and a job that cannot be reached is recorded as unknown with its scratch kept.
-A result with the wrong commit, command or bundle digest, a missing or partial log, or a duplicate delivery is rejected and is never a pass.
+Every unknown job keeps a durable local record in `state/heavy-remote/unknown-<host>/`, and each new `--remote` request reconciles those records over SSH before it is admitted, from the job's completion file, its started marker and whether its own process group is alive.
+While such a job still runs, no second job starts there and the request runs locally with fallback `unknown-job-running`; a job whose supervisor has died is stopped first, because nothing else would stop it.
+When the destination cannot be reached the record stays and the request runs locally with fallback `unreachable`.
+A finished job's result is collected into `state/heavy-remote/<job>/` for that job alone and never counts as a pass for the new candidate; its scratch is then removed and `reconciled.json` there closes the record with the job's outcome.
+A result with the wrong commit, command or bundle digest, or a missing or partial log, is rejected and is never a pass, and the destination refuses a second start of one job, so a duplicate delivery never runs twice.
 [`bin/fm-heavy.sh`](../bin/fm-heavy.sh) owns the file format and the extra record fields, and [`bin/fm-heavy-remote.sh`](../bin/fm-heavy-remote.sh) owns the transfer, the outcomes and their exit statuses.
 [`bin/fm-heavy-summary.sh`](../bin/fm-heavy-summary.sh) gives local and remote jobs separate rows, so the queue wait a remote run saves can be read against its preparation and collection time.
 The destination needs only `python3`, `git`, `tar` and `ps`, and the runner it uses is shipped with each job, so nothing is installed there.
