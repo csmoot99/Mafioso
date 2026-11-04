@@ -491,6 +491,18 @@ test_cancelled_on_host_is_never_green() {
   expect_code 143 "$?" "a job stopped on the host whose command traps TERM and exits 0"
   expect_record '.outcome == "cancelled" and .exit == 143 and .host == "fake-mac"' "host-cancelled record"
   expect_host_clean "scratch after a job cancelled on the host"
+
+  # A logout signals the supervisor and the command together, so the command can
+  # be gone before the supervisor next looks at it.
+  setup hostcancelboth 'trap "exit 0" TERM; echo $$ > "$HOME/command.pid"; echo $PPID > "$HOME/supervisor.pid"; sleep 300 & wait'
+  heavy --remote >/dev/null 2>&1 &
+  pid=$!
+  wait_for "$REMOTE_HOME/supervisor.pid"
+  kill -TERM "$(cat "$REMOTE_HOME/supervisor.pid")" "$(cat "$REMOTE_HOME/command.pid")"
+  wait "$pid"
+  expect_code 143 "$?" "a job whose supervisor and command were stopped together"
+  expect_record '.outcome == "cancelled" and .exit == 143 and .host == "fake-mac"' "record of a job stopped together"
+  expect_host_clean "scratch after a job stopped together"
   pass "fm-heavy --remote: a job cancelled on the host is never green, even when its command exits 0"
 }
 
@@ -551,6 +563,40 @@ test_signal_during_eligibility_never_runs_locally() {
   pass "fm-heavy --remote: a signal while the destination is probed or the bundle made cancels the job instead of running it locally"
 }
 
+test_wrapper_only_signal_never_runs_locally() {
+  local pid
+  setup wrapperonly "echo ran >> $TMP_ROOT/wrapperonly/ran"
+  # The host is down, so the driver falls back; only the wrapper hears the signal.
+  rule slowprobe partial '^true$' 1 ': > "$HOME/probing"; sleep 1'
+  (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" FAKE_SSH_CTL="$CTL" FAKE_SSH_HOME="$REMOTE_HOME" \
+    exec "$HEAVY" --class test --remote -- bash t/job.sh >/dev/null 2>&1) &
+  pid=$!
+  wait_for "$REMOTE_HOME/probing"
+  kill -TERM "$pid"
+  wait "$pid"
+  expect_code 143 "$?" "a wrapper signalled while its driver falls back"
+  expect_record '.host == "local" and .started_at == null and .exit == null and .slot == null' "record of a job that never ran"
+  [ ! -e "$CASE/ran" ] || fail "a signalled job must not run locally"
+  [ "$(wc -l < "$LOG")" -eq 1 ] || fail "one record for the one job: $(cat "$LOG")"
+  pass "fm-heavy --remote: a signal only the wrapper hears still stops a fallback from running locally"
+}
+
+test_signal_during_collection_is_cancelled() {
+  local pid
+  setup collectsignal 'echo output-line'
+  rule slowcollect pre 'tar -cf - result.json' 1 ': > "$HOME/collecting"; sleep 3'
+  (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" FAKE_SSH_CTL="$CTL" FAKE_SSH_HOME="$REMOTE_HOME" \
+    exec setsid env --default-signal=INT "$HEAVY" --class test --remote -- bash t/job.sh >/dev/null 2>&1) &
+  pid=$!
+  wait_for "$REMOTE_HOME/collecting"
+  kill -TERM -- "-$pid"
+  wait "$pid"
+  expect_code 143 "$?" "a job signalled during collection"
+  expect_record '.outcome == "cancelled" and .exit == 143 and .host == "fake-mac"' "record of a job signalled during collection"
+  expect_host_clean "scratch after a signal during collection"
+  pass "fm-heavy --remote: a signal during collection cancels the job instead of rejecting its result"
+}
+
 test_dropped_collection_is_reconciled() {
   setup collectdrop 'echo output-line'
   # One dropped collection: the finished job is collected on the next attempt.
@@ -578,15 +624,25 @@ test_dropped_collection_is_reconciled() {
 }
 
 test_partial_transfer_is_cleaned() {
-  setup partial "echo ran >> $TMP_ROOT/partial/ran"
-  # The runner is on the host but the job never started: the connection dropped mid-transfer.
-  rule p partial 'tar -xf' 1 'd=$(printf "%s" "$CMD" | sed -n "s/.*mkdir -p \([^ ]*\) .*/\1/p"); mkdir -p "$d"; cp "$RUNNER_SRC" "$d/runner.py"; echo junk > "$d/src.bundle"'
-  heavy --remote >/dev/null 2>&1 || fail "a transfer that never started falls back to a local run"
-  expect_record '.host == "local" and .fallback == "transfer-failed"' "transfer-failed fallback"
-  [ "$(wc -l < "$CASE/ran")" -eq 1 ] || fail "the fallback runs the command once"
-  expect_host_clean "the partial job directory must be removed"
-  assert_absent "$HOME_FM/state/heavy-remote/unknown-fake-mac/$(ls "$HOME_FM/state/heavy-remote" | head -1).json" "no record is left open"
-  pass "fm-heavy --remote: a transfer cut short leaves nothing on the host"
+  local case_name cut
+  # The connection dropped mid-transfer, so what reached the host never started.
+  for case_name in junk-bundle truncated-runner no-runner; do
+    case "$case_name" in
+      junk-bundle) cut='cp "$RUNNER_SRC" "$d/runner.py"; echo junk > "$d/src.bundle"' ;;
+      truncated-runner) cut='head -c 100 "$RUNNER_SRC" > "$d/runner.py"' ;;
+      no-runner) cut=': > "$d/started"' ;;
+    esac
+    setup "partial-$case_name" "echo ran >> $TMP_ROOT/partial-$case_name/ran"
+    rule p partial 'tar -xf' 1 'd=$(printf "%s" "$CMD" | sed -n "s/.*mkdir -p \([^ ]*\) .*/\1/p"); mkdir -p "$d"; '"$cut"
+    heavy --remote >/dev/null 2>&1 || fail "$case_name: a transfer that never started falls back to a local run"
+    expect_record '.host == "local" and .fallback == "transfer-failed"' "$case_name: transfer-failed fallback"
+    [ "$(wc -l < "$CASE/ran")" -eq 1 ] || fail "$case_name: the fallback runs the command once"
+    expect_host_clean "$case_name: the partial job directory must be removed"
+    [ -z "$(ls -A "$HOME_FM/state/heavy-remote/unknown-fake-mac")" ] || fail "$case_name: no record is left open"
+    heavy --remote >/dev/null 2>&1 || fail "$case_name: the next request must run on the host"
+    expect_record '.host == "fake-mac" and .outcome == "pass"' "$case_name: the destination stays usable"
+  done
+  pass "fm-heavy --remote: a transfer cut short leaves nothing on the host and the destination usable"
 }
 
 test_summary_compares_hosts() {
@@ -621,6 +677,8 @@ test_runner_reconcile_ages_out_a_dead_start
 test_signalled_wrapper_stops_only_its_job
 test_unterminated_config_last_line
 test_signal_during_eligibility_never_runs_locally
+test_wrapper_only_signal_never_runs_locally
+test_signal_during_collection_is_cancelled
 test_dropped_collection_is_reconciled
 test_partial_transfer_is_cleaned
 test_cancelled_on_host_is_never_green

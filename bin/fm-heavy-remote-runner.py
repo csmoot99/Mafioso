@@ -230,6 +230,8 @@ def cmd_supervise(jdir):
         code = proc.wait()
         code = 128 - code if code < 0 else code
         kill_group(owner)  # anything the command left running
+        if stops and outcome == "exited":
+            outcome = "cancelled"
     log.close()
     usage = resource.getrusage(resource.RUSAGE_CHILDREN)
     artifact = os.path.join(jdir, "run.log")

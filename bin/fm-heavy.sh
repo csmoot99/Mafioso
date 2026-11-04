@@ -216,7 +216,6 @@ interruptible() {
 
 # While the command runs, bash holds this handler until the scope ends, and the
 # main flow below records the job.
-# shellcheck disable=SC2329 # Registered by the signal traps below.
 on_signal() {  # <signal number>
   signal=$1
   [ -z "$started" ] || return
@@ -247,6 +246,7 @@ if [ -n "$remote" ]; then
       exit "$rc"
     fi
     started=; : > "$sample"
+    [ -z "$signal" ] || on_signal "$signal"
   else
     fallback=destination-busy
   fi

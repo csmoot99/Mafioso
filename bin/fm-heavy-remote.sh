@@ -116,13 +116,16 @@ bgssh() {  # <outfile> args...
   bg=
   return "$rc"
 }
+# The shell test for a job that began on the host. The runner writes started only
+# after the whole stream arrived, so without it runner.py may be cut short; a
+# cleanup cut short can leave started behind without the runner.
+began() { printf '[ -f %s/started ] && [ -f %s/runner.py ]' "$rdir" "$rdir"; }
 # Reconcile with the job's record on the host: print its state, or "unreachable".
 job_state() {  # [runner action, default status]
   local n=0 out
   while [ "$n" -lt "$tries" ]; do
     [ -z "$sig" ] || { echo cancelled; return; }
-    # No runner on the host means the job never arrived.
-    out=$(rssh "if [ -f $rdir/runner.py ]; then $runner ${1:-status} $rdir; else echo absent; fi" 2>>"$stage/ssh.err") \
+    out=$(rssh "if $(began); then $runner ${1:-status} $rdir; else echo absent; fi" 2>>"$stage/ssh.err") \
       && { printf '%s\n' "$out"; return; }
     n=$((n + 1))
     [ "$n" -ge "$tries" ] || sleep "$pause"
@@ -135,7 +138,7 @@ finish() {  # <outcome> <exit status>
   exit "$2"
 }
 cleanup_remote() {
-  if rssh "if [ -f $rdir/runner.py ]; then $runner cleanup $rdir; else rm -rf $rdir; fi" >/dev/null 2>>"$stage/ssh.err"; then
+  if rssh "if $(began); then $runner cleanup $rdir; else rm -rf $rdir; fi" >/dev/null 2>>"$stage/ssh.err"; then
     rm -f "$record"
   else
     echo "fm-heavy-remote: could not remove $host:~/$rdir" >&2
@@ -150,9 +153,10 @@ collect() {  # <file...>
     bgssh "$stage/collect.tar" "cd $rdir && tar -cf - $*"
     rc=$?
     [ "$rc" -ne 0 ] || { tar -xf "$stage/collect.tar" -C "$jdir" "$@" 2>/dev/null && return 0 || return 1; }
+    [ -z "$sig" ] || return 255
     [ "$rc" -eq 255 ] || return 1
     n=$((n + 1))
-    { [ "$n" -lt "$tries" ] && [ -z "$sig" ]; } || return 255
+    [ "$n" -lt "$tries" ] || return 255
     sleep "$pause"
   done
 }
