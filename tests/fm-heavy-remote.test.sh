@@ -489,6 +489,37 @@ test_cancelled_on_host_is_never_green() {
   pass "fm-heavy --remote: a job cancelled on the host is never green, even when its command exits 0"
 }
 
+test_zombie_group_eperm_keeps_the_result() {
+  local shim=$TMP_ROOT/macos-killpg
+  mkdir -p "$shim"
+  # macOS answers EPERM for a group holding only zombies; Linux does not, so every
+  # killpg after the SIGKILL answers that way here.
+  cat > "$shim/sitecustomize.py" <<'PY'
+import os
+import signal
+
+real_killpg = os.killpg
+killed = []
+
+
+def killpg(group, sig):
+    if killed:
+        raise PermissionError(1, "Operation not permitted")
+    real_killpg(group, sig)
+    if sig == signal.SIGKILL:
+        killed.append(group)
+
+
+os.killpg = killpg
+PY
+  setup eperm 'trap "" TERM; sleep 300' 1
+  PYTHONPATH=$shim heavy --remote >/dev/null 2>&1
+  expect_code 124 "$?" "a job that outlives TERM on a host answering EPERM for its zombie group"
+  expect_record '.outcome == "timeout" and .exit == 124' "EPERM timeout record"
+  expect_host_clean "scratch after an EPERM group"
+  pass "fm-heavy-remote-runner: EPERM from a group of zombies means the group is gone, so the result is still published"
+}
+
 test_summary_compares_hosts() {
   local log=$TMP_ROOT/summary.jsonl out
   cat > "$log" <<'EOF'
@@ -520,6 +551,7 @@ test_unknown_job_other_endings
 test_runner_reconcile_ages_out_a_dead_start
 test_signalled_wrapper_stops_only_its_job
 test_cancelled_on_host_is_never_green
+test_zombie_group_eperm_keeps_the_result
 test_runner_refuses_bad_input
 test_summary_compares_hosts
 

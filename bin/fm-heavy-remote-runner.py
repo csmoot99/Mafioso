@@ -97,15 +97,18 @@ def owned_group(owner):
     return group if group and proc_start(group) in ("", owner.get("group_start")) else None
 
 
-def group_alive(owner):
-    group = owned_group(owner)
-    if not group:
-        return False
+def signal_group(group, sig):
+    """Whether the group took the signal; macOS answers EPERM for a group of zombies."""
     try:
-        os.killpg(group, 0)
-    except (ProcessLookupError, PermissionError):  # macOS answers EPERM for a group of zombies
+        os.killpg(group, sig)
+    except (ProcessLookupError, PermissionError):
         return False
     return True
+
+
+def group_alive(owner):
+    group = owned_group(owner)
+    return bool(group) and signal_group(group, 0)
 
 
 def kill_group(owner, proc=None):
@@ -114,17 +117,13 @@ def kill_group(owner, proc=None):
     if not group:
         return
     for sig, patience in ((signal.SIGTERM, 3.0), (signal.SIGKILL, 0.0)):
-        try:
-            os.killpg(group, sig)
-        except ProcessLookupError:
+        if not signal_group(group, sig):
             return
         end = time.monotonic() + patience
         while time.monotonic() < end:
             if proc is not None:
                 proc.poll()
-            try:
-                os.killpg(group, 0)
-            except ProcessLookupError:
+            if not signal_group(group, 0):
                 return
             time.sleep(0.1)
 
