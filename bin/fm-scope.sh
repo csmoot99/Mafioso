@@ -8,7 +8,7 @@
 # The scope record lives in state/<id>.meta, written by bin/fm-spawn.sh:
 #   base_sha=    DETECTED: the starting revision of the task's copy
 #   scope=       DECLARED at intake (--scope, repeatable): comma-separated
-#                repo-relative paths, directories, or globs the task expects to change
+#                repo-relative exact paths or directories the task expects to change
 #   interfaces=  DECLARED at intake (--interface, repeatable): comma-separated names of
 #                the shared contracts (types, schemas, config, CLI registration) it changes
 # Actual changed files are DETECTED here from the task's copy; dependencies are not
@@ -25,7 +25,9 @@
 #   dependency. Each dependent becomes blocked-by the owner, so bin/fm-spawn.sh will not
 #   dispatch it until the owner is Done; there is no separate lock. Refuses a dependent that
 #   is already dispatched, an owner already Done, and any edge that would close a cycle.
-#   Ownership ends when the owner is Done; to end it early (owner cancelled), run
+#   Ownership ends when the owner lands or is cleaned up without a retained captain call,
+#   both of which close its row to Done. A retained owner returns to Queued and keeps its
+#   dependents queued until the captain answers. To end it early (owner cancelled), run
 #   `bin/fm-tasks-axi.sh unblock <dependent> --by <owner>` for each dependent.
 set -u
 
@@ -41,10 +43,9 @@ meta_get() {  # <id> <key>
   sed -n "s/^$2=//p" "$STATE/$1.meta" 2>/dev/null | tail -1
 }
 
-# True when path <1> falls under scope entry <2> (exact, directory prefix, or glob).
+# True when path <1> falls under scope entry <2> (exact path or directory prefix).
 in_entry() {
-  # shellcheck disable=SC2254
-  case "$1" in "$2"|"${2%/}"/*|$2) return 0 ;; esac
+  case "$1" in "$2"|"${2%/}"/*) return 0 ;; esac
   return 1
 }
 
@@ -65,8 +66,8 @@ changed_files() {
   done
   mb=${mb:-$base}
   [ -n "$mb" ] || return 0
-  { git -C "$wt" diff --name-only "$mb" 2>/dev/null
-    git -C "$wt" ls-files --others --exclude-standard 2>/dev/null; } | sort -u
+  { git -C "$wt" -c core.quotePath=false diff --name-only "$mb" 2>/dev/null
+    git -C "$wt" -c core.quotePath=false ls-files --others --exclude-standard 2>/dev/null; } | sort -u
 }
 
 csv_each() { printf '%s\n' "$1" | tr ',' '\n' | sed '/^$/d'; }
@@ -90,7 +91,7 @@ cmd_changed() {
 }
 
 cmd_overlap() {
-  local id=$1 scope ifaces project other m reasons f e o i
+  local id=$1 scope ifaces project other m reasons other_changed f e o i
   [ -f "$STATE/$id.meta" ] || fail "no task record for $id"
   scope=$(meta_get "$id" scope)
   ifaces=$(meta_get "$id" interfaces)
@@ -108,6 +109,8 @@ cmd_overlap() {
         && reasons="$reasons
   - both change interface $i"
     done < <(csv_each "$ifaces")
+    other_changed=
+    [ -z "$scope" ] || other_changed=$(changed_files "$other")
     while IFS= read -r e; do
       while IFS= read -r o; do
         entries_overlap "$e" "$o" && reasons="$reasons
@@ -116,7 +119,7 @@ cmd_overlap() {
       while IFS= read -r f; do
         in_entry "$f" "$e" && reasons="$reasons
   - $f, which it has already changed, is in declared scope $e"
-      done < <(changed_files "$other")
+      done <<< "$other_changed"
     done < <(csv_each "$scope")
     [ -z "$reasons" ] || printf 'scope overlap (advisory) between %s and live task %s:%s\n' "$id" "$other" "$(printf '%s\n' "$reasons" | awk '!s[$0]++')"
   done
@@ -150,7 +153,7 @@ reaches() {
     [ "$cur" != "$queue" ] && queue=${queue#* } || queue=
     case "$seen" in *" $cur "*) continue ;; esac
     seen="$seen$cur "
-    for b in $(tasks_axi show "$cur" 2>/dev/null | sed -n 's/^  blocked_by: *//p' | head -1 | tr ',' ' '); do
+    for b in $(tasks_axi show "$cur" 2>/dev/null | sed -n 's/^  blocked_by: *//p' | head -1 | tr ',"' '  '); do
       [ "$b" != none ] || continue
       [ "$b" != "$2" ] || return 0
       queue="$queue${queue:+ }$b"

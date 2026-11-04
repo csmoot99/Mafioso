@@ -56,6 +56,32 @@ test_changed_reports_files_outside_declared_scope() {
   pass "fm-scope.sh: changed names exactly the files outside the declared scope"
 }
 
+test_scope_entries_are_exact_paths_or_directories() {
+  local out
+  make_task g-a "src/*.ts" ""
+  echo x >> "$TMP_ROOT/wt-g-a/src/schema.ts"
+  out=$(scope changed g-a)
+  assert_contains "$out" "outside declared scope (src/*.ts): src/schema.ts" "a scope entry is a literal path, never a glob"
+  make_task g-b "src/schema.ts,docs/" ""
+  echo y >> "$TMP_ROOT/wt-g-b/src/schema.ts"
+  echo z >> "$TMP_ROOT/wt-g-b/docs/INDEX.md"
+  assert_contains "$(scope changed g-b)" "within declared scope" "an exact path and a directory prefix both cover their files"
+  pass "fm-scope.sh: scope entries match exact paths and directory prefixes only"
+}
+
+test_non_ascii_paths_match_their_scope() {
+  local out
+  make_task u-a "docs" ""
+  echo x > "$TMP_ROOT/wt-u-a/docs/café.md"
+  assert_contains "$(scope changed u-a)" "within declared scope" "an untracked non-ASCII path is matched unquoted"
+  git -C "$TMP_ROOT/wt-u-a" add -A && git -C "$TMP_ROOT/wt-u-a" commit -qm wip
+  assert_contains "$(scope changed u-a)" "within declared scope" "a committed non-ASCII path is matched unquoted"
+  make_task u-b "docs/café.md" ""
+  out=$(scope overlap u-b)
+  assert_contains "$out" "docs/café.md, which it has already changed" "a non-ASCII changed file is visible to the overlap check"
+  pass "fm-scope.sh: non-ASCII paths are compared unquoted"
+}
+
 test_overlap_explains_and_never_blocks() {
   local out rc
   make_task o-a "src/cli,docs" "cli-registry"
@@ -101,6 +127,20 @@ test_ownership_orders_dispatch_through_blocked_by() {
   pass "fm-scope.sh: ownership is the backlog blocked-by link and cannot deadlock"
 }
 
+test_ownership_refuses_a_cycle_through_a_multi_blocker_task() {
+  local out id
+  for id in cy-a cy-b cy-c cy-d; do tasks add "$id" "cycle node $id" >/dev/null; done
+  scope own cy-a cy-b >/dev/null || fail "cy-b should wait on cy-a"
+  scope own cy-c cy-b >/dev/null || fail "cy-b should also wait on cy-c"
+  scope own cy-b cy-d >/dev/null || fail "cy-d should wait on cy-b"
+  out=$(scope own cy-d cy-a) && fail "a cycle through the first of two blockers must be refused"
+  assert_contains "$out" "cycle" "the first-blocker refusal says why"
+  out=$(scope own cy-d cy-c) && fail "a cycle through the last of two blockers must be refused"
+  assert_contains "$out" "cycle" "the last-blocker refusal says why"
+  assert_contains "$(tasks show cy-a)" "blocked: no" "the refused edge is not recorded"
+  pass "fm-scope.sh: a cycle through a task with several blockers is refused"
+}
+
 test_spawn_scope_flags_are_refused_where_they_do_not_apply() {
   local out
   out=$(FM_HOME="$HOME_DIR" "$ROOT/bin/fm-spawn.sh" some-id "$PROJ" --scout --scope src 2>&1) && fail "--scope on a scout must be refused"
@@ -113,6 +153,9 @@ test_spawn_scope_flags_are_refused_where_they_do_not_apply() {
 }
 
 test_changed_reports_files_outside_declared_scope
+test_scope_entries_are_exact_paths_or_directories
+test_non_ascii_paths_match_their_scope
 test_overlap_explains_and_never_blocks
 test_ownership_orders_dispatch_through_blocked_by
+test_ownership_refuses_a_cycle_through_a_multi_blocker_task
 test_spawn_scope_flags_are_refused_where_they_do_not_apply

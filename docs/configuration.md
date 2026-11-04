@@ -487,14 +487,16 @@ A ship spawn can record what the task is expected to touch, so overlap between l
 | --- | --- |
 | `base_sha=` the starting revision of the task's copy | Detected at every fresh ship spawn |
 | Files the task actually changed | Detected from the task's copy when `fm-scope.sh` is run |
-| `scope=` expected paths, directories, or globs | Declared at intake with `fm-spawn.sh --scope` (repeatable) |
+| `scope=` expected exact paths or directories | Declared at intake with `fm-spawn.sh --scope` (repeatable) |
 | `interfaces=` shared contracts the task changes (types, schemas, config, CLI registration) | Declared at intake with `fm-spawn.sh --interface` (repeatable) |
 | Dependencies | The backlog's own `blocked-by` links, not stored in the task record |
 
 - **Advisory overlap:** after a spawn that declared scope or interfaces, `fm-scope.sh overlap` prints which live tasks of the same project meet it, naming the shared interface, the meeting declared scopes, or the already-changed files.
   It never blocks or serializes, because overlapping files often merge cleanly.
 - **Temporary ownership:** `fm-scope.sh own <owner-id> <dependent-id>...` makes each queued dependent `blocked-by` the owner, so dispatch refuses it until the owner is Done.
-  Ownership is only that backlog link: there is no lock or reservation store, it ends when the owner is Done, and it refuses a cycle, an already dispatched dependent, or a finished owner.
+  Ownership is only that backlog link: there is no lock or reservation store, and it refuses a cycle, an already dispatched dependent, or a finished owner.
+  It ends when the owner lands or is cleaned up without a retained captain call, both of which close the owner's row to Done.
+  A retained owner returns to Queued and keeps its dependents queued until the captain answers.
   If the owner is cancelled, clear the links with `fm-tasks-axi.sh unblock <dependent> --by <owner>`.
 - **Out-of-scope report:** the generated ship brief tells the worker to run `fm-scope.sh changed` before each `done:` line and to name any files outside the declared scope there.
 - **Reversal:** omit the flags and nothing is recorded or explained; `own` is the only step that gates dispatch, and `unblock` undoes it.

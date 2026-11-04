@@ -48,8 +48,9 @@
 #   base_branch= in state/<id>.meta, which a relaunch reuses and later review and
 #   cleanup read; it is refused on secondmates and relaunches, and without it
 #   nothing changes.
-#   --scope <path> and --interface <name> (each repeatable, ship spawns only) declare
-#   the task's expected scope and the shared interfaces it changes; they are recorded
+#   --scope <path-or-directory> and --interface <name> (each repeatable, ship spawns
+#   only) declare the task's expected scope, as exact repo-relative paths or directory
+#   prefixes, and the shared interfaces it changes; they are recorded
 #   as scope= and interfaces= in state/<id>.meta beside the detected base_sha=
 #   (the starting revision), and a fresh dispatch then prints bin/fm-scope.sh's
 #   advisory overlap explanation, which never blocks. Refused on relaunches, scouts,
