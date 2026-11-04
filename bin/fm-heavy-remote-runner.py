@@ -12,7 +12,8 @@ src.bundle (the candidate revision with its history).
 start     Refuses a second start of the same job, verifies the bundle and command
           digests, clones the bundle, checks out and verifies the exact sha, then
           launches a detached supervisor and prints "started". It exits 10 on any
-          refusal, having launched nothing.
+          refusal, having launched nothing, and 11 when the supervisor it launched
+          recorded no owner in time, so the job may still have started.
 supervise Runs the command in its own process group with cwd the checkout, output
           to run.log, enforcing the timeout and killing the whole group on
           timeout, cancel or exit. It then publishes result.json atomically; that

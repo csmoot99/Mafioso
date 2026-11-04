@@ -1214,7 +1214,7 @@ Without it, more agents can mean more test runs at once, so set the flag before 
 A record holds the task, project, command class (test, build, e2e or image), the wait for the slot, start and end, exit status, and peak memory and CPU time read from the job's own scope; a value that is not available is `null`, never an estimate.
 A job stopped by TERM, INT or HUP is recorded too, whether it was running or still queued; the wrapper's header owns the exact fields.
 The command's exit status passes through, so 137 means the memory cap killed the command itself; when the cap kills one of its child processes, systemd stops the whole scope and the status is usually 143, with the peak still recorded.
-[`bin/fm-heavy-summary.sh`](../bin/fm-heavy-summary.sh) prints queue wait against run time and peak memory per project and class.
+[`bin/fm-heavy-summary.sh`](../bin/fm-heavy-summary.sh) prints queue wait against run time and peak memory per project, class and host.
 The wrapper needs Linux with `flock`, `systemd-run` and `jq`; elsewhere it refuses without running anything.
 
 `config/host-test-slots` is one positive integer in the root home.

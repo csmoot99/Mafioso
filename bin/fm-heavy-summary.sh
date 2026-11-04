@@ -4,17 +4,17 @@
 # usage: fm-heavy-summary.sh [--since <epoch>] [--log <file>]
 #
 # Reads the log bin/fm-heavy.sh appends to (state/heavy-jobs.jsonl in the root
-# Firstmate home; --log reads another file) and prints one row per project and
-# command class: jobs, failed (non-zero exit), average and maximum slot wait in
-# seconds, average and maximum run time in seconds, wait_pct (total wait over
-# total wait plus run, the share of elapsed time spent queued), the largest peak
-# memory in MiB, and unknown_peak (jobs with no peak memory reading). Averages
+# Firstmate home; --log reads another file) and prints one row per project,
+# command class and host: jobs, failed (non-zero exit), average and maximum slot
+# wait in seconds, average and maximum run time in seconds, wait_pct (total wait
+# over total wait plus run, the share of elapsed time spent queued), the largest
+# peak memory in MiB, and unknown_peak (jobs with no peak memory reading). Averages
 # and maxima use only the jobs that have the value; a column with no values
 # prints "unknown", and a job without a task or project is grouped under
-# "unknown". Rows are per host too: a job that ran on another machine through
-# fm-heavy.sh --remote has its own row, with that host's average preparation
-# (transfer and checkout) and result-collection seconds in the last columns; local
-# jobs are host "local" and show "unknown" there, having neither stage.
+# "unknown". A job that ran on another machine through fm-heavy.sh --remote has its
+# own row, with that host's average preparation (transfer and checkout) and
+# result-collection seconds in the last columns; local jobs are host "local" and
+# show "unknown" there, having neither stage.
 # A job killed while queued has a wait but null run time and exit: it counts in
 # jobs and in the wait columns, and not as failed.
 # --since keeps jobs whose slot request is at or after that epoch.

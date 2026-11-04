@@ -73,7 +73,8 @@
 # config); FM_HEAVY_LOCK overrides the slot lock path for tests.
 #
 # Exit status: the command's, 128+n when the wrapper was signalled, 2 on a usage
-# or configuration error, or 69 when flock, systemd-run or jq is missing.
+# or configuration error, or 69 when flock, systemd-run or jq is missing. A remote
+# job that did not pass exits with its outcome's status from bin/fm-heavy-remote.sh.
 set -u
 
 SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
