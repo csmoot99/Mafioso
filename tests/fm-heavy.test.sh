@@ -7,6 +7,7 @@
 # reports queue wait against run time per project and class. Also the brief rule
 # that points workers at the wrapper. The real systemd scope cases are skipped
 # where systemd-run cannot create user scopes.
+# shellcheck disable=SC2016 # single-quoted scripts expand inside their own shells
 set -u
 
 # shellcheck source=tests/lib.sh
