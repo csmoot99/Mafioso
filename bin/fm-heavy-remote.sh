@@ -25,7 +25,7 @@
 # Nothing started: when the host is unreachable, the tree is dirty, an earlier
 # job is still running there or the host cannot prepare the job, the sample gets
 # fallback=<reason> and the exit status is 0, so the caller runs the command
-# locally under its normal slot.
+# locally under its normal slot. A signalled script ends cancelled instead.
 #
 # Outcomes (outcome= in the sample; exit status in parentheses):
 #   pass (0), failed (the command's own status), timeout (124: the host killed the

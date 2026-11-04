@@ -49,7 +49,10 @@
 # destination takes one job at a time; when it is busy, unreachable, still running
 # a job that ended unknown here or cannot prepare the job, or the working tree is
 # not a clean repository root, the command runs locally under the normal slot rule
-# and the record's fallback says why. bin/fm-heavy-remote.sh owns the transfer, the
+# and the record's fallback says why. A signal before the job starts stops it from
+# running anywhere, whichever of the two scripts hears it: the record's outcome is
+# cancelled when the driver did, and otherwise it is a queued job's record with the
+# fallback it would have taken. bin/fm-heavy-remote.sh owns the transfer, the
 # completion record, the failure outcomes and their exit statuses, and reconciling
 # unknown jobs. Its job copies are kept in state/heavy-remote/<job> in the root
 # home, and its open unknown-job records in state/heavy-remote/unknown-<host>.
