@@ -1194,6 +1194,37 @@ A malformed or unreadable file refuses every fresh ship or scout spawn until it 
 Firstmate cannot see which part of a worker's life uses the resource, so the number bounds whole workers from launch to handoff, and the tightest resource every worker needs should decide it.
 [`bin/fm-project-capacity-lib.sh`](../bin/fm-project-capacity-lib.sh) owns the file format, what holds a place, and why concurrent spawns cannot both take the last one.
 
+## Heavy commands and concurrency (config/host-test-slots, config/heavy-commands)
+
+Three separate limits bound test load, and none stands in for another.
+
+| Limit | Owner | Default |
+|---|---|---|
+| Coding agents per project | `config/project-capacity` ("Project capacity" above) | uncapped |
+| Heavy commands at once on this machine (host test slots) | `config/host-test-slots` | 1 |
+| Test-runner workers inside one job | each project's own runner flag (for example Vitest `--maxWorkers`, Playwright workers) | the project's own setting |
+
+Firstmate enforces only the first, at spawn.
+The host limit is cooperative: it binds only commands a worker runs through `bin/fm-heavy.sh`, and briefs tell workers to do that only when `config/heavy-commands` is present.
+The third is documented here and never enforced.
+With the flag set, raising agents does not raise test concurrency, because those heavy commands queue for a slot.
+Without it, more agents can mean more test runs at once, so set the flag before raising project capacity on a machine that must run one heavy command at a time.
+
+[`bin/fm-heavy.sh`](../bin/fm-heavy.sh) runs a heavy command on the slot under the standing 6 GB memory scope with no swap, exactly as `flock -o /tmp/fm-heavy.lock systemd-run --user --scope -q -p MemoryMax=6G -p MemorySwapMax=0 <command>` did, and appends one record per job to `state/heavy-jobs.jsonl` in the root home.
+A record holds the task, project, command class (test, build, e2e or image), the wait for the slot, start and end, exit status, and peak memory and CPU time read from the job's own scope; a value that is not available is `null`, never an estimate.
+A job stopped by TERM, INT or HUP is recorded too, whether it was running or still queued; the wrapper's header owns the exact fields.
+The command's exit status passes through, so 137 means the memory cap killed the command itself; when the cap kills one of its child processes, systemd stops the whole scope and the status is usually 143, with the peak still recorded.
+[`bin/fm-heavy-summary.sh`](../bin/fm-heavy-summary.sh) prints queue wait against run time and peak memory per project and class.
+The wrapper needs Linux with `flock`, `systemd-run` and `jq`; elsewhere it refuses without running anything.
+
+`config/host-test-slots` is one positive integer in the root home.
+Absent means 1, the single machine-wide lock; a malformed file refuses the run.
+The default is the owner's standing PC rule of one heavy command at a time, so change it only from measured peaks in the log.
+
+The optional presence flag `config/heavy-commands` makes `bin/fm-brief.sh` add a "Heavy commands" rule to ship and scout briefs that points workers at the wrapper.
+The flag is machine-wide like the slot and the log: it is read from the root home, so it covers workers spawned by every local secondmate, and a copy in a secondmate home has no effect.
+A drive call holds the slot only while it runs a local test step, build or e2e, and the pipeline agent never takes the slot again inside that hold.
+
 ## Launch environment values (config/launch-env)
 
 The optional local, gitignored `config/launch-env` lists environment values every agent Firstmate launches starts with: crewmates, scouts, and secondmates, on every harness and backend, on a fresh spawn and on a relaunch alike, including raw launch commands and remote secondmates.
