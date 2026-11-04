@@ -30,14 +30,17 @@
 # Outcomes (outcome= in the sample; exit status in parentheses):
 #   pass (0), failed (the command's own status), timeout (124: the host killed the
 #   job's own process group at --timeout), rejected (65: wrong sha, command or
-#   bundle digest, wrong or replayed job, or missing or partial artifacts; never a
-#   pass), lost (70: the job's supervisor died without a result), unknown (75: the
-#   connection was lost and the job could not be reached again within
-#   FM_HEAVY_REMOTE_RECONNECT_TRIES attempts, so whether it ran is unknown; also a
-#   finished job whose result stayed unreachable after that many tries; the
-#   host's scratch and the open record are kept and no retry is made), cancelled
-#   (128+n: this script was signalled and stopped only its own job; 143 when the
-#   job was stopped on the host, whatever status the command itself exited with).
+#   bundle digest, wrong or replayed job, missing or partial artifacts, or a check
+#   that did not finish; never a pass), lost (70: the job's supervisor died
+#   without a result), unknown (75: the connection was lost and the job could not
+#   be reached again within FM_HEAVY_REMOTE_RECONNECT_TRIES attempts, so whether
+#   it ran is unknown; also a finished job whose result stayed unreachable after
+#   that many tries; the host's scratch and the open record are kept and no retry
+#   is made), cancelled
+#   (128+n: this script was signalled and stopped only its own job; a signal
+#   before the outcome is recorded replaces any other outcome, even once every
+#   check has held; 143 when the job was stopped on the host, whatever status the
+#   command itself exited with).
 # After a lost connection the job is reconciled against its record on the host
 # before anything else happens: a job found running or done is waited for and
 # collected, never run again.
@@ -54,7 +57,8 @@
 #               for the new candidate; its scratch is removed and the record closes
 #               into <state-dir>/<job>/reconciled.json (job, candidate, outcome and
 #               reconciled_at). outcome is pass, failed, timeout, cancelled,
-#               rejected, lost, or absent when the job never arrived.
+#               rejected, lost, or absent when the job never arrived. A signal
+#               while its result is collected or checked leaves the record open.
 #   unreachable the record stays; fallback=unreachable.
 #
 # Environment (all optional): FM_HEAVY_REMOTE_RECONNECT_TRIES (5),
@@ -132,7 +136,11 @@ job_state() {  # [runner action, default status]
   done
   echo unreachable
 }
-finish() {  # <outcome> <exit status>
+finish() {  # <outcome> <exit status>; once this script is signalled, always cancelled
+  if [ -n "$sig" ]; then
+    [ ! -e "$record" ] || cleanup_remote
+    set -- cancelled $((128 + sig))
+  fi
   emit outcome "$1"
   emit job "$id"
   exit "$2"
@@ -160,16 +168,16 @@ collect() {  # <file...>
     sleep "$pause"
   done
 }
-result_problem() {  # print why the collected result fails its checks; nothing when it holds
+result_problem() {  # status 0 only when the collected result holds every check; otherwise print why
   local want
   jq -e --arg id "$id" --arg sha "$sha" --arg cs "$cmd_sha" --arg bs "$bundle_sha" '
     .schema == "fm-heavy-remote.v1" and .id == $id and .sha == $sha and .command_sha256 == $cs
     and .bundle_sha256 == $bs and (.outcome | IN("exited", "timeout", "cancelled"))
     and (.exit_code | type) == "number" and (.artifacts["run.log"] | type) == "object"' \
-    "$jdir/result.json" >/dev/null 2>&1 || { echo "wrong candidate, command, job or malformed envelope"; return; }
+    "$jdir/result.json" >/dev/null 2>&1 || { echo "wrong candidate, command, job or malformed envelope"; return 1; }
   want=$(jq -r '.artifacts["run.log"] | "\(.bytes) \(.sha256)"' "$jdir/result.json")
   [ "$(wc -c < "$jdir/run.log") $(sha256sum "$jdir/run.log" | cut -d' ' -f1)" = "$want" ] \
-    || echo "run.log does not match its recorded size and checksum"
+    || { echo "run.log does not match its recorded size and checksum"; return 1; }
 }
 result_outcome() {
   jq -r 'if .outcome == "exited" then (if .exit_code == 0 then "pass" else "failed" end) else .outcome end' "$jdir/result.json"
@@ -200,7 +208,8 @@ reconcile_job() {  # <open record>
       rc=$?
       if [ "$rc" -eq 255 ] || [ -n "$sig" ]; then blocked=unreachable; return 1; fi
       outcome=rejected
-      [ "$rc" -ne 0 ] || [ -n "$(result_problem)" ] || outcome=$(result_outcome)
+      if [ "$rc" -eq 0 ] && result_problem >/dev/null; then outcome=$(result_outcome); fi
+      [ -z "$sig" ] || { blocked=unreachable; return 1; }
       ;;
     lost) collect run.log; outcome=lost ;;
     absent) outcome=absent ;;
@@ -328,8 +337,7 @@ if [ "$state" = lost ] || [ "$state" = absent ]; then
   finish lost 70
 fi
 [ -n "$collected" ] || reject "result or log missing or incomplete"
-why=$(result_problem)
-[ -z "$why" ] || reject "$why"
+why=$(result_problem) || reject "${why:-the checks did not finish}"
 emit cpu "$(jq -r '.cpu_usec' "$jdir/result.json")"
 cleanup_remote
 
