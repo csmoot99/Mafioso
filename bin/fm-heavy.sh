@@ -2,7 +2,7 @@
 # fm-heavy.sh - run one heavy command on this machine's shared test slot and
 # record where its time went.
 #
-# usage: fm-heavy.sh --class test|build|e2e|image [--task <id>] [--project <name>] -- <command> [args...]
+# usage: fm-heavy.sh --class test|build|e2e|image [--task <id>] [--project <name>] [--remote] -- <command> [args...]
 #
 # The command runs exactly as workers ran it by hand before this wrapper:
 #   flock -o /tmp/fm-heavy.lock systemd-run --user --scope -q -p MemoryMax=6G -p MemorySwapMax=0 <command>
@@ -37,6 +37,34 @@
 # never runs: wait_s is its wait so far, and started_at, ended_at, run_s, exit
 # and slot are null.
 #
+# Remote destination (opt-in): --remote runs the command on another machine over
+# SSH instead of this machine's slot, only when config/heavy-remote in the root
+# home approves it. Without --remote nothing changes. The file holds lines
+#   host <ssh alias>      the destination, for example fm-mac
+#   command <words...>    the one approved portable command, matched word for word
+#   timeout <seconds>     optional, default 900; the host kills the job's own
+#                         process group when it runs longer
+# and a '#' line is a comment. A missing or malformed file, a command that is not
+# the approved one, or a class other than test refuses with status 2. The
+# destination takes one job at a time; when it is busy, unreachable or cannot
+# prepare the job, or the working tree is not a clean repository root, the command
+# runs locally under the normal slot rule and the record's fallback says why.
+# bin/fm-heavy-remote.sh owns the transfer, the completion record, the failure
+# outcomes and their exit statuses. Its job copies are kept in
+# state/heavy-remote/<job> in the root home.
+#
+# A remote job's record has the same fields plus: host (the alias, "local" for a
+# local run), prepare_s (bundle, transfer and checkout until the job started) and
+# collect_s (fetching and checking the result; both null for a local run),
+# outcome (pass, failed, timeout, rejected, lost, unknown or cancelled; null for
+# a local run), job (the remote job id), candidate (the commit run), and
+# fallback (why a --remote request ran locally). wait_s is the time before
+# preparation began; started_at is when the job started on the host and ended_at
+# when its completion was seen, both read on this machine's clock; peak_memory_bytes
+# is null because no whole-job peak is read remotely, cpu_usec comes from the
+# host. Queue wait, preparation, run and collection add up to the job's elapsed
+# time, so local and remote runs compare end to end.
+#
 # bin/fm-heavy-summary.sh summarizes the log. Linux with flock, systemd-run and
 # jq only; elsewhere the wrapper exits 69 without running anything.
 #
@@ -48,6 +76,7 @@
 set -u
 
 SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+REMOTE="$(dirname "$SELF")/fm-heavy-remote.sh"
 MEMORY_MAX=6G
 
 # Scope stage: runs inside the systemd scope, so /proc/self/cgroup names the
@@ -75,13 +104,14 @@ fi
 
 usage() { sed -n '2,/^set -u/p' "$0" | sed '$d; s/^# \{0,1\}//'; }
 
-class=; task=; project=
+class=; task=; project=; remote=
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -h|--help) usage; exit 0 ;;
     --class) class=${2:-}; shift 2 || break ;;
     --task) task=${2:-}; shift 2 || break ;;
     --project) project=${2:-}; shift 2 || break ;;
+    --remote) remote=1; shift ;;
     --) shift; break ;;
     *) break ;;
   esac
@@ -105,6 +135,26 @@ if [ -e "$root/config/host-test-slots" ]; then
     echo "fm-heavy.sh: config/host-test-slots must hold one positive integer" >&2; exit 2 ;; esac
 fi
 
+rhost=; rcmd=; rtimeout=
+if [ -n "$remote" ]; then
+  [ "$class" = test ] || { echo "fm-heavy.sh: --remote runs class test only" >&2; exit 2; }
+  [ -r "$root/config/heavy-remote" ] || { echo "fm-heavy.sh: --remote needs config/heavy-remote" >&2; exit 2; }
+  bad=
+  while read -r key rest; do
+    case "$key" in
+      ''|'#'*) ;;
+      host) [ -z "$rhost" ] && [[ $rest =~ ^[A-Za-z0-9._-]+$ ]] && rhost=$rest || bad=1 ;;
+      command) [ -z "$rcmd" ] && [ -n "$rest" ] && rcmd=$rest || bad=1 ;;
+      timeout) [ -z "$rtimeout" ] && [[ $rest =~ ^[1-9][0-9]{0,5}$ ]] && rtimeout=$rest || bad=1 ;;
+      *) bad=1 ;;
+    esac
+  done < "$root/config/heavy-remote"
+  [ -z "$bad" ] && [ -n "$rhost" ] && [ -n "$rcmd" ] \
+    || { echo "fm-heavy.sh: config/heavy-remote needs one host line, one command line and at most one valid timeout line" >&2; exit 2; }
+  [ "$*" = "$rcmd" ] || { echo "fm-heavy.sh: --remote is approved only for: $rcmd" >&2; exit 2; }
+  rtimeout=${rtimeout:-900}
+fi
+
 lock=${FM_HEAVY_LOCK:-/tmp/fm-heavy.lock}
 log="$root/state/heavy-jobs.jsonl"
 cmd=$(basename -- "$1")
@@ -113,27 +163,41 @@ unit="fm-heavy-$$-$requested"
 sample=$(mktemp)
 trap 'rm -f "$sample"' EXIT
 mkdir -p "$root/state"
-slot=; started=; signal=; waiter=
+slot=; started=; signal=; waiter=; host=; fallback=
+sget() { sed -n "s/^$1=//p" "$sample" 2>/dev/null | tail -1; }
 
 record() {  # <exit status, empty when the command never started>
-  local now peak cpu ended='' run_s='' wait_s
+  local now peak cpu ended='' run_s='' wait_s began
   now=$(date +%s)
-  wait_s=$((${started:-$now} - requested))
-  if [ -n "$started" ]; then
-    ended=$now
-    run_s=$((now - started))
+  if [ -n "$host" ]; then  # a remote job: the stage times come from its driver
+    started=$(sget started)
+    ended=$(sget ended)
+    began=$(sget wait_until)
+    wait_s=$((${began:-$now} - requested))
+    [ -z "$started" ] || [ -z "$ended" ] || run_s=$((ended - started))
+  else
+    wait_s=$((${started:-$now} - requested))
+    if [ -n "$started" ]; then
+      ended=$now
+      run_s=$((now - started))
+    fi
   fi
-  peak=$(sed -n 's/^peak=//p' "$sample" 2>/dev/null)
-  cpu=$(sed -n 's/^cpu=//p' "$sample" 2>/dev/null)
+  peak=$(sget peak)
+  cpu=$(sget cpu)
   jq -nc --arg task "$task" --arg project "$project" --arg class "$class" --arg cmd "$cmd" \
     --arg req "$requested" --arg start "$started" --arg end "$ended" --arg wait "$wait_s" \
-    --arg run "$run_s" --arg rc "$1" --arg slot "${started:+$slot}" --arg peak "$peak" --arg cpu "$cpu" '
+    --arg run "$run_s" --arg rc "$1" --arg slot "${started:+$slot}" --arg peak "$peak" --arg cpu "$cpu" \
+    --arg host "${host:-local}" --arg prep "$(sget prepare_s)" --arg coll "$(sget collect_s)" \
+    --arg outcome "$(sget outcome)" --arg job "$(sget job)" --arg cand "$(sget candidate)" \
+    --arg fallback "$fallback" '
     def num: if test("^[0-9]+$") then tonumber else null end;
     def str: if . == "" then null else . end;
     {task: ($task | str), project: ($project | str), class: $class, cmd: $cmd,
      requested_at: ($req | num), started_at: ($start | num), ended_at: ($end | num),
      wait_s: ($wait | num), run_s: ($run | num), exit: ($rc | num), slot: ($slot | num),
-     peak_memory_bytes: ($peak | num), cpu_usec: ($cpu | num)}' >> "$log"
+     peak_memory_bytes: ($peak | num), cpu_usec: ($cpu | num),
+     host: $host, prepare_s: ($prep | num), collect_s: ($coll | num), outcome: ($outcome | str),
+     job: ($job | str), candidate: ($cand | str), fallback: ($fallback | str)}' >> "$log"
 }
 
 # A foreground command would hold a trap back until it returned, so the steps of
@@ -162,6 +226,30 @@ on_signal() {  # <signal number>
 trap 'on_signal 1' HUP
 trap 'on_signal 2' INT
 trap 'on_signal 15' TERM
+
+# A remote job takes the destination's one place (descriptor 8) instead of a slot.
+# Anything that stops it from starting there, or leaves nothing running, falls
+# through to the local slot below.
+if [ -n "$remote" ]; then
+  exec 8>>"$lock.remote.$rhost" || { echo "fm-heavy.sh: cannot open $lock.remote.$rhost" >&2; exit 2; }
+  if flock -n 8; then
+    started=$(date +%s)  # a signal now is the driver's to handle, as for a running command
+    "$REMOTE" --host "$rhost" --timeout "$rtimeout" --sample "$sample" \
+      --state-dir "$root/state/heavy-remote" -- "$@" 8>&-
+    rc=$?
+    fallback=$(sget fallback)
+    if [ -z "$fallback" ]; then
+      host=$rhost
+      [ -z "$signal" ] || rc=$((128 + signal))
+      record "$rc"
+      exit "$rc"
+    fi
+    started=; : > "$sample"
+  else
+    fallback=destination-busy
+  fi
+  exec 8>&-
+fi
 
 # This shell holds the lock on descriptor 9 for the life of the job.
 nb=(); [ "$slots" -gt 1 ] && nb=(-n)

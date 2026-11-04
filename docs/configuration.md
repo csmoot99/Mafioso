@@ -1194,7 +1194,7 @@ A malformed or unreadable file refuses every fresh ship or scout spawn until it 
 Firstmate cannot see which part of a worker's life uses the resource, so the number bounds whole workers from launch to handoff, and the tightest resource every worker needs should decide it.
 [`bin/fm-project-capacity-lib.sh`](../bin/fm-project-capacity-lib.sh) owns the file format, what holds a place, and why concurrent spawns cannot both take the last one.
 
-## Heavy commands and concurrency (config/host-test-slots, config/heavy-commands)
+## Heavy commands and concurrency (config/host-test-slots, config/heavy-commands, config/heavy-remote)
 
 Three separate limits bound test load, and none stands in for another.
 
@@ -1224,6 +1224,16 @@ The default is the owner's standing PC rule of one heavy command at a time, so c
 The optional presence flag `config/heavy-commands` makes `bin/fm-brief.sh` add a "Heavy commands" rule to ship and scout briefs that points workers at the wrapper.
 The flag is machine-wide like the slot and the log: it is read from the root home, so it covers workers spawned by every local secondmate, and a copy in a secondmate home has no effect.
 A drive call holds the slot only while it runs a local test step, build or e2e, and the pipeline agent never takes the slot again inside that hold.
+
+`config/heavy-remote` in the root home is the opt-in for the SSH destination, and without it `fm-heavy.sh --remote` refuses and every job runs locally as before.
+It names the SSH alias of the destination, the one portable command approved to run there, and an optional timeout in seconds.
+A worker or firstmate passes `--remote` for that command only, and the job then runs on the destination's own capacity instead of the shared slot.
+The destination takes one job at a time; when it is busy or unreachable, or the working tree is not a clean repository root, the command runs locally under the normal slot rule instead of blocking.
+A lost connection never leads to a second run of a job that may still be running: the job is reconciled against its record on the destination first, and a job that cannot be reached is recorded as unknown with its scratch kept.
+A result with the wrong commit, command or bundle digest, a missing or partial log, or a duplicate delivery is rejected and is never a pass.
+[`bin/fm-heavy.sh`](../bin/fm-heavy.sh) owns the file format and the extra record fields, and [`bin/fm-heavy-remote.sh`](../bin/fm-heavy-remote.sh) owns the transfer, the outcomes and their exit statuses.
+[`bin/fm-heavy-summary.sh`](../bin/fm-heavy-summary.sh) gives local and remote jobs separate rows, so the queue wait a remote run saves can be read against its preparation and collection time.
+The destination needs only `python3`, `git`, `tar` and `ps`, and the runner it uses is shipped with each job, so nothing is installed there.
 
 ## Launch environment values (config/launch-env)
 
