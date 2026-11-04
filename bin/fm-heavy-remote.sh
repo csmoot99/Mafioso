@@ -160,16 +160,16 @@ collect() {  # <file...>
     sleep "$pause"
   done
 }
-result_problem() {  # print why the collected result fails its checks; nothing when it holds
+result_problem() {  # status 0 only when the collected result holds every check; otherwise print why
   local want
   jq -e --arg id "$id" --arg sha "$sha" --arg cs "$cmd_sha" --arg bs "$bundle_sha" '
     .schema == "fm-heavy-remote.v1" and .id == $id and .sha == $sha and .command_sha256 == $cs
     and .bundle_sha256 == $bs and (.outcome | IN("exited", "timeout", "cancelled"))
     and (.exit_code | type) == "number" and (.artifacts["run.log"] | type) == "object"' \
-    "$jdir/result.json" >/dev/null 2>&1 || { echo "wrong candidate, command, job or malformed envelope"; return; }
+    "$jdir/result.json" >/dev/null 2>&1 || { echo "wrong candidate, command, job or malformed envelope"; return 1; }
   want=$(jq -r '.artifacts["run.log"] | "\(.bytes) \(.sha256)"' "$jdir/result.json")
   [ "$(wc -c < "$jdir/run.log") $(sha256sum "$jdir/run.log" | cut -d' ' -f1)" = "$want" ] \
-    || echo "run.log does not match its recorded size and checksum"
+    || { echo "run.log does not match its recorded size and checksum"; return 1; }
 }
 result_outcome() {
   jq -r 'if .outcome == "exited" then (if .exit_code == 0 then "pass" else "failed" end) else .outcome end' "$jdir/result.json"
@@ -200,7 +200,7 @@ reconcile_job() {  # <open record>
       rc=$?
       if [ "$rc" -eq 255 ] || [ -n "$sig" ]; then blocked=unreachable; return 1; fi
       outcome=rejected
-      [ "$rc" -ne 0 ] || [ -n "$(result_problem)" ] || outcome=$(result_outcome)
+      if [ "$rc" -eq 0 ] && result_problem >/dev/null; then outcome=$(result_outcome); fi
       ;;
     lost) collect run.log; outcome=lost ;;
     absent) outcome=absent ;;
@@ -329,7 +329,12 @@ if [ "$state" = lost ] || [ "$state" = absent ]; then
 fi
 [ -n "$collected" ] || reject "result or log missing or incomplete"
 why=$(result_problem)
-[ -z "$why" ] || reject "$why"
+checked=$?
+if [ -n "$sig" ]; then
+  cleanup_remote
+  finish cancelled $((128 + sig))
+fi
+[ "$checked" -eq 0 ] || reject "${why:-the checks did not finish}"
 emit cpu "$(jq -r '.cpu_usec' "$jdir/result.json")"
 cleanup_remote
 

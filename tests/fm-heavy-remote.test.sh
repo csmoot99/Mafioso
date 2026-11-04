@@ -609,7 +609,35 @@ test_signal_during_collection_is_cancelled() {
   wait "$pid"
   expect_code 143 "$?" "a job signalled during result extraction"
   expect_record '.outcome == "cancelled" and .exit == 143' "record of a job signalled during result extraction"
-  pass "fm-heavy --remote: a signal during collection cancels the job instead of rejecting its result"
+
+  # Everything is collected and the stop arrives while the result is being checked.
+  setup verifysignal 'echo output-line'
+  printf '%s\n' '#!/usr/bin/env bash' \
+    'case "$*" in *run.log*) : > "$FM_HOME/verifying"; sleep 3 ;; esac' \
+    "exec $(command -v sha256sum) \"\$@\"" > "$FAKEBIN/sha256sum"
+  chmod +x "$FAKEBIN/sha256sum"
+  (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" FAKE_SSH_CTL="$CTL" FAKE_SSH_HOME="$REMOTE_HOME" \
+    exec setsid env --default-signal=INT "$HEAVY" --class test --remote -- bash t/job.sh >/dev/null 2>&1) &
+  pid=$!
+  wait_for "$HOME_FM/verifying"
+  kill -TERM -- "-$pid"
+  wait "$pid"
+  expect_code 143 "$?" "a job signalled during result verification"
+  expect_record '.outcome == "cancelled" and .exit == 143' "record of a job signalled during result verification"
+  expect_host_clean "scratch after a signal during result verification"
+  pass "fm-heavy --remote: a signal during collection or verification cancels the job instead of judging its result"
+}
+
+test_killed_check_is_never_a_pass() {
+  setup killedcheck 'echo output-line'
+  printf '%s\n' '#!/usr/bin/env bash' \
+    'case "$*" in *"-e --arg id"*) kill -TERM "$PPID" ;; esac' \
+    "exec $(command -v jq) \"\$@\"" > "$FAKEBIN/jq"
+  chmod +x "$FAKEBIN/jq"
+  heavy --remote >/dev/null 2>&1
+  expect_code 65 "$?" "a job whose result check was killed"
+  expect_record '.outcome == "rejected" and .exit == 65' "record of a job whose result check was killed"
+  pass "fm-heavy --remote: a result check that dies on its own rejects the result"
 }
 
 test_dropped_collection_is_reconciled() {
@@ -694,6 +722,7 @@ test_unterminated_config_last_line
 test_signal_during_eligibility_never_runs_locally
 test_wrapper_only_signal_never_runs_locally
 test_signal_during_collection_is_cancelled
+test_killed_check_is_never_a_pass
 test_dropped_collection_is_reconciled
 test_partial_transfer_is_cleaned
 test_cancelled_on_host_is_never_green
