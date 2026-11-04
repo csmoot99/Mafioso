@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Spawn a direct report: a crewmate in a treehouse or Orca worktree, or a
 # secondmate in its isolated firstmate home.
-# Usage: fm-spawn.sh <task-id> <project-dir> --mode <no-mistakes|direct-PR|local-only> --yolo <on|off> [--branch-prefix <prefix>] [--base-branch <branch>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] [--herdr-resume-lock-wait]
+# Usage: fm-spawn.sh <task-id> <project-dir> --mode <no-mistakes|direct-PR|local-only> --yolo <on|off> [--branch-prefix <prefix>] [--base-branch <branch>] [--scope <path-or-directory>]... [--interface <name>]... [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] [--herdr-resume-lock-wait]
 #        fm-spawn.sh <task-id> <project-dir> --scout [--base-branch <branch>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] [--herdr-resume-lock-wait]
 #        fm-spawn.sh <task-id> [<firstmate-home>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] --secondmate
 #   --mode and --yolo are this task's delivery contract, REQUIRED for every ship
@@ -48,6 +48,13 @@
 #   base_branch= in state/<id>.meta, which a relaunch reuses and later review and
 #   cleanup read; it is refused on secondmates and relaunches, and without it
 #   nothing changes.
+#   --scope <path-or-directory> and --interface <name> (each repeatable, ship spawns
+#   only) declare the task's expected scope, as exact repo-relative paths or directory
+#   prefixes, and the shared interfaces it changes; they are recorded
+#   as scope= and interfaces= in state/<id>.meta beside the detected base_sha=
+#   (the starting revision), and a fresh dispatch then prints bin/fm-scope.sh's
+#   advisory overlap explanation, which never blocks. Refused on relaunches, scouts,
+#   secondmates, and batches; bin/fm-scope.sh owns the record and ownership contract.
 #   Optional attempt classification: --row <label>, --tier <label>,
 #   --pool <label>, --attempt-n <positive-integer>, and --prior-tier <label>
 #   record the intake classification as row, tier, pool, attempt_n, and
@@ -298,7 +305,9 @@
 #   Only after this isolation check, every fresh ship or scout requires a clean
 #   task worktree. When an origin configuration is detected, spawn fetches it,
 #   resolves the current remote default branch (or uses --base-branch, described
-#   above), and resets to its tip. When none is detected, spawn skips that remote freshness check and launches from the
+#   above), and resets to its tip; a local-only ship resets to the local default
+#   branch instead unless that branch is merely behind origin, because a local-only
+#   landing never reaches origin. When none is detected, spawn skips that remote freshness check and launches from the
 #   clean worktree's current HEAD. Relaunch reuses the recorded worktree without
 #   fetching or resetting its base. An unreachable detected origin, unresolved
 #   default branch, or non-clean worktree refuses a fresh spawn rather than
@@ -1373,6 +1382,8 @@ YOLO_SET=0
 BRANCH_PREFIX_SET=0
 BASE_BRANCH=
 BASE_BRANCH_SET=0
+SCOPE=
+INTERFACES=
 TRACEPARENT_SET=0
 RELAUNCH=0
 # Opt-in only: exact-resume presentation-order lock waits instead of refusing.
@@ -1402,6 +1413,8 @@ for a in "$@"; do
       EFFORT_SET=1
       ;;
     row) ROW=$a; ROW_SET=1 ;;
+    scope) SCOPE="$SCOPE${SCOPE:+,}$a" ;;
+    interface) INTERFACES="$INTERFACES${INTERFACES:+,}$a" ;;
     tier) TIER=$a; TIER_SET=1 ;;
     pool) POOL=$a; POOL_SET=1 ;;
     attempt-n) ATTEMPT_N=$a; ATTEMPT_N_SET=1 ;;
@@ -1464,6 +1477,10 @@ for a in "$@"; do
     EFFORT=${a#--effort=}
     EFFORT_SET=1
     ;;
+  --scope) want_value=scope ;;
+  --scope=*) SCOPE="$SCOPE${SCOPE:+,}${a#--scope=}" ;;
+  --interface) want_value=interface ;;
+  --interface=*) INTERFACES="$INTERFACES${INTERFACES:+,}${a#--interface=}" ;;
   --row) want_value=row ;;
   --row=*) ROW=${a#--row=}; ROW_SET=1 ;;
   --tier) want_value=tier ;;
@@ -1524,6 +1541,18 @@ for classification_key in ROW TIER POOL ATTEMPT_N PRIOR_TIER; do
       ;;
   esac
 done
+if [ -n "$SCOPE$INTERFACES" ]; then
+  if [ "$RELAUNCH" -eq 1 ] || [ "$KIND" != ship ]; then
+    echo "error: --scope and --interface are recorded at a fresh ship dispatch only" >&2
+    exit 1
+  fi
+  case "$SCOPE$INTERFACES" in
+    *$'\n'*|*$'\r'*|*,,*|,*|*,|*' '*)
+      echo "error: --scope and --interface take single-line values without spaces or empty entries (commas only join repeats)" >&2
+      exit 1
+      ;;
+  esac
+fi
 if [ "$ATTEMPT_N_SET" -eq 1 ] && ! [[ "$ATTEMPT_N" =~ ^[1-9][0-9]*$ ]]; then
   echo "error: --attempt-n must be a positive integer" >&2
   exit 1
@@ -2238,6 +2267,10 @@ fi
 if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in */*) false ;; *) true ;; esac then
   if [ "$KIND" != secondmate ] && [ -z "$HARNESS_ARG" ] && [ -f "$CONFIG/crew-dispatch.json" ]; then
     echo "error: config/crew-dispatch.json is active - pass an explicit harness resolved from the dispatch rules (the consultation backstop, so the rules are never silently skipped)." >&2
+    exit 1
+  fi
+  if [ -n "$SCOPE$INTERFACES" ]; then
+    echo "error: --scope and --interface declare one task's scope; spawn that task on its own" >&2
     exit 1
   fi
   rc=0
@@ -4131,6 +4164,12 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
     echo "error: could not fetch '$target' for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
     return 1
   fi
+  # A local-only landing moves only the local default branch, so landed work is
+  # there and not on origin. Start from it unless it is merely behind origin.
+  if [ "$MODE" = local-only ] && git -C "$worktree" rev-parse --verify --quiet "refs/heads/$default^{commit}" >/dev/null 2>&1 \
+    && ! git -C "$worktree" merge-base --is-ancestor "refs/heads/$default" "$target" 2>/dev/null; then
+    target="refs/heads/$default"
+  fi
   expected=$(git -C "$worktree" rev-parse --verify --quiet "$target^{commit}" 2>/dev/null) || {
     echo "error: '$target' is not a commit for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
     return 1
@@ -5903,6 +5942,13 @@ preserve_relaunch_meta() {
   [ -z "${BRANCH:-}" ] || echo "branch=$BRANCH"
   echo "tasktmp=$TASK_TMP"
   [ -z "$BASE_BRANCH" ] || echo "base_branch=$BASE_BRANCH"
+  # Scope record (bin/fm-scope.sh): the starting revision is detected, the rest is declared.
+  if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" = ship ]; then
+    scope_base_sha=$(git -C "$WT" rev-parse --verify -q HEAD 2>/dev/null || true)
+    [ -z "$scope_base_sha" ] || echo "base_sha=$scope_base_sha"
+    [ -z "$SCOPE" ] || echo "scope=$SCOPE"
+    [ -z "$INTERFACES" ] || echo "interfaces=$INTERFACES"
+  fi
   echo "model=${MODEL:-default}"
   echo "effort=${EFFORT:-default}"
   [ -z "$ROW" ] || echo "row=$ROW"
@@ -5972,6 +6018,8 @@ if [ "$RELAUNCH" -eq 0 ]; then
     exit 1
   fi
   SPAWN_META_TMP=
+  # Advisory only: explain overlap with live tasks, never block the dispatch.
+  [ -z "$SCOPE$INTERFACES" ] || FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-scope.sh" overlap "$ID" || true
 fi
 
 # Fuse the backlog In-flight transition into the publication that just created

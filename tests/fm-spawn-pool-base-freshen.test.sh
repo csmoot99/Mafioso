@@ -4,8 +4,9 @@
 # A treehouse pool can return a clean detached worktree whose origin/main was
 # advanced after the worktree was allocated.
 # These tests drive the real spawn path with a fake terminal, then prove it
-# starts the worker from the fetched origin tip, launches a clean origin-less
-# pool as-is, or stops when a configured origin is unusable.
+# starts the worker from the fetched origin tip (or, for a local-only ship, from
+# work landed on local main), launches a clean origin-less pool as-is, or stops
+# when a configured origin is unusable.
 set -u
 
 # shellcheck source=tests/fixtures.sh
@@ -163,6 +164,34 @@ test_linked_spawning_home_rejects_primary_before_refresh() {
   done
 }
 
+test_declared_scope_is_recorded_and_overlap_is_advisory() {
+  local rec id out status meta
+  id='pool-scope-s1'
+  rec=$(make_case scope-record "$id")
+  read_case_record "$rec"
+  # A live sibling that declares the same interface; the spawn must explain it and still launch.
+  printf 'kind=ship\nproject=%s\ninterfaces=cli-registry\n' "$PROJECT_DIR" > "$HOME_DIR/state/sibling-s1.meta"
+
+  out=$(run_spawn "$id" --mode no-mistakes --yolo off --scope docs --scope src/cli --interface cli-registry)
+  status=$?
+  expect_code 0 "$status" "a declared scope must not block the spawn"$'\n'"$out"
+  meta="$HOME_DIR/state/$id.meta"
+  assert_grep "base_sha=$(git -C "$POOL_DIR" rev-parse HEAD)" "$meta" "the starting revision is detected into the task record"
+  assert_grep "scope=docs,src/cli" "$meta" "the declared scope is recorded"
+  assert_grep "interfaces=cli-registry" "$meta" "the declared interfaces are recorded"
+  assert_contains "$out" "live task sibling-s1" "the overlap with the live sibling is explained"
+  assert_contains "$out" "spawned $id" "the overlap explanation does not stop the spawn"
+
+  id='pool-scope-s2'
+  fm_test_spawn_brief "$HOME_DIR" "$id"
+  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 0 "$status" "a spawn that declares nothing still launches"$'\n'"$out"
+  assert_grep "base_sha=" "$HOME_DIR/state/$id.meta" "the starting revision is recorded even without a declared scope"
+  assert_no_grep "scope=" "$HOME_DIR/state/$id.meta" "no scope is invented when none was declared"
+  pass "a declared scope is recorded at spawn and overlap is explained without blocking"
+}
+
 test_stale_pool_base_refreshes_before_branching() {
   local rec id out status current branch_head
   id='pool-current-base-r1'
@@ -197,6 +226,60 @@ test_stale_pool_base_refreshes_before_branching() {
   assert_grep 'must survive a newly spawned branch' "$POOL_DIR/advanced-main.txt" \
     "the branch created after spawn omitted advanced-main content"
   pass "a stale pooled worktree refreshes to current origin/main before a crew branch is created"
+}
+
+land_on_local_main() { # <project>: a local-only landing moves local main and never origin
+  printf 'landed locally\n' > "$1/landed.txt"
+  git -C "$1" add landed.txt
+  git -C "$1" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm land-owner
+}
+
+test_local_only_starts_from_work_landed_on_local_main() {
+  local rec id out status landed
+  id='pool-local-landed-r1'
+  rec=$(make_case local-landed "$id")
+  read_case_record "$rec"
+  git -C "$PROJECT_DIR" pull --quiet --ff-only origin main
+  land_on_local_main "$PROJECT_DIR"
+  landed=$(git -C "$PROJECT_DIR" rev-parse HEAD)
+
+  out=$(run_spawn "$id" --mode local-only --yolo off)
+  status=$?
+  expect_code 0 "$status" "a local-only spawn should launch from local main"$'\n'"$out"
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$landed" ] \
+    || fail "a local-only copy started without work landed on local main"
+  assert_grep "base_sha=$landed" "$HOME_DIR/state/$id.meta" "the recorded start is not the landed local main"
+
+  # Only local-only lands locally; a mode that delivers to origin still starts there.
+  id='pool-local-landed-pr-r1'
+  fm_test_spawn_brief "$HOME_DIR" "$id"
+  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 0 "$status" "a no-mistakes spawn should launch from origin"$'\n'"$out"
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$(git -C "$POOL_DIR" rev-parse origin/main)" ] \
+    || fail "a no-mistakes copy left origin's tip for local main"
+
+  # Landed work wins over an origin that moved on separately: the landing fast-forwards local main.
+  id='pool-local-diverged-r1'
+  rec=$(make_case local-diverged "$id")
+  read_case_record "$rec"
+  land_on_local_main "$PROJECT_DIR"
+  out=$(run_spawn "$id" --mode local-only --yolo off)
+  status=$?
+  expect_code 0 "$status" "a local-only spawn should launch from a diverged local main"$'\n'"$out"
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$(git -C "$PROJECT_DIR" rev-parse HEAD)" ] \
+    || fail "a local-only copy started away from the local main it must land on"
+
+  # A local main with nothing of its own is just stale, so origin stays the current base.
+  id='pool-local-behind-r1'
+  rec=$(make_case local-behind "$id")
+  read_case_record "$rec"
+  out=$(run_spawn "$id" --mode local-only --yolo off)
+  status=$?
+  expect_code 0 "$status" "a local-only spawn should launch from origin when local main is behind"$'\n'"$out"
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$(git -C "$POOL_DIR" rev-parse origin/main)" ] \
+    || fail "a local-only copy started from a local main behind origin"
+  pass "a local-only copy starts from landed local work, and from origin when local main is only behind"
 }
 
 test_non_main_default_branch_refreshes_before_branching() {
@@ -969,6 +1052,7 @@ test_remote_seeded_home_spawns_from_treehouse_pool
 test_pool_slot_claim_follows_the_spawn_outcome
 test_linked_spawning_home_rejects_primary_before_refresh
 test_stale_pool_base_refreshes_before_branching
+test_local_only_starts_from_work_landed_on_local_main
 test_named_base_branch_starts_from_that_branch
 test_qwen_shaped_brief_gets_its_branch_and_read_only_named_files
 test_prose_qwen_shape_line_is_ignored
@@ -981,6 +1065,7 @@ test_dirty_pool_refuses_without_discarding_work
 test_unresolved_remote_default_refuses_pool
 test_unreachable_origin_refuses_stale_pool_base
 test_originless_pool_launches_without_a_freshness_fetch
+test_declared_scope_is_recorded_and_overlap_is_advisory
 test_originless_dirty_pool_refuses_without_discarding_work
 test_origin_config_without_url_refuses_pool
 test_empty_origin_config_section_refuses_pool

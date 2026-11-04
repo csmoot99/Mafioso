@@ -478,6 +478,30 @@ Task meta records `backend=` only for a non-default backend; an absent `backend=
 
 - A cmux task additionally records `cmux_workspace_id=` and `cmux_surface_id=`.
 
+### Task scope and interface ownership
+
+A ship spawn can record what the task is expected to touch, so overlap between live tasks is explained at dispatch instead of discovered at merge.
+[`bin/fm-scope.sh`](../bin/fm-scope.sh) owns the record, the advisory check, and ownership.
+
+| Field in the task record | Source |
+| --- | --- |
+| `base_sha=` the starting revision of the task's copy | Detected at every fresh ship spawn |
+| Files the task actually changed | Detected from the task's copy when `fm-scope.sh` is run |
+| `scope=` expected exact paths or directories | Declared at intake with `fm-spawn.sh --scope` (repeatable) |
+| `interfaces=` shared contracts the task changes (types, schemas, config, CLI registration) | Declared at intake with `fm-spawn.sh --interface` (repeatable) |
+| Dependencies | The backlog's own `blocked-by` links, not stored in the task record |
+
+- **Advisory overlap:** a fresh spawn that declared scope or interfaces runs `fm-scope.sh overlap`, which prints which live tasks of the same project meet it, naming the shared interface, the meeting declared scopes, or the already-changed files.
+  It never blocks or serializes, because overlapping files often merge cleanly.
+- **Temporary ownership:** `fm-scope.sh own <owner-id> <dependent-id>...` makes each queued dependent `blocked-by` the owner, so dispatch refuses it until the owner is Done.
+  Ownership is only that backlog link: there is no lock or reservation store, and it refuses a cycle, an already dispatched dependent, or a finished owner.
+  It ends when the owner lands or is cleaned up without a retained captain call, both of which close the owner's row to Done.
+  A retained owner returns to Queued and keeps its dependents queued until the captain answers.
+  If the owner is cancelled, clear the links with `fm-tasks-axi.sh unblock <dependent> --by <owner>`.
+  A dependent starts from the owner's landed change: a local-only landing moves only the local default branch, so a fresh local-only copy starts from that branch unless it is merely behind origin, and `fm-scope.sh changed` measures from it too.
+- **Out-of-scope report:** the standard ship brief tells the worker to run `fm-scope.sh changed` before each `done:` line and to end that line with `; outside-scope: <files>` when it lists any; the compact qwen-shaped brief does not carry this step.
+- **Reversal:** omit the flags and no scope or interface is recorded or explained; `own` is the only step that gates dispatch, and `unblock` undoes it.
+
 ### Task selectors
 
 Task selectors for `fm-peek.sh`, `fm-send.sh`, and `fm-crew-state.sh` resolve centrally through `fm_backend_resolve_selector`.
