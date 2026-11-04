@@ -1194,7 +1194,7 @@ A malformed or unreadable file refuses every fresh ship or scout spawn until it 
 Firstmate cannot see which part of a worker's life uses the resource, so the number bounds whole workers from launch to handoff, and the tightest resource every worker needs should decide it.
 [`bin/fm-project-capacity-lib.sh`](../bin/fm-project-capacity-lib.sh) owns the file format, what holds a place, and why concurrent spawns cannot both take the last one.
 
-## Heavy commands and concurrency (config/host-test-slots, config/heavy-commands)
+## Heavy commands and concurrency (config/host-test-slots, config/heavy-commands, config/heavy-remote)
 
 Three separate limits bound test load, and none stands in for another.
 
@@ -1214,7 +1214,7 @@ Without it, more agents can mean more test runs at once, so set the flag before 
 A record holds the task, project, command class (test, build, e2e or image), the wait for the slot, start and end, exit status, and peak memory and CPU time read from the job's own scope; a value that is not available is `null`, never an estimate.
 A job stopped by TERM, INT or HUP is recorded too, whether it was running or still queued; the wrapper's header owns the exact fields.
 The command's exit status passes through, so 137 means the memory cap killed the command itself; when the cap kills one of its child processes, systemd stops the whole scope and the status is usually 143, with the peak still recorded.
-[`bin/fm-heavy-summary.sh`](../bin/fm-heavy-summary.sh) prints queue wait against run time and peak memory per project and class.
+[`bin/fm-heavy-summary.sh`](../bin/fm-heavy-summary.sh) prints queue wait against run time and peak memory per project, class and host.
 The wrapper needs Linux with `flock`, `systemd-run` and `jq`; elsewhere it refuses without running anything.
 
 `config/host-test-slots` is one positive integer in the root home.
@@ -1224,6 +1224,21 @@ The default is the owner's standing PC rule of one heavy command at a time, so c
 The optional presence flag `config/heavy-commands` makes `bin/fm-brief.sh` add a "Heavy commands" rule to ship and scout briefs that points workers at the wrapper.
 The flag is machine-wide like the slot and the log: it is read from the root home, so it covers workers spawned by every local secondmate, and a copy in a secondmate home has no effect.
 A drive call holds the slot only while it runs a local test step, build or e2e, and the pipeline agent never takes the slot again inside that hold.
+
+`config/heavy-remote` in the root home is the opt-in for the SSH destination, and without it `fm-heavy.sh --remote` refuses and every job runs locally as before.
+It names the SSH alias of the destination, the one portable command approved to run there, and an optional timeout in seconds.
+A worker or firstmate passes `--remote` for that command only, and the job then runs on the destination's own capacity instead of the shared slot.
+The destination takes one job at a time; when it is busy or unreachable, or the working tree is not a clean repository root, the command runs locally under the normal slot rule instead of blocking.
+A lost connection never leads to a second run of a job that may still be running: the job is reconciled against its record on the destination first, and a job that cannot be reached is recorded as unknown with its scratch kept.
+A finished job whose result cannot be fetched after the same reconnect attempts is recorded the same way, with the result left on the destination for the next request to collect.
+Every unknown job keeps a durable local record in `state/heavy-remote/unknown-<host>/`, and each new `--remote` request reconciles those records over SSH before it is admitted, from the job's completion file, its started marker and whether its own process group is alive.
+While such a job still runs, no second job starts there and the request runs locally with fallback `unknown-job-running`; a job whose supervisor has died is stopped first, because nothing else would stop it.
+When the destination cannot be reached the record stays and the request runs locally with fallback `unreachable`.
+A finished job's result is collected into `state/heavy-remote/<job>/` for that job alone and never counts as a pass for the new candidate; its scratch is then removed and `reconciled.json` there closes the record with the job's outcome.
+A result with the wrong commit, command or bundle digest, or a missing or partial log, is rejected and is never a pass, and the destination refuses a second start of one job, so a duplicate delivery never runs twice.
+[`bin/fm-heavy.sh`](../bin/fm-heavy.sh) owns the file format and the extra record fields, and [`bin/fm-heavy-remote.sh`](../bin/fm-heavy-remote.sh) owns the transfer, the outcomes and their exit statuses.
+[`bin/fm-heavy-summary.sh`](../bin/fm-heavy-summary.sh) gives local and remote jobs separate rows, so the queue wait a remote run saves can be read against its preparation and collection time.
+The destination needs only `python3`, `git`, `tar` and `ps`, and the runner it uses is shipped with each job, so nothing is installed there.
 
 ## Launch environment values (config/launch-env)
 
