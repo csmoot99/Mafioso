@@ -37,8 +37,8 @@
 # never runs: wait_s is its wait so far, and started_at, ended_at, run_s, exit
 # and slot are null.
 #
-# bin/fm-heavy-summary.sh summarizes the log. Linux with flock and systemd-run
-# only; elsewhere the wrapper exits 69 without running anything.
+# bin/fm-heavy-summary.sh summarizes the log. Linux with flock, systemd-run and
+# jq only; elsewhere the wrapper exits 69 without running anything.
 #
 # Environment: FM_HOME selects the home (the root home is used for the log and
 # config); FM_HEAVY_LOCK overrides the slot lock path for tests.

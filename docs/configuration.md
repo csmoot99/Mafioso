@@ -1188,7 +1188,7 @@ Without it, more agents can mean more test runs at once, so set the flag before 
 
 [`bin/fm-heavy.sh`](../bin/fm-heavy.sh) runs a heavy command on the slot under the standing 6 GB memory scope with no swap, exactly as `flock -o /tmp/fm-heavy.lock systemd-run --user --scope -q -p MemoryMax=6G -p MemorySwapMax=0 <command>` did, and appends one record per job to `state/heavy-jobs.jsonl` in the root home.
 A record holds the task, project, command class (test, build, e2e or image), the wait for the slot, start and end, exit status, and peak memory and CPU time read from the job's own scope; a value that is not available is `null`, never an estimate.
-A job stopped by TERM, INT or HUP is recorded too: while running, once its scope ends, with exit 128+n; while queued, with its wait so far and `started_at`, `ended_at`, `run_s`, `exit` and `slot` all `null`.
+A job stopped by TERM, INT or HUP is recorded too, whether it was running or still queued; the wrapper's header owns the exact fields.
 The command's exit status passes through, so 137 means the memory cap killed the command itself; when the cap kills one of its child processes, systemd stops the whole scope and the status is usually 143, with the peak still recorded.
 [`bin/fm-heavy-summary.sh`](../bin/fm-heavy-summary.sh) prints queue wait against run time and peak memory per project and class.
 The wrapper needs Linux with `flock`, `systemd-run` and `jq`; elsewhere it refuses without running anything.
