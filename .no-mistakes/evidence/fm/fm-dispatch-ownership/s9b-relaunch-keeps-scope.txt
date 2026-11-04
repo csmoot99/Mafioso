@@ -1,0 +1,32 @@
+=== S9b: a relaunch keeps the original scope record ===
+--- before relaunch:
+base_sha=dce0694cf0d0191b64c2c42908c2a5374c7c3cd2
+scope=notes/__init__.py
+interfaces=notes-api
+spawn_gen=s1793763792.588863.22413
+$ fm-control.sh lab5602d5264ff0-sib exit
+stopped lab5602d5264ff0-sib harness=claude backend=tmux endpoint=firstmate:fm-lab5602d5264ff0-sib worktree=/tmp/fmlab.eUna19/treehouse/.treehouse/notes-39df3d/3/notes
+[rc=0]
+$ fm-spawn.sh lab5602d5264ff0-sib --relaunch
+spawned lab5602d5264ff0-sib harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-lab5602d5264ff0-sib worktree=/tmp/fmlab.eUna19/treehouse/.treehouse/notes-39df3d/3/notes
+[rc=0]
+--- after relaunch:
+base_sha=dce0694cf0d0191b64c2c42908c2a5374c7c3cd2
+scope=notes/__init__.py
+interfaces=notes-api
+spawn_gen=s1793764021.763765.27173
+scope record identical across the relaunch
+--- duplicate keys after relaunch (expect 1 each):
+base_sha: 1
+scope: 1
+interfaces: 1
+--- changed still works off the kept record:
+outside declared scope (notes/__init__.py): stray.txt
+--- overlap still works off the kept record:
+scope overlap (advisory) between lab5602d5264ff0-sib and live task lab5602d5264ff0-dep:
+  - both change interface notes-api
+  - declared scope notes/__init__.py meets its declared scope notes
+  - notes/__init__.py, which it has already changed, is in declared scope notes/__init__.py
+scope overlap (advisory) between lab5602d5264ff0-sib and live task lab5602d5264ff0-rdep:
+  - declared scope notes/__init__.py meets its declared scope notes
+[rc=0]

@@ -1,0 +1,14 @@
+=== S4b: a landing that reaches origin (what a PR merge does) ===
+--- labd660c6604ef5-dep before origin moves:
+outside declared scope (notes,tests/test_notes.py): CHANGELOG.md
+pushed local main to the lab origin
+--- labd660c6604ef5-dep after origin holds the owner (expect only its own CHANGELOG.md):
+outside declared scope (notes,tests/test_notes.py): CHANGELOG.md
+spawned labd660c6604ef5-dep2 harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-labd660c6604ef5-dep2 worktree=/tmp/fmlab.mqamTx/treehouse/.treehouse/notes-b5874e/9/notes
+[rc=0]
+--- base_sha vs origin main vs local main (expect all equal):
+base_sha=ddf6fc56ffde0a1d50367cbd8ed6f543fad49aa0
+ddf6fc56ffde0a1d50367cbd8ed6f543fad49aa0
+ddf6fc56ffde0a1d50367cbd8ed6f543fad49aa0
+--- owner's change present in the new copy:
+15:def find_notes(tag):

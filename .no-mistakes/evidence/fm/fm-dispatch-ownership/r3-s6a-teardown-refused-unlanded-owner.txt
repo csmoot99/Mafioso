@@ -1,0 +1,55 @@
+=== S6: a retained owner keeps its dependents queued until the captain answers ===
+$ fm-scope.sh own labd660c6604ef5-cov labd660c6604ef5-rdep 
+labd660c6604ef5-rdep waits for labd660c6604ef5-cov: dispatch resumes once labd660c6604ef5-cov is Done
+[rc=0]
+$ fm-captain-hold.sh hold labd660c6604ef5-cov --reason lab: keep or drop the shared README contract? 
+labd660c6604ef5-cov
+[rc=0]
+--- owner before cleanup:
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: yes
+$ fm-teardown.sh labd660c6604ef5-cov 
+REFUSED: local-only worktree /tmp/fmlab.mqamTx/treehouse/.treehouse/notes-b5874e/4/notes has work not yet merged into main and not on any remote.
+commits not yet on main:
+4172a2d Reword README first sentence
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), or push to a fork/remote, or get the captain's explicit OK to discard, then --force.
+[rc=1]
+--- owner after cleanup (expect queued, held; worker and record gone):
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: yes
+  /tmp/fmlab.mqamTx/home/state/labd660c6604ef5-cov.meta
+  windows: 1
+--- dependent (expect queued, blocked):
+  state: queued
+  blocked: yes
+  blocked_by: labd660c6604ef5-cov
+  held: no
+--- dispatching the dependent while the captain call is open (expect refusal):
+error: this home's backlog item labd660c6604ef5-rdep is not dispatchable in state queued no yes; refusing before creating its endpoint or local copy
+[rc=1]
+  ls: cannot access '/tmp/fmlab.mqamTx/home/state/labd660c6604ef5-rdep.meta': No such file or directory
+--- the captain answers:
+$ fm-captain-hold.sh answer labd660c6604ef5-cov --decision-file decision.txt 
+answered: labd660c6604ef5-cov
+[rc=0]
+--- owner:
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+--- dependent:
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+--- dispatching the dependent after the answer:
+spawned labd660c6604ef5-rdep harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-labd660c6604ef5-rdep worktree=/tmp/fmlab.mqamTx/treehouse/.treehouse/notes-b5874e/6/notes
+[rc=0]
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no

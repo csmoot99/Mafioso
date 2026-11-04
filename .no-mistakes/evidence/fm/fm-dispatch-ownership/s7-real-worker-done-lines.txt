@@ -1,0 +1,20 @@
+Done lines written by real Claude workers in the lab, copied from their state/<id>.status ledgers while live.
+No brief spec mentioned the tail, except child3 and the steered pr line, whose specs said to use exactly the shape the brief gives.
+
+own (declared notes,tests/test_notes.py; asked to edit README.md):
+  done [at=1793763787]: ready in branch fm/lab5602d5264ff0-own
+  done [at=1793763792]: ready in branch fm/lab5602d5264ff0-own (amended to drop accidentally committed __pycache__; ignore prior done line); outside-scope: README.md (asked for in brief)
+dep (declared notes,tests/test_notes.py; asked to create CHANGELOG.md):
+  done [at=1793763908]: ready in branch fm/lab5602d5264ff0-dep (rebased onto main for find_notes; 3 tests pass; skipped: nothing)
+  done [at=1793763911]: ready in branch fm/lab5602d5264ff0-dep; outside-scope: CHANGELOG.md, README.md (CHANGELOG.md was requested; README.md untouched by me, likely base diff from main advancing)
+so (declared lib; originless project; asked to edit README.md):
+  done [at=1793764249]: ready in branch fm/lab5602d5264ff0-so (get_value() returns VALUE; README line added; no tests run, none exist)
+  done [at=1793764252]: ready in branch fm/lab5602d5264ff0-so; outside-scope: README.md (requested by the brief)
+pr (declared notes; direct-PR; asked to edit README.md):
+  done [at=1793764086]: PR https://github.com/o/r/pull/7 (lab, no forge: not pushed). 2 files, +2 lines: notes/__init__.py, README.md; checks not run; outside-scope: README.md (captain asked for the README line)
+  done [at=1793764112]: PR https://github.com/o/r/pull/7; outside-scope: README.md captain asked for the README line   (after a steer asking for the canonical shape)
+child3 (declared notes; direct-PR under the second mate):
+  done [at=1793764730]: PR https://github.com/o/r/pull/8; outside-scope: README.md (captain asked for the README line)
+
+Note: own, dep, so and pr each wrote a first done line without the tail, then a corrected line seconds later.
+The transcripts show them chaining commit, fm-scope.sh changed and the done append in one shell step, so the first line was written before they read the check's output.

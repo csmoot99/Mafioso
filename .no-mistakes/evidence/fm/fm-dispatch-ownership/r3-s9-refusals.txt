@@ -1,0 +1,32 @@
+=== S9 adversarial: --scope/--interface refused outside a fresh ship dispatch (expect rc=1, one error each) ===
+$ fm-spawn.sh labd660c6604ef5-scout1 notes --scout --scope notes 
+error: --scope and --interface are recorded at a fresh ship dispatch only
+[rc=1]
+$ fm-spawn.sh labd660c6604ef5-scout1 notes --scout --interface notes-api 
+error: --scope and --interface are recorded at a fresh ship dispatch only
+[rc=1]
+$ fm-spawn.sh labd660c6604ef5-own --relaunch --scope notes 
+error: --scope and --interface are recorded at a fresh ship dispatch only
+[rc=1]
+$ fm-spawn.sh labd660c6604ef5-own --relaunch --interface other 
+error: --scope and --interface are recorded at a fresh ship dispatch only
+[rc=1]
+$ fm-spawn.sh notes notes --mode local-only --yolo on --harness claude --scope notes 
+error: --scope and --interface declare one task's scope; spawn that task on its own
+[rc=1]
+$ fm-spawn.sh labd660c6604ef5-m1 --secondmate --scope notes 
+error: --scope and --interface are recorded at a fresh ship dispatch only
+[rc=1]
+$ fm-spawn.sh labd660c6604ef5-b1 notes --mode local-only --yolo on --harness claude --scope a b 
+error: --scope and --interface take single-line values without spaces or empty entries (commas only join repeats)
+[rc=1]
+$ fm-spawn.sh labd660c6604ef5-b1 notes --mode local-only --yolo on --harness claude --scope a,,b 
+error: --scope and --interface take single-line values without spaces or empty entries (commas only join repeats)
+[rc=1]
+--- nothing was created by those refusals:
+(no state files)
+  state: queued
+  state: queued
+--- the owner's record is unchanged by the refused relaunches:
+scope=notes,tests/test_notes.py
+interfaces=notes-api

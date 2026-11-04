@@ -1,0 +1,27 @@
+=== S3b: a task with no declared scope is still compared by its actual changes ===
+scope overlap (advisory) between lab5602d5264ff0-sib and live task lab5602d5264ff0-worker:
+  - notes/__init__.py, which it has already changed, is in declared scope notes/__init__.py
+
+=== S8a: done gate reads the real worker's outside-scope done line ===
+--- worker's own final line:
+done [at=1793764112]: PR https://github.com/o/r/pull/7; outside-scope: README.md captain asked for the README line
+--- its head is on no remote:
+  (end of remote list)
+--- seeded forge record (the lab has no forge): pr=https://github.com/o/r/pull/7 and a merged marker
+--- this change: fm-crew-state.sh lab5602d5264ff0-pr
+state: done · source: status-log · PR https://github.com/o/r/pull/7; outside-scope: README.md captain asked for the README line
+--- control, the same line through base commit 61de8bb's parser:
+state: blocked · source: status-log · named head 79306860b66158feb55f5ddaaab1904ab28737eb is unreachable outside the worker copy
+
+=== S4b: landing that reaches origin (what a PR merge does) ===
+--- lab5602d5264ff0-dep before: origin/main has not moved
+outside declared scope (notes,tests/test_notes.py): CHANGELOG.md, README.md
+pushed local main to the lab origin
+--- lab5602d5264ff0-dep after origin holds the owner (expect only its own CHANGELOG.md):
+outside declared scope (notes,tests/test_notes.py): CHANGELOG.md
+spawned lab5602d5264ff0-dep2 harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-lab5602d5264ff0-dep2 worktree=/tmp/fmlab.eUna19/treehouse/.treehouse/notes-39df3d/7/notes
+--- base_sha vs origin/main:
+base_sha=7b6809223e6a2dcfabd1eed568178879ba51d19b
+7b6809223e6a2dcfabd1eed568178879ba51d19b
+--- owner's change present in the new copy:
+15:def find_notes(tag):

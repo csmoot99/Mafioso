@@ -1,0 +1,21 @@
+=== S2: second dispatch on the same interface and an overlapping scope ===
+$ fm-spawn.sh lab5602d5264ff0-sib ... --scope notes/__init__.py --interface notes-api
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+scope overlap (advisory) between lab5602d5264ff0-sib and live task lab5602d5264ff0-own:
+  - both change interface notes-api
+  - declared scope notes/__init__.py meets its declared scope notes
+  - notes/__init__.py, which it has already changed, is in declared scope notes/__init__.py
+spawned lab5602d5264ff0-sib harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-lab5602d5264ff0-sib worktree=/tmp/fmlab.eUna19/treehouse/.treehouse/notes-39df3d/3/notes
+[rc=0]
+--- window list:
+lab
+fm-lab5602d5264ff0-worker
+main
+fm-lab5602d5264ff0-own
+fm-lab5602d5264ff0-sib
+--- record:
+base_sha=dce0694cf0d0191b64c2c42908c2a5374c7c3cd2
+scope=notes/__init__.py
+interfaces=notes-api
+--- backlog state:
+in_flight

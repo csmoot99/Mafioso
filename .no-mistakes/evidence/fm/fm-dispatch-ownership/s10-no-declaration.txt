@@ -1,0 +1,14 @@
+=== S10 (no declaration): the lab's gated worker was spawned with no --scope/--interface ===
+spawned lab5602d5264ff0-worker harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-lab5602d5264ff0-worker worktree=/tmp/fmlab.eUna19/treehouse/.treehouse/notes-39df3d/1/notes
+--- overlap lines in the spawn output (expect none):
+0
+--- task record scope fields:
+base_sha=dce0694cf0d0191b64c2c42908c2a5374c7c3cd2
+--- fm-scope.sh changed (expect empty):
+[rc=0]
+--- fm-scope.sh overlap (expect empty):
+[rc=0]
+--- worker status:
+paused [at=1793763696]: waiting for gate file /tmp/fmlab.eUna19/home/data/lab5602d5264ff0-worker/gate and a resume message
+--- brief carries the report command:
+43:   Before each `done:` report, run `FM_HOME='/tmp/fmlab.eUna19/home' FM_STATE_OVERRIDE='/tmp/fmlab.eUna19/home/state' '/tmp/fmlab.eUna19/home/bin/fm-scope.sh' changed lab5602d5264ff0-worker`; when it lists files outside the declared scope, end that done line with `; outside-scope: <files>` and one clause on why they changed. It prints nothing when no scope was declared.

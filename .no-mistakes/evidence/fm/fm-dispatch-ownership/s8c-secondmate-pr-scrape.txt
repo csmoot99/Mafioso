@@ -1,0 +1,18 @@
+spawned lab5602d5264ff0-child3 harness=claude kind=ship mode=direct-PR yolo=off window=firstmate:fm-lab5602d5264ff0-child3 worktree=/tmp/fmlab.eUna19/treehouse/.treehouse/notes-a6cc39/1/notes
+=== S8c: real child under a real second mate ===
+--- child status:
+done [at=1793764730]: PR https://github.com/o/r/pull/8; outside-scope: README.md (captain asked for the README line)
+--- pr= lines in the child record (expect 0, so the delivery must scrape the done line):
+0
+--- parent channel, /tmp/fmlab.eUna19/home/state/lab5602d5264ff0-mate.status:
+cat: /tmp/fmlab.eUna19/home/state/lab5602d5264ff0-mate.status: No such file or directory
+--- head reachable on the mate's origin:
+    origin/fm/lab5602d5264ff0-child3
+$ fm-inactive-reconcile.sh scan  (the mate home's own poll step)
+[rc=0]
+6 Nov  3 22:50 lab5602d5264ff0-mate.git-hooks
+6 Nov  3 22:50 lab5602d5264ff0-mate.inbox
+6 Nov  3 22:50 lab5602d5264ff0-mate.meta
+6 Nov  3 22:59 lab5602d5264ff0-mate.status
+--- parent channel:
+done [key=child-outcome-lab5602d5264ff0-child3-done-5f1ea82c] [at=1793764752]: child lab5602d5264ff0-child3 done: PR https://github.com/o/r/pull/8; outside-scope: README.md (captain asked for the README line) pr=https://github.com/o/r/pull/8 mode=direct-PR yolo=off

@@ -1,0 +1,17 @@
+=== S3: a live worker changed README.md, which is OUTSIDE its own declared scope (notes,tests/test_notes.py) ===
+--- lab5602d5264ff0-own actual change:
+README.md
+notes/__init__.py
+tests/test_notes.py
+
+$ fm-spawn.sh lab5602d5264ff0-cov ... --scope README.md
+scope overlap (advisory) between lab5602d5264ff0-cov and live task lab5602d5264ff0-own:
+  - README.md, which it has already changed, is in declared scope README.md
+spawned lab5602d5264ff0-cov harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-lab5602d5264ff0-cov worktree=/tmp/fmlab.eUna19/treehouse/.treehouse/notes-39df3d/4/notes
+[rc=0]
+
+$ fm-spawn.sh lab5602d5264ff0-far ... --scope docs/unrelated --interface other-contract   (expect no overlap lines)
+spawned lab5602d5264ff0-far harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-lab5602d5264ff0-far worktree=/tmp/fmlab.eUna19/treehouse/.treehouse/notes-39df3d/5/notes
+[rc=0]
+--- rerun overlap directly for lab5602d5264ff0-far (expect empty):
+[rc=0]

@@ -1,0 +1,74 @@
+=== S6: retained owner keeps its dependents queued until the captain answers ===
+$ fm-scope.sh own lab5602d5264ff0-cov lab5602d5264ff0-rdep
+lab5602d5264ff0-rdep waits for lab5602d5264ff0-cov: dispatch resumes once lab5602d5264ff0-cov is Done
+[rc=0]
+$ fm-captain-hold.sh hold lab5602d5264ff0-cov --reason 'lab: keep or drop the shared README contract?'
+lab5602d5264ff0-cov
+[rc=0]
+--- owner before cleanup:
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: yes
+
+$ fm-teardown.sh lab5602d5264ff0-cov
+teardown: reaping leaked worktree process(es) for lab5602d5264ff0-cov: 628672 632403
+teardown: force-killing leaked worktree process(es) for lab5602d5264ff0-cov: 628672
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown lab5602d5264ff0-cov complete (window firstmate:fm-lab5602d5264ff0-cov, worktree /tmp/fmlab.eUna19/treehouse/.treehouse/notes-39df3d/4/notes)
+Backlog: lab5602d5264ff0-cov stays open in /tmp/fmlab.eUna19/home/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
+[rc=0]
+--- owner after cleanup (expect queued, held; worker and record gone):
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  ls: cannot access '/tmp/fmlab.eUna19/home/state/lab5602d5264ff0-cov.meta': No such file or directory
+  (no window)
+--- dependent (expect queued, blocked):
+  state: queued
+  blocked: yes
+  blocked_by: lab5602d5264ff0-cov
+  held: no
+
+--- dispatching the dependent while the captain call is open (expect refusal):
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  4 task(s) in flight, but no live watcher process holds this home lock (last beat: 9s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: this home's backlog item lab5602d5264ff0-rdep is not dispatchable in state queued no yes; refusing before creating its endpoint or local copy
+[rc=1]
+  ls: cannot access '/tmp/fmlab.eUna19/home/state/lab5602d5264ff0-rdep.meta': No such file or directory
+
+--- the captain answers:
+$ fm-captain-hold.sh answer lab5602d5264ff0-cov --decision-file decision.txt
+answered: lab5602d5264ff0-cov
+[rc=0]
+--- owner:
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+--- dependent:
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+
+--- dispatching the dependent after the answer:
+scope overlap (advisory) between lab5602d5264ff0-rdep and live task lab5602d5264ff0-dep:
+  - declared scope notes meets its declared scope notes
+  - notes/__init__.py, which it has already changed, is in declared scope notes
+scope overlap (advisory) between lab5602d5264ff0-rdep and live task lab5602d5264ff0-sib:
+  - declared scope notes meets its declared scope notes/__init__.py
+spawned lab5602d5264ff0-rdep harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-lab5602d5264ff0-rdep worktree=/tmp/fmlab.eUna19/treehouse/.treehouse/notes-39df3d/4/notes
+[rc=0]
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no

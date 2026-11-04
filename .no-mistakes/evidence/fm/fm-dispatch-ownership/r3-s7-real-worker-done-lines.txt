@@ -1,0 +1,31 @@
+=== S7: real Claude workers' done lines, unprompted by any brief spec ===
+--- own (declared: ):
+--- sib (declared: notes/__init__.py):
+done [at=1793766099]: ready in branch fm/labd660c6604ef5-sib (list_notes(limit=None) + test; unittest passes; skipped negative-limit handling)
+done [at=1793766103]: ready in branch fm/labd660c6604ef5-sib (list_notes(limit=None) + test; unittest passes; skipped negative-limit handling); outside-scope: tests/test_notes.py (test for the new limit arg)
+--- dep (declared: notes,tests/test_notes.py):
+done [at=1793766134]: ready in branch fm/labd660c6604ef5-dep (count_tagged + test + CHANGELOG; tests pass; skipped nothing)
+done [at=1793766136]: ready in branch fm/labd660c6604ef5-dep; outside-scope: CHANGELOG.md (requested by brief)
+--- cov (declared: README.md):
+done [at=1793766101]: ready in branch fm/labd660c6604ef5-cov
+--- far (declared: docs/unrelated):
+done [at=1793766107]: ready in branch fm/labd660c6604ef5-far (added docs/unrelated/note.md, 1 line; no checks run)
+--- fm-scope.sh changed labd660c6604ef5-dep:
+outside declared scope (notes,tests/test_notes.py): CHANGELOG.md
+--- what dep committed on top of the landed owner (no rebase; parent is local main):
+  c44a015 Add count_tagged(tag)
+  ddf6fc5 Add find_notes(tag)
+  d0b8100 seed notes
+   CHANGELOG.md        | 1 +
+   notes/__init__.py   | 4 ++++
+   tests/test_notes.py | 6 ++++++
+   3 files changed, 11 insertions(+)
+--- fm-scope.sh changed labd660c6604ef5-cov (in scope):
+within declared scope (README.md)
+--- fm-scope.sh changed labd660c6604ef5-far (in scope):
+within declared scope (docs/unrelated)
+--- own (declared notes,tests/test_notes.py; asked to edit README.md), copied from its ledger before teardown removed it:
+done [at=1793766045]: ready in branch fm/labd660c6604ef5-own
+done [at=1793766049]: ready in branch fm/labd660c6604ef5-own; outside-scope: README.md (captain asked for a README line)
+--- so (declared lib; originless; asked to edit README.md):
+done [at=1793766289]: ready in branch fm/labd660c6604ef5-so; outside-scope: README.md (captain asked for a README line)

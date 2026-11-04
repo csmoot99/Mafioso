@@ -1,0 +1,19 @@
+=== S1: dispatch a ship task declaring scope and an interface ===
+$ fm-spawn.sh labd660c6604ef5-own $LAB/projects/notes --mode local-only --yolo on --harness claude --model sonnet --effort low --scope notes --scope tests/test_notes.py --interface notes-api
+spawned labd660c6604ef5-own harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-labd660c6604ef5-own worktree=/tmp/fmlab.mqamTx/treehouse/.treehouse/notes-b5874e/2/notes
+[rc=]
+--- task record:
+worktree=/tmp/fmlab.mqamTx/treehouse/.treehouse/notes-b5874e/2/notes
+mode=local-only
+base_sha=d0b8100145375bb1e20275ce16df5b8bb9bcd316
+scope=notes,tests/test_notes.py
+interfaces=notes-api
+--- worktree HEAD:
+d0b8100145375bb1e20275ce16df5b8bb9bcd316
+--- local main:
+d0b8100145375bb1e20275ce16df5b8bb9bcd316
+--- backlog:
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no

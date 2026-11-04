@@ -1,0 +1,16 @@
+=== S2: second dispatch on the same interface and an overlapping scope ===
+$ fm-spawn.sh labd660c6604ef5-sib ... --scope notes/__init__.py --interface notes-api
+scope overlap (advisory) between labd660c6604ef5-sib and live task labd660c6604ef5-own:
+  - both change interface notes-api
+  - declared scope notes/__init__.py meets its declared scope notes
+  - notes/__init__.py, which it has already changed, is in declared scope notes/__init__.py
+spawned labd660c6604ef5-sib harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-labd660c6604ef5-sib worktree=/tmp/fmlab.mqamTx/treehouse/.treehouse/notes-b5874e/3/notes
+[rc=0]
+--- the worker still launched, window list:
+  fm-labd660c6604ef5-sib
+--- record:
+base_sha=d0b8100145375bb1e20275ce16df5b8bb9bcd316
+scope=notes/__init__.py
+interfaces=notes-api
+--- backlog:
+  state: in_flight

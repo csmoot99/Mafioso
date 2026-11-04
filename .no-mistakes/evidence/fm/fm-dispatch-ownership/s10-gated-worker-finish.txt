@@ -1,0 +1,17 @@
+=== S10 end to end: the gated worker declared nothing ===
+paused [at=1793763696]: waiting for gate file /tmp/fmlab.eUna19/home/data/lab5602d5264ff0-worker/gate and a resume message
+done [at=1793764086]: ready in branch fm/lab5602d5264ff0-worker; count_notes() + test in notes/__init__.py, tests/test_notes.py; unittest 2 passed
+--- tail present (expect 0):
+0
+--- fm-scope.sh changed (expect empty):
+[rc=0]
+--- worker commit:
+  dd5beb1 Add count_notes()
+  
+   notes/__init__.py                            |   4 ++++
+   notes/__pycache__/__init__.cpython-314.pyc   | Bin 0 -> 875 bytes
+   tests/__pycache__/test_notes.cpython-314.pyc | Bin 0 -> 1706 bytes
+   tests/test_notes.py                          |   6 ++++++
+   4 files changed, 10 insertions(+)
+
+=== S3b: its actual change is still visible to a new task's overlap check ===

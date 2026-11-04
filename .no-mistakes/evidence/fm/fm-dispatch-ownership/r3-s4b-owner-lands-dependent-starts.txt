@@ -1,0 +1,53 @@
+=== S4 part 2: land the owner through the product path, origin stays behind ===
+--- fm-scope.sh changed for the owner, before landing:
+outside declared scope (notes,tests/test_notes.py): README.md
+$ fm-merge-local.sh labd660c6604ef5-own 
+merged fm/labd660c6604ef5-own into local main (d0b8100 -> ddf6fc5) in /tmp/fmlab.mqamTx/home/projects/notes
+[rc=0]
+$ fm-teardown.sh labd660c6604ef5-own 
+WARNING: watcher still down (same stale episode; last beat: 21s ago, grace 300s) - full banner already printed this episode.
+teardown: reaping leaked worktree process(es) for labd660c6604ef5-own: 1689883 1691891
+teardown: force-killing leaked worktree process(es) for labd660c6604ef5-own: 1689883
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown labd660c6604ef5-own complete (window firstmate:fm-labd660c6604ef5-own, worktree /tmp/fmlab.mqamTx/treehouse/.treehouse/notes-b5874e/2/notes)
+Backlog: labd660c6604ef5-own is closed in /tmp/fmlab.mqamTx/home/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+[rc=0]
+--- owner:
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+--- dependent:
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+--- refs in the project:
+  local main:  ddf6fc56ffde0a1d50367cbd8ed6f543fad49aa0
+  origin/main: d0b8100145375bb1e20275ce16df5b8bb9bcd316
+  real origin: d0b8100145375bb1e20275ce16df5b8bb9bcd316
+--- dispatch the dependent again:
+$ fm-spawn.sh labd660c6604ef5-dep ... --scope notes --scope tests/test_notes.py --interface notes-api
+scope overlap (advisory) between labd660c6604ef5-dep and live task labd660c6604ef5-sib:
+  - both change interface notes-api
+  - declared scope notes meets its declared scope notes/__init__.py
+  - notes/__init__.py, which it has already changed, is in declared scope notes
+  - tests/test_notes.py, which it has already changed, is in declared scope tests/test_notes.py
+spawned labd660c6604ef5-dep harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-labd660c6604ef5-dep worktree=/tmp/fmlab.mqamTx/treehouse/.treehouse/notes-b5874e/2/notes
+[rc=0]
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+--- dependent starts from the landed owner (expect base_sha == local main != origin):
+base_sha=ddf6fc56ffde0a1d50367cbd8ed6f543fad49aa0
+  worktree HEAD: ddf6fc56ffde0a1d50367cbd8ed6f543fad49aa0
+  local main:    ddf6fc56ffde0a1d50367cbd8ed6f543fad49aa0
+  origin/main:   d0b8100145375bb1e20275ce16df5b8bb9bcd316
+--- owner's change is in the dependent's copy at dispatch:
+15:def find_notes(tag):
+--- changed before the worker edits (expect within scope, owner's README.md not reported):
+within declared scope (notes,tests/test_notes.py)

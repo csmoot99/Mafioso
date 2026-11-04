@@ -1,0 +1,61 @@
+=== S6: a retained owner keeps its dependents queued until the captain answers ===
+--- owner's deliverable is on the lab origin, so teardown may proceed:
+    fm/labd660c6604ef5-cov2
+$ fm-scope.sh own labd660c6604ef5-cov2 labd660c6604ef5-rdep3 
+labd660c6604ef5-rdep3 waits for labd660c6604ef5-cov2: dispatch resumes once labd660c6604ef5-cov2 is Done
+[rc=0]
+$ fm-captain-hold.sh hold labd660c6604ef5-cov2 --reason lab: keep or drop the shared contract? 
+labd660c6604ef5-cov2
+[rc=0]
+--- owner before cleanup:
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: yes
+$ fm-teardown.sh labd660c6604ef5-cov2 
+teardown: reaping leaked worktree process(es) for labd660c6604ef5-cov2: 1797461 1800350
+teardown: force-killing leaked worktree process(es) for labd660c6604ef5-cov2: 1797461
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown labd660c6604ef5-cov2 complete (window firstmate:fm-labd660c6604ef5-cov2, worktree /tmp/fmlab.mqamTx/treehouse/.treehouse/notes-b5874e/7/notes)
+Backlog: labd660c6604ef5-cov2 stays open in /tmp/fmlab.mqamTx/home/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
+[rc=0]
+--- owner after cleanup (expect queued, held; worker and record gone):
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  ls: cannot access '/tmp/fmlab.mqamTx/home/state/labd660c6604ef5-cov2.meta': No such file or directory
+  windows: 0
+--- dependent (expect queued, blocked):
+  state: queued
+  blocked: yes
+  blocked_by: labd660c6604ef5-cov2
+  held: no
+--- dispatching the dependent while the captain call is open (expect refusal):
+error: this home's backlog item labd660c6604ef5-rdep3 is not dispatchable in state queued no yes; refusing before creating its endpoint or local copy
+[rc=1]
+  ls: cannot access '/tmp/fmlab.mqamTx/home/state/labd660c6604ef5-rdep3.meta': No such file or directory
+--- the captain answers:
+$ fm-captain-hold.sh answer labd660c6604ef5-cov2 --decision-file decision.txt 
+answered: labd660c6604ef5-cov2
+[rc=0]
+--- owner:
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+--- dependent:
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+--- dispatching the dependent after the answer:
+spawned labd660c6604ef5-rdep3 harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-labd660c6604ef5-rdep3 worktree=/tmp/fmlab.mqamTx/treehouse/.treehouse/notes-b5874e/7/notes
+[rc=0]
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no

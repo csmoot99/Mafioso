@@ -1,0 +1,13 @@
+spawned labd660c6604ef5-child harness=claude kind=ship mode=direct-PR yolo=off window=firstmate:fm-labd660c6604ef5-child worktree=/tmp/fmlab.mqamTx/treehouse/.treehouse/notes-b5874e/10/notes
+=== S8c: real child under a real second mate ===
+--- child status:
+done [at=1793766540]: PR https://github.com/o/r/pull/8; outside-scope: README.md (captain asked for the README line)
+--- pr= lines in the child record (expect 0, so delivery must scrape the done line):
+0
+--- head reachable on the mate's origin:
+    origin/fm/labd660c6604ef5-child
+--- parent channel, before scan:
+$ fm-inactive-reconcile.sh scan  (the mate home's own poll step)
+[rc=0]
+--- parent channel, after scan:
+done [key=child-outcome-labd660c6604ef5-child-done-f5836eb2] [at=1793766596]: child labd660c6604ef5-child done: PR https://github.com/o/r/pull/8; outside-scope: README.md (captain asked for the README line) pr=https://github.com/o/r/pull/8 mode=direct-PR yolo=off

@@ -1,0 +1,25 @@
+=== S4 part 1: ownership orders dispatch through the backlog ===
+$ fm-scope.sh own labd660c6604ef5-own labd660c6604ef5-dep 
+labd660c6604ef5-dep waits for labd660c6604ef5-own: dispatch resumes once labd660c6604ef5-own is Done
+[rc=0]
+--- owner:
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+--- dependent:
+  state: queued
+  blocked: yes
+  blocked_by: labd660c6604ef5-own
+  held: no
+--- dispatch the dependent while the owner is in flight (expect refusal):
+$ fm-spawn.sh labd660c6604ef5-dep ... --scope notes --scope tests/test_notes.py --interface notes-api
+error: this home's backlog item labd660c6604ef5-dep is not dispatchable in state queued no yes; refusing before creating its endpoint or local copy
+[rc=1]
+--- nothing was created:
+  ls: cannot access '/tmp/fmlab.mqamTx/home/state/labd660c6604ef5-dep.meta': No such file or directory
+  windows named for the dependent: 0
+  state: queued
+  blocked: yes
+  blocked_by: labd660c6604ef5-own
+  held: no

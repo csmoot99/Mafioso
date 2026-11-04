@@ -1,0 +1,43 @@
+=== S4c: originless local-only project (the real fleet's local-only shape) ===
+--- dependent blocked while owner is in flight:
+error: this home's backlog item labd660c6604ef5-sd is not dispatchable in state queued no yes; refusing before creating its endpoint or local copy
+[rc=1]
+--- owner's real outside-scope line:
+done [at=1793766289]: ready in branch fm/labd660c6604ef5-so; outside-scope: README.md (captain asked for a README line)
+--- owner changed:
+outside declared scope (lib): README.md
+$ fm-merge-local.sh labd660c6604ef5-so 
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+merged fm/labd660c6604ef5-so into local main (977bf87 -> 3e5c0ae) in /tmp/fmlab.mqamTx/home/projects/solo
+[rc=0]
+$ fm-teardown.sh labd660c6604ef5-so 
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+teardown: reaping leaked worktree process(es) for labd660c6604ef5-so: 1828803 1838247
+teardown: force-killing leaked worktree process(es) for labd660c6604ef5-so: 1828803
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown labd660c6604ef5-so complete (window firstmate:fm-labd660c6604ef5-so, worktree /tmp/fmlab.mqamTx/treehouse/.treehouse/solo-3ab0ce/1/solo)
+Backlog: labd660c6604ef5-so is closed in /tmp/fmlab.mqamTx/home/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+[rc=0]
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+--- dispatch after landing:
+NOTICE: wake rows held by the live supervision branch - it presents and acknowledges them; do not drain them from here.
+spawned labd660c6604ef5-sd harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-labd660c6604ef5-sd worktree=/tmp/fmlab.mqamTx/treehouse/.treehouse/solo-3ab0ce/1/solo
+[rc=0]
+--- base_sha vs local main:
+base_sha=3e5c0ae540b79de54b28df1ddb3ab2152520bc80
+3e5c0ae540b79de54b28df1ddb3ab2152520bc80
+--- owner's change in the dependent's copy:
+4:def get_value():
+--- S4c follow-up: the dependent's real worker finished from the landed owner, no rebase:
+done [at=1793766354]: ready in branch fm/labd660c6604ef5-sd (lib/core.py +4 double_value; tests not run, none exist)
+--- fm-scope.sh changed (expect within scope; owner's README.md not blamed):
+within declared scope (lib)
+  392efcc Add double_value() to lib/core.py
+  3e5c0ae Add get_value() to lib/core.py
+  977bf87 seed solo

@@ -1,0 +1,17 @@
+=== S4g adversarial: local main moves AFTER a task forked; changed must not blame that task for the newcomer ===
+--- dep2 forked at ddf6fc5; before main moves:
+within declared scope (dep2.txt)
+$ fm-merge-local.sh labd660c6604ef5-dep 
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+merged fm/labd660c6604ef5-dep into local main (ddf6fc5 -> c44a015) in /tmp/fmlab.mqamTx/home/projects/notes
+[rc=0]
+  local main now: c44a015 (holds dep's CHANGELOG.md); origin stays at ddf6fc5
+--- dep2 after main moved (expect still within scope, no CHANGELOG.md):
+within declared scope (dep2.txt)
+--- rdep3 forked from an older main (expect within scope):
+within declared scope (rdep3.txt)
+--- a NEW task starts from the moved local main:
+spawned labd660c6604ef5-dep3 harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-labd660c6604ef5-dep3 worktree=/tmp/fmlab.mqamTx/treehouse/.treehouse/not
+base_sha=c44a0154657705a2999b0b96fc82327900c1991c
+  local main: c44a0154657705a2999b0b96fc82327900c1991c
+error: exit-delivered labd660c6604ef5-dep3 interrupt=delivered verified=agent-alive cancel

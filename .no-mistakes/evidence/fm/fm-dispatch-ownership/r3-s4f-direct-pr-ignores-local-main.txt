@@ -1,0 +1,21 @@
+=== S4f adversarial: a direct-PR task on the same project must ignore local main (origin is its landing target) ===
+  local main before: ddf6fc56ffde0a1d50367cbd8ed6f543fad49aa0
+  origin main:       d0b8100145375bb1e20275ce16df5b8bb9bcd316
+$ fm-spawn.sh labd660c6604ef5-pr ... --mode direct-PR --yolo off --scope notes
+scope overlap (advisory) between labd660c6604ef5-pr and live task labd660c6604ef5-dep:
+  - declared scope notes meets its declared scope notes
+  - notes/__init__.py, which it has already changed, is in declared scope notes
+scope overlap (advisory) between labd660c6604ef5-pr and live task labd660c6604ef5-sib:
+  - declared scope notes meets its declared scope notes/__init__.py
+  - notes/__init__.py, which it has already changed, is in declared scope notes
+scope overlap (advisory) between labd660c6604ef5-pr and live task labd660c6604ef5-worker:
+  - notes/__init__.py, which it has already changed, is in declared scope notes
+  - notes/__pycache__/__init__.cpython-314.pyc, which it has already changed, is in declared scope notes
+spawned labd660c6604ef5-pr harness=claude kind=ship mode=direct-PR yolo=off window=firstmate:fm-labd660c6604ef5-pr worktree=/tmp/fmlab.mqamTx/treehouse/.treehouse/notes-b5874e/8/notes
+[rc=0]
+--- expect base_sha == origin main, not local main:
+mode=direct-PR
+base_sha=d0b8100145375bb1e20275ce16df5b8bb9bcd316
+  HEAD: d0b8100145375bb1e20275ce16df5b8bb9bcd316
+--- owner's unpushed find_notes absent from this copy (expect 0):
+0

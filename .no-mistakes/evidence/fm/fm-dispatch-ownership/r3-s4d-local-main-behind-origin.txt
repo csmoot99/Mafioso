@@ -1,0 +1,15 @@
+=== S4d adversarial: local main merely behind origin; a local-only task must take origin, not stale local main ===
+  local main before: 10a45cce07aed8aa81767b6a5870d509eea34f97
+  real origin main:  48a5065d75aedddbcf05b8bad9f79befc918d47a
+spawned labd660c6604ef5-bh harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-labd660c6604ef5-bh worktree=/tmp/fmlab.mqamTx/treehouse/.treehouse/behind-2e61fd/1/behind
+[rc=0]
+base_sha=48a5065d75aedddbcf05b8bad9f79befc918d47a
+  HEAD: 48a5065d75aedddbcf05b8bad9f79befc918d47a
+  local main now: 10a45cce07aed8aa81767b6a5870d509eea34f97
+--- origin's advance present:
+/tmp/fmlab.mqamTx/treehouse/.treehouse/behind-2e61fd/1/behind/upstream.txt
+--- S4d follow-up: fm-scope.sh changed labd660c6604ef5-bh after the real worker finished (expect within scope; upstream.txt not blamed):
+within declared scope (bh.txt)
+  90906ea add bh.txt
+  48a5065 upstream advance
+  10a45cc seed behind

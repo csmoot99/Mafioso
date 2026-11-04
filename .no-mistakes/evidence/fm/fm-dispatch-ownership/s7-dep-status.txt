@@ -1,0 +1,13 @@
+=== S7: real worker done lines (status ledger) ===
+done [at=1793763908]: ready in branch fm/lab5602d5264ff0-dep (rebased onto main for find_notes; 3 tests pass; skipped: nothing)
+done [at=1793763911]: ready in branch fm/lab5602d5264ff0-dep; outside-scope: CHANGELOG.md, README.md (CHANGELOG.md was requested; README.md untouched by me, likely base diff from main advancing)
+
+--- fm-scope.sh changed lab5602d5264ff0-dep:
+outside declared scope (notes,tests/test_notes.py): CHANGELOG.md, README.md
+--- what the worker actually committed on top of the landed owner:
+  231a831 Add count_tagged(tag) with test and CHANGELOG
+  
+   CHANGELOG.md        | 1 +
+   notes/__init__.py   | 4 ++++
+   tests/test_notes.py | 7 +++++++
+   3 files changed, 12 insertions(+)

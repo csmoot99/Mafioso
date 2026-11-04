@@ -1,0 +1,24 @@
+=== S4c: originless local-only project (the real fleet's local-only shape) ===
+--- dependent blocked while owner is in flight:
+error: this home's backlog item lab5602d5264ff0-sd is not dispatchable in state queued no yes; refusing before creating its endpoint or local copy
+--- owner's real outside-scope line:
+done [at=1793764252]: ready in branch fm/lab5602d5264ff0-so; outside-scope: README.md (requested by the brief)
+--- owner changed:
+outside declared scope (lib): README.md
+merged fm/lab5602d5264ff0-so into local main (83d9d11 -> 878a01d) in /tmp/fmlab.eUna19/home/projects/solo
+teardown lab5602d5264ff0-so complete (window firstmate:fm-lab5602d5264ff0-so, worktree /tmp/fmlab.eUna19/treehouse/.treehouse/solo-d17cf7/1/
+Backlog: lab5602d5264ff0-so is closed in /tmp/fmlab.eUna19/home/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candid
+  state: queued
+  blocked: no
+  blocked_by: none
+--- dispatch after landing:
+spawned lab5602d5264ff0-sd harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-lab5602d5264ff0-sd worktree=/tmp/fmlab.eUna19/treehouse/.treehouse/solo-d1
+--- base_sha vs local main:
+base_sha=878a01dcb02b444c289dd555d0c9fc1805936b20
+878a01dcb02b444c289dd555d0c9fc1805936b20
+--- owner's change in the dependent's copy:
+4:def get_value():
+878a01d (HEAD, main, fm/lab5602d5264ff0-so) Add get_value() to lib/core.py and mention it 
+83d9d11 seed solo
+--- changed for the dependent with one in-scope edit:
+within declared scope (lib)

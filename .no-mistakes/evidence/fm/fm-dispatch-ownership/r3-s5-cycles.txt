@@ -1,0 +1,48 @@
+=== S5 adversarial: own refuses any edge that would close a cycle ===
+$ fm-scope.sh own labd660c6604ef5-cya labd660c6604ef5-cyb 
+labd660c6604ef5-cyb waits for labd660c6604ef5-cya: dispatch resumes once labd660c6604ef5-cya is Done
+[rc=0]
+$ fm-scope.sh own labd660c6604ef5-cyc labd660c6604ef5-cyb 
+labd660c6604ef5-cyb waits for labd660c6604ef5-cyc: dispatch resumes once labd660c6604ef5-cyc is Done
+[rc=0]
+$ fm-scope.sh own labd660c6604ef5-cyb labd660c6604ef5-cyd 
+labd660c6604ef5-cyd waits for labd660c6604ef5-cyb: dispatch resumes once labd660c6604ef5-cyb is Done
+[rc=0]
+--- cyb now waits on two owners:
+  blocked_by: "labd660c6604ef5-cya,labd660c6604ef5-cyc"
+--- direct two-node cycle (expect rc=2):
+$ fm-scope.sh own labd660c6604ef5-cyb labd660c6604ef5-cya 
+fm-scope: refusing: labd660c6604ef5-cyb already waits on labd660c6604ef5-cya, so labd660c6604ef5-cya waiting on labd660c6604ef5-cyb would be a cycle
+[rc=2]
+--- through the first of two blockers (expect rc=2):
+$ fm-scope.sh own labd660c6604ef5-cyd labd660c6604ef5-cya 
+fm-scope: refusing: labd660c6604ef5-cyd already waits on labd660c6604ef5-cya, so labd660c6604ef5-cya waiting on labd660c6604ef5-cyd would be a cycle
+[rc=2]
+--- through the last of two blockers (expect rc=2):
+$ fm-scope.sh own labd660c6604ef5-cyd labd660c6604ef5-cyc 
+fm-scope: refusing: labd660c6604ef5-cyd already waits on labd660c6604ef5-cyc, so labd660c6604ef5-cyc waiting on labd660c6604ef5-cyd would be a cycle
+[rc=2]
+--- self edge (expect non-zero):
+$ fm-scope.sh own labd660c6604ef5-cye labd660c6604ef5-cye 
+fm-scope: could not record labd660c6604ef5-cye blocked-by labd660c6604ef5-cye
+[rc=2]
+  blocked_by: none
+--- refused edges not recorded (expect none, none):
+  blocked_by: none
+  blocked_by: none
+--- dependent already dispatched (expect rc=2):
+$ fm-scope.sh own labd660c6604ef5-cya labd660c6604ef5-own 
+fm-scope: dependent labd660c6604ef5-own is already dispatched or closed; ownership only orders dispatch
+[rc=2]
+--- unknown owner / dependent (expect rc=2):
+$ fm-scope.sh own labd660c6604ef5-nope labd660c6604ef5-cyf 
+fm-scope: owner labd660c6604ef5-nope has no backlog item
+[rc=2]
+$ fm-scope.sh own labd660c6604ef5-cyf labd660c6604ef5-nope 
+fm-scope: dependent labd660c6604ef5-nope has no backlog item
+[rc=2]
+--- all-or-nothing: second dependent would cycle, first must not be recorded:
+$ fm-scope.sh own labd660c6604ef5-cyd labd660c6604ef5-cyf labd660c6604ef5-cya 
+fm-scope: refusing: labd660c6604ef5-cyd already waits on labd660c6604ef5-cya, so labd660c6604ef5-cya waiting on labd660c6604ef5-cyd would be a cycle
+[rc=2]
+  blocked_by: none

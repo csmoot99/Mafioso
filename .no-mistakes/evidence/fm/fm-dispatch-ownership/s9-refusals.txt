@@ -1,0 +1,48 @@
+=== S9 adversarial: --scope/--interface refused outside a fresh ship dispatch ===
+--- scout:
+$ fm-spawn.sh lab5602d5264ff0-scout1 /tmp/fmlab.eUna19/home/projects/notes --scout --scope notes
+error: --scope and --interface are recorded at a fresh ship dispatch only
+[rc=]
+--- scout, interface:
+$ fm-spawn.sh lab5602d5264ff0-scout1 /tmp/fmlab.eUna19/home/projects/notes --scout --interface notes-api
+error: --scope and --interface are recorded at a fresh ship dispatch only
+[rc=]
+--- relaunch:
+$ fm-spawn.sh lab5602d5264ff0-sib --relaunch --scope notes
+error: --scope and --interface are recorded at a fresh ship dispatch only
+[rc=]
+--- relaunch, interface:
+$ fm-spawn.sh lab5602d5264ff0-sib --relaunch --interface other
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  3 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: --scope and --interface are recorded at a fresh ship dispatch only
+[rc=]
+--- batch:
+$ fm-spawn.sh lab5602d5264ff0-b1=/tmp/fmlab.eUna19/home/projects/notes lab5602d5264ff0-b2=/tmp/fmlab.eUna19/home/projects/notes --mode local-only --yolo on --harness claude --scope notes
+error: --scope and --interface declare one task's scope; spawn that task on its own
+[rc=]
+--- secondmate:
+$ fm-spawn.sh lab5602d5264ff0-m1 --secondmate --scope notes
+error: --scope and --interface are recorded at a fresh ship dispatch only
+[rc=]
+--- value with a space:
+$ fm-spawn.sh lab5602d5264ff0-b1 /tmp/fmlab.eUna19/home/projects/notes --mode local-only --yolo on --harness claude --scope a b
+error: --scope and --interface take single-line values without spaces or empty entries (commas only join repeats)
+[rc=]
+--- empty entry:
+$ fm-spawn.sh lab5602d5264ff0-b1 /tmp/fmlab.eUna19/home/projects/notes --mode local-only --yolo on --harness claude --scope a,,b
+error: --scope and --interface take single-line values without spaces or empty entries (commas only join repeats)
+[rc=]
+--- nothing was created by those refusals:
+(no state files)
+(no windows)
+state: queued
+state: queued
+state: queued
+scout rc=1
+relaunch rc=1
+batch rc=1

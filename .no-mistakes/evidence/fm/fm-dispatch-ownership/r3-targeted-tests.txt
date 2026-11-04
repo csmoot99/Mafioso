@@ -1,0 +1,5 @@
+tests/fm-scope.test.sh: rc=0 ok - fm-spawn.sh: --scope and --interface are refused outside a fresh ship dispatch
+tests/fm-spawn-pool-base-freshen.test.sh: rc=0 # all fm-spawn-pool-base-freshen tests passed
+tests/fm-brief.test.sh: rc=0 ok - fm-brief.sh --combine is refused without its done command, beside a plan, or on a malformed combine file
+tests/fm-dod-lib.test.sh: rc=0 all fm-dod-lib tests passed
+tests/fm-inactive-reconcile.test.sh: rc=0 all inactive reconciliation tests passed

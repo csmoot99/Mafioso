@@ -1,0 +1,25 @@
+=== S10: the lab's gated worker declared nothing (tree 0763c78) ===
+overlap lines in spawn output (expect 0): 0
+--- task record scope fields:
+base_sha=d0b8100145375bb1e20275ce16df5b8bb9bcd316
+--- fm-scope.sh changed (expect empty):
+[rc=0]
+--- fm-scope.sh overlap (expect empty):
+[rc=0]
+--- worker status:
+paused [at=1793765424]: waiting for gate file /tmp/fmlab.mqamTx/home/data/labd660c6604ef5-worker/gate and a resume message
+=== S10 end to end: the gated worker declared nothing ===
+paused [at=1793765424]: waiting for gate file /tmp/fmlab.mqamTx/home/data/labd660c6604ef5-worker/gate and a resume message
+done [at=1793766149]: ready in branch fm/labd660c6604ef5-worker; count_notes() + test, 2 files, unittest passes; skipped: nothing
+--- outside-scope tail present (expect 0):
+0
+--- fm-scope.sh changed (expect empty):
+[rc=0]
+--- worker commit:
+  463688b Add count_notes()
+  
+   notes/__init__.py                            |   4 ++++
+   notes/__pycache__/__init__.cpython-314.pyc   | Bin 0 -> 875 bytes
+   tests/__pycache__/test_notes.cpython-314.pyc | Bin 0 -> 1647 bytes
+   tests/test_notes.py                          |   5 +++++
+   4 files changed, 9 insertions(+)

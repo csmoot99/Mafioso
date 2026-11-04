@@ -1,0 +1,52 @@
+=== S5 adversarial: own refuses any edge that would close a cycle ===
+$ fm-scope.sh own lab5602d5264ff0-cya lab5602d5264ff0-cyb
+lab5602d5264ff0-cyb waits for lab5602d5264ff0-cya: dispatch resumes once lab5602d5264ff0-cya is Done
+[rc=0]
+$ fm-scope.sh own lab5602d5264ff0-cyc lab5602d5264ff0-cyb
+lab5602d5264ff0-cyb waits for lab5602d5264ff0-cyc: dispatch resumes once lab5602d5264ff0-cyc is Done
+[rc=0]
+$ fm-scope.sh own lab5602d5264ff0-cyb lab5602d5264ff0-cyd
+lab5602d5264ff0-cyd waits for lab5602d5264ff0-cyb: dispatch resumes once lab5602d5264ff0-cyb is Done
+[rc=0]
+--- lab5602d5264ff0-cyb now waits on two owners:
+  blocked_by: "lab5602d5264ff0-cya,lab5602d5264ff0-cyc"
+--- direct two-node cycle:
+$ fm-scope.sh own lab5602d5264ff0-cyb lab5602d5264ff0-cya
+fm-scope: refusing: lab5602d5264ff0-cyb already waits on lab5602d5264ff0-cya, so lab5602d5264ff0-cya waiting on lab5602d5264ff0-cyb would be a cycle
+[rc=2]
+--- through first of two blockers:
+$ fm-scope.sh own lab5602d5264ff0-cyd lab5602d5264ff0-cya
+fm-scope: refusing: lab5602d5264ff0-cyd already waits on lab5602d5264ff0-cya, so lab5602d5264ff0-cya waiting on lab5602d5264ff0-cyd would be a cycle
+[rc=2]
+--- through last of two blockers:
+$ fm-scope.sh own lab5602d5264ff0-cyd lab5602d5264ff0-cyc
+fm-scope: refusing: lab5602d5264ff0-cyd already waits on lab5602d5264ff0-cyc, so lab5602d5264ff0-cyc waiting on lab5602d5264ff0-cyd would be a cycle
+[rc=2]
+--- self edge:
+$ fm-scope.sh own lab5602d5264ff0-cye lab5602d5264ff0-cye
+fm-scope: could not record lab5602d5264ff0-cye blocked-by lab5602d5264ff0-cye
+[rc=2]
+--- lab5602d5264ff0-cye after self own:
+  blocked: no
+  blocked_by: none
+--- refused edges were not recorded:
+  blocked_by: none
+  blocked_by: none
+--- dependent already dispatched:
+$ fm-scope.sh own lab5602d5264ff0-cya lab5602d5264ff0-own
+fm-scope: dependent lab5602d5264ff0-own is already dispatched or closed; ownership only orders dispatch
+[rc=2]
+--- owner with no row:
+$ fm-scope.sh own lab5602d5264ff0-nope lab5602d5264ff0-cyf
+fm-scope: owner lab5602d5264ff0-nope has no backlog item
+[rc=2]
+--- dependent with no row:
+$ fm-scope.sh own lab5602d5264ff0-cyf lab5602d5264ff0-nope
+fm-scope: dependent lab5602d5264ff0-nope has no backlog item
+[rc=2]
+--- all-or-nothing, second dependent would cycle (lab5602d5264ff0-cya -> lab5602d5264ff0-cyf ok, then lab5602d5264ff0-cya -> lab5602d5264ff0-cyc fine; try lab5602d5264ff0-cyd with lab5602d5264ff0-cyf and lab5602d5264ff0-cya):
+$ fm-scope.sh own lab5602d5264ff0-cyd lab5602d5264ff0-cyf lab5602d5264ff0-cya
+fm-scope: refusing: lab5602d5264ff0-cyd already waits on lab5602d5264ff0-cya, so lab5602d5264ff0-cya waiting on lab5602d5264ff0-cyd would be a cycle
+[rc=2]
+--- lab5602d5264ff0-cyf after the refused batch:
+  blocked_by: none

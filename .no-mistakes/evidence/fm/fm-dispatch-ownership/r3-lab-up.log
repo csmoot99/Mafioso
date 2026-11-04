@@ -1,0 +1,15 @@
+lab: /tmp/fmlab.mqamTx (tear down with: /home/work/.no-mistakes/worktrees/5f69104d19ce/01M6J7PKV256GMHCCDMF1HB193/bin/fm-live-lab.sh down /tmp/fmlab.mqamTx)
+tree: 0763c784f28f74835b430c596a707164c0cdb489 from /home/work/.no-mistakes/worktrees/5f69104d19ce/01M6J7PKV256GMHCCDMF1HB193
+spawned labd660c6604ef5-worker harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-labd660c6604ef5-worker worktree=/tmp/fmlab.mqamTx/treehouse/.treehouse/notes-b5874e/1/notes
+gate: /tmp/fmlab.mqamTx/home/data/labd660c6604ef5-worker/gate (touch, then message the worker to resume)
+primary: claude --setting-sources project,local --model sonnet --effort medium --permission-mode auto
+ok primary: claude pid 1525363 in /tmp/fmlab.mqamTx/home
+ok probe: the primary answered LABREADY-d660c6604ef5
+ok trust: /tmp/fmlab.mqamTx/home is trusted in the Claude store
+ok mirror: verified writer, check passed, captain=1 main=1
+ok host: supervision host pid 1536445
+ok watcher: live watcher with a fresh beacon
+ok worker: labd660c6604ef5-worker parked on /tmp/fmlab.mqamTx/home/data/labd660c6604ef5-worker/gate
+ok treehouse: ~/.treehouse unchanged
+ready: /tmp/fmlab.mqamTx
+up rc=0

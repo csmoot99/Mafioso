@@ -1,0 +1,15 @@
+=== S4e adversarial: local main and origin diverged; a local-only task must keep the landed work ===
+  local main before: 7a4cbfde92cf8f7f4412e0d81e4aba93596326e8
+  real origin main:  2119d2e0c712acb6c30fbd257d5b391a55e9df7a
+spawned labd660c6604ef5-dv harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-labd660c6604ef5-dv worktree=/tmp/fmlab.mqamTx/treehouse/.treehouse/div-776966/1/div
+[rc=0]
+base_sha=7a4cbfde92cf8f7f4412e0d81e4aba93596326e8
+  HEAD: 7a4cbfde92cf8f7f4412e0d81e4aba93596326e8
+  origin/main in copy: 2119d2e0c712acb6c30fbd257d5b391a55e9df7a
+--- local landing present:
+/tmp/fmlab.mqamTx/treehouse/.treehouse/div-776966/1/div/landed.txt
+--- S4e follow-up: fm-scope.sh changed labd660c6604ef5-dv after the real worker finished (expect within scope; landed.txt not blamed):
+within declared scope (dv.txt)
+  88535bf add dv.txt
+  7a4cbfd local landing
+  926aee9 seed div

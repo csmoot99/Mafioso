@@ -1,0 +1,19 @@
+stopped: lab tmux server and lab processes
+removed: task temp /tmp/fm-labd660c6604ef5-mate+e4cdbee421e573e979965a10aa009b54b74c8037864010501c6abbda09f0af16
+removed: task temp /tmp/fm-labd660c6604ef5-mate
+removed: task temp /tmp/fm-labd660c6604ef5-worker+e4cdbee421e573e979965a10aa009b54b74c8037864010501c6abbda09f0af16
+removed: task temp /tmp/fm-labd660c6604ef5-worker
+removed: task temp /tmp/fm-labd660c6604ef5-bh+e4cdbee421e573e979965a10aa009b54b74c8037864010501c6abbda09f0af16
+removed: task temp /tmp/fm-labd660c6604ef5-cov+e4cdbee421e573e979965a10aa009b54b74c8037864010501c6abbda09f0af16
+removed: task temp /tmp/fm-labd660c6604ef5-dep+e4cdbee421e573e979965a10aa009b54b74c8037864010501c6abbda09f0af16
+removed: task temp /tmp/fm-labd660c6604ef5-dep2+e4cdbee421e573e979965a10aa009b54b74c8037864010501c6abbda09f0af16
+removed: task temp /tmp/fm-labd660c6604ef5-dep3+e4cdbee421e573e979965a10aa009b54b74c8037864010501c6abbda09f0af16
+removed: task temp /tmp/fm-labd660c6604ef5-dv+e4cdbee421e573e979965a10aa009b54b74c8037864010501c6abbda09f0af16
+removed: task temp /tmp/fm-labd660c6604ef5-far+e4cdbee421e573e979965a10aa009b54b74c8037864010501c6abbda09f0af16
+removed: task temp /tmp/fm-labd660c6604ef5-pr+e4cdbee421e573e979965a10aa009b54b74c8037864010501c6abbda09f0af16
+removed: task temp /tmp/fm-labd660c6604ef5-rdep+e4cdbee421e573e979965a10aa009b54b74c8037864010501c6abbda09f0af16
+removed: task temp /tmp/fm-labd660c6604ef5-rdep3+e4cdbee421e573e979965a10aa009b54b74c8037864010501c6abbda09f0af16
+removed: task temp /tmp/fm-labd660c6604ef5-sd+e4cdbee421e573e979965a10aa009b54b74c8037864010501c6abbda09f0af16
+removed: task temp /tmp/fm-labd660c6604ef5-sib+e4cdbee421e573e979965a10aa009b54b74c8037864010501c6abbda09f0af16
+removed: 21 Claude project entries under /tmp/fmlab.mqamTx
+removed: /tmp/fmlab.mqamTx

@@ -1,0 +1,11 @@
+=== S8a: the done gate reads a real worker's outside-scope done line (direct-PR) ===
+--- worker's own final line (written after a steer to the brief's exact shape):
+done [at=1793766405]: PR https://github.com/o/r/pull/7; outside-scope: README.md, tests/test_notes.py (captain asked the README line; test covers the change)
+--- its head is on no remote (expect no refs):
+  (end of remote list)
+--- seeded forge record, because the lab has no forge: pr= and the merged marker bin/fm-pr-lib.sh writes
+marker rc=0
+--- this change: fm-crew-state.sh labd660c6604ef5-pr
+state: done · source: status-log · PR https://github.com/o/r/pull/7; outside-scope: README.md, tests/test_notes.py (captain asked the README line; test covers the change)
+--- control: the same line and record through base commit 61de8bb's parser:
+state: blocked · source: status-log · named head 341842114c545e340bf016a0513301311b0de656 is unreachable outside the worker copy
