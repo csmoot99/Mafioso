@@ -1,0 +1,39 @@
+=== S5 timeout kills the job's own group, a same-named outside process survives
+decoy pid on Mac: 31459
+rc=124 (want 124)
+{"host":"fm-mac","outcome":"timeout","exit":124,"slot":null,"fallback":null,"job":"1793803626-3294564-20576","candidate":"4966361d22","wait_s":0,"prepare_s":1,"run_s":4,"collect_s":0,"cpu_usec":20614,"peak_memory_bytes":null}
+mac 'sleep 977/978' left:
+31459 sleep 977
+scratch: 0
+=== S6 macOS: job ignores TERM past timeout (real killpg/EPERM path), 3 runs
+ignoring TERM
+rc=124 (want 124)
+{"host":"fm-mac","outcome":"timeout","exit":124,"slot":null,"fallback":null,"job":"1793803635-3307896-8945","candidate":"4966361d22","wait_s":0,"prepare_s":1,"run_s":6,"collect_s":1,"cpu_usec":55722,"peak_memory_bytes":null}
+{"outcome":"timeout","exit_code":137,"run_s":5.234}
+scratch: 0
+ignoring TERM
+rc=124 (want 124)
+{"host":"fm-mac","outcome":"timeout","exit":124,"slot":null,"fallback":null,"job":"1793803644-3313132-18447","candidate":"4966361d22","wait_s":1,"prepare_s":1,"run_s":6,"collect_s":0,"cpu_usec":55852,"peak_memory_bytes":null}
+{"outcome":"timeout","exit_code":137,"run_s":5.163}
+scratch: 0
+ignoring TERM
+rc=124 (want 124)
+{"host":"fm-mac","outcome":"timeout","exit":124,"slot":null,"fallback":null,"job":"1793803654-3318486-22638","candidate":"4966361d22","wait_s":1,"prepare_s":1,"run_s":6,"collect_s":0,"cpu_usec":62342,"peak_memory_bytes":null}
+{"outcome":"timeout","exit_code":137,"run_s":5.236}
+scratch: 0
+mac leftovers: []
+=== S7 wrapper signalled: stops only its job, nothing runs locally
+running on mac: 38850 bash t/job.sh slow 40
+=== S7 (group signal, as a process manager or Ctrl-C delivers it)
+running on mac: 47278 bash t/job.sh slow 40
+rc=143 (want 143) after 2s
+{"host":"fm-mac","outcome":"cancelled","exit":143,"slot":null,"fallback":null,"job":"1793803725-3337998-15913","candidate":"4966361d22","wait_s":1,"prepare_s":1,"run_s":1,"collect_s":null,"cpu_usec":null,"peak_memory_bytes":null}
+records added: 1 (want 1; no local run)
+mac job left: [] outsider: [46747 sleep 979] scratch: 0
+=== S8 cancelled on the host: command traps TERM and exits 0 must not be green
+supervisor on mac: 47833
+rc=143 (want 143)
+trapping TERM to exit 0
+{"host":"fm-mac","outcome":"cancelled","exit":143,"slot":null,"fallback":null,"job":"1793803734-3339439-23109","candidate":"4966361d22","wait_s":0,"prepare_s":1,"run_s":4,"collect_s":1,"cpu_usec":21884,"peak_memory_bytes":null}
+{"outcome":"cancelled","exit_code":0}
+scratch: 0

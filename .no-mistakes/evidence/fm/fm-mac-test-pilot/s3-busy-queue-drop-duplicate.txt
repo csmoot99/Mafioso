@@ -1,0 +1,32 @@
+=== S9 destination takes one job; a second request runs locally at once
+slow-started 3359171
+slow-finished
+second rc=0 after 12s
+{"host":"local","outcome":null,"exit":0,"slot":1,"fallback":"destination-busy","job":null,"candidate":"","wait_s":0,"prepare_s":null,"run_s":12,"collect_s":null,"cpu_usec":20811,"peak_memory_bytes":3932160}
+first rc=0
+{"host":"fm-mac","outcome":"pass","exit":0,"slot":null,"fallback":null,"job":"1793803773-3358770-14900","candidate":"4966361d22","wait_s":1,"prepare_s":1,"run_s":12,"collect_s":1,"cpu_usec":14799,"peak_memory_bytes":null}
+slow-started 52064
+slow-finished
+=== S10 slot busy: --remote does not queue behind it; a plain job does
+Darwin
+remote finished after 4s while the slot was held
+{"host":"fm-mac","outcome":"pass","exit":0,"slot":null,"fallback":null,"job":"1793803790-3362001-12746","candidate":"4966361d22","wait_s":1,"prepare_s":1,"run_s":1,"collect_s":1,"cpu_usec":19063,"peak_memory_bytes":null}
+{"host":"local","slot":1,"wait_s":13,"run_s":0,"exit":0}
+=== S11 transient connection drop during the job: reconciled, collected, not re-run
+connection cut at 09:50:08, mac job: 57897 bash t/job.sh slow 14
+connection back at 09:50:13
+rc=0 (want 0)
+slow-started 57897
+slow-finished
+{"host":"fm-mac","outcome":"pass","exit":0,"slot":null,"fallback":null,"job":"1793803803-3368139-24297","candidate":"4966361d22","wait_s":1,"prepare_s":1,"run_s":14,"collect_s":1,"cpu_usec":12898,"peak_memory_bytes":null}
+starts-so-far-all-scenarios-via-shim: 1
+scratch: 0
+=== S16 duplicate delivery: a second start of the same job is refused on the host
+job dir .fm-heavy-remote/1793803822-3375276-23602
+refused: job 1793803822-3375276-23602 was already started
+second start rc=10 (want 10)
+job rc=0 (want 0)
+slow-started 59604
+slow-finished
+{"host":"fm-mac","outcome":"pass","exit":0,"slot":null,"fallback":null,"job":"1793803822-3375276-23602","candidate":"4966361d22","wait_s":1,"prepare_s":1,"run_s":10,"collect_s":1,"cpu_usec":15518,"peak_memory_bytes":null}
+scratch: 0

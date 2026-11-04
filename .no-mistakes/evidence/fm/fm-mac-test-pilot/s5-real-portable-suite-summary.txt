@@ -1,0 +1,21 @@
+0
+132c0e9245530d5826a7813d203db730e495ccaa
+=== S17 remote
+rc=0 (want 0)
+ok - lint skips only Markdown, JSON, license, and asset changes that no lint input reads
+ok - --strict exits 3 for unmapped changes and --only-from narrows a selection
+ok - board and Lavish changes select only the board and process-event suites
+{"host":"fm-mac","outcome":"pass","exit":0,"candidate":"132c0e9245530d5826a7813d203db730e495ccaa","wait_s":1,"prepare_s":7,"run_s":23,"collect_s":1,"fallback":null}
+scratch: 0
+=== S17 local under the shared slot
+rc=0 (want 0)
+ok - board and Lavish changes select only the board and process-event suites
+{"host":"local","exit":0,"slot":1,"wait_s":0,"run_s":27,"peak_memory_bytes":173277184}
+=== S18 summary over every lab record
+project    class  jobs  failed  wait_avg_s  wait_max_s  run_avg_s  run_max_s  wait_pct  peak_mib  unknown_peak  host    prepare_avg_s  collect_avg_s
+firstmate  test   1     0       1           1           23         23         4         unknown   1             fm-mac  7              1
+firstmate  test   1     0       0           0           27         27         0         165       0             local   unknown        unknown
+lab        test   20    13      1           4           6          40         16        unknown   20            fm-mac  1              1
+lab        test   9     1       2           13          2          12         53        5         0             local   unknown        unknown
+rc=0
+0

@@ -1,0 +1,67 @@
+=== S12a network drop for longer than the reconnect budget: unknown 75, no retry
+rc=75 (want 75)
+{"host":"fm-mac","outcome":"unknown","exit":75,"slot":null,"fallback":null,"job":"1793803853-3383157-17664","candidate":"4966361d22","wait_s":1,"prepare_s":1,"run_s":3,"collect_s":null,"cpu_usec":null,"peak_memory_bytes":null}
+records added: 1 (want 1: no local retry)
+open records: 1793803853-3383157-17664.json
+mac still has: 62417 bash t/job.sh slow 40 scratch: 1
+=== S12b connection still down: new request runs locally, the record stays
+fm-heavy-remote: not running on fm-mac (unreachable); running locally
+Linux
+DESKTOP-NKCLCNH
+4966361d22812394063e9d6912cdf277c85ec276
+/tmp/fm-lab.movF7u/repo
+JOB-RAN-OK
+rc=0
+{"host":"local","outcome":null,"exit":0,"slot":1,"fallback":"unreachable","job":null,"candidate":"","wait_s":0,"prepare_s":null,"run_s":1,"collect_s":null,"cpu_usec":24761,"peak_memory_bytes":5070848}
+open: 1
+=== S12c connection back, first job still running: NO second job on the Mac
+fm-heavy-remote: not running on fm-mac (unknown-job-running); running locally
+Linux
+DESKTOP-NKCLCNH
+4966361d22812394063e9d6912cdf277c85ec276
+/tmp/fm-lab.movF7u/repo
+JOB-RAN-OK
+rc=0
+{"host":"local","outcome":null,"exit":0,"slot":1,"fallback":"unknown-job-running","job":null,"candidate":"","wait_s":1,"prepare_s":null,"run_s":0,"collect_s":null,"cpu_usec":22843,"peak_memory_bytes":5001216}
+open: 1; mac jobs:        1 dir(s): 1793803853-3383157-17664
+=== S12d first job finishes; new commit requests: reconciled for its own record, cleaned, new candidate runs on its own
+old=4966361d22812394063e9d6912cdf277c85ec276 new=31e4deeb416ad3f5c7c665f81f25edbc3c714402
+fm-heavy-remote: earlier job 1793803853-3383157-17664 on fm-mac ended pass (kept in /tmp/fm-lab.movF7u/state/heavy-remote/1793803853-3383157-17664)
+Darwin
+Chriss-MacBook-Pro.local
+31e4deeb416ad3f5c7c665f81f25edbc3c714402
+/Users/chris/.fm-heavy-remote/1793803896-3397057-29539/work
+JOB-RAN-OK
+rc=0 (want 0)
+{"host":"fm-mac","outcome":"pass","exit":0,"slot":null,"fallback":null,"job":"1793803896-3397057-29539","candidate":"31e4deeb41","wait_s":3,"prepare_s":1,"run_s":1,"collect_s":1,"cpu_usec":18255,"peak_memory_bytes":null}
+reconciled.json: {"job":"1793803853-3383157-17664","candidate":"4966361d22812394063e9d6912cdf277c85ec276","outcome":"pass","reconciled_at":1793803898}
+reconciled.json
+result.json
+run.log
+slow-started 62417
+slow-finished
+open: 0 scratch: 0
+=== S13 unknown job whose supervisor died (kill -9): stopped first, then closed as lost
+rc=75 (want 75)
+killed supervisor 70847; orphan group: 70849 bash t/job.sh slow 200
+fm-heavy-remote: not running on fm-mac (unknown-job-running); running locally
+Linux
+{"host":"local","outcome":null,"exit":141,"slot":1,"fallback":"unknown-job-running","job":null,"candidate":"","wait_s":2,"prepare_s":null,"run_s":1,"collect_s":null,"cpu_usec":22354,"peak_memory_bytes":5193728}
+orphan left: [] open: 1
+fm-heavy-remote: earlier job 1793803904-3398501-6903 on fm-mac ended lost (kept in /tmp/fm-lab.movF7u/state/heavy-remote/1793803904-3398501-6903)
+Darwin
+{"host":"fm-mac","outcome":"pass","exit":0,"slot":null,"fallback":null,"job":"1793803914-3400720-1631","candidate":"31e4deeb41","wait_s":4,"prepare_s":1,"run_s":1,"collect_s":1,"cpu_usec":16485,"peak_memory_bytes":null}
+{"job":"1793803904-3398501-6903","candidate":"31e4deeb416ad3f5c7c665f81f25edbc3c714402","outcome":"lost","reconciled_at":1793803917}
+
+open: 0 scratch: 0
+=== S15 tampered evidence at collection
+fm-heavy-remote: result rejected: wrong candidate, command, job or malformed envelope (kept in /tmp/fm-lab.movF7u/state/heavy-remote/1793803922-3405047-6837)
+wrong sha rc=65 (want 65)
+{"host":"fm-mac","outcome":"rejected","exit":65,"slot":null,"fallback":null,"job":"1793803922-3405047-6837","candidate":"31e4deeb41","wait_s":1,"prepare_s":1,"run_s":1,"collect_s":2,"cpu_usec":null,"peak_memory_bytes":null}
+fm-heavy-remote: result rejected: run.log does not match its recorded size and checksum (kept in /tmp/fm-lab.movF7u/state/heavy-remote/1793803928-3407076-5099)
+truncated log rc=65 (want 65)
+{"host":"fm-mac","outcome":"rejected","exit":65,"slot":null,"fallback":null,"job":"1793803928-3407076-5099","candidate":"31e4deeb41","wait_s":1,"prepare_s":1,"run_s":1,"collect_s":2,"cpu_usec":null,"peak_memory_bytes":null}
+fm-heavy-remote: result rejected: result or log missing or incomplete (kept in /tmp/fm-lab.movF7u/state/heavy-remote/1793803934-3408795-26279)
+missing log rc=65 (want 65)
+{"host":"fm-mac","outcome":"rejected","exit":65,"slot":null,"fallback":null,"job":"1793803934-3408795-26279","candidate":"31e4deeb41","wait_s":1,"prepare_s":1,"run_s":1,"collect_s":2,"cpu_usec":null,"peak_memory_bytes":null}
+scratch: 0 open: 0

@@ -1,0 +1,64 @@
+=== S1 opt-in: no config, --remote refuses; no --remote stays local
+fm-heavy.sh: --remote needs config/heavy-remote
+rc=2 (want 2)
+Linux
+DESKTOP-NKCLCNH
+4966361d22812394063e9d6912cdf277c85ec276
+/tmp/fm-lab.movF7u/repo
+JOB-RAN-OK
+rc=0
+{"host":"local","outcome":null,"exit":0,"slot":1,"fallback":null,"job":null,"candidate":"","wait_s":0,"prepare_s":null,"run_s":0,"collect_s":null,"cpu_usec":24391,"peak_memory_bytes":5398528}
+=== S1b refusals with config present
+fm-heavy.sh: --remote is approved only for: bash t/job.sh ok
+unapproved rc=2 (want 2)
+fm-heavy.sh: --remote runs class test only
+class=build rc=2 (want 2)
+fm-heavy.sh: config/heavy-remote needs one host line, one command line and at most one valid timeout line
+two hosts rc=2 (want 2)
+fm-heavy.sh: config/heavy-remote needs one host line, one command line and at most one valid timeout line
+bad host rc=2 (want 2)
+1
+=== S2 approved job on real Mac
+candidate=4966361d22812394063e9d6912cdf277c85ec276
+Darwin
+Chriss-MacBook-Pro.local
+4966361d22812394063e9d6912cdf277c85ec276
+/Users/chris/.fm-heavy-remote/1793803600-3285977-3556/work
+JOB-RAN-OK
+rc=0 (want 0)
+{"host":"fm-mac","outcome":"pass","exit":0,"slot":null,"fallback":null,"job":"1793803600-3285977-3556","candidate":"4966361d22","wait_s":1,"prepare_s":1,"run_s":1,"collect_s":0,"cpu_usec":21328,"peak_memory_bytes":null}
+mac scratch entries: 0
+result.json
+run.log
+{"schema":"fm-heavy-remote.v1","sha":"4966361d22812394063e9d6912cdf277c85ec276","outcome":"exited","exit_code":0,"host":"Chriss-MacBook-Pro.local","run_s":0.271,"cpu_usec":21328,"artifacts":{"run.log":{"bytes":143,"sha256":"7a1c1d22aabc4fa449121a537c765dc1be8253043cc5d0b3357da7de19bd5465"}}}
+0
+=== S3 failing command keeps its own status
+failing on purpose
+rc=7 (want 7)
+{"host":"fm-mac","outcome":"failed","exit":7,"slot":null,"fallback":null,"job":"1793803605-3287304-6115","candidate":"4966361d22","wait_s":1,"prepare_s":1,"run_s":1,"collect_s":1,"cpu_usec":5026,"peak_memory_bytes":null}
+mac scratch: 0
+=== S4 fallbacks: dirty tree, unreachable host, subdirectory
+fm-heavy-remote: not running on fm-mac (dirty-tree); running locally
+Linux
+DESKTOP-NKCLCNH
+4966361d22812394063e9d6912cdf277c85ec276
+/tmp/fm-lab.movF7u/repo
+JOB-RAN-OK
+rc=0
+{"host":"local","outcome":null,"exit":0,"slot":1,"fallback":"dirty-tree","job":null,"candidate":"","wait_s":0,"prepare_s":null,"run_s":0,"collect_s":null,"cpu_usec":22452,"peak_memory_bytes":5140480}
+fm-heavy-remote: not running on fm-lab-no-such-host.invalid (unreachable); running locally
+Linux
+DESKTOP-NKCLCNH
+4966361d22812394063e9d6912cdf277c85ec276
+/tmp/fm-lab.movF7u/repo
+JOB-RAN-OK
+rc=0
+{"host":"local","outcome":null,"exit":0,"slot":1,"fallback":"unreachable","job":null,"candidate":"","wait_s":0,"prepare_s":null,"run_s":0,"collect_s":null,"cpu_usec":22292,"peak_memory_bytes":5287936}
+fm-heavy-remote: not running on fm-mac (not-repository-root); running locally
+Linux
+DESKTOP-NKCLCNH
+4966361d22812394063e9d6912cdf277c85ec276
+/tmp/fm-lab.movF7u/repo/t
+JOB-RAN-OK
+rc=0
+{"host":"local","outcome":null,"exit":0,"slot":1,"fallback":"not-repository-root","job":null,"candidate":"","wait_s":0,"prepare_s":null,"run_s":0,"collect_s":null,"cpu_usec":21910,"peak_memory_bytes":5062656}
