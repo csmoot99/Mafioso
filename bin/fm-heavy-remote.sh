@@ -33,7 +33,8 @@
 #   bundle digest, wrong or replayed job, or missing or partial artifacts; never a
 #   pass), lost (70: the job's supervisor died without a result), unknown (75: the
 #   connection was lost and the job could not be reached again within
-#   FM_HEAVY_REMOTE_RECONNECT_TRIES attempts, so whether it ran is unknown; the
+#   FM_HEAVY_REMOTE_RECONNECT_TRIES attempts, so whether it ran is unknown; also a
+#   finished job whose result stayed unreachable after that many tries; the
 #   host's scratch and the open record are kept and no retry is made), cancelled
 #   (128+n: this script was signalled and stopped only its own job; 143 when the
 #   job was stopped on the host, whatever status the command itself exited with).
@@ -99,6 +100,7 @@ rrun() { rssh "$runner $1 $rdir ${2:-}"; }  # <runner action> [argument]
 fallback() {  # <reason>: nothing was started; the caller runs the command locally
   rmdir "$jdir" 2>/dev/null
   rm -f "$record"
+  [ -z "$sig" ] || finish cancelled $((128 + sig))  # a signalled job never runs, here or locally
   emit fallback "$1"
   echo "fm-heavy-remote: not running on $host ($1); running locally" >&2
   exit 0
@@ -139,8 +141,20 @@ cleanup_remote() {
     echo "fm-heavy-remote: could not remove $host:~/$rdir" >&2
   fi
 }
-collect() {  # <file...>: fetch from the host's job directory into the local one
-  bgssh "$stage/collect.tar" "cd $rdir && tar -cf - $*" && tar -xf "$stage/collect.tar" -C "$jdir" "$@" 2>/dev/null
+# Fetch from the host's job directory into the local one. Status 0: fetched; 1: the
+# host answered but the files are missing or incomplete; 255: the host could not be
+# reached within the reconnect attempts (or this script was signalled).
+collect() {  # <file...>
+  local n=0 rc
+  while :; do
+    bgssh "$stage/collect.tar" "cd $rdir && tar -cf - $*"
+    rc=$?
+    [ "$rc" -ne 0 ] || { tar -xf "$stage/collect.tar" -C "$jdir" "$@" 2>/dev/null && return 0 || return 1; }
+    [ "$rc" -eq 255 ] || return 1
+    n=$((n + 1))
+    { [ "$n" -lt "$tries" ] && [ -z "$sig" ]; } || return 255
+    sleep "$pause"
+  done
 }
 result_problem() {  # print why the collected result fails its checks; nothing when it holds
   local want
@@ -211,7 +225,6 @@ for open in "$open_records"/*.json; do
 done
 
 emit candidate "$sha"
-emit host "$host"
 prepare_began=$(date +%s)
 emit wait_until "$prepare_began"
 cmd_sha=$(printf '%s\0' "$@" | sha256sum | cut -d' ' -f1)
@@ -235,7 +248,11 @@ if [ "$rc" -ne 0 ]; then
     finish cancelled $((128 + sig))
   elif [ "$rc" -eq 255 ] || [ "$rc" -eq 11 ]; then  # the job may have started without the runner saying so
     case $(job_state) in
-      absent) fallback transfer-failed ;;
+      absent)  # a dropped transfer can leave part of the job directory behind
+        cleanup_remote
+        [ ! -e "$record" ] || finish unknown 75
+        fallback transfer-failed
+        ;;
       unreachable) emit prepare_s "$(($(date +%s) - prepare_began))"; finish unknown 75 ;;
     esac
   else  # the runner refused, or mkdir, tar or python failed: nothing was launched
@@ -269,7 +286,6 @@ while :; do
   case "$state" in running|preparing) ;; *) break ;; esac
 done
 ended=$(date +%s)
-emit ended "$ended"
 
 if [ -n "$sig" ]; then
   rrun cancel >/dev/null 2>>"$stage/ssh.err"
@@ -277,12 +293,23 @@ if [ -n "$sig" ]; then
   finish cancelled $((128 + sig))
 fi
 [ "$state" != unreachable ] || finish unknown 75
+emit ended "$ended"  # the completion was seen
 
 collect_began=$(date +%s)
 collected=1
 files=(result.json run.log)
 if [ "$state" != "done" ]; then files=(run.log); fi
-collect "${files[@]}" || collected=
+collect "${files[@]}"
+crc=$?
+if [ "$crc" -eq 255 ]; then  # the result stays on the host and its record stays open
+  emit collect_s "$(($(date +%s) - collect_began))"
+  if [ -n "$sig" ]; then
+    cleanup_remote
+    finish cancelled $((128 + sig))
+  fi
+  finish unknown 75
+fi
+[ "$crc" -eq 0 ] || collected=
 emit collect_s "$(($(date +%s) - collect_began))"
 [ ! -s "$jdir/run.log" ] || cat "$jdir/run.log"
 

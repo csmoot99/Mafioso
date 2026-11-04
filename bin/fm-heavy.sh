@@ -142,7 +142,7 @@ if [ -n "$remote" ]; then
   [ "$class" = test ] || { echo "fm-heavy.sh: --remote runs class test only" >&2; exit 2; }
   [ -r "$root/config/heavy-remote" ] || { echo "fm-heavy.sh: --remote needs config/heavy-remote" >&2; exit 2; }
   bad=
-  while read -r key rest; do
+  while read -r key rest || [ -n "$key" ]; do  # a last line without a newline counts
     case "$key" in
       ''|'#'*) ;;
       host) [ -z "$rhost" ] && [[ $rest =~ ^[A-Za-z0-9._-]+$ ]] && rhost=$rest || bad=1 ;;

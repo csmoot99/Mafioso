@@ -28,8 +28,10 @@ export FM_HEAVY_REMOTE_RECONNECT_SLEEP=0.1 FM_HEAVY_REMOTE_RECONNECT_TRIES=3
 
 # The fake ssh: skips ssh's options and the host, then runs the command string in
 # $FAKE_SSH_HOME, as a login would. Rules in $FAKE_SSH_CTL/rules/* misbehave:
-#   line 1  drop (fail 255 without running), after (run, then fail 255) or pre (run
-#           the rest of the file as a script in the host's home first)
+#   line 1  drop (fail 255 without running), after (run, then fail 255), pre (run
+#           the rest of the file as a script in the host's home first) or partial
+#           (run that script, then fail 255 without running the command; both
+#           scripts see the command string in $CMD and the runner in $RUNNER_SRC)
 #   line 2  an extended regex the command string must match
 #   line 3  how many matching calls still misbehave (-1 for all)
 # Every command string is appended to $FAKE_SSH_CTL/log.
@@ -48,10 +50,10 @@ for rule in "$FAKE_SSH_CTL"/rules/*; do
   printf '%s' "$cmd" | grep -Eq "$(sed -n 2p "$rule")" || continue
   [ "$left" -lt 0 ] || sed -i "3s/.*/$((left - 1))/" "$rule"
   mode=$(sed -n 1p "$rule")
-  [ "$mode" != pre ] || (cd "$FAKE_SSH_HOME" && HOME="$FAKE_SSH_HOME" bash -c "$(sed -n '4,$p' "$rule")")
+  case "$mode" in pre|partial) (cd "$FAKE_SSH_HOME" && HOME="$FAKE_SSH_HOME" CMD="$cmd" bash -c "$(sed -n '4,$p' "$rule")") ;; esac
   break
 done
-[ "$mode" != drop ] || exit 255
+[ "$mode" != drop ] && [ "$mode" != partial ] || exit 255
 cd "$FAKE_SSH_HOME" && HOME="$FAKE_SSH_HOME" bash -c "$cmd"
 rc=$?
 [ "$mode" != after ] || exit 255
@@ -103,7 +105,7 @@ setup() {
 # heavy [args before --]: run the wrapper from the repository root.
 heavy() {
   (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" \
-    FAKE_SSH_CTL="$CTL" FAKE_SSH_HOME="$REMOTE_HOME" "$HEAVY" --class test --task t --project p "$@" -- bash t/job.sh)
+    FAKE_SSH_CTL="$CTL" FAKE_SSH_HOME="$REMOTE_HOME" RUNNER_SRC="$RUNNER" "$HEAVY" --class test --task t --project p "$@" -- bash t/job.sh)
 }
 
 last_record() { tail -1 "$LOG"; }
@@ -157,7 +159,8 @@ test_off_by_default_and_refusals() {
   local bad
   for bad in 'host a\n' 'host a\ncommand bash t/job.sh\nhost b\n' 'host a b\ncommand bash t/job.sh\n' \
     'host a\ncommand bash t/job.sh\ncommand bash t/other.sh\n' 'host a\ncommand bash t/job.sh\ntimeout 0\n' \
-    'host a\ncommand bash t/job.sh\nsurprise 1\n'; do
+    'host a\ncommand bash t/job.sh\nsurprise 1\n' 'host a\ncommand bash t/job.sh\nsurprise 1' \
+    'host a\ncommand bash t/job.sh\ntimeout 0'; do
     # shellcheck disable=SC2059 # the cases are printf formats
     printf "$bad" > "$HOME_FM/config/heavy-remote"
     heavy --remote >/dev/null 2>&1; expect_code 2 "$?" "malformed config: $bad"
@@ -268,7 +271,8 @@ test_unreachable_job_is_unknown() {
   setup unknown 'echo run >> "$HOME/runs"; sleep 1'
   rule gone drop 'runner.py (wait|status)' -1
   heavy --remote >"$CASE/out" 2>&1; expect_code 75 "$?" "a job that cannot be reached again"
-  expect_record '.outcome == "unknown" and .exit == 75 and .host == "fake-mac" and (.job | type) == "string"' "unknown record"
+  expect_record '.outcome == "unknown" and .exit == 75 and .host == "fake-mac" and (.job | type) == "string"
+    and .ended_at == null and .run_s == null' "unknown record: completion was never seen"
   assert_present "$REMOTE_HOME/.fm-heavy-remote/$(last_record | jq -r .job)" "an unknown job's scratch is kept for reconciliation"
   assert_present "$HOME_FM/state/heavy-remote/unknown-fake-mac/$(last_record | jq -r .job).json" "an unknown job's record stays open"
   [ "$(wc -l < "$LOG")" -eq 1 ] || fail "an unknown job must not be retried locally: $(cat "$LOG")"
@@ -382,11 +386,12 @@ test_unknown_job_other_endings() {
   unknown_job dropped 'echo run' 'runner.py (wait|status)'
   HOME="$REMOTE_HOME" python3 "$RUNNER" wait "$REMOTE_HOME/.fm-heavy-remote/$JOB" 20 >/dev/null
   new_candidate 'echo next'
-  rule collect drop 'tar -cf - result.json' 1
+  rule collect drop 'tar -cf - result.json' -1
   heavy --remote >/dev/null 2>&1 || fail "a dropped collection falls back to a local run"
   expect_record '.host == "local" and .fallback == "unreachable"' "dropped collection fallback"
   assert_present "$OPEN" "a dropped collection leaves the record open"
   assert_present "$REMOTE_HOME/.fm-heavy-remote/$JOB/result.json" "a dropped collection must keep the result on the host"
+  rm "$CTL/rules/collect"
   heavy --remote >/dev/null 2>&1 || fail "the next request reconciles and passes"
   expect_record '.host == "fake-mac" and .outcome == "pass"' "the request after a dropped collection"
   jq -e '.outcome == "pass"' "$JOB_DIR/reconciled.json" >/dev/null || fail "the retried collection closes the record: $(cat "$JOB_DIR/reconciled.json")"
@@ -520,6 +525,70 @@ PY
   pass "fm-heavy-remote-runner: EPERM from a group of zombies means the group is gone, so the result is still published"
 }
 
+test_unterminated_config_last_line() {
+  setup lastline 'sleep 4' 
+  printf 'host fake-mac\ncommand bash t/job.sh\ntimeout 1' > "$HOME_FM/config/heavy-remote"
+  heavy --remote >/dev/null 2>&1; expect_code 124 "$?" "an unterminated timeout line must apply"
+  expect_record '.outcome == "timeout"' "timeout from the last config line"
+  pass "fm-heavy --remote: the last config line counts without a trailing newline"
+}
+
+test_signal_during_eligibility_never_runs_locally() {
+  local pid n=0
+  setup eligibility "echo ran >> $TMP_ROOT/eligibility/ran"
+  rule slowprobe pre '^true$' 1 'sleep 3'
+  (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" FAKE_SSH_CTL="$CTL" FAKE_SSH_HOME="$REMOTE_HOME" \
+    exec setsid env --default-signal=INT "$HEAVY" --class test --remote -- bash t/job.sh >/dev/null 2>&1) &
+  pid=$!
+  until [ -s "$CTL/log" ]; do n=$((n + 1)); [ "$n" -le 100 ] || fail "the probe never started"; sleep 0.1; done
+  kill -TERM -- "-$pid"
+  wait "$pid"
+  expect_code 143 "$?" "a job signalled while its destination is being probed"
+  expect_record '.outcome == "cancelled" and .exit == 143 and .fallback == null' "cancelled record"
+  [ ! -e "$CASE/ran" ] || fail "a signalled job must not run locally"
+  [ "$(wc -l < "$LOG")" -eq 1 ] || fail "one record for the one job: $(cat "$LOG")"
+  expect_host_clean "nothing may reach the host"
+  pass "fm-heavy --remote: a signal while the destination is probed or the bundle made cancels the job instead of running it locally"
+}
+
+test_dropped_collection_is_reconciled() {
+  setup collectdrop 'echo output-line'
+  # One dropped collection: the finished job is collected on the next attempt.
+  rule c drop 'tar -cf - result.json' 1
+  heavy --remote >"$CASE/out" 2>&1 || fail "a finished job must survive one dropped collection: $(cat "$CASE/out")"
+  assert_contains "$(cat "$CASE/out")" output-line "the log is relayed"
+  expect_record '.outcome == "pass" and .exit == 0' "collected after a reconnect"
+  assert_present "$HOME_FM/state/heavy-remote/$(last_record | jq -r .job)/result.json" "the result is kept locally"
+  expect_host_clean "scratch is removed only after the collection"
+
+  # The host stays unreachable for the collection: the result is kept there, the job unknown.
+  setup collectgone 'echo output-line'
+  rule c drop 'tar -cf - result.json' -1
+  heavy --remote >/dev/null 2>&1; expect_code 75 "$?" "a result that cannot be fetched"
+  expect_record '.outcome == "unknown" and .exit == 75' "unknown record"
+  assert_present "$REMOTE_HOME/.fm-heavy-remote/$(last_record | jq -r .job)/result.json" "the only copy of the result is kept on the host"
+  assert_present "$HOME_FM/state/heavy-remote/unknown-fake-mac/$(last_record | jq -r .job).json" "the record stays open"
+  # Back again: the next request collects it for its own record, cleans up and runs.
+  rm "$CTL/rules/c"
+  heavy --remote >/dev/null 2>&1 || fail "the next request must reconcile and pass"
+  expect_record '.outcome == "pass"' "the next job"
+  jq -e '.outcome == "pass"' "$HOME_FM/state/heavy-remote/$(jq -r .job "$LOG" | head -1)/reconciled.json" >/dev/null     || fail "the earlier job's result must be collected for its own record"
+  expect_host_clean "the earlier job's scratch after reconciliation"
+  pass "fm-heavy --remote: a dropped collection is retried, and an unreachable one keeps the result for reconciliation"
+}
+
+test_partial_transfer_is_cleaned() {
+  setup partial "echo ran >> $TMP_ROOT/partial/ran"
+  # The runner is on the host but the job never started: the connection dropped mid-transfer.
+  rule p partial 'tar -xf' 1 'd=$(printf "%s" "$CMD" | sed -n "s/.*mkdir -p \([^ ]*\) .*/\1/p"); mkdir -p "$d"; cp "$RUNNER_SRC" "$d/runner.py"; echo junk > "$d/src.bundle"'
+  heavy --remote >/dev/null 2>&1 || fail "a transfer that never started falls back to a local run"
+  expect_record '.host == "local" and .fallback == "transfer-failed"' "transfer-failed fallback"
+  [ "$(wc -l < "$CASE/ran")" -eq 1 ] || fail "the fallback runs the command once"
+  expect_host_clean "the partial job directory must be removed"
+  assert_absent "$HOME_FM/state/heavy-remote/unknown-fake-mac/$(ls "$HOME_FM/state/heavy-remote" | head -1).json" "no record is left open"
+  pass "fm-heavy --remote: a transfer cut short leaves nothing on the host"
+}
+
 test_summary_compares_hosts() {
   local log=$TMP_ROOT/summary.jsonl out
   cat > "$log" <<'EOF'
@@ -550,6 +619,10 @@ test_unknown_job_blocks_until_reconciled
 test_unknown_job_other_endings
 test_runner_reconcile_ages_out_a_dead_start
 test_signalled_wrapper_stops_only_its_job
+test_unterminated_config_last_line
+test_signal_during_eligibility_never_runs_locally
+test_dropped_collection_is_reconciled
+test_partial_transfer_is_cleaned
 test_cancelled_on_host_is_never_green
 test_zombie_group_eperm_keeps_the_result
 test_runner_refuses_bad_input

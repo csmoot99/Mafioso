@@ -1230,6 +1230,7 @@ It names the SSH alias of the destination, the one portable command approved to 
 A worker or firstmate passes `--remote` for that command only, and the job then runs on the destination's own capacity instead of the shared slot.
 The destination takes one job at a time; when it is busy or unreachable, or the working tree is not a clean repository root, the command runs locally under the normal slot rule instead of blocking.
 A lost connection never leads to a second run of a job that may still be running: the job is reconciled against its record on the destination first, and a job that cannot be reached is recorded as unknown with its scratch kept.
+A finished job whose result cannot be fetched after the same reconnect attempts is recorded the same way, with the result left on the destination for the next request to collect.
 Every unknown job keeps a durable local record in `state/heavy-remote/unknown-<host>/`, and each new `--remote` request reconciles those records over SSH before it is admitted, from the job's completion file, its started marker and whether its own process group is alive.
 While such a job still runs, no second job starts there and the request runs locally with fallback `unknown-job-running`; a job whose supervisor has died is stopped first, because nothing else would stop it.
 When the destination cannot be reached the record stays and the request runs locally with fallback `unreachable`.
