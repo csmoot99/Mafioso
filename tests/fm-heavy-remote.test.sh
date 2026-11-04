@@ -475,6 +475,20 @@ test_signalled_wrapper_stops_only_its_job() {
   pass "fm-heavy --remote: a signalled wrapper stops its own job, records it, and leaves the rest alone"
 }
 
+test_cancelled_on_host_is_never_green() {
+  local pid
+  setup hostcancel 'trap "exit 0" TERM; echo $PPID > "$HOME/supervisor.pid"; sleep 300 & wait'
+  heavy --remote >/dev/null 2>&1 &
+  pid=$!
+  wait_for "$REMOTE_HOME/supervisor.pid"
+  kill -TERM "$(cat "$REMOTE_HOME/supervisor.pid")"
+  wait "$pid"
+  expect_code 143 "$?" "a job stopped on the host whose command traps TERM and exits 0"
+  expect_record '.outcome == "cancelled" and .exit == 143 and .host == "fake-mac"' "host-cancelled record"
+  expect_host_clean "scratch after a job cancelled on the host"
+  pass "fm-heavy --remote: a job cancelled on the host is never green, even when its command exits 0"
+}
+
 test_summary_compares_hosts() {
   local log=$TMP_ROOT/summary.jsonl out
   cat > "$log" <<'EOF'
@@ -505,6 +519,7 @@ test_unknown_job_blocks_until_reconciled
 test_unknown_job_other_endings
 test_runner_reconcile_ages_out_a_dead_start
 test_signalled_wrapper_stops_only_its_job
+test_cancelled_on_host_is_never_green
 test_runner_refuses_bad_input
 test_summary_compares_hosts
 

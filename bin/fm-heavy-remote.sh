@@ -35,7 +35,8 @@
 #   connection was lost and the job could not be reached again within
 #   FM_HEAVY_REMOTE_RECONNECT_TRIES attempts, so whether it ran is unknown; the
 #   host's scratch and the open record are kept and no retry is made), cancelled
-#   (128+n: this script was signalled and stopped only its own job).
+#   (128+n: this script was signalled and stopped only its own job; 143 when the
+#   job was stopped on the host, whatever status the command itself exited with).
 # After a lost connection the job is reconciled against its record on the host
 # before anything else happens: a job found running or done is waited for and
 # collected, never run again.
@@ -303,5 +304,8 @@ cleanup_remote
 
 outcome=$(result_outcome)
 code=$(jq -r '.exit_code' "$jdir/result.json")
-[ "$outcome" != timeout ] || code=124
+case "$outcome" in
+  timeout) code=124 ;;
+  cancelled) code=143 ;;
+esac
 finish "$outcome" "$code"
