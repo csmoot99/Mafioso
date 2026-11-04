@@ -1,0 +1,56 @@
+=== S2b locale: LC_ALL absent outside stays absent inside; a worker's own LC_ALL survives ===
+0
+LANG=C.UTF-8
+LC_ALL=C.UTF-8
+
+=== S4 queue: hand-run flock -o holds the slot 5s; wrapped job must wait, then record the wait ===
+ran-after-holder
+wrapper exit=0 elapsed=5s
+{"task":"lab-s4-queued","wait_s":5,"run_s":0,"exit":0,"slot":1,"requested_at":1793762495,"started_at":1793762500}
+
+=== S5 two wrapped jobs, default one slot: never overlap ===
+start-a 1793762500.247085931
+end-a 1793762503.252604647
+start-b 1793762503.312958183
+end-b 1793762506.318575191
+{"task":"lab-s5-a","wait_s":0,"run_s":3,"slot":1}
+{"task":"lab-s5-b","wait_s":3,"run_s":3,"slot":1}
+
+=== S6 config/host-test-slots=2: two run together, third queues ===
+start-a 1793762506.421438485
+start-b 1793762506.421652997
+end-a 1793762509.426942620
+end-b 1793762509.426942630
+start-c 1793762510.443525465
+end-c 1793762513.448554399
+{"task":"lab-s5-a","wait_s":0,"run_s":3,"slot":1}
+{"task":"lab-s5-b","wait_s":0,"run_s":3,"slot":2}
+{"task":"lab-s5-c","wait_s":4,"run_s":3,"slot":1}
+
+=== S7 malformed slots refuse, run nothing, write no record ===
+fm-heavy.sh: config/host-test-slots must hold one positive integer
+value=[0] exit=2 ran=no
+fm-heavy.sh: config/host-test-slots must hold one positive integer
+value=[00] exit=2 ran=no
+fm-heavy.sh: config/host-test-slots must hold one positive integer
+value=[-1] exit=2 ran=no
+fm-heavy.sh: config/host-test-slots must hold one positive integer
+value=[two] exit=2 ran=no
+fm-heavy.sh: config/host-test-slots must hold one positive integer
+value=[1
+2] exit=2 ran=no
+fm-heavy.sh: config/host-test-slots must hold one positive integer
+value=[1 2] exit=2 ran=no
+fm-heavy.sh: config/host-test-slots must hold one positive integer
+value=[99999] exit=2 ran=no
+fm-heavy.sh: config/host-test-slots must hold one positive integer
+value=[empty file] exit=2 ran=no
+records added: 0
+fm-heavy.sh: --class must be test, build, e2e or image
+bad class exit=2
+fm-heavy.sh: no command after --
+no command exit=2
+
+=== S8 a daemon the command leaves behind must not keep the slot ===
+exit=0
+slot free immediately after job

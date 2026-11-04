@@ -1,0 +1,23 @@
+=== S9c output reader gone before TERM (tool call timed out) ===
+{"task":"lab-s9c-dead-pipe","run_s":3,"exit":143,"slot":1,"peak_memory_bytes":null,"cpu_usec":null}
+
+=== S10b real Ctrl-C at a foreground terminal (lab tmux) ===
+queued: command never ran
+{"task":"lab-s10b-ctrlc-queued","started_at":null,"wait_s":3,"run_s":null,"exit":null,"slot":null}
+{"task":"lab-s10c-ctrlc-running","run_s":3,"exit":130,"slot":1,"peak_memory_bytes":2830336,"cpu_usec":16602}
+--- lab terminal ---
+bash-5.3$ bin/fm-heavy.sh --class test --task lab-s10b-ctrlc-queued --project firstmate -- touch /tmp/fm-lab.g6oYa7/ra
+ctrlc; echo wrapper-exit=$?
+^Cwrapper-exit=130
+bash-5.3$ bin/fm-heavy.sh --class test --task lab-s10c-ctrlc-running --project firstmate -- sleep 30; echo wrapper-exi
+$?
+^Cwrapper-exit=130
+bash-5.3$
+--- lab Claude final answer ---
+  test suite with the command: bash tests/fm-heavy.test.sh . Then say DONE and the suite's exit status. Change no files.
+● DONE. The suite's exit status was 0: all 12 tests passed. I ran it through the heavy-command wrapper as the brief requires, and no files changed.
+=== dead output pipe, throwaway copy with PIPE added to the stage trap ===
+{"task":"lab-s9d-pipe-trap","run_s":3,"exit":143,"peak_memory_bytes":214495232,"cpu_usec":102310}
+=== does the command keep default SIGPIPE under that copy? ===
+rc=0
+0000000001001000

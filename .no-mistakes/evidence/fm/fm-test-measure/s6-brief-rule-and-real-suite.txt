@@ -1,0 +1,52 @@
+=== S16 brief rule: off without the flag, on with it, review excluded ===
+flag off, ship:   rc=0 heavy sections=0
+flag off, scout:  rc=0 heavy sections=0
+flag off, review: rc=0 heavy sections=0
+flag on, ship:   rc=0 heavy sections=1
+flag on, scout:  rc=0 heavy sections=1
+flag on, review: rc=0 heavy sections=0
+secondmate's own flag only: rc=0 heavy sections=0
+root flag, secondmate worker (earlier run): heavy sections=1
+
+--- emitted section (ship) ---
+# Heavy commands
+Run full or multi-file test suites, production builds, image builds, e2e runs, and every `no-mistakes axi run` or `respond` drive call that will execute a local test step, build or e2e through the machine's shared slot, one heavy command at a time under a 6 GB memory cap:
+`FM_HOME='/tmp/fm-lab.g6oYa7' '/home/work/.no-mistakes/worktrees/5f69104d19ce/01M6J6YMRW4NYJVVM4G9JNGSMX/bin/fm-heavy.sh' --class test|build|e2e|image --task lab-on-ship --project firstmate -- <command>`
+Use class test for a drive call. The wrapper takes the lock and the memory scope for you and records the wait, run time and peak memory, so never wrap it in flock or systemd-run yourself.
+Hold the slot only while the command runs a local test step, build or e2e: drive without it while the pipeline is in intent, rebase or review, and once only document, lint, push, PR or ci remain.
+The pipeline agent never takes the slot again inside your hold, so when your `respond` asks for local builds or drivers, say that the caller already holds the slot and the commands run under the 6G cap only.
+
+=== S17 run the brief's own command line, verbatim except class and command ===
+$ FM_HOME='/tmp/fm-lab.g6oYa7' '/home/work/.no-mistakes/worktrees/5f69104d19ce/01M6J6YMRW4NYJVVM4G9JNGSMX/bin/fm-heavy.sh' --class test --task lab-on-ship --project firstmate -- bash tests/fm-heavy.test.sh
+ok - fm-heavy: one record per job and the command's exit status
+ok - fm-heavy: the command keeps its environment and stdin, and leftovers do not hold the slot
+Hangup                     "$@"
+Terminated                 "$@"
+ok - fm-heavy: a job killed while running is recorded with exit 128+n
+ok - fm-heavy: a job killed while queued records its wait and never runs
+ok - fm-heavy: peak memory and CPU come from the job's own scope
+Terminated                 "$@"
+ok - fm-heavy: a scope-wide stop still records peak memory and CPU
+ok - fm-heavy: a reading outside the job's own scope is recorded as null
+ok - fm-heavy: queue wait is measured and config/host-test-slots opens more slots
+ok - fm-heavy: usage and configuration errors refuse without a record
+ok - fm-heavy-summary: wait versus run time and peak memory per project and class
+ok - fm-brief: config/heavy-commands points ship and scout workers at the wrapper
+ok - fm-brief: config/heavy-commands is read from the root home
+# all fm-heavy tests passed
+wrapped suite rc=0
+{
+  "task": "lab-on-ship",
+  "project": "firstmate",
+  "class": "test",
+  "cmd": "bash",
+  "requested_at": 1793762725,
+  "started_at": 1793762725,
+  "ended_at": 1793762734,
+  "wait_s": 0,
+  "run_s": 9,
+  "exit": 0,
+  "slot": 1,
+  "peak_memory_bytes": 51167232,
+  "cpu_usec": 2175382
+}

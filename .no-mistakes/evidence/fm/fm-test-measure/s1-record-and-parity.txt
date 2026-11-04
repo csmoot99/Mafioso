@@ -1,0 +1,30 @@
+=== S1 real test command through wrapper (repo's own targeted suite file) ===
+6442450944
+0
+/user.slice/user-1000.slice/user@1000.service/app.slice/fm-heavy-4154175-1793762459.scope
+wrapper exit=7
+{
+  "task": "lab-s1",
+  "project": "firstmate",
+  "class": "test",
+  "cmd": "bash",
+  "requested_at": 1793762459,
+  "started_at": 1793762459,
+  "ended_at": 1793762459,
+  "wait_s": 0,
+  "run_s": 0,
+  "exit": 7,
+  "slot": 1,
+  "peak_memory_bytes": 371273728,
+  "cpu_usec": 513147
+}
+
+=== S2 by-hand parity: stdin, args with spaces, env/locale, cwd ===
+Invalid environment variable name evaluates to an empty string: LC_ALL-unset
+stdin=via-stdin argc=1 a1=[arg with space] LC_ALL=[] LANG=C.UTF-8 MYVAR=keep cwd=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M6J6YMRW4NYJVVM4G9JNGSMX; fd9=closed
+wrapper exit=0
+
+=== S3 missing command / 127 passes through, record says so ===
+/home/work/.no-mistakes/worktrees/5f69104d19ce/01M6J6YMRW4NYJVVM4G9JNGSMX/bin/fm-heavy.sh: line 62: no-such-binary-xyz: command not found
+wrapper exit=127
+{"task":null,"project":null,"class":"e2e","cmd":"no-such-binary-xyz","exit":127,"peak_memory_bytes":4063232}

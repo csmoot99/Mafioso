@@ -1,0 +1,28 @@
+=== S9 running job gets TERM on its process group: record exit 143 with real counters ===
+    PID    PGID CMD
+4168362 4168362 bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M6J6YMRW4NYJVVM4G9JNGSMX/bin/fm-heavy.sh --class t
+{"task":"lab-s9-killed-running","started_at":1793762530,"ended_at":1793762559,"run_s":29,"exit":143,"slot":1,"peak_memory_bytes":null,"cpu_usec":null}
+command gone
+slot released
+
+=== S10 job killed while queued: wait kept, run fields null, command never runs ===
+TERM: wrapper exit=143
+{"task":"lab-s10-queued-TERM","requested_at":1793762561,"started_at":null,"ended_at":null,"wait_s":3,"run_s":null,"exit":null,"slot":null,"peak_memory_bytes":null}
+command never ran
+INT: wrapper exit=0
+{"task":"lab-s10-queued-INT","requested_at":1793762567,"started_at":1793762573,"ended_at":1793762573,"wait_s":6,"run_s":0,"exit":0,"slot":1,"peak_memory_bytes":4042752}
+COMMAND RAN AFTER KILL
+HUP: wrapper exit=129
+{"task":"lab-s10-queued-HUP","requested_at":1793762574,"started_at":null,"ended_at":null,"wait_s":2,"run_s":null,"exit":null,"slot":null,"peak_memory_bytes":null}
+command never ran
+
+=== S11 signal to the wrapper alone while running: command finishes, record says 128+n ===
+command-finished
+wrapper exit=143
+{"task":"lab-s11-wrapper-only","run_s":3,"exit":143,"peak_memory_bytes":3452928}
+
+=== S12 no scope available: peak and CPU are null, never estimated ===
+exit=0
+{"task":"lab-s12-unscoped","class":"image","exit":0,"peak_memory_bytes":null,"cpu_usec":null}
+fm-heavy.sh: flock is required
+no flock/systemd-run exit=69 ran=no

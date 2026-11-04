@@ -1,0 +1,17 @@
+               total        used        free      shared  buff/cache   available
+Mem:           15561        4910        3631          73        7331       10650
+=== S13 command itself exceeds the real 6G cap ===
+allocated MiB 2048
+allocated MiB 4096
+/home/work/.no-mistakes/worktrees/5f69104d19ce/01M6J6YMRW4NYJVVM4G9JNGSMX/bin/fm-heavy.sh: line 74: 34241 Killed                     "$@"
+wrapper exit=137
+{"task":"lab-s13-cap-direct","run_s":4,"exit":137,"peak_memory_bytes":6442450944,"cpu_usec":3759849,"peak_gib":6}
+Mem:           15561        4505        6849          57        4583       11056
+
+=== S13b a child exceeds the cap, the runner survives: peak must be kept ===
+allocated MiB 2048
+allocated MiB 4096
+Terminated                 "$@"
+wrapper exit=143
+{"task":"lab-s13b-cap-child","run_s":3,"exit":143,"peak_memory_bytes":6442450944,"cpu_usec":2493711,"peak_gib":6}
+Mem:           15561        9998        1292          57        4647        5562

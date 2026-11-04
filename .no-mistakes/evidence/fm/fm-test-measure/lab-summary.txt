@@ -1,0 +1,7 @@
+project    class  jobs  failed  wait_avg_s  wait_max_s  run_avg_s  run_max_s  wait_pct  peak_mib  unknown_peak
+firstmate  build  2     0       1           1           0          0          100       4         0
+firstmate  image  1     0       0           0           0          0          unknown   unknown   1
+firstmate  test   24    12      1           6           4          29         22        6144      5
+unknown    build  2     0       0           0           0          0          unknown   5         0
+unknown    e2e    1     1       0           0           0          0          unknown   4         0
+unknown    test   3     0       0           1           0          0          100       5         0

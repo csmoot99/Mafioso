@@ -1,0 +1,33 @@
+=== S14 summary over the real lab log (real waits, killed, queued-killed, null peaks) ===
+project    class  jobs  failed  wait_avg_s  wait_max_s  run_avg_s  run_max_s  wait_pct  peak_mib  unknown_peak
+firstmate  build  1     0       1           1           0          0          100       4         0
+firstmate  image  1     0       0           0           0          0          unknown   unknown   1
+firstmate  test   21    11      1           6           4          29         27        6144      5
+unknown    build  2     0       0           0           0          0          unknown   5         0
+unknown    e2e    1     1       0           0           0          0          unknown   4         0
+unknown    test   1     0       0           0           0          0          unknown   5         0
+summary exit=0
+
+--since after the first records:
+project    class  jobs  failed  wait_avg_s  wait_max_s  run_avg_s  run_max_s  wait_pct  peak_mib  unknown_peak
+firstmate  test   3     3       0           0           3          4          0         6144      0
+
+--since in the future / missing log / bad value:
+project  class  jobs  failed  wait_avg_s  wait_max_s  run_avg_s  run_max_s  wait_pct  peak_mib  unknown_peak
+exit=0
+no heavy-command records in /tmp/fm-lab.g6oYa7/none.jsonl
+exit=0
+fm-heavy-summary.sh: --since needs epoch seconds
+exit=2
+
+every log line is valid JSON with the full field set:
+[
+  13
+]
+27
+
+=== S15 secondmate home: slots config and log resolve to the root home ===
+exit=0 (a secondmate's own slot file is ignored)
+root log grew by: 1
+secondmate log exists: no
+{"task":"lab-s15-mate","class":"build","exit":0}

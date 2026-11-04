@@ -1,0 +1,12 @@
+=== S9 rerun x3: TERM to the job's process group from a live parent shell ===
+Terminated                 "$@"
+{"task":"lab-s9-run1","run_s":3,"exit":143,"slot":1,"peak_memory_bytes":214437888,"cpu_usec":92538}
+Terminated                 "$@"
+{"task":"lab-s9-run2","run_s":3,"exit":143,"slot":1,"peak_memory_bytes":214556672,"cpu_usec":91651}
+Terminated                 "$@"
+{"task":"lab-s9-run3","run_s":3,"exit":143,"slot":1,"peak_memory_bytes":214061056,"cpu_usec":87814}
+
+=== S9b systemd stops the scope (the cap / stop path) ===
+Terminated                 "$@"
+wrapper exit=143
+{"task":"lab-s9b-scope-stop","run_s":3,"exit":143,"peak_memory_bytes":214974464,"cpu_usec":86991}
