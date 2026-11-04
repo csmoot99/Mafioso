@@ -373,27 +373,19 @@ test_lock_steals_dead_pid_lock() {
   pass "dead-pid stale lock is reclaimed by a single acquirer"
 }
 
-# Start a process that claims each given link lock, then SIGKILL it so every
-# claim is left behind with a dead owner - an acquirer TERMed mid-steal.
+# Run a process that claims each given link lock and exits without releasing
+# them, so every claim is left behind with a dead owner - an acquirer TERMed
+# mid-steal. It runs to completion because a claim rewrites the published pid
+# file, so a poller could see that file empty even after seeing it filled.
 leave_dead_link_locks() {  # <state> <lock>...
-  local state=$1 holder i last
+  local state=$1
   shift
-  last=${!#}
   FM_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     shift
     for lock do fm_lock_try_create "$lock" || exit 7; done
-    exec sleep 30
-  ' _ "$LIB" "$@" >/dev/null 2>&1 &
-  holder=$!
-  i=0
-  while [ "$i" -lt 50 ] && [ ! -s "$last/pid" ]; do
-    sleep 0.02
-    i=$((i + 1))
-  done
-  [ -s "$last/pid" ] || fail "dead link-lock owner did not publish its pid"
-  kill -KILL "$holder" 2>/dev/null || true
-  wait "$holder" 2>/dev/null || true
+  ' _ "$LIB" "$@" >/dev/null 2>&1 \
+    || fail "dead link-lock owner could not claim its locks"
 }
 
 test_lock_reclaims_dead_steal_owner_without_nested_markers() {
@@ -516,7 +508,7 @@ test_lock_steal_reap_cannot_remove_successor() {
   fakebin="$dir/fakebin"
   out="$dir/competitor"
   leave_dead_link_locks "$state" "$steal"
-  # The killed fixture owner may have its PID reused during a loaded serial
+  # The exited fixture owner may have its PID reused during a loaded serial
   # shard. Pin a verified-dead PID so the race exercises reaping, not liveness.
   printf '%s\n' "$(dead_pid)" > "$steal/pid"
   cat > "$fakebin/rm" <<'SH'
