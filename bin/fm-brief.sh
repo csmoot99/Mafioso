@@ -703,7 +703,7 @@ REPO=${POS[1]}
 # the job log are machine-wide (docs/configuration.md "Heavy commands and
 # concurrency"). A read-only review runs no heavy commands.
 HEAVY_BLOCK=
-# shellcheck source=bin/fm-wake-lib.sh
+# shellcheck source=/dev/null # Isolated in this subshell; linted as its own root.
 if [ "$KIND" != review ] \
   && HEAVY_ROOT=$(. "$SCRIPT_DIR/fm-wake-lib.sh" && fm_firstmate_root_home "$FM_HOME") \
   && [ -e "$HEAVY_ROOT/config/heavy-commands" ]; then

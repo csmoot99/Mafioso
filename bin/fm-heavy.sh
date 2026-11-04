@@ -94,7 +94,7 @@ for tool in flock systemd-run jq; do
   command -v "$tool" >/dev/null 2>&1 || { echo "fm-heavy.sh: $tool is required" >&2; exit 69; }
 done
 
-# shellcheck source=bin/fm-wake-lib.sh
+# shellcheck source=/dev/null # Isolated in this subshell; linted as its own root.
 root=$(. "$(dirname "$SELF")/fm-wake-lib.sh" && fm_firstmate_root_home) || {
   echo "fm-heavy.sh: cannot resolve the root Firstmate home" >&2; exit 2; }
 slots=1
@@ -150,6 +150,7 @@ interruptible() {
 
 # While the command runs, bash holds this handler until the scope ends, and the
 # main flow below records the job.
+# shellcheck disable=SC2329 # Registered by the signal traps below.
 on_signal() {  # <signal number>
   signal=$1
   [ -z "$started" ] || return
