@@ -152,7 +152,7 @@ collect() {  # <file...>
   while :; do
     bgssh "$stage/collect.tar" "cd $rdir && tar -cf - $*"
     rc=$?
-    [ "$rc" -ne 0 ] || { tar -xf "$stage/collect.tar" -C "$jdir" "$@" 2>/dev/null && return 0 || return 1; }
+    [ "$rc" -ne 0 ] || { tar -xf "$stage/collect.tar" -C "$jdir" "$@" 2>/dev/null && return 0 || { [ -z "$sig" ] || return 255; return 1; }; }
     [ -z "$sig" ] || return 255
     [ "$rc" -eq 255 ] || return 1
     n=$((n + 1))

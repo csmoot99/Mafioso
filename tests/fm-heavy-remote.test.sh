@@ -594,6 +594,21 @@ test_signal_during_collection_is_cancelled() {
   expect_code 143 "$?" "a job signalled during collection"
   expect_record '.outcome == "cancelled" and .exit == 143 and .host == "fake-mac"' "record of a job signalled during collection"
   expect_host_clean "scratch after a signal during collection"
+
+  # The transfer finished but unpacking is still running when the stop arrives.
+  setup extractsignal 'echo output-line'
+  printf '%s\n' '#!/usr/bin/env bash' \
+    'case "$*" in *collect.tar*) case "$*" in *-xf*) : > "$FM_HOME/extracting"; sleep 3 ;; esac ;; esac' \
+    "exec $(command -v tar) \"\$@\"" > "$FAKEBIN/tar"
+  chmod +x "$FAKEBIN/tar"
+  (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" FAKE_SSH_CTL="$CTL" FAKE_SSH_HOME="$REMOTE_HOME" \
+    exec setsid env --default-signal=INT "$HEAVY" --class test --remote -- bash t/job.sh >/dev/null 2>&1) &
+  pid=$!
+  wait_for "$HOME_FM/extracting"
+  kill -TERM -- "-$pid"
+  wait "$pid"
+  expect_code 143 "$?" "a job signalled during result extraction"
+  expect_record '.outcome == "cancelled" and .exit == 143' "record of a job signalled during result extraction"
   pass "fm-heavy --remote: a signal during collection cancels the job instead of rejecting its result"
 }
 
