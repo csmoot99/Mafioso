@@ -174,6 +174,8 @@ test_recorded_merged_pr_is_landed_after_prune() {
   write_merge_marker "$state" merged github github.com o/r 7
   accept_done ship direct-PR "$wt" "$repo" "done: PR https://github.com/o/r/pull/7" "$state" merged "$meta" \
     || fail "recorded merged PR was refused after its remote-tracking ref was pruned"
+  accept_done ship direct-PR "$wt" "$repo" "done: PR https://github.com/o/r/pull/7; outside-scope: docs/x.md, shared config" "$state" merged "$meta" \
+    || fail "an outside-scope report on the done line hid the recorded merged PR"
   pass "a recorded merged PR satisfies the gate after prune"
 }
 

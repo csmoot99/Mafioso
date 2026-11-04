@@ -614,7 +614,7 @@ fm_dod_pr_url_from_done_note() {  # <note>
     *) return 1 ;;
   esac
   url=${note#PR }
-  url=${url%% *}
+  url=${url%%[ ;]*}
   printf '%s\n' "$url"
 }
 
