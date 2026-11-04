@@ -1,0 +1,34 @@
+Note: switching to '51d6d47cc8becf979971b737df8bcce6b8884ec4'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+ok - push, schedule, dispatch, and a base-less pull request select the complete set
+bin/fm-test-run.sh: redirection error: cannot duplicate fd: Too many open files
+bin/fm-test-run.sh: redirection error: cannot duplicate fd: Too many open files
+bin/fm-test-run.sh: redirection error: cannot duplicate fd: Too many open files
+bin/fm-test-run.sh: redirection error: cannot duplicate fd: Too many open files
+bin/fm-test-run.sh: redirection error: cannot duplicate fd: Too many open files
+bin/fm-test-run.sh: redirection error: cannot duplicate fd: Too many open files
+bin/fm-test-run.sh: redirection error: cannot duplicate fd: Too many open files
+bin/fm-test-run.sh: redirection error: cannot duplicate fd: Too many open files
+bin/fm-test-run.sh: redirection error: cannot duplicate fd: Too many open files
+bin/fm-test-run.sh: redirection error: cannot duplicate fd: Too many open files
+ok - a pull request that changes one test runs it in its own job and skips the others
+ok - an unmapped path, the workflow, the selector, the runner, and the shared test library select the complete set
+ok - an unknown base commit selects the complete set
+ok - lint skips only Markdown, JSON, license, and asset changes that no lint input reads
+ok - --strict exits 3 for unmapped changes and --only-from narrows a selection
+ok - board and Lavish changes select only the board and process-event suites

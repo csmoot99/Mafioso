@@ -1,0 +1,127 @@
+
+### B1 opt-in pass on the real Mac, plain PATH, no shim
+candidate HEAD 51d6d47cc8becf979971b737df8bcce6b8884ec4
+rc=0 elapsed=32s
+ok - push, schedule, dispatch, and a base-less pull request select the complete set
+ok - a pull request that changes one test runs it in its own job and skips the others
+ok - an unmapped path, the workflow, the selector, the runner, and the shared test library select the complete set
+ok - an unknown base commit selects the complete set
+ok - lint skips only Markdown, JSON, license, and asset changes that no lint input reads
+ok - --strict exits 3 for unmapped changes and --only-from narrows a selection
+ok - board and Lavish changes select only the board and process-event suites
+too-many-open-files lines: 10
+{"host":"fm-mac","outcome":"pass","exit":0,"fallback":null,"slot":null,"wait_s":1,"prepare_s":7,"run_s":23,"collect_s":1,"started_at":1793809136,"candidate":"51d6d47cc8be","job":"1793809128-1136267-25783"}
+result.json
+run.log
+{"schema":"fm-heavy-remote.v1","id":"1793809128-1136267-25783","sha":"51d6d47cc8becf979971b737df8bcce6b8884ec4","tree":"c2912d68fcef32fbf777b03da0df221d6b09e2c3","outcome":"exited","exit_code":0,"run_s":22.48,"cpu_usec":29927087,"artifacts":{"run.log":{"bytes":1963,"sha256":"f017616183e2bb5a441dd8b0436a85acc14ea8ac22960e0af5a5f8832891de3b"}}}
+local run.log: 1963 bytes f017616183e2bb5a441dd8b0436a85acc14ea8ac22960e0af5a5f8832891de3b
+open records: 0
+mac scratch entries: 0
+mac owned processes: 0
+mac open-file limit over ssh: 256
+
+### B3 timeout 5 s on the real Mac: exit 124, only the job's own processes stop
+unrelated Mac process pid 33879
+rc=124
+{"host":"fm-mac","outcome":"timeout","exit":124,"fallback":null,"slot":null,"wait_s":1,"prepare_s":7,"run_s":5,"collect_s":1,"started_at":1793809172,"candidate":"51d6d47cc8be","job":"1793809164-1148431-15276"}
+unrelated Mac process alive: yes
+open records: 0
+mac scratch entries: 0
+mac owned processes: 0
+
+### B4 group TERM while running on the real Mac: 143 cancelled, no local run
+mid-run: mac owned processes: 5
+rc=143
+{"host":"fm-mac","outcome":"cancelled","exit":143,"fallback":null,"slot":null,"wait_s":1,"prepare_s":8,"run_s":null,"collect_s":null,"started_at":1793809192,"candidate":"51d6d47cc8be","job":"1793809183-1158649-28865"}
+local records for this job: fm-mac
+unrelated Mac process alive: yes
+open records: 0
+mac scratch entries: 0
+mac owned processes: 0
+
+### B7 the job's own supervisor and group are SIGKILLed on the Mac: lost, never green
+killed owned supervisor and group
+rc=70
+fm-heavy-remote: the job on fm-mac ended without a result
+{"host":"fm-mac","outcome":"lost","exit":70,"fallback":null,"slot":null,"wait_s":0,"prepare_s":8,"run_s":4,"collect_s":1,"started_at":1793809211,"candidate":"51d6d47cc8be","job":"1793809203-1166087-21886"}
+open records: 0
+mac scratch entries: 0
+mac owned processes: 0
+
+### B5 real ssh client killed mid-wait, plus a second request while the first runs
+killed real ssh client pid 1170434
+second request rc=0
+Note: switching to '51d6d47cc8becf979971b737df8bcce6b8884ec4'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+first request rc=0
+{"host":"fm-mac","outcome":"pass","exit":0,"fallback":null,"slot":null,"job":"1793809218-1168706-20014"}
+{"host":"local","outcome":null,"exit":0,"fallback":"destination-busy","slot":1,"job":null}
+remote starts: 1; ok lines in first run's relayed log: 7
+open records: 0
+mac scratch entries: 0
+mac owned processes: 0
+
+### B6 a real job outlives the link: unknown 75, then reconcile
+killed real ssh client pid 1202773
+first request rc=75
+{"host":"fm-mac","outcome":"unknown","exit":75,"fallback":null,"slot":null,"wait_s":0,"prepare_s":8,"run_s":null,"collect_s":null,"started_at":1793809266,"candidate":"51d6d47cc8be","job":"1793809258-1200530-21915"}
+open records: 1
+mac scratch entries: 1
+host status of 1793809258-1200530-21915: running
+--- second request while it still runs
+second request rc=0
+fm-heavy-remote: not running on fm-mac (unknown-job-running); running locally
+Note: switching to '51d6d47cc8becf979971b737df8bcce6b8884ec4'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+{"host":"local","outcome":null,"exit":0,"fallback":"unknown-job-running","slot":1,"wait_s":2,"prepare_s":null,"run_s":25,"collect_s":null,"started_at":1793809271,"candidate":"","job":null}
+remote starts so far: 1
+open records: 1
+--- third request after it finished
+third request rc=0
+fm-heavy-remote: earlier job 1793809258-1200530-21915 on fm-mac ended pass (kept in /tmp/fm-lab.25M4s1/state/heavy-remote/1793809258-1200530-21915)
+{"host":"fm-mac","outcome":"pass","exit":0,"fallback":null,"slot":null,"wait_s":4,"prepare_s":15,"run_s":23,"collect_s":1,"started_at":1793809316,"candidate":"51d6d47cc8be","job":"1793809297-1228867-15144"}
+reconciled.json: {"job":"1793809258-1200530-21915","candidate":"51d6d47cc8becf979971b737df8bcce6b8884ec4","outcome":"pass","reconciled_at":1793809300}
+remote starts: 2
+open records: 0
+mac scratch entries: 0
+mac owned processes: 0
+
+### B2 the same command locally, then the summary
+rc=0
+7
+{"host":"local","outcome":null,"exit":0,"fallback":null,"slot":1,"wait_s":0,"prepare_s":null,"run_s":27,"collect_s":null,"started_at":1793809342,"candidate":"","job":null}
+project    class  jobs  failed  wait_avg_s  wait_max_s  run_avg_s  run_max_s  wait_pct  peak_mib  unknown_peak  host          prepare_avg_s  collect_avg_s
+firstmate  test   1     1       2           2           unknown    unknown    100       unknown   1             10.255.255.1  unknown        unknown
+firstmate  test   7     4       1           4           16         23         9         unknown   7             fm-mac        9              1
+firstmate  test   8     0       2           10          11         27         14        158       1             local         unknown        unknown
+worktree dirty files: 0

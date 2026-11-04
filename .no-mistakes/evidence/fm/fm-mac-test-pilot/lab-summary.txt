@@ -1,0 +1,4 @@
+project    class  jobs  failed  wait_avg_s  wait_max_s  run_avg_s  run_max_s  wait_pct  peak_mib  unknown_peak  host          prepare_avg_s  collect_avg_s
+firstmate  test   1     1       2           2           unknown    unknown    100       unknown   1             10.255.255.1  unknown        unknown
+firstmate  test   7     4       1           4           16         23         9         unknown   7             fm-mac        9              1
+firstmate  test   8     0       2           10          11         27         14        158       1             local         unknown        unknown

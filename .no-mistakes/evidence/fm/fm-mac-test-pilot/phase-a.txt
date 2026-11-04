@@ -1,0 +1,56 @@
+
+### A1 no config/heavy-remote: --remote refuses, nothing contacts ssh
+fm-heavy.sh: --remote needs config/heavy-remote
+rc=2
+ssh calls: 0
+/home/work/.no-mistakes/evidence/01M6KK70Z00D0EW6CPCYVRJ4E3/phase-a.sh: line 9: /tmp/fm-lab.25M4s1/state/heavy-jobs.jsonl: No such file or directory
+records: 0
+
+### A2 an unapproved command refuses
+fm-heavy.sh: --remote is approved only for: bash tests/fm-ci-select.test.sh
+rc=2
+
+### A3 a class other than test refuses
+fm-heavy.sh: --remote runs class test only
+rc=2
+
+### A4 malformed config with an unterminated last line refuses
+fm-heavy.sh: config/heavy-remote needs one host line, one command line and at most one valid timeout line
+rc=2
+ssh calls after A1-A4: 0
+
+### A5 no --remote: today's local path, no remote fields set, no ssh
+plain-local-run
+rc=0
+{"host":"local","outcome":null,"exit":0,"fallback":null,"slot":1,"wait_s":0,"prepare_s":null,"run_s":0,"collect_s":null,"started_at":1793809044,"candidate":"","job":null}
+ssh calls: 0
+
+### A6 unreachable destination (real ssh, unresolvable alias): runs locally under the slot
+fm-heavy-remote: not running on fm-lab-unreachable.invalid (unreachable); running locally
+ran-locally
+rc=0
+{"host":"local","outcome":null,"exit":0,"fallback":"unreachable","slot":1,"wait_s":0,"prepare_s":null,"run_s":0,"collect_s":null,"started_at":1793809044,"candidate":"","job":null}
+
+### A7 dirty tree in a clone: runs locally, fallback dirty-tree, nothing reaches the Mac
+fm-heavy-remote: not running on fm-mac (dirty-tree); running locally
+ran-locally
+rc=0
+{"host":"local","outcome":null,"exit":0,"fallback":"dirty-tree","slot":1,"wait_s":1,"prepare_s":null,"run_s":0,"collect_s":null,"started_at":1793809045,"candidate":"","job":null}
+ssh calls: 0
+
+### A8 below the repository root: runs locally, fallback not-repository-root
+fm-heavy-remote: not running on fm-mac (not-repository-root); running locally
+ran-locally
+rc=0
+{"host":"local","outcome":null,"exit":0,"fallback":"not-repository-root","slot":1,"wait_s":0,"prepare_s":null,"run_s":0,"collect_s":null,"started_at":1793809045,"candidate":"","job":null}
+
+### A9 TERM to the fm-heavy.sh pid alone during the probe of a silent host: the command never runs
+fm-heavy-remote: not running on 10.255.255.1 (unreachable); running locally
+rc=143
+command did not run
+{"host":"local","outcome":null,"exit":null,"fallback":"unreachable","slot":null,"wait_s":10,"prepare_s":null,"run_s":null,"collect_s":null,"started_at":null,"candidate":"","job":null}
+
+### A10 TERM to the whole process group during the probe: the command never runs
+rc=143
+command did not run
+{"host":"10.255.255.1","outcome":"cancelled","exit":143,"fallback":null,"slot":null,"wait_s":2,"prepare_s":null,"run_s":null,"collect_s":null,"started_at":null,"candidate":"","job":"1793809067-1113963-21571"}
