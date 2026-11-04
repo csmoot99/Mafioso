@@ -17,7 +17,7 @@
 # overlap: explains how the task's declared scope and interfaces meet the other live
 #   ship tasks of the same project (their declared scope, declared interfaces, and
 #   actual changed files). It is advisory: it prints, exits 0, and never blocks or
-#   serializes. Overlap is not a conflict; bin/fm-spawn.sh runs it after dispatch.
+#   serializes. Overlap is not a conflict; bin/fm-spawn.sh runs it during a fresh dispatch.
 # changed: lists the files the task changed (committed, uncommitted, untracked) against
 #   its fork point (for a local-only task, the local default branch it lands on), and
 #   those outside its declared scope. Workers run it before a done report and name any
