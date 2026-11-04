@@ -498,6 +498,7 @@ A ship spawn can record what the task is expected to touch, so overlap between l
   It ends when the owner lands or is cleaned up without a retained captain call, both of which close the owner's row to Done.
   A retained owner returns to Queued and keeps its dependents queued until the captain answers.
   If the owner is cancelled, clear the links with `fm-tasks-axi.sh unblock <dependent> --by <owner>`.
+  A dependent starts from the owner's landed change: a local-only landing moves only the local default branch, so a fresh local-only copy starts from that branch unless it is merely behind origin, and `fm-scope.sh changed` measures from it too.
 - **Out-of-scope report:** the generated ship brief tells the worker to run `fm-scope.sh changed` before each `done:` line and to name any files outside the declared scope there.
 - **Reversal:** omit the flags and nothing is recorded or explained; `own` is the only step that gates dispatch, and `unblock` undoes it.
 

@@ -305,7 +305,9 @@
 #   Only after this isolation check, every fresh ship or scout requires a clean
 #   task worktree. When an origin configuration is detected, spawn fetches it,
 #   resolves the current remote default branch (or uses --base-branch, described
-#   above), and resets to its tip. When none is detected, spawn skips that remote freshness check and launches from the
+#   above), and resets to its tip; a local-only ship resets to the local default
+#   branch instead unless that branch is merely behind origin, because a local-only
+#   landing never reaches origin. When none is detected, spawn skips that remote freshness check and launches from the
 #   clean worktree's current HEAD. Relaunch reuses the recorded worktree without
 #   fetching or resetting its base. An unreachable detected origin, unresolved
 #   default branch, or non-clean worktree refuses a fresh spawn rather than
@@ -4161,6 +4163,12 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
   if ! git -C "$worktree" fetch --quiet origin "+refs/heads/$default:refs/remotes/origin/$default"; then
     echo "error: could not fetch '$target' for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
     return 1
+  fi
+  # A local-only landing moves only the local default branch, so landed work is
+  # there and not on origin. Start from it unless it is merely behind origin.
+  if [ "$MODE" = local-only ] && git -C "$worktree" rev-parse --verify --quiet "refs/heads/$default^{commit}" >/dev/null 2>&1 \
+    && ! git -C "$worktree" merge-base --is-ancestor "refs/heads/$default" "$target" 2>/dev/null; then
+    target="refs/heads/$default"
   fi
   expected=$(git -C "$worktree" rev-parse --verify --quiet "$target^{commit}" 2>/dev/null) || {
     echo "error: '$target' is not a commit for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2

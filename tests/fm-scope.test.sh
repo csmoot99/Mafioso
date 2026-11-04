@@ -82,6 +82,59 @@ test_non_ascii_paths_match_their_scope() {
   pass "fm-scope.sh: non-ASCII paths are compared unquoted"
 }
 
+# A local-only task is a real linked worktree, so it sees the project's own default branch.
+make_local_task() {  # <project> <id> <scope-csv> <start-rev>
+  local wt="$TMP_ROOT/wt-$2"
+  git -C "$1" worktree add -q --detach "$wt" "$4"
+  {
+    echo "kind=ship"; echo "mode=local-only"; echo "project=$1"; echo "worktree=$wt"
+    echo "base_sha=$(git -C "$wt" rev-parse HEAD)"; echo "scope=$3"
+  } > "$HOME_DIR/state/$2.meta"
+}
+
+commit_file() {  # <repo> <path>: what a landing or a worker's commit leaves behind
+  echo "$2" >> "$1/$2"
+  git -C "$1" add -A && git -C "$1" commit -qm "change $2"
+}
+
+test_changed_counts_only_the_tasks_own_files_after_a_local_landing() {
+  local origin="$TMP_ROOT/lo-origin.git" proj="$TMP_ROOT/lo-proj" solo="$TMP_ROOT/lo-solo" pub="$TMP_ROOT/lo-pub" out
+  git clone -q --bare "$PROJ" "$origin"
+  git clone -q "$origin" "$proj"
+  git -C "$proj" config user.email t@t && git -C "$proj" config user.name t
+
+  # An owner landed on local main only, so origin is behind what the dependent starts from.
+  commit_file "$proj" OWNER.md
+  make_local_task "$proj" lo-dep "src/cli" HEAD
+  commit_file "$TMP_ROOT/wt-lo-dep" src/cli/main.ts
+  assert_contains "$(scope changed lo-dep)" "within declared scope" "the landed owner's file is not the dependent's change"
+  commit_file "$TMP_ROOT/wt-lo-dep" docs/INDEX.md
+  out=$(scope changed lo-dep)
+  assert_contains "$out" "outside declared scope (src/cli): docs/INDEX.md" "the dependent's own outside file is still named"
+  assert_not_contains "$out" "OWNER.md" "the landed owner's file stays out of the dependent's report"
+
+  # With no origin, a worker that rebases onto a landing has moved past its recorded start.
+  git clone -q "$PROJ" "$solo" && git -C "$solo" remote remove origin
+  git -C "$solo" config user.email t@t && git -C "$solo" config user.name t
+  make_local_task "$solo" lo-solo "src/cli" HEAD
+  commit_file "$TMP_ROOT/wt-lo-solo" src/cli/main.ts
+  commit_file "$solo" OWNER.md
+  git -C "$TMP_ROOT/wt-lo-solo" rebase -q "$(git -C "$solo" rev-parse HEAD)"
+  assert_contains "$(scope changed lo-solo)" "within declared scope" "a rebase onto a landing does not make it the worker's change"
+
+  # Local main merely behind origin: the copy started from origin, so origin is still the fork point.
+  git clone -q "$origin" "$pub"
+  git -C "$pub" config user.email t@t && git -C "$pub" config user.name t
+  commit_file "$pub" UPSTREAM.md
+  git -C "$pub" push -q origin HEAD
+  git -C "$proj" reset -q --hard HEAD~1
+  git -C "$proj" fetch -q origin
+  make_local_task "$proj" lo-behind "src/cli" origin/HEAD
+  commit_file "$TMP_ROOT/wt-lo-behind" src/cli/main.ts
+  assert_contains "$(scope changed lo-behind)" "within declared scope" "upstream work the local branch lacks is not the worker's change"
+  pass "fm-scope.sh: changed names only the task's own files in every local-only landing shape"
+}
+
 test_overlap_explains_and_never_blocks() {
   local out rc
   make_task o-a "src/cli,docs" "cli-registry"
@@ -155,6 +208,7 @@ test_spawn_scope_flags_are_refused_where_they_do_not_apply() {
 test_changed_reports_files_outside_declared_scope
 test_scope_entries_are_exact_paths_or_directories
 test_non_ascii_paths_match_their_scope
+test_changed_counts_only_the_tasks_own_files_after_a_local_landing
 test_overlap_explains_and_never_blocks
 test_ownership_orders_dispatch_through_blocked_by
 test_ownership_refuses_a_cycle_through_a_multi_blocker_task

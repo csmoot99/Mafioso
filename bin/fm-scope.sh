@@ -19,8 +19,9 @@
 #   actual changed files). It is advisory: it prints, exits 0, and never blocks or
 #   serializes. Overlap is not a conflict; bin/fm-spawn.sh runs it after dispatch.
 # changed: lists the files the task changed (committed, uncommitted, untracked) against
-#   its starting point, and those outside its declared scope. Workers run it before
-#   a done report and name any outside file there. Prints nothing when no scope was declared.
+#   its fork point (for a local-only task, the local default branch it lands on), and
+#   those outside its declared scope. Workers run it before a done report and name any
+#   outside file there. Prints nothing when no scope was declared.
 # own: temporary ownership of an unstable interface, expressed as the existing backlog
 #   dependency. Each dependent becomes blocked-by the owner, so bin/fm-spawn.sh will not
 #   dispatch it until the owner is Done; there is no separate lock. Refuses a dependent that
@@ -35,6 +36,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+# shellcheck source=bin/fm-ff-lib.sh
+. "$SCRIPT_DIR/fm-ff-lib.sh"
 
 usage() { awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$0"; }
 fail() { printf 'fm-scope: %s\n' "$*" >&2; exit 2; }
@@ -54,7 +57,7 @@ entries_overlap() { in_entry "$1" "$2" || in_entry "$2" "$1"; }
 
 # Files changed by task <1>, one per line.
 changed_files() {
-  local wt base ref mb
+  local wt base ref mb landed
   wt=$(meta_get "$1" worktree)
   [ -d "$wt" ] || return 0
   base=$(meta_get "$1" base_sha)
@@ -66,6 +69,13 @@ changed_files() {
   done
   mb=${mb:-$base}
   [ -n "$mb" ] || return 0
+  # A local-only landing moves only the local default branch, so the task forks from
+  # there unless that branch is merely behind the point found above.
+  if [ "$(meta_get "$1" mode)" = local-only ] \
+    && landed=$(git -C "$wt" merge-base HEAD "refs/heads/$(default_branch "$wt")" 2>/dev/null) \
+    && git -C "$wt" merge-base --is-ancestor "$mb" "$landed" 2>/dev/null; then
+    mb=$landed
+  fi
   { git -C "$wt" -c core.quotePath=false diff --name-only "$mb" 2>/dev/null
     git -C "$wt" -c core.quotePath=false ls-files --others --exclude-standard 2>/dev/null; } | sort -u
 }
