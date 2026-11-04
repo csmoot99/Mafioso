@@ -163,6 +163,34 @@ test_linked_spawning_home_rejects_primary_before_refresh() {
   done
 }
 
+test_declared_scope_is_recorded_and_overlap_is_advisory() {
+  local rec id out status meta
+  id='pool-scope-s1'
+  rec=$(make_case scope-record "$id")
+  read_case_record "$rec"
+  # A live sibling that declares the same interface; the spawn must explain it and still launch.
+  printf 'kind=ship\nproject=%s\ninterfaces=cli-registry\n' "$PROJECT_DIR" > "$HOME_DIR/state/sibling-s1.meta"
+
+  out=$(run_spawn "$id" --mode no-mistakes --yolo off --scope docs --scope src/cli --interface cli-registry)
+  status=$?
+  expect_code 0 "$status" "a declared scope must not block the spawn"$'\n'"$out"
+  meta="$HOME_DIR/state/$id.meta"
+  assert_grep "base_sha=$(git -C "$POOL_DIR" rev-parse HEAD)" "$meta" "the starting revision is detected into the task record"
+  assert_grep "scope=docs,src/cli" "$meta" "the declared scope is recorded"
+  assert_grep "interfaces=cli-registry" "$meta" "the declared interfaces are recorded"
+  assert_contains "$out" "live task sibling-s1" "the overlap with the live sibling is explained"
+  assert_contains "$out" "spawned $id" "the overlap explanation does not stop the spawn"
+
+  id='pool-scope-s2'
+  fm_test_spawn_brief "$HOME_DIR" "$id"
+  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 0 "$status" "a spawn that declares nothing still launches"$'\n'"$out"
+  assert_grep "base_sha=" "$HOME_DIR/state/$id.meta" "the starting revision is recorded even without a declared scope"
+  assert_no_grep "scope=" "$HOME_DIR/state/$id.meta" "no scope is invented when none was declared"
+  pass "a declared scope is recorded at spawn and overlap is explained without blocking"
+}
+
 test_stale_pool_base_refreshes_before_branching() {
   local rec id out status current branch_head
   id='pool-current-base-r1'
@@ -981,6 +1009,7 @@ test_dirty_pool_refuses_without_discarding_work
 test_unresolved_remote_default_refuses_pool
 test_unreachable_origin_refuses_stale_pool_base
 test_originless_pool_launches_without_a_freshness_fetch
+test_declared_scope_is_recorded_and_overlap_is_advisory
 test_originless_dirty_pool_refuses_without_discarding_work
 test_origin_config_without_url_refuses_pool
 test_empty_origin_config_section_refuses_pool

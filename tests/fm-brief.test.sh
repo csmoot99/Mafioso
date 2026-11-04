@@ -271,6 +271,18 @@ test_ship_mode_is_explicit_not_registry() {
   pass "fm-brief.sh: the explicit ship mode wins over the registered posture"
 }
 
+test_ship_brief_asks_for_outside_scope_report() {
+  local home brief
+  home="$TMP_ROOT/scope-report-home"
+  mkdir -p "$home/data"
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-scope-a1 some-proj --mode no-mistakes >/dev/null 2>&1 \
+    || fail "ship brief should scaffold"
+  brief="$home/data/brief-scope-a1/brief.md"
+  assert_grep "fm-scope.sh' changed brief-scope-a1" "$brief" "ship brief did not carry the scope report command"
+  assert_grep "outside-scope: <files>" "$brief" "ship brief did not ask for the outside-scope clause"
+  pass "fm-brief.sh: a ship brief asks the worker to report changes outside the declared scope"
+}
+
 # yolo is firstmate's merge authority and never reaches the worker, and a scout
 # or charter carries no delivery contract. Each must refuse rather than accept and
 # discard the flag, which would look recorded but change nothing.
@@ -2023,6 +2035,7 @@ test_workers_wait_without_spending_turns
 test_wait_no_turns_absent_keeps_the_previous_brief
 test_home_brief_include_is_appended_last
 test_base_branch_is_rendered_and_bounded
+test_ship_brief_asks_for_outside_scope_report
 test_ship_branch_prefix_defaults_to_legacy_fm
 test_ship_branch_prefix_override_is_consistent_across_modes
 test_ship_branch_prefix_empty_override_yields_bare_task_id
