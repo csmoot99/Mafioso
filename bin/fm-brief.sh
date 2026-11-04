@@ -696,6 +696,23 @@ fi
 
 REPO=${POS[1]}
 
+# How a worker runs heavy commands on this machine's shared slot. The wrapper
+# (bin/fm-heavy.sh) owns the lock, the memory scope and the job record; this
+# section only tells the worker to use it. Emitted only when config/heavy-commands
+# is present (docs/configuration.md "Heavy commands and concurrency").
+HEAVY_BLOCK=
+if [ -e "$CONFIG/heavy-commands" ] && [ "$KIND" != secondmate ]; then
+IFS= read -r -d '' HEAVY_SECTION <<EOF || true
+# Heavy commands
+Run full or multi-file test suites, production builds, image builds, e2e runs, and every \`no-mistakes axi run\` or \`respond\` drive call that will execute a local test step, build or e2e through the machine's shared slot, one heavy command at a time under a 6 GB memory cap:
+\`FM_HOME=$(shell_quote "$FM_HOME") $(shell_quote "$FM_ROOT/bin/fm-heavy.sh") --class test|build|e2e|image --task ${ID:-<task-id>} --project ${REPO:-<project>} -- <command>\`
+Use class test for a drive call. The wrapper takes the lock and the memory scope for you and records the wait, run time and peak memory, so never wrap it in flock or systemd-run yourself.
+Hold the slot only while the command runs a local test step, build or e2e: drive without it while the pipeline is in intent, rebase or review, and once only document, lint, push, PR or ci remain.
+The pipeline agent never takes the slot again inside your hold, so when your \`respond\` asks for local builds or drivers, say that the caller already holds the slot and the commands run under the 6G cap only.
+EOF
+  HEAVY_BLOCK="$HEAVY_SECTION"$'\n\n'
+fi
+
 if [ "$HERDR_LAB" -eq 1 ]; then
 HERDR_LAB_HELPER=$(shell_quote "$FM_ROOT/bin/fm-herdr-lab.sh")
 # shellcheck disable=SC2016  # single quotes are deliberate: these lines are literal brief text whose backtick-wrapped $(...) and "$HERDR_LAB_SESSION" snippets must reach the reading agent verbatim, not expand at scaffold time; only the '"$VAR"' break-outs interpolate.
@@ -876,7 +893,7 @@ $CREWMATE_PAUSE_INSTRUCTIONS
 $SHARED_INFRA_RULE
 $SHARED_NO_CD_RULE
 
-$WAIT_BLOCK$INBOX_SECTION
+$WAIT_BLOCK$HEAVY_BLOCK$INBOX_SECTION
 
 # Definition of done
 $REPORT_DOD
@@ -1137,7 +1154,7 @@ $ASK_USER_BLOCK
 $SHARED_INFRA_RULE
 $SHARED_NO_CD_RULE
 
-$WAIT_BLOCK$INBOX_SECTION
+$WAIT_BLOCK$HEAVY_BLOCK$INBOX_SECTION
 
 $CODING_DISCIPLINE
 
