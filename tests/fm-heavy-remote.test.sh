@@ -581,16 +581,29 @@ test_wrapper_only_signal_never_runs_locally() {
   pass "fm-heavy --remote: a signal only the wrapper hears still stops a fallback from running locally"
 }
 
-test_signal_during_collection_is_cancelled() {
+# stop_group_at <file>: start the job in its own process group, then TERM the group
+# once <file> appears. Returns the wrapper's status.
+stop_group_at() {
   local pid
-  setup collectsignal 'echo output-line'
-  rule slowcollect pre 'tar -cf - result.json' 1 ': > "$HOME/collecting"; sleep 3'
   (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" FAKE_SSH_CTL="$CTL" FAKE_SSH_HOME="$REMOTE_HOME" \
     exec setsid env --default-signal=INT "$HEAVY" --class test --remote -- bash t/job.sh >/dev/null 2>&1) &
   pid=$!
-  wait_for "$REMOTE_HOME/collecting"
+  wait_for "$1"
   kill -TERM -- "-$pid"
   wait "$pid"
+}
+# slow_verification: checking run.log leaves $HOME_FM/verifying and takes 3 seconds.
+slow_verification() {
+  printf '%s\n' '#!/usr/bin/env bash' \
+    'case "$*" in *run.log*) : > "$FM_HOME/verifying"; sleep 3 ;; esac' \
+    "exec $(command -v sha256sum) \"\$@\"" > "$FAKEBIN/sha256sum"
+  chmod +x "$FAKEBIN/sha256sum"
+}
+
+test_signal_during_collection_is_cancelled() {
+  setup collectsignal 'echo output-line'
+  rule slowcollect pre 'tar -cf - result.json' 1 ': > "$HOME/collecting"; sleep 3'
+  stop_group_at "$REMOTE_HOME/collecting"
   expect_code 143 "$?" "a job signalled during collection"
   expect_record '.outcome == "cancelled" and .exit == 143 and .host == "fake-mac"' "record of a job signalled during collection"
   expect_host_clean "scratch after a signal during collection"
@@ -601,31 +614,41 @@ test_signal_during_collection_is_cancelled() {
     'case "$*" in *collect.tar*) case "$*" in *-xf*) : > "$FM_HOME/extracting"; sleep 3 ;; esac ;; esac' \
     "exec $(command -v tar) \"\$@\"" > "$FAKEBIN/tar"
   chmod +x "$FAKEBIN/tar"
-  (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" FAKE_SSH_CTL="$CTL" FAKE_SSH_HOME="$REMOTE_HOME" \
-    exec setsid env --default-signal=INT "$HEAVY" --class test --remote -- bash t/job.sh >/dev/null 2>&1) &
-  pid=$!
-  wait_for "$HOME_FM/extracting"
-  kill -TERM -- "-$pid"
-  wait "$pid"
+  stop_group_at "$HOME_FM/extracting"
   expect_code 143 "$?" "a job signalled during result extraction"
   expect_record '.outcome == "cancelled" and .exit == 143' "record of a job signalled during result extraction"
 
   # Everything is collected and the stop arrives while the result is being checked.
   setup verifysignal 'echo output-line'
-  printf '%s\n' '#!/usr/bin/env bash' \
-    'case "$*" in *run.log*) : > "$FM_HOME/verifying"; sleep 3 ;; esac' \
-    "exec $(command -v sha256sum) \"\$@\"" > "$FAKEBIN/sha256sum"
-  chmod +x "$FAKEBIN/sha256sum"
-  (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" FAKE_SSH_CTL="$CTL" FAKE_SSH_HOME="$REMOTE_HOME" \
-    exec setsid env --default-signal=INT "$HEAVY" --class test --remote -- bash t/job.sh >/dev/null 2>&1) &
-  pid=$!
-  wait_for "$HOME_FM/verifying"
-  kill -TERM -- "-$pid"
-  wait "$pid"
+  slow_verification
+  stop_group_at "$HOME_FM/verifying"
   expect_code 143 "$?" "a job signalled during result verification"
   expect_record '.outcome == "cancelled" and .exit == 143' "record of a job signalled during result verification"
   expect_host_clean "scratch after a signal during result verification"
-  pass "fm-heavy --remote: a signal during collection or verification cancels the job instead of judging its result"
+
+  # Every check held and the stop arrives while the host is being cleaned.
+  setup cleanupsignal 'echo output-line'
+  rule slowcleanup pre 'runner.py cleanup' 1 ': > "$HOME/cleaning"; sleep 3'
+  stop_group_at "$REMOTE_HOME/cleaning"
+  expect_code 143 "$?" "a job signalled during the final cleanup"
+  expect_record '.outcome == "cancelled" and .exit == 143' "record of a job signalled during the final cleanup"
+  assert_absent "$HOME_FM/state/heavy-remote/unknown-fake-mac/$(last_record | jq -r .job).json" "the record closes after a signal during the final cleanup"
+  expect_host_clean "scratch after a signal during the final cleanup"
+  pass "fm-heavy --remote: a signal from collection to the final cleanup cancels the job instead of judging its result"
+}
+
+test_signal_during_reconcile_keeps_the_record() {
+  unknown_job reconcilesignal 'echo run' 'runner.py (wait|status)'
+  HOME="$REMOTE_HOME" python3 "$RUNNER" wait "$REMOTE_HOME/.fm-heavy-remote/$JOB" 20 >/dev/null
+  new_candidate 'echo next'
+  slow_verification
+  stop_group_at "$HOME_FM/verifying"
+  expect_code 143 "$?" "a request signalled while it checks an earlier job"
+  expect_record ".outcome == \"cancelled\" and .exit == 143 and .job != \"$JOB\"" "record of a request signalled during reconciliation"
+  assert_present "$OPEN" "the earlier job's record stays open"
+  assert_absent "$JOB_DIR/reconciled.json" "a stopped check closes nothing"
+  [ "$(remote_starts)" -eq 1 ] || fail "a signalled request must not start a new job: $(cat "$CTL/log")"
+  pass "fm-heavy --remote: a signal while an earlier job is checked leaves its record open and starts nothing"
 }
 
 test_killed_check_is_never_a_pass() {
@@ -722,6 +745,7 @@ test_unterminated_config_last_line
 test_signal_during_eligibility_never_runs_locally
 test_wrapper_only_signal_never_runs_locally
 test_signal_during_collection_is_cancelled
+test_signal_during_reconcile_keeps_the_record
 test_killed_check_is_never_a_pass
 test_dropped_collection_is_reconciled
 test_partial_transfer_is_cleaned

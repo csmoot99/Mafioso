@@ -132,7 +132,11 @@ job_state() {  # [runner action, default status]
   done
   echo unreachable
 }
-finish() {  # <outcome> <exit status>
+finish() {  # <outcome> <exit status>; once this script is signalled, always cancelled
+  if [ -n "$sig" ]; then
+    [ ! -e "$record" ] || cleanup_remote
+    set -- cancelled $((128 + sig))
+  fi
   emit outcome "$1"
   emit job "$id"
   exit "$2"
@@ -152,7 +156,7 @@ collect() {  # <file...>
   while :; do
     bgssh "$stage/collect.tar" "cd $rdir && tar -cf - $*"
     rc=$?
-    [ "$rc" -ne 0 ] || { tar -xf "$stage/collect.tar" -C "$jdir" "$@" 2>/dev/null && return 0 || { [ -z "$sig" ] || return 255; return 1; }; }
+    [ "$rc" -ne 0 ] || { tar -xf "$stage/collect.tar" -C "$jdir" "$@" 2>/dev/null && return 0 || return 1; }
     [ -z "$sig" ] || return 255
     [ "$rc" -eq 255 ] || return 1
     n=$((n + 1))
@@ -201,6 +205,7 @@ reconcile_job() {  # <open record>
       if [ "$rc" -eq 255 ] || [ -n "$sig" ]; then blocked=unreachable; return 1; fi
       outcome=rejected
       if [ "$rc" -eq 0 ] && result_problem >/dev/null; then outcome=$(result_outcome); fi
+      [ -z "$sig" ] || { blocked=unreachable; return 1; }
       ;;
     lost) collect run.log; outcome=lost ;;
     absent) outcome=absent ;;
@@ -328,13 +333,7 @@ if [ "$state" = lost ] || [ "$state" = absent ]; then
   finish lost 70
 fi
 [ -n "$collected" ] || reject "result or log missing or incomplete"
-why=$(result_problem)
-checked=$?
-if [ -n "$sig" ]; then
-  cleanup_remote
-  finish cancelled $((128 + sig))
-fi
-[ "$checked" -eq 0 ] || reject "${why:-the checks did not finish}"
+why=$(result_problem) || reject "${why:-the checks did not finish}"
 emit cpu "$(jq -r '.cpu_usec' "$jdir/result.json")"
 cleanup_remote
 
