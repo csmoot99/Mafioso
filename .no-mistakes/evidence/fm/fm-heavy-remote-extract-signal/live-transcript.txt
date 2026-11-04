@@ -1,0 +1,75 @@
+=== S1 no stop: real job pass / failed over real ssh ===
+[S1-pass-fix] wrapper exit=0 record={"host":"lab-mac","outcome":"pass","exit":0,"job":"1793817008-3904374-11018","candidate":"1c75f15d","collect_s":0,"cpu_usec":286153} open_records=0 host_jobs=0
+[S1-failed-fix] wrapper exit=7 record={"host":"lab-mac","outcome":"failed","exit":7,"job":"1793817009-3904760-19792","candidate":"cb045068","collect_s":0,"cpu_usec":276396} open_records=0 host_jobs=0
+=== S2 TERM to the group during the real unpack of a finished result ===
+[S2-unpack-BASE-22a91c5] live process at the stop: 3907095 tar -xf /tmp/tmp.ImfnQ6ukF0/collect.tar -C /tmp/fm-lab-ssh.ycWncj/cases/ex-base/home/state/heavy-remot
+[S2-unpack-BASE-22a91c5] wrapper exit=143 record={"host":"lab-mac","outcome":"rejected","exit":143,"job":"1793817011-3905055-4881","candidate":"626f380c","collect_s":5,"cpu_usec":null} open_records=0 host_jobs=0
+    stderr: Terminated                 tar -xf "$stage/collect.tar" -C "$jdir" "$@" 2> /dev/null
+    stderr: fm-heavy-remote: result rejected: result or log missing or incomplete (kept in /tmp/fm-lab-ssh.ycWncj/cases/ex-base/home/state/heavy-remote/1793817011-3905055-4881)
+[S2-unpack-FIX] live process at the stop: 3908683 tar -xf /tmp/tmp.OcixFlkZ1y/collect.tar -C /tmp/fm-lab-ssh.ycWncj/cases/ex-fix/home/state/heavy-remote
+[S2-unpack-FIX] wrapper exit=143 record={"host":"lab-mac","outcome":"cancelled","exit":143,"job":"1793817019-3907437-32444","candidate":"a237d160","collect_s":5,"cpu_usec":null} open_records=0 host_jobs=0
+    stderr: Terminated                 tar -xf "$stage/collect.tar" -C "$jdir" "$@" 2> /dev/null
+    stderr: fm-heavy-remote: result rejected: result or log missing or incomplete (kept in /tmp/fm-lab-ssh.ycWncj/cases/ex-fix/home/state/heavy-remote/1793817019-3907437-32444)
+=== S3 HUP to the group during the real unpack ===
+[S3-unpack-HUP-FIX] live process at the stop: 3910084 tar -xf /tmp/tmp.Ooe3ohxAIf/collect.tar -C /tmp/fm-lab-ssh.ycWncj/cases/ex-hup/home/state/heavy-remote
+[S3-unpack-HUP-FIX] wrapper exit=129 record={"host":"lab-mac","outcome":"cancelled","exit":129,"job":"1793817028-3908851-801","candidate":"61714a83","collect_s":5,"cpu_usec":null} open_records=0 host_jobs=0
+    stderr: Hangup                     tar -xf "$stage/collect.tar" -C "$jdir" "$@" 2> /dev/null
+    stderr: fm-heavy-remote: result rejected: result or log missing or incomplete (kept in /tmp/fm-lab-ssh.ycWncj/cases/ex-hup/home/state/heavy-remote/1793817028-3908851-801)
+=== S4 real Ctrl-C at a terminal (tmux pty) during the real unpack ===
+[S4-ctrl-c-FIX] live process at the stop: 3918519 tar -xf /tmp/tmp.GgvMy2UmP0/collect.tar -C /tmp/fm-lab-ssh.ycWncj/cases/ex-int/home/state/heavy-remote
+    pane: ^Cfm-heavy-remote: result rejected: result or log missing or incomplete (kept in /tmp/fm-lab-ssh.ycWncj/cases/ex-int/home/state/heavy-remote/1793817
+    pane: 0-3914122-19467)
+    pane: WRAPPER_EXIT=130
+    pane: lab$
+[S4-ctrl-c-FIX] record={"host":"lab-mac","outcome":"cancelled","exit":130,"job":"1793817050-3914122-19467","candidate":"94a65933","collect_s":6,"cpu_usec":null} open_records=0 host_jobs=0
+=== S5 TERM to the group during the real checksum of run.log ===
+[S5-verify-BASE-22a91c5] live process at the stop: 3922038 sha256sum /tmp/fm-lab-ssh.ycWncj/cases/vf-base/home/state/heavy-remote/1793817060-3918772-24848/run.lo
+[S5-verify-BASE-22a91c5] wrapper exit=143 record={"host":"lab-mac","outcome":"pass","exit":143,"job":"1793817060-3918772-24848","candidate":"3a15c09b","collect_s":7,"cpu_usec":1432335} open_records=0 host_jobs=0
+[S5-verify-FIX] live process at the stop: 3925447 sha256sum /tmp/fm-lab-ssh.ycWncj/cases/vf-fix/home/state/heavy-remote/1793817073-3922209-15118/run.log
+[S5-verify-FIX] wrapper exit=143 record={"host":"lab-mac","outcome":"cancelled","exit":143,"job":"1793817073-3922209-15118","candidate":"e4da24d3","collect_s":7,"cpu_usec":null} open_records=0 host_jobs=0
+    stderr: fm-heavy-remote: result rejected: the checks did not finish (kept in /tmp/fm-lab-ssh.ycWncj/cases/vf-fix/home/state/heavy-remote/1793817073-3922209-15118)
+=== S6 TERM to the group during the real final cleanup ssh (host scratch holds 200k files) ===
+[S6-cleanup-BASE-22a91c5] live process at the stop: 3928303 /usr/bin/ssh -F /tmp/fm-lab-ssh.ycWncj/run/ssh_config -o BatchMode=yes -o ConnectTimeout=10 -o ServerA
+[S6-cleanup-BASE-22a91c5] wrapper exit=143 record={"host":"lab-mac","outcome":"pass","exit":143,"job":"1793817085-3925854-22212","candidate":"dfaa0f5b","collect_s":0,"cpu_usec":8149817} open_records=1 host_jobs=1
+    stderr: fm-heavy-remote: could not remove lab-mac:~/.fm-heavy-remote/1793817085-3925854-22212
+    after 4s: open_records=1 host_jobs=0
+[S6-cleanup-FIX] live process at the stop: 3930292 /usr/bin/ssh -F /tmp/fm-lab-ssh.ycWncj/run/ssh_config -o BatchMode=yes -o ConnectTimeout=10 -o ServerA
+[S6-cleanup-FIX] wrapper exit=143 record={"host":"lab-mac","outcome":"cancelled","exit":143,"job":"1793817098-3929011-3516","candidate":"8aa16065","collect_s":0,"cpu_usec":7850108} open_records=0 host_jobs=0
+    stderr: fm-heavy-remote: could not remove lab-mac:~/.fm-heavy-remote/1793817098-3929011-3516
+    after 4s: open_records=0 host_jobs=0
+=== S7 only the checksum process dies, nobody stopped the job: must stay rejected ===
+[S7-check-killed-alone-FIX] live process at the stop: 3941426 sha256sum /tmp/fm-lab-ssh.ycWncj/cases/kc/home/state/heavy-remote/1793817134-3938533-17523/run.log
+[S7-check-killed-alone-FIX] wrapper exit=65 record={"host":"lab-mac","outcome":"rejected","exit":65,"job":"1793817134-3938533-17523","candidate":"5969f5c0","collect_s":6,"cpu_usec":null} open_records=0 host_jobs=0
+    stderr: fm-heavy-remote: result rejected: run.log does not match its recorded size and checksum (kept in /tmp/fm-lab-ssh.ycWncj/cases/kc/home/state/heavy-remote/1793817134-3938533-17523)
+=== S8 host log tampered before collection, no stop: must stay rejected ===
+[S8-tampered-FIX] wrapper exit=65 record={"host":"lab-mac","outcome":"rejected","exit":65,"job":"1793817145-3941745-7353","candidate":"74104ede","collect_s":0,"cpu_usec":null} open_records=0 host_jobs=0
+    stderr: fm-heavy-remote: result rejected: run.log does not match its recorded size and checksum (kept in /tmp/fm-lab-ssh.ycWncj/cases/tm/home/state/heavy-remote/1793817145-3941745-7353)
+=== S9 TERM while an earlier finished job is being checked by the next request ===
+[S9-base-real-outage] wrapper exit=75 record={"host":"lab-mac","outcome":"unknown","exit":75,"job":"1793817146-3941961-22260","candidate":"93387c78","collect_s":1,"cpu_usec":null} open_records=1 host_jobs=1
+    earlier job 1793817146-3941961-22260 finished on host: {"outcome":"exited","exit_code":0}
+[S9-reconcile-base] live process at the stop: 3946078 sha256sum /tmp/fm-lab-ssh.ycWncj/cases/rc-base/home/state/heavy-remote/1793817146-3941961-22260/run.lo
+[S9-reconcile-base] wrapper exit=143 record={"host":"lab-mac","outcome":"cancelled","exit":143,"job":"1793817156-3944239-26536","candidate":"b9fdcdf4","collect_s":null,"cpu_usec":null} open_records=0 host_jobs=0
+    stderr: fm-heavy-remote: earlier job 1793817146-3941961-22260 on lab-mac ended pass (kept in /tmp/fm-lab-ssh.ycWncj/cases/rc-base/home/state/heavy-remote/1793817146-3941961-22260)
+    earlier record open: no; reconciled.json: {"outcome":"pass"}; runner starts on host: 1
+[S9-fix-real-outage] wrapper exit=75 record={"host":"lab-mac","outcome":"unknown","exit":75,"job":"1793817166-3946529-3047","candidate":"d0f519e4","collect_s":1,"cpu_usec":null} open_records=1 host_jobs=1
+    earlier job 1793817166-3946529-3047 finished on host: {"outcome":"exited","exit_code":0}
+[S9-reconcile-fix] live process at the stop: 3949519 sha256sum /tmp/fm-lab-ssh.ycWncj/cases/rc-fix/home/state/heavy-remote/1793817166-3946529-3047/run.log
+[S9-reconcile-fix] wrapper exit=143 record={"host":"lab-mac","outcome":"cancelled","exit":143,"job":"1793817175-3948561-32084","candidate":null,"collect_s":null,"cpu_usec":null} open_records=1 host_jobs=1
+    earlier record open: yes; reconciled.json: ; runner starts on host: 0
+=== S10 the next unstopped request settles the earlier job, then runs its own ===
+[S10-next-request-FIX] wrapper exit=0 record={"host":"lab-mac","outcome":"pass","exit":0,"job":"1793817182-3949606-21034","candidate":"c5a56a08","collect_s":0,"cpu_usec":276845} open_records=0 host_jobs=0
+    stderr: fm-heavy-remote: earlier job 1793817166-3946529-3047 on lab-mac ended pass (kept in /tmp/fm-lab-ssh.ycWncj/cases/rc-fix/home/state/heavy-remote/1793817166-3946529-3047)
+    reconciled.json: {"job":"1793817166-3946529-3047","outcome":"pass"}; runner starts on host: 1
+=== S11 summary view of the cancelled job ===
+project  class  jobs  failed  wait_avg_s  wait_max_s  run_avg_s  run_max_s  wait_pct  peak_mib  unknown_peak  host     prepare_avg_s  collec
+lab      test   3     2       6           11          4          8          69        unknown   3             lab-mac  1              1
+{"outcome":"unknown","exit":75,"job":"1793817166-3946529-3047"}
+{"outcome":"cancelled","exit":143,"job":"1793817175-3948561-32084"}
+{"outcome":"pass","exit":0,"job":"1793817182-3949606-21034"}
+=== S12 stop arrives while the host is really down: cancelled, but the open record is kept ===
+[S12-stop-during-outage-FIX] wrapper exit=143 record={"host":"lab-mac","outcome":"cancelled","exit":143,"job":"1793817215-3958711-27341","candidate":"28450608","collect_s":null,"cpu_usec":null} open_records=1 host_jobs=1
+    stderr: fm-heavy-remote: could not remove lab-mac:~/.fm-heavy-remote/1793817215-3958711-27341
+    stderr: fm-heavy-remote: could not remove lab-mac:~/.fm-heavy-remote/1793817215-3958711-27341
+[S12-next-request-after-host-returns-FIX] wrapper exit=0 record={"host":"lab-mac","outcome":"pass","exit":0,"job":"1793817222-3962124-9408","candidate":"28450608","collect_s":0,"cpu_usec":294685} open_records=0 host_jobs=0
+    stderr: fm-heavy-remote: earlier job 1793817215-3958711-27341 on lab-mac ended pass (kept in /tmp/fm-lab-ssh.ycWncj/cases/down/home/state/heavy-remote/1793817215-3958711-27341)
+    reconciled.json: {"job":"1793817215-3958711-27341","outcome":"pass"}

@@ -1,0 +1,4 @@
+^Cfm-heavy-remote: result rejected: result or log missing or incomplete (kept in /tmp/fm-lab-ssh.ycWncj/cases/ex-int/home/state/heavy-remote/1793817
+0-3914122-19467)
+WRAPPER_EXIT=130
+lab$
