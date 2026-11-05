@@ -1,0 +1,7 @@
+Simulated slow link: 400 kbit/s down, 200 up, 300 ms RTT, cold cache, phone viewport, same payload (110 reports, 2 cards, 6 phone-size PNGs of 4.6 MB)
+run               card in DOM  card visible  first image  bytes to card  font reqs  full images  thumbs
+head-slow                8.0s         14.6s         9.4s         373386          0            0       3
+base-slow               21.8s         21.8s       116.7s        1048462          4            3       0
+head-fonthang            8.0s         14.4s         9.5s         373386          0            0       3
+base-fonthang           36.2s         36.2s       131.2s        1152232          1            3       0
+board page bytes: base 770003, new 94928; reports index 677251 loaded only on first opening Reports

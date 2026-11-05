@@ -1,0 +1,5 @@
+{"titles":["Pick the checkout layout","Keep the legacy importer?"],"src":"bearings-board-assets/lab-speed-card-one/1.png","w":1170}
+ffmpeg on PATH: none
+build rc=0
+fm-bearings-board: thumbnails unavailable for some images; using originals
+board: /tmp/fm-lab.hE8bik/.lavish/bearings-board.html

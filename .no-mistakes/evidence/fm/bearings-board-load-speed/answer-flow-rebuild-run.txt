@@ -1,0 +1,45 @@
+first worker finished; build-times: 1
+already-armed: lavish-76a97a5a3712f6e0
+22:24:53.213 frame loaded revision 5
+22:24:53.969 == S-rebuild: config set once, captain answers card two then starts composing card three
+22:25:00.922 backlog: r3-two done, answer captured
+22:25:17.083 PASS 16s after capture no reload (0) and draft intact
+22:25:24.404 frame loaded revision 6
+22:25:24.425 build started 20.078s after capture; open board reloaded 23.482s after capture
+22:25:24.425 PASS exactly one build, started after the 20s quiet period
+22:25:28.974 cards after automatic reload: r3-three,r3-four,r3-five,r3-six,r3-seven,r3-eight
+22:25:29.057 PASS answered cards gone after automatic reload
+22:25:29.101 frame loaded revision 7
+22:25:34.412 cards after manual reload: r3-three,r3-four,r3-five,r3-six,r3-seven,r3-eight
+22:25:34.413 PASS manual reload keeps answered cards away, open ones stay
+22:25:34.413 == S-coalesce: two answers 10s apart, third request while composing
+22:25:41.338 three captured
+22:25:51.344 PASS no reload yet at 10s
+22:25:58.188 four captured 16.85s after three
+22:26:18.815 build started 19.812s after last answer
+22:26:21.836 frame loaded revision 8
+22:26:24.822 PASS two answers produced one build
+22:26:24.822 PASS build followed the LAST answer's quiet period
+22:26:24.826 cards: r3-five,r3-six,r3-seven,r3-eight
+22:26:24.827 PASS both answered cards gone
+22:26:24.827 == S-batch: two answers queued and sent in one send
+22:26:33.251 five and six captured
+22:26:56.630 frame loaded revision 9
+22:26:59.480 PASS one send with two answers produced one build
+22:27:01.161 cards: r3-seven,r3-eight
+22:27:01.161 == S-failure: the configured build fails
+22:27:08.057 seven captured
+22:27:28.574 PASS failure recorded
+22:27:28.574 failures.log: 2026-11-05T22:27:28Z Board rebuild failed (exit 7); the answer remains recorded
+22:27:28.574 last.log: builder blew up
+22:27:28.574 FAIL check notification published
+22:27:28.661 PASS answer stays closed after failed build
+22:27:28.661 == S-recovery: next answer after fixing the builder
+22:27:28.711 frame loaded revision 10
+22:27:34.023 cards: r3-seven,r3-eight
+22:27:40.857 eight captured
+22:28:04.692 frame loaded revision 11
+22:28:07.492 PASS rebuild works again
+22:28:07.496 cards: 
+22:28:07.606 PASS all answered cards are gone from the board
+driver rc=1

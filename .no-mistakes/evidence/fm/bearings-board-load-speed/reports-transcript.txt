@@ -1,0 +1,22 @@
+PASS report index not requested on board load
+index.js bytes: 677251
+status while loading: Loading report list and search…
+PASS search disabled while index loads
+report list arrived after 14.421s on the slow link
+count: 110 reports
+PASS all 110 reports listed
+PASS index requested once
+PASS reopening Reports does not refetch
+search rows: 1 Lab report 77beta · 2026-10-22…y widget pipeline and its calibration knobs in depth, token
+PASS full-text search finds a word only in the report body
+report frame: a/bearings-board-assets/.reports/77.html
+report body: "Download report (.md)\nLab report 77\n\nParagraph 1 of report 7"
+PASS report opens in its frame
+tile src: bearings-board-assets/lab-speed-card-one/1.thumb.jpg natural width 320
+PASS tile shows the generated preview
+lightbox: {"src":"bearings-board-assets/lab-speed-card-one/1.png","w":1170,"h":2532}
+PASS tapping opens the untouched full-size original
+failed status: Reports could not load. Type or reopen Reports to retry.
+PASS index failure shows a retry message
+PASS other sections keep working after index failure
+PASS reopening Reports retries and recovers

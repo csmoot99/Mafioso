@@ -1,0 +1,6 @@
+request rc=0
+immediately after failures.log appears: wake lines=
+2s later: wake lines=1
+1793917720	1	check	bearings-rebuild	Board rebuild failed (exit 7); the answer remains recorded; output=/tmp/fm-lab.F8F2Wg/state/bearings-rebuild/last.log
+2026-11-05T22:28:40Z Board rebuild failed (exit 7); the answer remains recorded
+builder blew up
