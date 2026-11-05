@@ -12,6 +12,7 @@ import time
 CLASSES = ("regression", "stale", "brittle", "new-code", "preventable", "flaky")
 TEXT_MAX = 300
 ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
+PNPM_STEP = re.compile(r"^(\S+ \S+)(?:\$ |: Failed$)")
 VITEST_JEST_FAIL = re.compile(r"^\s*FAIL\s+(?:\|[^|]*\|\s+)?(.+)$")
 FILE_SUFFIX = re.compile(r"\s+(?:\[ .* \]|\([\d.]+ m?s\))$")
 JEST_BULLET = re.compile(r"^\s*●\s+(.+)$")
@@ -40,6 +41,16 @@ def clean(text):
 
 def joined(title):
     return " > ".join(part.strip() for part in title.split(" › "))
+
+
+def without_pnpm_prefix(lines):
+    """Drops the `<package> <script>: ` that `pnpm -r` puts on each line of a package it names."""
+    prefixes = {found.group(1) for found in map(PNPM_STEP.match, lines) if found}
+    kept = []
+    for line in lines:
+        prefix, _, rest = line.partition(": ")
+        kept.append(rest if prefix in prefixes else line)
+    return kept
 
 
 def first_error(lines, index):
@@ -86,10 +97,11 @@ def parse_failures(text):
     """Failing tests in reporter output, as {file, test, error} dicts.
 
     Each reporter names a failure twice, so a detailed entry (vitest FAIL, jest
-    bullet, the Playwright failed list, a TAP not ok) wins and the running marks
-    count only in output that has no detailed entry at all.
+    bullet, the Playwright failed list, a TAP not ok, a node:test mark under its
+    `test at` line) wins and the running marks count only in output that has no
+    detailed entry at all.
     """
-    lines = [ANSI.sub("", line).rstrip() for line in text.splitlines()]
+    lines = without_pnpm_prefix([ANSI.sub("", line).rstrip() for line in text.splitlines()])
     detailed, marked, playwright_errors = {}, {}, {}
     has_summary = any(SUMMARY.match(line) for line in lines)
     current_file = None
@@ -153,7 +165,7 @@ def parse_failures(text):
             add(marked, title, title[1], title[2], None)
             continue
 
-        match = VITEST_FILE.match(line) or NODE_LOCATION.match(line)
+        match = VITEST_FILE.match(line)
         if match:
             current_file = match.group(1)
             continue
@@ -161,7 +173,12 @@ def parse_failures(text):
         match = MARK.match(line) or (has_summary and ASCII_MARK.match(line))
         if match and match.group(1) != "failing tests:":
             test = joined(DURATION.sub("", match.group(1)))
-            add(marked, test, current_file, test, first_error(lines, index))
+            location = index and NODE_LOCATION.match(lines[index - 1])
+            if location:
+                file = location.group(1)
+                add(detailed, ("node", file, test), file, test, first_error(lines, index))
+            else:
+                add(marked, (current_file, test), current_file, test, first_error(lines, index))
 
     rows = list((detailed or marked).values())
     if rows:
@@ -278,8 +295,9 @@ def classify(root, args):
     if not cause:
         print("fm-test-failure.sh: --cause needs one line of text", file=sys.stderr)
         return 2
+    test = joined(args.test)
     failures = [e for e in read_entries(root) if e["kind"] == "failure" and e.get("task") == args.task]
-    linked = next((e for e in reversed(failures) if matches(e, args.test, args.file)), None)
+    linked = next((e for e in reversed(failures) if matches(e, test, args.file)), None)
     source = linked or (failures[-1] if failures else None)
     project = source.get("project") if source else task_project(root, args.task)
     if not project:
@@ -287,12 +305,12 @@ def classify(root, args):
         return 1
     append(root, project, [{
         "kind": "classification", "ts": int(time.time()), "project": project, "task": args.task,
-        "test": linked["test"] if linked else args.test,
+        "test": linked["test"] if linked else test,
         "file": linked.get("file") if linked else args.file,
         "class": args.failure_class, "cause": cause, "job": linked.get("job") if linked else None,
     }])
     if not linked:
-        print(f"fm-test-failure.sh: no recorded failure of {args.test} in task {args.task}; classification kept unlinked", file=sys.stderr)
+        print(f"fm-test-failure.sh: no recorded failure of {test} in task {args.task}; classification kept unlinked", file=sys.stderr)
     return 0
 
 

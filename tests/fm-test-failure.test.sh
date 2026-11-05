@@ -66,9 +66,38 @@ src/cart.test.ts|cart > applies tax|TypeError: cannot read tax of undefined'
   assert_parsed node-tap '/repo/test/a.test.js|inner fails|expected true
 /repo/test/b.test.js|multi line|first line of the error'
   assert_parsed node-spec 'test/c.test.js|fails|AssertionError [ERR_ASSERTION]: expected true'
+  assert_parsed node-spec-nested 'test/a.test.js|inner fails|AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+test/a.test.js|deeper fails|Error: boom deep
+test/a.test.js|child fails|Error: boom child
+test/a.test.js|fails|Error: a fails
+test/b.test.js|fails|Error: b fails'
+  assert_parsed pnpm-workspace 'src/cart.test.ts|cart > totals the items|AssertionError: expected 3 to be 4 // Object.is equality
+src/cart.test.ts|cart > applies tax|TypeError: cannot read tax of undefined
+src/math.test.js|math > divides|expect(received).toBe(expected) // Object.is equality'
   assert_parsed bats 'tests/flags.bats|refuses a bad flag|`[ "$status" -eq 2 ]'"'"' failed'
   assert_parsed unparsed '-|(unparsed)|Error: could not start the database'
   pass "capture: names failing tests from each reporter, and a run with none parsable still leaves a line"
+}
+
+test_pnpm_log_cut_before_its_start_lines() {
+  local home
+  home=$(make_home pnpm-tail)
+  grep -v ' test\$ ' "$FIXTURES/pnpm-workspace.txt" > "$TMP_ROOT/pnpm-tail.log"
+  capture "$home" "$TMP_ROOT/pnpm-tail.log" t1 || fail "capture failed"
+  [ "$(jq -r .test "$home/data/test-failures/demo.jsonl")" = "cart > totals the items
+cart > applies tax
+math > divides" ] || fail "a pnpm log without start lines parsed as: $(cat "$home/data/test-failures/demo.jsonl")"
+  pass "capture: a pnpm log cut before its start lines still names its failures"
+}
+
+test_marks_of_two_files_stay_separate() {
+  local home
+  home=$(make_home marks-two-files)
+  printf ' ❯ a.test.ts (1 test | 1 failed)\n   × same\n ❯ b.test.ts (1 test | 1 failed)\n   × same\n' > "$TMP_ROOT/two-files.log"
+  capture "$home" "$TMP_ROOT/two-files.log" t1 || fail "capture failed"
+  [ "$(jq -r .file "$home/data/test-failures/demo.jsonl")" = "a.test.ts
+b.test.ts" ] || fail "same-named marks collapsed: $(cat "$home/data/test-failures/demo.jsonl")"
+  pass "capture: same-named marks in two files stay two failures"
 }
 
 test_failure_line_fields() {
@@ -126,6 +155,24 @@ test_classify() {
     || fail "a task with only a task record was refused"
   [ -s "$home/data/test-failures/fresh.jsonl" ] || fail "the task record did not choose the ledger"
   pass "classify: links the latest matching failure, refuses a bad class, keeps unrecorded tests unlinked"
+}
+
+test_classify_title_as_printed() {
+  local home ledger out
+  home=$(make_home classify-title)
+  ledger="$home/data/test-failures/demo.jsonl"
+  capture "$home" "$FIXTURES/playwright.txt" t1
+  out=$(FM_HOME="$home" "$LEDGER" classify t1 --test 'login › rejects a bad password' --class stale --cause c 2>&1) \
+    || fail "classify failed: $out"
+  [ "$(tail -1 "$ledger" | jq -r '[.test,.job] | join("|")')" = "login > rejects a bad password|job-1" ] \
+    || fail "a title with › did not link: $(tail -1 "$ledger")"
+  out=$(FM_HOME="$home" "$LEDGER" report) || fail "report failed"
+  assert_contains "$out" "unclassified: 0 of 1 (0%)" "a title with › must classify its failure"
+
+  FM_HOME="$home" "$LEDGER" classify t1 --test 'checkout › never recorded' --class flaky --cause c 2>/dev/null \
+    || fail "an unrecorded title was refused"
+  [ "$(tail -1 "$ledger" | jq -r .test)" = "checkout > never recorded" ] || fail "an unlinked title kept its separator"
+  pass "classify: a title copied from reporter output links like the stored name"
 }
 
 test_report_and_recent() {
@@ -262,8 +309,11 @@ test_brief_rule() {
 }
 
 test_parsers
+test_pnpm_log_cut_before_its_start_lines
+test_marks_of_two_files_stay_separate
 test_failure_line_fields
 test_classify
+test_classify_title_as_printed
 test_report_and_recent
 test_heavy_capture
 test_lingering_process_frees_the_slot

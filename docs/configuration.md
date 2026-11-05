@@ -1218,6 +1218,7 @@ A job stopped by TERM, INT or HUP is recorded too, whether it was running or sti
 The command's exit status passes through, so 137 means the memory cap killed the command itself; when the cap kills one of its child processes, systemd stops the whole scope and the status is usually 143, with the peak still recorded.
 [`bin/fm-heavy-summary.sh`](../bin/fm-heavy-summary.sh) prints queue wait against run time and peak memory per project, class and host.
 A failing test or e2e job also records each failing test in the project's ledger, and [`bin/fm-test-failure.sh`](../bin/fm-test-failure.sh) classifies those failures and reports on them.
+The weekly rollup is `bin/fm-test-failure.sh report --since 7d`, run on demand until a schedule is added.
 The wrapper needs Linux with `flock`, `systemd-run` and `jq`; elsewhere it refuses without running anything.
 
 `config/host-test-slots` is one positive integer in the root home.

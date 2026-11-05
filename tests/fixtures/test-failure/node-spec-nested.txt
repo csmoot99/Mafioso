@@ -1,0 +1,46 @@
+▶ outer
+  ✖ inner fails (0.798645ms)
+  ▶ deep
+    ✖ deeper fails (0.172443ms)
+  ✖ deep (0.304015ms)
+  ✔ ok (0.072522ms)
+✖ outer (1.932416ms)
+▶ parent
+  ✖ child fails (0.090002ms)
+  ✔ child ok (0.062281ms)
+✖ parent (0.487819ms)
+✖ fails (0.106362ms)
+✖ fails (0.408008ms)
+ℹ tests 8
+ℹ suites 2
+ℹ pass 2
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 46.757745
+
+✖ failing tests:
+
+test at test/a.test.js:4:3
+✖ inner fails (0.798645ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 2
+  
+
+test at test/a.test.js:5:28
+✖ deeper fails (0.172443ms)
+  Error: boom deep
+
+test at test/a.test.js:9:11
+✖ child fails (0.090002ms)
+  Error: boom child
+
+test at test/a.test.js:12:1
+✖ fails (0.106362ms)
+  Error: a fails
+
+test at test/b.test.js:2:1
+✖ fails (0.408008ms)
+  Error: b fails

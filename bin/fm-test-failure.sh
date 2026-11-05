@@ -20,19 +20,21 @@
 #
 # classify records why a test failed: class is one of regression, stale, brittle,
 # new-code, preventable or flaky, and any other value is refused. --test matches a
-# failure's whole name or its last " > " parts, and --file narrows by path or path
-# suffix. The line is kind "classification" with ts, project, task, test, file,
-# class, cause and job, and links the most recent matching failure of that task
-# through job, test and file. A test the ledger never saw, such as one fixed in a
-# pipeline round, is still counted: its line has job null and its project comes
-# from another failure of the task or from state/<task-id>.meta in FM_HOME or the
-# root home. With neither the command refuses, because no ledger can be chosen.
+# failure's whole name or its last " > " parts, a title copied with " › " included,
+# and --file narrows by path or path suffix. The line is kind "classification" with
+# ts, project, task, test, file, class, cause and job, and links the most recent
+# matching failure of that task through job, test and file. A test the ledger never
+# saw, such as one fixed in a pipeline round, is still counted: its line has job
+# null and its project comes from another failure of the task or from
+# state/<task-id>.meta in FM_HOME or the root home. With neither the command
+# refuses, because no ledger can be chosen.
 #
 # report prints failures per project, classifications per class, the ten
 # most-repeated tests, the ten most-implicated files and the share of failures
 # unclassified. A classification covers its linked failure and that test's earlier
 # failures in the same task, so a later failure of the test counts as unclassified.
-# --since keeps the last n days. recent prints the latest lines, newest last.
+# --since keeps the last n days. The weekly rollup is report --since 7d, run on
+# demand until a schedule is added. recent prints the latest lines, newest last.
 #
 # capture is the internal entry bin/fm-heavy.sh calls with a finished job's log.
 #
