@@ -90,6 +90,7 @@ Each effective `FM_HOME` contains private operational directories.
 - Bounded per-job test output under `state/heavy-logs/` in the root home ([`bin/fm-heavy.sh`](../bin/fm-heavy.sh)).
 - Parent-side remote ledger copies under `state/secondmate-summary-cache/`.
 - One-shot Bearings reconcile requests under `state/reconcile-notify/`.
+- The Bearings rebuild queue and logs under `state/bearings-rebuild/` ([`bin/fm-bearings-rebuild.sh`](../bin/fm-bearings-rebuild.sh)).
 - Private secondmate config-reread generations with their retry and quarantine state.
 - Per-task steering-inbox records under `state/<id>.inbox/` (`bin/fm-task-inbox-lib.sh`).
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).

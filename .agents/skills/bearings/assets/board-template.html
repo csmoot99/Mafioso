@@ -715,8 +715,9 @@ __FM_BEARINGS_BOARD_DATA__
     return dated.concat(undated);
   }
   /* Reports: build renders each write-up to an inert page beside the board and
-     injects only that relative src; anything else is not one of ours. Newest
-     first, payload order within a day. */
+     lists that relative src in .reports/index.js, loaded on first opening the
+     tab; anything else is not one of ours. Newest first, payload order within
+     a day. */
   var REPORT_SRC = "bearings-board-assets/.reports/";
   var reports = [];
   var reportsCount = data.reports_count || 0;

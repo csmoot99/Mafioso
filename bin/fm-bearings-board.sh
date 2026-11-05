@@ -328,7 +328,7 @@ IMAGE_SRC_DEF='
 
 # Copy every surviving card's images into <stage>, laid out as the served
 # <card-key>/<n>.<ext>, and rewrite the payload so a card's `images` carry only
-# the relative src, alt and caption.
+# the relative src, alt, caption and any generated thumbnail.
 stage_images() {  # <payload.json> <stage-dir> <rewritten.json>
   local payload=$1 stage=$2 dest=$3 src path rel thumb noted=0
   local thumbs="$stage/thumbs.jsonl"
@@ -390,9 +390,9 @@ validate_report_files() {  # <data.json>
   done < <(jq -r '.reports[]? | .path' "$1")
 }
 
-# Render every report into <stage>/.reports/<n>.html and rewrite the payload's
-# `reports` to carry the relative src and a plain-text search index beside
-# title, repo, date and summary.
+# Render every report into <stage>/.reports/<n>.html, write title, repo, date,
+# summary, relative src and plain-text search content to <stage>/.reports/index.js,
+# and replace the payload's `reports` with `reports_count`.
 stage_reports() {  # <payload.json> <stage-dir>; rewrites the payload in place
   local payload=$1 stage=$2 n=0 path name dir="$2/$REPORTS_DIR_NAME"
   while IFS=$'\t' read -r path name; do
