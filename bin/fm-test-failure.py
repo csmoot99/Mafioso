@@ -281,16 +281,18 @@ def capture(root, args):
     return 0
 
 
-def path_suffix(path, suffix):
-    return path == suffix or path.endswith("/" + suffix)
+def same_file(one, other):
+    """Whether two paths can name one file: equal, or one ends the other at a "/"."""
+    if one == other:
+        return True
+    return bool(one and other) and (one.endswith("/" + other) or other.endswith("/" + one))
 
 
 def matches(entry, test, file):
     name = entry.get("test") or ""
     if name != test and not name.endswith(" > " + test):
         return False
-    stored = entry.get("file")
-    return not file or bool(stored) and (path_suffix(stored, file) or path_suffix(file, stored))
+    return not file or same_file(entry.get("file"), file)
 
 
 def task_project(root, task):
@@ -350,14 +352,18 @@ def report(root, args):
     if not failures and not classes:
         print("no test failures recorded")
         return 0
-    newest = {}  # the latest classification of each linked test in a task
+    linked = collections.defaultdict(list)  # the classifications of each test in a task
     for entry in entries:
         if entry["kind"] == "classification" and entry.get("job"):
-            newest[(entry.get("task"), entry.get("file"), entry.get("test"))] = entry.get("ts") or 0
-    unclassified = sum(
-        1 for e in failures
-        if (e.get("ts") or 0) > newest.get((e.get("task"), e.get("file"), e.get("test")), -1)
-    )
+            linked[(entry.get("task"), entry.get("test"))].append(entry)
+
+    def classified(failure):
+        return any(
+            same_file(failure.get("file"), entry.get("file")) and (entry.get("ts") or 0) >= (failure.get("ts") or 0)
+            for entry in linked.get((failure.get("task"), failure.get("test")), ())
+        )
+
+    unclassified = sum(1 for e in failures if not classified(e))
     share = round(unclassified * 100 / len(failures)) if failures else 0
     print(f"failures: {len(failures)}")
     print(f"unclassified: {unclassified} of {len(failures)} ({share}%)")

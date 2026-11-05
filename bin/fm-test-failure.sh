@@ -33,7 +33,8 @@
 # report prints failures per project, classifications per class, the ten
 # most-repeated tests, the ten most-implicated files and the share of failures
 # unclassified. A classification covers its linked failure and that test's earlier
-# failures in the same task, so a later failure of the test counts as unclassified.
+# failures in the same task whose path matches by the --file rule, so a later
+# failure of the test counts as unclassified.
 # --since keeps the last n days. The weekly rollup is report --since 7d, run on
 # demand until a schedule is added. recent prints the latest lines, newest last.
 #

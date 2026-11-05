@@ -195,6 +195,30 @@ test_classify_repo_path_of_a_package_relative_row() {
   pass "classify: a repo --file links a package-relative row at a path boundary only"
 }
 
+test_report_covers_both_path_shapes() {
+  local home ledger out
+  home=$(make_home report-shapes)
+  ledger="$home/data/test-failures/demo.jsonl"
+  grep -v '^apps/storefront' "$FIXTURES/pnpm-interleaved.txt" > "$TMP_ROOT/recursive.log"
+  printf ' FAIL  lib/proxy.test.ts > proxy > strips headers\nError: filtered\n' > "$TMP_ROOT/filtered.log"
+  capture "$home" "$TMP_ROOT/recursive.log" t1
+  capture "$home" "$TMP_ROOT/filtered.log" t1
+  [ "$(jq -r .file "$ledger")" = "apps/admin/lib/proxy.test.ts
+lib/proxy.test.ts" ] || fail "the two runs stored: $(cat "$ledger")"
+  out=$(FM_HOME="$home" "$LEDGER" classify t1 --test "proxy > strips headers" \
+    --file apps/admin/lib/proxy.test.ts --class stale --cause c 2>&1) || fail "classify failed: $out"
+  out=$(FM_HOME="$home" "$LEDGER" report) || fail "report failed"
+  assert_contains "$out" "unclassified: 0 of 2 (0%)" "one classification must cover both shapes of a path"
+
+  home=$(make_home report-no-file)
+  capture "$home" "$FIXTURES/unparsed.txt" t1
+  out=$(FM_HOME="$home" "$LEDGER" classify t1 --test "(unparsed)" --class flaky --cause c 2>&1) \
+    || fail "classify failed: $out"
+  out=$(FM_HOME="$home" "$LEDGER" report) || fail "report failed"
+  assert_contains "$out" "unclassified: 0 of 1 (0%)" "a classification must cover a failure with no file"
+  pass "report: one classification covers both path shapes of a failure, and a failure with no file"
+}
+
 test_classify_title_as_printed() {
   local home ledger out
   home=$(make_home classify-title)
@@ -353,6 +377,7 @@ test_failure_line_fields
 test_classify
 test_classify_file_in_a_pnpm_package
 test_classify_repo_path_of_a_package_relative_row
+test_report_covers_both_path_shapes
 test_classify_title_as_printed
 test_report_and_recent
 test_heavy_capture
