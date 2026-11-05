@@ -823,6 +823,52 @@ test_build_copies_card_images_beside_the_board_and_injects_only_relative_srcs() 
   pass "build copies card images beside the board and injects only relative srcs"
 }
 
+test_build_generates_smaller_thumbnails_and_keeps_originals() {
+  local board_home board assets thumbnail original
+  command -v ffmpeg >/dev/null 2>&1 || { pass "thumbnail generation skipped: optional ffmpeg absent"; return; }
+  board_home=$(make_home images-thumbnails)
+  mkdir -p "$board_home/src"
+  ffmpeg -nostdin -v error -f lavfi -i testsrc=size=780x1688 -frames:v 1 -threads 1 "$board_home/src/screen.png" \
+    || fail "cannot generate the screenshot fixture"
+  payload_with_cards "$board_home" "[$(card_with_images screens "$board_home/src/screen.png")]"
+  run_board "$board_home" build "$board_home/payload.json" >/dev/null 2>&1 || fail "the thumbnail board did not build"
+  board="$board_home/.lavish/bearings-board.html"
+  assets="$board_home/.lavish"
+  original=$(extract_payload "$board" | jq -r '.captains_call[0].images[0].src')
+  thumbnail=$(extract_payload "$board" | jq -r '.captains_call[0].images[0].thumbnail')
+  assert_present "$assets/$thumbnail" "the generated thumbnail is missing"
+  cmp "$board_home/src/screen.png" "$assets/$original" || fail "the original was changed"
+  [ "$(wc -c < "$assets/$thumbnail")" -lt "$(wc -c < "$assets/$original")" ] || fail "thumbnail did not reduce image bytes"
+  [ "$(wc -c < "$assets/$thumbnail")" -lt 15000 ] || fail "thumbnail exceeds the tile byte target"
+  pass "build generates small thumbnails and preserves original images"
+}
+
+test_build_without_ffmpeg_preserves_images_and_prints_one_note() {
+  local board_home tools out
+  board_home=$(make_home images-no-ffmpeg)
+  tools="$board_home/without-ffmpeg"
+  mkdir -p "$tools"
+  # Keep the build's ordinary tools available while making ffmpeg genuinely absent.
+  perl -e '
+    for $dir (split /:/, $ENV{PATH}) {
+      opendir(my $entries, $dir) or next;
+      for $name (readdir $entries) {
+        next if $name eq "." || $name eq ".." || $name eq "ffmpeg";
+        symlink "$dir/$name", "$ARGV[0]/$name" unless -e "$ARGV[0]/$name" || -l "$ARGV[0]/$name";
+      }
+      closedir $entries;
+    }' "$tools"
+  PATH="$tools" command -v ffmpeg >/dev/null 2>&1 && fail "ffmpeg is still available in the fallback fixture"
+  make_image "$board_home/src/a.png"
+  payload_with_cards "$board_home" "[$(card_with_images screens "$board_home/src/a.png" "$board_home/src/a.png")]"
+  out=$(PATH="$tools" run_board "$board_home" build "$board_home/payload.json" 2>&1) || fail "a build without ffmpeg failed: $out"
+  [ "$(printf '%s' "$out" | grep -c 'thumbnails unavailable')" = 1 ] || fail "fallback did not print exactly one note: $out"
+  extract_payload "$board_home/.lavish/bearings-board.html" | jq -e '[.captains_call[].images[] | has("thumbnail")] == [false,false]' >/dev/null \
+    || fail "fallback published unavailable thumbnails"
+  cmp "$board_home/src/a.png" "$board_home/.lavish/bearings-board-assets/screens/1.png" || fail "fallback did not preserve the original"
+  pass "build without ffmpeg preserves original images with one note"
+}
+
 test_build_refuses_a_bad_images_field_before_touching_the_board() {
   local home good name filter
   home=$(make_home images-refuse)
@@ -991,22 +1037,24 @@ test_build_publishes_each_report_beside_the_board_and_injects_only_relative_srcs
   make_report "$home/data/status-report-2026-11-02.md" '# Status'
   payload_with_reports "$home" "[$(report_entry "Scout A" "$home/data/scout-a/report.md"),$(report_entry "Status" "$home/data/status-report-2026-11-02.md")]"
   run_board "$home" build "$home/payload.json" >/dev/null 2>&1 || fail "a payload with reports did not build"
-  [ "$(find "$assets/.reports" -type f | wc -l | tr -d ' ')" = 2 ] || fail "the reports were not published beside the board"
+  [ "$(find "$assets/.reports" -type f | wc -l | tr -d ' ')" = 4 ] || fail "the reports were not published beside the board"
   assert_present "$assets/.reports/1.html" "the first report was not published"
   grep -q "Scout A" "$assets/.reports/1.html" || fail "the first published page is not the first report"
   grep -q "Status" "$assets/.reports/2.html" || fail "the second published page is not the second report"
-  extract_payload "$board" | jq -e '
-    (.reports | map(del(.text))) == [
+  extract_payload "$board" | jq -e '.reports_count == 2 and (has("reports") | not) and ([.. | objects | has("text")] | any | not)' >/dev/null \
+    || fail "report metadata or text remained in the inline page data"
+  jq -e '
+    (map(del(.text))) == [
       {title:"Scout A",repo:"sample",date:"2026-11-02",summary:"One line",src:"bearings-board-assets/.reports/1.html"},
-      {title:"Status",repo:"sample",date:"2026-11-02",summary:"One line",src:"bearings-board-assets/.reports/2.html"}]' >/dev/null \
+      {title:"Status",repo:"sample",date:"2026-11-02",summary:"One line",src:"bearings-board-assets/.reports/2.html"}]' "$assets/.reports/index.json" >/dev/null \
     || fail "the page data does not carry exactly the title, project, date, summary and relative src"
-  extract_payload "$board" | jq -e '(.reports[0].text | startswith("Scout A")) and .reports[1].text == "Status"' >/dev/null \
-    || fail "the page data does not carry each report's search text"
+  jq -e '(.[0].text | startswith("Scout A")) and .[1].text == "Status"' "$assets/.reports/index.json" >/dev/null \
+    || fail "the external index does not carry each report's search text"
   grep -qF "$home/data" "$board" && fail "the page leaked a local report path"
   # a rebuild replaces the folder, so a dropped report cannot linger
   payload_with_reports "$home" "[$(report_entry "Status" "$home/data/status-report-2026-11-02.md")]"
   run_board "$home" build "$home/payload.json" >/dev/null 2>&1 || fail "the rebuild failed"
-  [ "$(find "$assets/.reports" -type f | wc -l | tr -d ' ')" = 1 ] || fail "a dropped report survived a rebuild"
+  [ "$(find "$assets/.reports" -type f | wc -l | tr -d ' ')" = 3 ] || fail "a dropped report survived a rebuild"
   pass "build publishes each report beside the board and injects only relative srcs"
 }
 
@@ -1108,9 +1156,9 @@ test_each_report_page_downloads_the_original_and_the_board_carries_a_capped_sear
   name=$(sed -n 's/.*<a download="\([^"]*\)".*/\1/p' "$assets/.reports/1.html")
   [ "$name" = "2026-11-02-scout-n-more.md" ] || fail "the download is not named <date>-<title-slug>.md: $name"
   grep -qiE '<script|https?://[^"]*"? *(src|href)=' "$assets/.reports/1.html" && fail "the report page is not inert"
-  extract_payload "$board" | jq -e '
-    (.reports[0].text | contains("Scout") and (contains("|") | not) and (contains("---") | not) and (contains("```") | not) and contains("link item"))
-    and (.reports[1].text | length == 6000 and (contains("tail-marker") | not))' >/dev/null \
+  jq -e '
+    (.[0].text | contains("Scout") and (contains("|") | not) and (contains("---") | not) and (contains("```") | not) and contains("link item"))
+    and (.[1].text | length == 6000 and (contains("tail-marker") | not))' "$assets/.reports/index.json" >/dev/null \
     || fail "the search index is not plain, capped text"
   want=$(( $(grep -c . "$board") ))
   [ "$want" -gt 0 ] || fail "empty board"
@@ -1136,6 +1184,8 @@ test_every_decision_card_carries_the_reconcile_choice
 test_build_refuses_a_payload_that_occupies_the_reconcile_value
 test_build_refuses_a_nondecision_reconcile_value
 test_build_copies_card_images_beside_the_board_and_injects_only_relative_srcs
+test_build_generates_smaller_thumbnails_and_keeps_originals
+test_build_without_ffmpeg_preserves_images_and_prints_one_note
 test_build_refuses_a_bad_images_field_before_touching_the_board
 test_build_clears_stale_images_on_every_rebuild
 test_build_does_not_copy_images_of_a_dropped_landed_card

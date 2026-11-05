@@ -867,6 +867,7 @@ test_answer_records_and_closes() {
     > "$home/drifted-answer.out" 2> "$home/drifted-answer.err"; then
     fail "answer retry accepted a different captain decision"
   fi
+  assert_absent "$home/state/bearings-rebuild" "unconfigured answers created rebuild state"
   # The answered call releases the work routed behind it: a Done blocker reads
   # as resolved everywhere.
   show=$(tasks_in "$home" show sample-guard-work --full)
@@ -880,6 +881,106 @@ test_answer_records_and_closes() {
       and (.landed | any(.id == "sample-guard-call") | not)
   ' >/dev/null || fail "an answered captain call still renders somewhere it should not: $json"
   pass "answer records the captain's words, closes idempotently, and releases routed work"
+}
+
+# Rebuilds use the same answer owner as keyed channel intake. They must start
+# after the answer is durable and must never turn a rebuild failure into a lost
+# answer or concurrent builds against the same staged assets.
+wait_for_board_rebuild() {  # <home> <completion-file>
+  local board_home=$1 completion=$2 deadline=$((SECONDS + 20))
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    if [ -f "$completion" ] && [ ! -e "$board_home/state/bearings-rebuild/run.lock" ] \
+      && [ ! -e "$board_home/state/bearings-rebuild/pending" ]; then
+      return 0
+    fi
+    sleep 0.05
+  done
+  fail "board rebuild did not finish in its scratch home: $board_home"
+}
+
+test_answer_rebuild_failure_preserves_the_answer() {
+  local board_home show out
+  board_home=$(make_home rebuild-failure)
+  run_captain "$board_home" hold sample-rebuild-fail --title "Rebuild failure" --reason choice --repo sample >/dev/null \
+    || fail "could not create rebuild call"
+  cat > "$board_home/config/bearings-rebuild" <<'SH'
+printf '%s\n' "$FM_HOME" > "$FM_HOME/rebuild-home"
+./missing-rebuild-command
+SH
+  out=$(printf 'sample-rebuild-fail\tyes\tProceed\n' | run_captain "$board_home" answers --any-origin --source "scratch board") \
+    || fail "a failed rebuild failed keyed answer capture"
+  assert_contains "$out" "closed:" "keyed answer did not close"
+  wait_for_board_rebuild "$board_home" "$board_home/state/bearings-rebuild/failures.log"
+  show=$(tasks_in "$board_home" show sample-rebuild-fail --full)
+  assert_contains "$show" "state: done" "a failed rebuild reopened the answer"
+  assert_contains "$show" "Proceed" "a failed rebuild lost the saved answer"
+  assert_equals "$board_home" "$(cat "$board_home/rebuild-home")" "rebuild did not receive FM_HOME"
+  assert_grep 'Board rebuild failed' "$board_home/state/.wake-queue" "rebuild failure did not publish a check"
+  assert_grep 'missing-rebuild-command' "$board_home/state/bearings-rebuild/last.log" "build diagnostics were lost"
+  pass "keyed answers remain durable when the configured board rebuild fails"
+}
+
+test_answer_rebuilds_serialize_and_coalesce() {
+  local board_home show deadline
+  board_home=$(make_home rebuild-coalesce)
+  run_captain "$board_home" hold sample-rebuild-one --title "First answer" --reason choice --repo sample >/dev/null \
+    || fail "could not create first rebuild call"
+  run_captain "$board_home" hold sample-rebuild-two --title "Second answer" --reason choice --repo sample >/dev/null \
+    || fail "could not create second rebuild call"
+  cat > "$board_home/config/bearings-rebuild" <<'SH'
+set -eu
+mkdir "$FM_HOME/active" || { touch "$FM_HOME/overlap"; exit 1; }
+trap 'rmdir "$FM_HOME/active"' EXIT
+printf 'run\n' >> "$FM_HOME/runs"
+tasks-axi show sample-rebuild-one --full > "$FM_HOME/answer-at-build"
+touch "$FM_HOME/started"
+while [ ! -f "$FM_HOME/release" ]; do sleep 0.05; done
+printf 'finished\n' >> "$FM_HOME/finished"
+SH
+  printf 'First choice.\n' > "$board_home/answer"
+  FM_BEARINGS_REBUILD_TIMEOUT_SECONDS=60 run_captain "$board_home" answer sample-rebuild-one --decision-file "$board_home/answer" >/dev/null \
+    || fail "first answer failed"
+  deadline=$((SECONDS + 10))
+  until [ -f "$board_home/started" ]; do
+    [ "$SECONDS" -lt "$deadline" ] || fail "first build never started"
+    sleep 0.05
+  done
+  assert_grep 'state: done' "$board_home/answer-at-build" "build started before the answer closed"
+  assert_grep 'First choice.' "$board_home/answer-at-build" "build started before the answer was recorded"
+  printf 'sample-rebuild-two\tyes\tSecond choice\n' \
+    | FM_BEARINGS_REBUILD_TIMEOUT_SECONDS=60 run_captain "$board_home" answers --any-origin --source "scratch board" >/dev/null \
+    || fail "second keyed answer failed"
+  # More requests while the first run is held must remain one follow-up run.
+  FM_HOME="$board_home" FM_STATE_OVERRIDE="$board_home/state" FM_CONFIG_OVERRIDE="$board_home/config" \
+    "$ROOT/bin/fm-bearings-rebuild.sh"
+  FM_HOME="$board_home" FM_STATE_OVERRIDE="$board_home/state" FM_CONFIG_OVERRIDE="$board_home/config" \
+    "$ROOT/bin/fm-bearings-rebuild.sh"
+  assert_absent "$board_home/finished" "answer capture waited for the active rebuild"
+  touch "$board_home/release"
+  wait_for_board_rebuild "$board_home" "$board_home/finished"
+  assert_equals 2 "$(wc -l < "$board_home/runs" | tr -d ' ')" "requests during a build did not coalesce into one more run"
+  assert_absent "$board_home/overlap" "two board rebuilds ran concurrently"
+  assert_absent "$board_home/state/bearings-rebuild/failures.log" "serialized builds failed"
+  show=$(tasks_in "$board_home" show sample-rebuild-two --full)
+  assert_contains "$show" "state: done" "coalescing lost the second answer"
+  pass "answers trigger serialized board builds and rapid requests coalesce"
+}
+
+test_answer_rebuild_timeout_preserves_the_answer() {
+  local board_home show
+  board_home=$(make_home rebuild-timeout)
+  run_captain "$board_home" hold sample-rebuild-timeout --title "Bounded rebuild" --reason choice --repo sample >/dev/null \
+    || fail "could not create timeout call"
+  printf 'sleep 30\n' > "$board_home/config/bearings-rebuild"
+  printf 'Proceed.\n' > "$board_home/answer"
+  FM_BEARINGS_REBUILD_TIMEOUT_SECONDS=1 run_captain "$board_home" answer sample-rebuild-timeout --decision-file "$board_home/answer" >/dev/null \
+    || fail "timed-out rebuild failed the answer"
+  wait_for_board_rebuild "$board_home" "$board_home/state/bearings-rebuild/failures.log"
+  assert_grep 'exit 124' "$board_home/state/bearings-rebuild/failures.log" "rebuild did not honor its timeout"
+  show=$(tasks_in "$board_home" show sample-rebuild-timeout --full)
+  assert_contains "$show" "state: done" "timed-out rebuild undid the answer"
+  assert_contains "$show" "Proceed." "timed-out rebuild lost the answer text"
+  pass "a timed-out rebuild is reported without blocking or losing the answer"
 }
 
 # --release lifts the hold instead of closing, preserving the work item's own
@@ -4763,6 +4864,9 @@ test_hold_decodes_a_bare_scalar_body_without_the_nonref_default
 test_retained_body_keeps_its_utf8_bytes
 test_completion_gate_attests_and_transfers
 test_answer_records_and_closes
+test_answer_rebuild_failure_preserves_the_answer
+test_answer_rebuilds_serialize_and_coalesce
+test_answer_rebuild_timeout_preserves_the_answer
 test_release_frees_held_work
 test_hold_stamp_precedes_hold_visibility
 test_interrupted_answer_preserves_hold_age

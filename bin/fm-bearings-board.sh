@@ -80,7 +80,12 @@
 # $FM_HOME/.lavish/bearings-board-assets/<card-key>/<n>.<ext>, beside the stable
 # board file where Lavish serves sibling files by relative path, replaces that
 # whole folder on every build so no stale file survives, and injects only the
-# relative `src` into the page data, never the local path. A bad `images` entry
+# relative `src` into the page data, never the local path. When ffmpeg is available,
+# build also generates a 320-pixel-wide JPEG preview, top-cropped to at most 426
+# pixels high, and adds its relative `thumbnail` when smaller than the original.
+# Tiles load previews lazily; the lightbox opens the untouched original.
+# Missing or failing ffmpeg keeps originals and prints one build note, without
+# changing the payload or requiring image preparation. A bad `images` entry
 # refuses before the existing board or its assets are touched.
 #
 # The payload MAY carry `reports`, the write-ups firstmate wrote for the captain,
@@ -97,11 +102,16 @@
 # $FM_HOME/.lavish/bearings-board-assets/.reports/<n>.html, beside the board
 # like a card image: Lavish's sandboxed frame cannot fetch a sibling file, so
 # the board shows that page in an iframe instead. The whole assets folder is
-# replaced on every build, and only the relative `src` reaches the page data,
-# never the local path. Each page carries a Download link holding the report's
-# original bytes, saved as <YYYY-MM-DD>-<title-slug>.md, and the payload gains a
-# plain-text `text` of each report, capped by bin/fm-bearings-md.pl --text, for
-# the Reports tab's full-text search. A payload with no `reports`, or an empty
+# replaced on every build. Each page carries a Download link holding the report's
+# original bytes, saved as <YYYY-MM-DD>-<title-slug>.md. Report metadata, relative
+# `src` and plain-text search content (capped by bin/fm-bearings-md.pl --text)
+# live in .reports/index.json, never inline; only `reports_count` enters the page.
+# The automatically generated .reports/index.js transports the same index through
+# a classic script callback because Lavish's opaque-origin sandbox cannot fetch
+# sibling JSON without server CORS support. The page requests it on first opening
+# Reports and shows loading until it arrives, independently of the other sections.
+# Card and report authors keep the same fields and build command.
+# A payload with no `reports`, or an empty
 # list, builds exactly as before and the board shows no Reports tab.
 #
 # Every Underway row likewise carries a non-empty `name`: the durable task name
@@ -320,21 +330,43 @@ IMAGE_SRC_DEF='
 # <card-key>/<n>.<ext>, and rewrite the payload so a card's `images` carry only
 # the relative src, alt and caption.
 stage_images() {  # <payload.json> <stage-dir> <rewritten.json>
-  local payload=$1 stage=$2 dest=$3 src path rel
+  local payload=$1 stage=$2 dest=$3 src path rel thumb noted=0
+  local thumbs="$stage/thumbs.jsonl"
+  : > "$thumbs"
   while IFS=$'\t' read -r src path; do
     rel=${src#*/}
     mkdir -p -- "$stage/${rel%/*}" && cp -- "$path" "$stage/$rel" || return 1
+    thumb="${rel%.*}.thumb.jpg"
+    # Tiles are at most 160 CSS pixels wide: 320px covers a 2x display.
+    if command -v ffmpeg >/dev/null 2>&1 && ffmpeg -nostdin -v error -threads 1 -i "$stage/$rel" \
+      -vf "scale=320:-2,crop=iw:min(ih\,426):0:0" \
+      -frames:v 1 -q:v 31 -threads 1 -y "$stage/$thumb" 2>/dev/null; then
+      if [ "$(wc -c < "$stage/$thumb")" -lt "$(wc -c < "$stage/$rel")" ]; then
+        jq -nc --arg src "$src" --arg thumbnail "$ASSETS_DIR_NAME/$thumb" \
+          '{key:$src,value:$thumbnail}' >> "$thumbs" || return 1
+      else
+        rm -f -- "$stage/$thumb"
+      fi
+    else
+      rm -f -- "$stage/$thumb"
+      if [ "$noted" -eq 0 ]; then
+        printf 'fm-bearings-board: thumbnails unavailable for some images; using originals\n' >&2
+        noted=1
+      fi
+    fi
   done < <(jq -r --arg dir "$ASSETS_DIR_NAME" "$IMAGE_SRC_DEF"'
     .captains_call[]? | select(has("images")) | .key as $key
     | .images | to_entries[] | .key as $i | .value
     | [(.path | image_src($key; $i + 1)), .path] | @tsv' "$payload")
-  jq --arg dir "$ASSETS_DIR_NAME" "$IMAGE_SRC_DEF"'
-    .captains_call |= map(if has("images")
+  jq --slurpfile thumbs "$thumbs" --arg dir "$ASSETS_DIR_NAME" "$IMAGE_SRC_DEF"'
+    ($thumbs | from_entries) as $thumbnails | .captains_call |= map(if has("images")
       then .key as $key | .images |= (to_entries | map(
         .key as $i | .value
         | {src: (.path | image_src($key; $i + 1)), alt: .alt}
-          + (if (.caption // "") != "" then {caption: .caption} else {} end)))
-      else . end)' "$payload" > "$dest"
+          + (if (.caption // "") != "" then {caption: .caption} else {} end)
+          | . + (if $thumbnails[.src] then {thumbnail: $thumbnails[.src]} else {} end)))
+      else . end)' "$payload" > "$dest" || return 1
+  rm -f -- "$thumbs"
 }
 
 # --- Reports ------------------------------------------------------------------
@@ -374,8 +406,13 @@ stage_reports() {  # <payload.json> <stage-dir>; rewrites the payload in place
     .reports |= (to_entries | map(.key as $i | .value
       | {title, repo, date, summary, text: $texts[$i], src: ($dir + "/" + ($i + 1 | tostring) + ".html")}))
   ' "$payload" > "$payload.r" || { rm -f -- "$payload.r"; return 1; }
-  rm -f -- "$dir/text.jsonl"
-  mv -f -- "$payload.r" "$payload"
+  jq -c '.reports' "$payload.r" > "$dir/index.json" || return 1
+  # Classic scripts work in Lavish's opaque-origin sandbox and offline file
+  # copies; fetch(JSON) cannot read sibling assets without server CORS changes.
+  { printf 'window.fmBearingsReports('; cat "$dir/index.json"; printf ');\n'; } > "$dir/index.js" || return 1
+  jq '.reports | length' "$payload.r" > "$dir/count" || return 1
+  jq --argjson count "$(cat "$dir/count")" 'del(.reports) | .reports_count = $count' "$payload.r" > "$payload" || return 1
+  rm -f -- "$dir/text.jsonl" "$dir/count" "$payload.r"
 }
 
 # --- Lavish session liveness -------------------------------------------------
@@ -565,8 +602,8 @@ command_build() {
   fi
   # `<` never appears in JSON syntax outside strings, so escaping every
   # occurrence keeps the payload valid JSON while making </script> inert. The
-  # payload goes to perl through a file: with a search index it outgrows the
-  # kernel's limit on one environment string.
+  # payload goes to perl through a file rather than an environment string, so
+  # injection does not depend on the kernel's per-string environment limit.
   jsonfile=$(umask 077; mktemp "${TMPDIR:-/tmp}/fm-bearings-json.XXXXXX") || { rm -rf -- "$stage" "$staged" "$effective"; fail "cannot stage the board data"; }
   if ! jq -c . "$staged" | sed 's/</\\u003c/g' > "$jsonfile"; then
     rm -rf -- "$stage" "$staged" "$effective" "$jsonfile"

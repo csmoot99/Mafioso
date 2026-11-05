@@ -2359,6 +2359,19 @@ Some built-in sources carry the captain's answer to a captain-held task, and wha
 - A binding can select one decision origin or the script's cross-origin mode; the command header owns the exact forms and key interpretation.
 - The built-in adapter reports only what the captain chose; the intake owns every rule about what happens next, so the runner names no adapter, parses no result, and carries no decision rule, and a future built-in answer source needs nothing here beyond an `answers` command and a binding.
 
+**Rebuild a board after answers**
+
+An optional `config/bearings-rebuild` Bash script declares how this home rebuilds its board from fresh inputs.
+For a home with a private board builder, its contents can be `exec bash "$FM_HOME/data/decision-board/build.sh"`.
+The file is trusted home configuration, not text from a board answer, and runs from `FM_HOME` with `FM_HOME` exported.
+After a successful `bin/fm-captain-hold.sh answer` records and closes or releases a call, `bin/fm-bearings-rebuild.sh` requests the rebuild; keyed `answers` from Lavish or other channels reach the same owner.
+An absent configuration does nothing and prints nothing.
+Answer capture returns without waiting for a build, and a failed build cannot undo or fail the saved answer.
+Rebuilds are serialized per state root; requests during one build coalesce into one additional run.
+Each run has a 120-second timeout, overridable with `FM_BEARINGS_REBUILD_TIMEOUT_SECONDS` as a positive integer up to 600.
+The worker keeps its latest output in `state/bearings-rebuild/last.log`, appends failures to `failures.log` beside it, and publishes failures as `check` notifications.
+The helper's header owns the queue and execution mechanics; no extra step or field is required for individual cards, reports, or answers.
+
 **Reconcile selections and handling boundaries**
 
 - The reserved Reconcile selection uses the parallel optional `reconciles` adapter command and binding-verified `reconcile-requests` intake rather than entering keyed answers; [`captain-hold-lifecycle.md`](captain-hold-lifecycle.md#reconcile-re-check-reality-never-a-blind-close) owns those semantics.
