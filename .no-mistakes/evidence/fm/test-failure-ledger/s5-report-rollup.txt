@@ -1,0 +1,101 @@
+=== bogus class exit status ===
+rc=2
+=== real pnpm -r then pnpm --filter in one task; one classification ===
+exit=1
+exit=1
+["t-both2","apps/storefront/lib/proxy.test.ts","proxy > strips headers"]
+["t-both2","apps/admin/lib/proxy.test.ts","proxy > strips headers"]
+["t-both2","lib/proxy.test.ts","proxy > strips headers"]
+rc=0
+["classification","lib/proxy.test.ts","fm-heavy-3831675-1793878870"]
+failures: 3
+unclassified: 0 of 3 (0%)
+per project:
+  3  both2
+per class:
+  1  stale
+most repeated tests:
+  1  apps/admin/lib/proxy.test.ts > proxy > strips headers
+  1  apps/storefront/lib/proxy.test.ts > proxy > strips headers
+  1  lib/proxy.test.ts > proxy > strips headers
+most implicated files:
+  1  apps/admin/lib/proxy.test.ts
+  1  apps/storefront/lib/proxy.test.ts
+  1  lib/proxy.test.ts
+=== a later failure of a classified test counts as unclassified again ===
+exit=1
+failures: 4
+unclassified: 1 of 4 (25%)
+=== --since 7d keeps the week: rewind one captured row by 8 days ===
+--- all time:
+failures: 21
+unclassified: 13 of 21 (62%)
+per project:
+  4  both2
+  4  nodeproj
+  4  tapproj
+  4  wsproj
+  2  bothproj
+  1  batsproj
+  1  jestproj
+  1  pwproj
+per class:
+--- --since 7d:
+failures: 20
+unclassified: 12 of 20 (60%)
+per project:
+  4  both2
+  4  nodeproj
+  4  tapproj
+  4  wsproj
+  2  bothproj
+  1  batsproj
+  1  pwproj
+per class:
+  5  stale
+--- bad window:
+fm-test-failure.sh: --since needs <days>d, for example 7d
+rc=2
+--- recent:
+2026-11-05T11:40:15Z	pwproj	t-pw	failure	e2e	tests/login.spec.ts	login > rejects a bad password	Error: expect(received).toBe(expected) // Object.is equality
+2026-11-05T11:40:29Z	pwproj	t-pw	classification	brittle	tests/login.spec.ts	login > rejects a bad password	timing
+--- empty project:
+no test failures recorded
+rc=0
+--- full rollup:
+failures: 20
+unclassified: 12 of 20 (60%)
+per project:
+  4  both2
+  4  nodeproj
+  4  tapproj
+  4  wsproj
+  2  bothproj
+  1  batsproj
+  1  pwproj
+per class:
+  5  stale
+  2  brittle
+  2  new-code
+  1  flaky
+  1  preventable
+  1  regression
+most repeated tests:
+  6  lib/proxy.test.ts > proxy > strips headers
+  2  apps/admin/lib/proxy.test.ts > proxy > strips headers
+  2  apps/storefront/lib/proxy.test.ts > proxy > strips headers
+  2  test/a.test.js > deeper fails
+  2  test/a.test.js > inner fails
+  2  test/b.test.js > fails
+  2  test/c.test.js > fails
+  1  test/a.bats > addition works
+  1  tests/login.spec.ts > login > rejects a bad password
+most implicated files:
+  6  lib/proxy.test.ts
+  4  test/a.test.js
+  2  apps/admin/lib/proxy.test.ts
+  2  apps/storefront/lib/proxy.test.ts
+  2  test/b.test.js
+  2  test/c.test.js
+  1  test/a.bats
+  1  tests/login.spec.ts

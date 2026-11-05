@@ -1,0 +1,36 @@
+--- what the earlier non-zero pass probe recorded:
+["test","test","'test failed'"]
+=== passing job: no ledger line, log kept, exit 0 ===
+exit=0 ledger+0 logs+1
+ls: cannot access '/tmp/fm-lab.g3JeV0/data/test-failures/pass.jsonl': No such file or directory
+=== >2 MiB of output: caller gets all of it, log bounded, marker first, tail failure parsed ===
+exit=1 caller_bytes=3535076
+log_bytes=2097174 first_line=[[fm-heavy: earlier output dropped]]
+[null,"(unparsed)","AssertionError: tail error"]
+=== worst-case parse: full 2 MiB log of failures, within the 10 s ledger budget ===
+exit=1 took=0.7s rows=60000 ledger_bytes=23628907
+=== log retention: newest 200 ===
+before=242
+exit=1 after=200 newest-kept=1
+=== process left holding the output: no hang, slot freed ===
+wrapper exit=1 in 4s
+ledger: ["(unparsed)","t-ling"]
+next job exit=0 took=0s
+=== TERM to the process group mid-run: job recorded, ledger line written, status 143 ===
+exit=143
+["t-term","/tmp/fm-lab.g3JeV0/slow.test.js","'Promise resolution is still pending but the event loop has already resolved'"]
+["t-term",143,true]
+=== two concurrent jobs, slots=2, one project: every line whole ===
+lines=16 valid=16 tasks=4
+=== a torn line in the ledger is skipped ===
+failures: 16
+unclassified: 16 of 16 (100%)
+rc=0
+=== heavy summary still reads the job log ===
+project          class  jobs  failed  wait_avg_s  wait_max_s  run_avg_s  run_max_s  wait_pct  peak_mib  unknown_peak  host   prepare_avg_s  collect_avg_s
+../../../evil/x  test   1     1       0           0           1          1          0         5         0             local  unknown        unknown
+abs              test   1     1       0           0           0          0          unknown   27        0             local  unknown        unknown
+ansi             test   1     1       0           0           1          1          0         236       0             local  unknown        unknown
+batsproj         test   1     1       0           0           1          1          0         56        0             local  unknown        unknown
+big              test   1     1       0           0           1          1          0         7         0             local  unknown        unknown
+rc=0

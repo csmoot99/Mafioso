@@ -1,0 +1,12 @@
+=== ship brief: rule rendered by bin/fm-brief.sh ===
+rc=0
+90:9. Before committing a change that makes a previously failing existing test pass, run `FM_HOME='/tmp/fm-lab.g3JeV0' '/home/work/.no-mistakes/worktrees/5f69104d19ce/01M6NP1V53NVS28PJ255KHNND3/bin/fm-test-failure.sh' classify ship-lab --test <name> [--file <path>] --class regression|stale|brittle|new-code|preventable|flaky --cause "<one line>"` once per test.
+91-   Classify pipeline fix rounds the same way from the findings file after the round.
+scout brief mentions ledger: 0
+=== run the printed command verbatim (placeholders filled) against a real failure of that task ===
+job exit=1
+$ FM_HOME='/tmp/fm-lab.g3JeV0' '/home/work/.no-mistakes/worktrees/5f69104d19ce/01M6NP1V53NVS28PJ255KHNND3/bin/fm-test-failure.sh' classify ship-lab --test fails --file test/b.test.js --class stale --cause "assert drifted from spec"
+rc=0
+{"kind":"classification","task":"ship-lab","test":"fails","file":"test/b.test.js","class":"stale","cause":"assert drifted from spec","job":"fm-heavy-3865630-1793878981"}
+failures: 1
+unclassified: 0 of 1 (0%)

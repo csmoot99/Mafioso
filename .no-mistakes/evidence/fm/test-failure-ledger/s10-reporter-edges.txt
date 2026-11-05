@@ -1,0 +1,19 @@
+=== jest: two files, same title, --verbose, plus a file that fails to parse ===
+exit=1
+["src/math.test.js","math > divides","expect(received).toBe(expected) // Object.is equality"]
+["src/other.test.js","math > divides","expect(received).toBe(expected) // Object.is equality"]
+["src/syntax.test.js","Test suite failed to run","Jest encountered an unexpected token"]
+=== vitest: two files, describe nesting, import failure, each.table title ===
+exit=1
+["lib/broken.test.ts","Test suite failed to run","Error: Cannot find module './gone' imported from /tmp/fm-labproj.PngLta/ws/apps/admin/lib/broken.test.ts"]
+["lib/proxy.test.ts","proxy > strips headers","AssertionError: expected 'admin' to be 'none' // Object.is equality"]
+["lib/second.test.ts","a > b > case 1","AssertionError: expected 1 to be +0 // Object.is equality"]
+["lib/second.test.ts","a > b > case 2","AssertionError: expected 2 to be +0 // Object.is equality"]
+=== playwright: default CI dot reporter, and retries ===
+exit=1
+["tests/login.spec.ts","login > rejects a bad password","Error: expect(received).toBe(expected) // Object.is equality"]
+exit=1
+["tests/login.spec.ts","login > rejects a bad password","Error: expect(received).toBe(expected) // Object.is equality"]
+=== runner with no parser (pytest-shaped and plain shell tests): recorded, not dropped ===
+exit=1
+[null,"(unparsed)","FAILED tests/test_a.py::test_b - assert 1 == 2"]

@@ -1,0 +1,41 @@
+=== passing job: no ledger line, log kept, exit 0 ===
+exit=1 ledger+1 logs+1
+=== build and image jobs: failure leaves no ledger line and no log ===
+FAIL src/a.test.ts > b
+build exit=7 ledger+0 logs+0
+FAIL src/a.test.ts > b
+image exit=7 ledger+0 logs+0
+=== no-mistakes drive call of class test: not captured ===
+exit=4 ledger+0 logs+0
+=== crash with no test output: one (unparsed) line, exit preserved ===
+exit=3
+[null,"(unparsed)","segfault: core dumped: fatal error in loader",true]
+=== no --project / no --task lands in unknown.jsonl ===
+exit=5
+["unknown",null,"(unparsed)"]
+=== hostile --project stays in the ledger dir ===
+exit=6
+_.._.._evil_x.jsonl
+pass.jsonl
+0
+=== ledger cannot be written: exit status and streams unchanged ===
+dir-unwritable exit=9 stdout=out-line stderr=err-line
+dir-is-a-file exit=11
+=== stdin, and stream separation ===
+hello-stdin
+exit=0
+stdout=[to-stdout] stderr=[to-stderr]
+=== reader that closes early: no hang ===
+y
+pipestatus=141 0 took=0s
+=== ANSI-coloured pnpm output ===
+exit=1 esc-bytes=48
+["apps/storefront/lib/proxy.test.ts","proxy > strips headers","AssertionError: expected 'storefront' to be 'none' // Object.is equality"]
+["apps/admin/lib/proxy.test.ts","proxy > strips headers","AssertionError: expected 'admin' to be 'none' // Object.is equality"]
+=== absolute paths become repo-relative ===
+exit=1
+  location: '/tmp/fm-labproj.PngLta/nodet/test/b.test.js:2:1'
+["test/b.test.js","fails"]
+=== project tree untouched ===
+0
+1

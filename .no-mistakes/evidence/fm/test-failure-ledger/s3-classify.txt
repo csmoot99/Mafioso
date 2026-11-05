@@ -1,0 +1,40 @@
+=== classes: all six accepted, anything else refused ===
+regression rc=0
+stale rc=0
+brittle rc=0
+new-code rc=0
+preventable rc=0
+flaky rc=0
+fm-test-failure.sh classify: error: argument --class: invalid choice: 'bogus' (choose from regression, stale, brittle, new-code, preventable, flaky)
+bogus rc=
+fm-test-failure.sh: --cause needs one line of text
+blank-cause rc=2
+=== unknown task, no record: refused, nothing written ===
+fm-test-failure.sh: no ledger for task no-such-task: it has no recorded failure or task record
+rc=1  lines before=21 after=21
+fm-test-failure.sh: no ledger for task ../../etc: it has no recorded failure or task record
+traversal task rc=1
+=== test never in ledger but task has a state/<id>.meta: counted, unlinked ===
+fm-test-failure.sh: no recorded failure of pipeline round test in task t-meta; classification kept unlinked
+rc=0
+{"project":"metaproj","task":"t-meta","test":"pipeline round test","file":null,"class":"new-code","cause":"found in review round 2","job":null}
+=== title copied as printed by Playwright with " › " ===
+rc=0
+{"test":"login > rejects a bad password","file":"tests/login.spec.ts","class":"brittle","cause":"timing","job":"fm-heavy-3815646-1793878814"}
+failures: 1
+unclassified: 0 of 1 (0%)
+per project:
+  1  pwproj
+per class:
+  1  brittle
+most repeated tests:
+  1  tests/login.spec.ts > login > rejects a bad password
+most implicated files:
+  1  tests/login.spec.ts
+=== last-parts title, with --file repo path against filtered row ===
+rc=0
+{"task":"t-b2b2","test":"proxy > strips headers","file":"lib/proxy.test.ts","class":"stale","job":"fm-heavy-3814514-1793878811"}
+=== --file must not match a partial path segment ===
+fm-test-failure.sh: no recorded failure of strips headers in task t-b2b2; classification kept unlinked
+rc=0
+{"task":"t-b2b2","test":"strips headers","file":"roxy.test.ts","class":"stale","job":null}

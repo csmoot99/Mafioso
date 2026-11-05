@@ -1,0 +1,16 @@
+=== one task with -r row and filtered row, one classification ===
+exit=1
+exit=1
+["t-both","lib/proxy.test.ts","proxy > strips headers"]
+["t-both","lib/proxy.test.ts","proxy > strips headers"]
+rc=0
+failures: 2
+unclassified: 0 of 2 (0%)
+per project:
+  2  bothproj
+per class:
+  1  stale
+most repeated tests:
+  2  lib/proxy.test.ts > proxy > strips headers
+most implicated files:
+  2  lib/proxy.test.ts

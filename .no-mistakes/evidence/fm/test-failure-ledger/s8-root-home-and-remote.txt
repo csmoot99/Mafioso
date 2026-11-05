@@ -1,0 +1,19 @@
+=== >2 MiB of output (newline-terminated fixture): tail failure parsed after the cut ===
+exit=1 caller_bytes=3535077
+log_bytes=2097175 first_line=[[fm-heavy: earlier output dropped]]
+["src/tail.test.ts","tail > survives the cut","AssertionError: tail error"]
+=== local secondmate home: job and ledger land in the root home ===
+exit=1
+root ledger rows: 1; mate has ledger dir: 0
+classify rc=0
+failures: 1
+unclassified: 0 of 1 (0%)
+--- unseen test in a task whose meta only the secondmate home has:
+fm-test-failure.sh: no recorded failure of round fix in task t-mate; classification kept unlinked
+rc=0
+["mateproj","t-mate",null]
+=== --remote with host unreachable: falls back local, log and ledger still written ===
+exit=1
+{"task":"t-rem","host":"local","outcome":null,"fallback":"unreachable","exit":1}
+["test/b.test.js","fails","AssertionError [ERR_ASSERTION]: expected true"]
+1

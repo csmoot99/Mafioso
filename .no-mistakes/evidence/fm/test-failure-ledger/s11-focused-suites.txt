@@ -1,0 +1,9 @@
+fm-test-failure rc=0 pass=13 notok=0
+ok - fm-heavy: a process that outlives the command cannot hold the wrapper or the slot
+ok - fm-brief: ship briefs tell the fixer to classify
+fm-heavy rc=0 pass=12 notok=0
+ok - fm-brief: config/heavy-commands is read from the root home
+# all fm-heavy tests passed
+fm-heavy-remote rc=0 pass=27 notok=0
+ok - fm-heavy-summary: local and remote jobs get their own rows with preparation and collection time
+# all fm-heavy-remote tests passed

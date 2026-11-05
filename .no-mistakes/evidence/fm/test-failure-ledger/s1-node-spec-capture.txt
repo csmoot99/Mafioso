@@ -1,0 +1,15 @@
+$ fm-heavy.sh --class test --task t-node --project nodeproj -- node --test   (spec reporter, real systemd scope)
+exit=1
+--- caller stdout lines: 89; stderr lines: 0
+--- ledger
+{"file":"test/a.test.js","test":"inner fails","error":"AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:","task":"t-node","project":"nodeproj","class":"test","command":"node --test","branch":"feat/node-fix","head":"e735f44f","job":"fm-heavy-3812390-1793878799","log":"/tmp/fm-lab.g3JeV0/state/heavy-logs/fm-heavy-3812390-1793878799.log"}
+{"file":"test/a.test.js","test":"deeper fails","error":"Error: boom deep","task":"t-node","project":"nodeproj","class":"test","command":"node --test","branch":"feat/node-fix","head":"e735f44f","job":"fm-heavy-3812390-1793878799","log":"/tmp/fm-lab.g3JeV0/state/heavy-logs/fm-heavy-3812390-1793878799.log"}
+{"file":"test/b.test.js","test":"fails","error":"AssertionError [ERR_ASSERTION]: expected true","task":"t-node","project":"nodeproj","class":"test","command":"node --test","branch":"feat/node-fix","head":"e735f44f","job":"fm-heavy-3812390-1793878799","log":"/tmp/fm-lab.g3JeV0/state/heavy-logs/fm-heavy-3812390-1793878799.log"}
+{"file":"test/c.test.js","test":"fails","error":"AssertionError [ERR_ASSERTION]: expected true","task":"t-node","project":"nodeproj","class":"test","command":"node --test","branch":"feat/node-fix","head":"e735f44f","job":"fm-heavy-3812390-1793878799","log":"/tmp/fm-lab.g3JeV0/state/heavy-logs/fm-heavy-3812390-1793878799.log"}
+--- heavy-jobs.jsonl
+{"task":"t-node","project":"nodeproj","class":"test","cmd":"node","exit":1,"slot":1,"peak_memory_bytes":54386688,"run_s":1}
+--- kept log
+total 12
+drwxrwxr-x 2 work work 4096 Nov  5 06:39 .
+drwxrwxr-x 3 work work 4096 Nov  5 06:40 ..
+-rw-rw-r-- 1 work work 3023 Nov  5 06:40 fm-heavy-3812390-1793878799.log

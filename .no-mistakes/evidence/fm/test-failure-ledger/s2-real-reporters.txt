@@ -1,0 +1,26 @@
+=== vitest: pnpm -r test (two packages, same path and title) ===
+exit=1
+["apps/storefront/lib/proxy.test.ts","proxy > strips headers","AssertionError: expected 'storefront' to be 'none' // Object.is equality"]
+["apps/admin/lib/proxy.test.ts","proxy > strips headers","AssertionError: expected 'admin' to be 'none' // Object.is equality"]
+=== vitest: pnpm --filter admin test (no prefix) ===
+exit=1
+["lib/proxy.test.ts","proxy > strips headers","AssertionError: expected 'admin' to be 'none' // Object.is equality"]
+=== vitest direct in one package ===
+exit=1
+["lib/proxy.test.ts","proxy > strips headers","AssertionError: expected 'storefront' to be 'none' // Object.is equality"]
+=== jest ===
+exit=1  (stderr bytes 533, stdout bytes 0)
+["src/math.test.js","math > divides","expect(received).toBe(expected) // Object.is equality"]
+=== playwright (class e2e) ===
+exit=1
+["tests/login.spec.ts","login > rejects a bad password","Error: expect(received).toBe(expected) // Object.is equality"]
+"e2e"
+=== bats ===
+exit=1
+["test/a.bats","addition works","`[ 2 -eq 3 ]' failed"]
+=== node --test --test-reporter=tap ===
+exit=1
+["test/a.test.js","inner fails","Expected values to be strictly equal:"]
+["test/a.test.js","deeper fails","boom deep"]
+["test/b.test.js","fails","expected true"]
+["test/c.test.js","fails","expected true"]
