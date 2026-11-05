@@ -76,7 +76,7 @@ packages/api/src/cart.test.ts|cart > applies tax|TypeError: cannot read tax of u
 packages/web/src/math.test.js|math > divides|expect(received).toBe(expected) // Object.is equality'
   assert_parsed pnpm-interleaved 'apps/admin/lib/proxy.test.ts|proxy > strips headers|Error: admin-error
 apps/storefront/lib/proxy.test.ts|proxy > strips headers|Error: storefront-error'
-  assert_parsed bats 'tests/flags.bats|refuses a bad flag|`[ "$status" -eq 2 ]'"'"' failed'
+  assert_parsed bats "tests/flags.bats|refuses a bad flag|\`[ \"\$status\" -eq 2 ]' failed"
   assert_parsed unparsed '-|(unparsed)|Error: could not start the database'
   pass "capture: names failing tests from each reporter, and a run with none parsable still leaves a line"
 }
@@ -310,7 +310,7 @@ test_heavy_capture() {
   run_heavy --class build --project built -- bash -c 'echo not-kept; exit 3' >/dev/null || rc=$?
   [ "$rc" = 3 ] || fail "a build's exit status changed to $rc"
   [ ! -e "$home/data/test-failures/built.jsonl" ] || fail "a build wrote the ledger"
-  [ -z "$(grep -rl not-kept "$home/state/heavy-logs")" ] || fail "a build's output was kept"
+  ! grep -rq not-kept "$home/state/heavy-logs" || fail "a build's output was kept"
 
   rc=0
   run_heavy --class test --project unnamed-exit -- sh -c 'exit 5' || rc=$?
@@ -327,7 +327,7 @@ test_heavy_capture() {
 
   run_heavy --class test --project big -- bash -c \
     'head -c 3000000 /dev/zero | tr "\0" "a" | fold -w 100; echo; echo last-line' >/dev/null || fail "the long job failed"
-  log=$(ls -t "$home"/state/heavy-logs/*.log | head -1)
+  log=$(find "$home/state/heavy-logs" -maxdepth 1 -name '*.log' -printf '%T@ %p\n' | sort -rn | head -1 | cut -d' ' -f2-)
   [ "$(wc -c < "$log")" -lt 2100000 ] || fail "the job log is not capped"
   [ "$(head -1 "$log")" = "[fm-heavy: earlier output dropped]" ] || fail "the marker is missing: $(head -c 80 "$log")"
   [ "$(tail -1 "$log")" = last-line ] || fail "the newest output was dropped"
