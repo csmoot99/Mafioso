@@ -1,0 +1,49 @@
+Scope: 3 of 4 workspace projects
+Scope: all 4 workspace projects
+Already up to date
+
+Done in 282ms using pnpm v11.25.0
+apps/admin test$ vitest run
+apps/storefront test$ vitest run
+packages/ui test$ vitest run
+apps/admin test:  RUN  v3.2.4
+packages/ui test:  RUN  v3.2.4
+apps/storefront test:  RUN  v3.2.4
+apps/admin test:  ❯ lib/proxy.test.ts (2 tests | 1 failed) 12ms
+packages/ui test:  ✓ lib/proxy.test.ts (2 tests) 12ms
+apps/storefront test:  ❯ lib/proxy.test.ts (2 tests | 1 failed) 12ms
+apps/admin test:    × proxy > strips headers 5ms
+packages/ui test:  Test Files  1 passed (1)
+apps/storefront test:    × proxy > strips headers 5ms
+apps/admin test:      → admin-error
+packages/ui test:       Tests  2 passed (2)
+apps/storefront test:      → storefront-error
+apps/admin test: ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+packages/ui test: Done
+apps/storefront test: ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+apps/admin test:  FAIL  lib/proxy.test.ts > proxy > strips headers
+apps/storefront test:  FAIL  lib/proxy.test.ts > proxy > strips headers
+apps/admin test: Error: admin-error
+apps/storefront test: Error: storefront-error
+apps/admin test:  ❯ lib/proxy.test.ts:9:21
+apps/storefront test:  ❯ lib/proxy.test.ts:9:21
+apps/admin test:  Test Files  1 failed (1)
+apps/storefront test:  Test Files  1 failed (1)
+apps/admin test:       Tests  1 failed | 1 passed (2)
+apps/storefront test:       Tests  1 failed | 1 passed (2)
+apps/admin test: Failed
+[WARN]  Local package.json exists, but node_modules missing, did you mean to install?
+apps/storefront test: Failed
+[WARN]  Local package.json exists, but node_modules missing, did you mean to install?
+[ERR_PNPM_RECURSIVE_FAIL] 
+
+
+Summary: 2 fails, 1 passes
+
+/repo/apps/admin:
+[ERROR] admin@1.0.0 test: `vitest run`
+Exit status 1
+
+/repo/apps/storefront:
+[ERROR] storefront@1.0.0 test: `vitest run`
+Exit status 1

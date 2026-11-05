@@ -43,14 +43,17 @@ def joined(title):
     return " > ".join(part.strip() for part in title.split(" › "))
 
 
-def without_pnpm_prefix(lines):
-    """Drops the `<package> <script>: ` that `pnpm -r` puts on each line of a package it names."""
+def package_streams(lines):
+    """Splits the interleaved `<package> <script>: ` lines of `pnpm -r` into {prefix: lines}."""
     prefixes = {found.group(1) for found in map(PNPM_STEP.match, lines) if found}
-    kept = []
+    streams = {"": []}
     for line in lines:
         prefix, _, rest = line.partition(": ")
-        kept.append(rest if prefix in prefixes else line)
-    return kept
+        if prefix in prefixes:
+            streams.setdefault(prefix, []).append(rest)
+        else:
+            streams[""].append(line)
+    return streams
 
 
 def first_error(lines, index):
@@ -93,15 +96,14 @@ def tap_failure(lines, index):
     return file, error
 
 
-def parse_failures(text):
-    """Failing tests in reporter output, as {file, test, error} dicts.
+def stream_failures(lines):
+    """Failing tests in one reporter's lines, as {file, test, error} dicts.
 
     Each reporter names a failure twice, so a detailed entry (vitest FAIL, jest
     bullet, the Playwright failed list, a TAP not ok, a node:test mark under its
     `test at` line) wins and the running marks count only in output that has no
     detailed entry at all.
     """
-    lines = without_pnpm_prefix([ANSI.sub("", line).rstrip() for line in text.splitlines()])
     detailed, marked, playwright_errors = {}, {}, {}
     has_summary = any(SUMMARY.match(line) for line in lines)
     current_file = None
@@ -180,7 +182,18 @@ def parse_failures(text):
             else:
                 add(marked, (current_file, test), current_file, test, first_error(lines, index))
 
-    rows = list((detailed or marked).values())
+    return list((detailed or marked).values())
+
+
+def parse_failures(text):
+    """Failing tests in a job's output, with each file under its pnpm package."""
+    lines = [ANSI.sub("", line).rstrip() for line in text.splitlines()]
+    rows = []
+    for prefix, stream in package_streams(lines).items():
+        package = prefix.partition(" ")[0]
+        for row in stream_failures(stream):
+            file = row["file"] and os.path.normpath(os.path.join(package, row["file"]))
+            rows.append({**row, "file": file})
     if rows:
         return rows
     error = next((clean(line) for line in lines if ERROR_WORD.search(line)), None)

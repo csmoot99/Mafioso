@@ -71,9 +71,11 @@ test/a.test.js|deeper fails|Error: boom deep
 test/a.test.js|child fails|Error: boom child
 test/a.test.js|fails|Error: a fails
 test/b.test.js|fails|Error: b fails'
-  assert_parsed pnpm-workspace 'src/cart.test.ts|cart > totals the items|AssertionError: expected 3 to be 4 // Object.is equality
-src/cart.test.ts|cart > applies tax|TypeError: cannot read tax of undefined
-src/math.test.js|math > divides|expect(received).toBe(expected) // Object.is equality'
+  assert_parsed pnpm-workspace 'packages/api/src/cart.test.ts|cart > totals the items|AssertionError: expected 3 to be 4 // Object.is equality
+packages/api/src/cart.test.ts|cart > applies tax|TypeError: cannot read tax of undefined
+packages/web/src/math.test.js|math > divides|expect(received).toBe(expected) // Object.is equality'
+  assert_parsed pnpm-interleaved 'apps/admin/lib/proxy.test.ts|proxy > strips headers|Error: admin-error
+apps/storefront/lib/proxy.test.ts|proxy > strips headers|Error: storefront-error'
   assert_parsed bats 'tests/flags.bats|refuses a bad flag|`[ "$status" -eq 2 ]'"'"' failed'
   assert_parsed unparsed '-|(unparsed)|Error: could not start the database'
   pass "capture: names failing tests from each reporter, and a run with none parsable still leaves a line"
@@ -155,6 +157,20 @@ test_classify() {
     || fail "a task with only a task record was refused"
   [ -s "$home/data/test-failures/fresh.jsonl" ] || fail "the task record did not choose the ledger"
   pass "classify: links the latest matching failure, refuses a bad class, keeps unrecorded tests unlinked"
+}
+
+test_classify_file_in_a_pnpm_package() {
+  local home ledger out
+  home=$(make_home classify-package)
+  ledger="$home/data/test-failures/demo.jsonl"
+  capture "$home" "$FIXTURES/pnpm-interleaved.txt" t1
+  out=$(FM_HOME="$home" "$LEDGER" classify t1 --test "proxy > strips headers" \
+    --file apps/admin/lib/proxy.test.ts --class stale --cause c 2>&1) || fail "classify failed: $out"
+  [ "$(tail -1 "$ledger" | jq -r '[.file,.job] | join("|")')" = "apps/admin/lib/proxy.test.ts|job-1" ] \
+    || fail "--file did not link the package's failure: $(tail -1 "$ledger")"
+  out=$(FM_HOME="$home" "$LEDGER" report) || fail "report failed"
+  assert_contains "$out" "unclassified: 1 of 2 (50%)" "a classification must cover only its own package's failure"
+  pass "classify: --file with the repo path links the failure of that pnpm package"
 }
 
 test_classify_title_as_printed() {
@@ -313,6 +329,7 @@ test_pnpm_log_cut_before_its_start_lines
 test_marks_of_two_files_stay_separate
 test_failure_line_fields
 test_classify
+test_classify_file_in_a_pnpm_package
 test_classify_title_as_printed
 test_report_and_recent
 test_heavy_capture

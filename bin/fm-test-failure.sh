@@ -14,9 +14,9 @@
 #
 # Failure line: kind "failure", ts (epoch seconds), project, task, class (test or
 # e2e), command, branch and head of the working tree, job (the heavy job id), file
-# (null when the output names none), test (suite and title joined with " > "),
-# error (the first error line, trimmed) and log (the job's kept output in
-# state/heavy-logs/).
+# (null when the output names none, and under its package directory in pnpm -r
+# output), test (suite and title joined with " > "), error (the first error line,
+# trimmed) and log (the job's kept output in state/heavy-logs/).
 #
 # classify records why a test failed: class is one of regression, stale, brittle,
 # new-code, preventable or flaky, and any other value is refused. --test matches a
