@@ -1,0 +1,23 @@
+
+ RUN  v3.2.4 /repo
+
+ ❯ src/cart.test.ts (3 tests | 2 failed) 12ms
+   ✓ cart > adds an item 1ms
+   × cart > totals the items 5ms
+     → expected 3 to be 4
+   × cart > applies tax 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cart.test.ts > cart > totals the items
+AssertionError: expected 3 to be 4 // Object.is equality
+ ❯ src/cart.test.ts:9:21
+
+⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |unit| src/cart.test.ts > cart > applies tax
+TypeError: cannot read tax of undefined
+ ❯ src/cart.test.ts:14:5
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 1 passed (3)

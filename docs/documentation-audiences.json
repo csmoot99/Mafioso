@@ -557,6 +557,54 @@
       "audience": "maintainer-verification"
     },
     {
+      "path": "tests/fixtures/test-failure/bats.txt",
+      "audience": "maintainer-verification"
+    },
+    {
+      "path": "tests/fixtures/test-failure/jest.txt",
+      "audience": "maintainer-verification"
+    },
+    {
+      "path": "tests/fixtures/test-failure/node-spec-nested.txt",
+      "audience": "maintainer-verification"
+    },
+    {
+      "path": "tests/fixtures/test-failure/node-spec.txt",
+      "audience": "maintainer-verification"
+    },
+    {
+      "path": "tests/fixtures/test-failure/node-tap.txt",
+      "audience": "maintainer-verification"
+    },
+    {
+      "path": "tests/fixtures/test-failure/playwright.txt",
+      "audience": "maintainer-verification"
+    },
+    {
+      "path": "tests/fixtures/test-failure/pnpm-interleaved.txt",
+      "audience": "maintainer-verification"
+    },
+    {
+      "path": "tests/fixtures/test-failure/pnpm-workspace.txt",
+      "audience": "maintainer-verification"
+    },
+    {
+      "path": "tests/fixtures/test-failure/unparsed.txt",
+      "audience": "maintainer-verification"
+    },
+    {
+      "path": "tests/fixtures/test-failure/vitest-load-error.txt",
+      "audience": "maintainer-verification"
+    },
+    {
+      "path": "tests/fixtures/test-failure/vitest-marks-only.txt",
+      "audience": "maintainer-verification"
+    },
+    {
+      "path": "tests/fixtures/test-failure/vitest.txt",
+      "audience": "maintainer-verification"
+    },
+    {
       "path": ".agents/skills/agent-skill-trigger-index/SKILL.md",
       "audience": "agent-runtime"
     },

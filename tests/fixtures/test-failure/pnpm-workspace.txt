@@ -1,0 +1,56 @@
+Scope: 2 of 3 workspace projects
+Scope: all 3 workspace projects
+Already up to date
+
+Done in 300ms using pnpm v11.25.0
+packages/api test$ vitest run
+packages/web test$ jest
+packages/api test:  RUN  v3.2.4 /repo
+packages/api test:  ❯ src/cart.test.ts (3 tests | 2 failed) 12ms
+packages/api test:    ✓ cart > adds an item 1ms
+packages/api test:    × cart > totals the items 5ms
+packages/api test:      → expected 3 to be 4
+packages/api test:    × cart > applies tax 2ms
+packages/api test: ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+packages/api test:  FAIL  src/cart.test.ts > cart > totals the items
+packages/api test: AssertionError: expected 3 to be 4 // Object.is equality
+packages/api test:  ❯ src/cart.test.ts:9:21
+packages/api test: ⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+packages/api test:  FAIL  |unit| src/cart.test.ts > cart > applies tax
+packages/api test: TypeError: cannot read tax of undefined
+packages/api test:  ❯ src/cart.test.ts:14:5
+packages/api test:  Test Files  1 failed (1)
+packages/api test:       Tests  2 failed | 1 passed (3)
+packages/web test: FAIL src/math.test.js (5.123 s)
+packages/web test:   math
+packages/web test:     ✓ adds (2 ms)
+packages/web test:     ✕ divides (3 ms)
+packages/web test:   ● math › divides
+packages/web test:     expect(received).toBe(expected) // Object.is equality
+packages/web test:     Expected: 2
+packages/web test:     Received: 3
+packages/web test:   ● Console
+packages/web test:     console.log
+packages/web test:       noise
+packages/web test: Summary of all failing tests
+packages/web test: FAIL src/math.test.js
+packages/web test:   ● math › divides
+packages/web test:     expect(received).toBe(expected) // Object.is equality
+packages/web test: Test Suites: 1 failed, 1 total
+packages/web test: Tests:       1 failed, 1 passed, 2 total
+packages/api test: Failed
+[WARN]  Local package.json exists, but node_modules missing, did you mean to install?
+packages/web test: Failed
+[WARN]  Local package.json exists, but node_modules missing, did you mean to install?
+[ERR_PNPM_RECURSIVE_FAIL] 
+
+
+Summary: 2 fails, 0 passes
+
+/repo/packages/api:
+[ERROR] api@1.0.0 test: `vitest run`
+Exit status 1
+
+/repo/packages/web:
+[ERROR] web@1.0.0 test: `jest`
+Exit status 1

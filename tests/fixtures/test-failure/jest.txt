@@ -1,0 +1,25 @@
+FAIL src/math.test.js (5.123 s)
+  math
+    ✓ adds (2 ms)
+    ✕ divides (3 ms)
+
+  ● math › divides
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 2
+    Received: 3
+
+  ● Console
+
+    console.log
+      noise
+
+Summary of all failing tests
+FAIL src/math.test.js
+  ● math › divides
+
+    expect(received).toBe(expected) // Object.is equality
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 passed, 2 total

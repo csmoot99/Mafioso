@@ -1161,6 +1161,9 @@ $ASK_USER_BLOCK
 $SHARED_INFRA_RULE
 $SHARED_NO_CD_RULE
 
+9. Before committing a change that makes a previously failing existing test pass, run \`FM_HOME=$(shell_quote "$FM_HOME") $(shell_quote "$FM_ROOT/bin/fm-test-failure.sh") classify ${ID:-<task-id>} --test <name> [--file <path>] --class regression|stale|brittle|new-code|preventable|flaky --cause "<one line>"\` once per test.
+   Classify pipeline fix rounds the same way from the findings file after the round.
+
 $WAIT_BLOCK$HEAVY_BLOCK$INBOX_SECTION
 
 $CODING_DISCIPLINE

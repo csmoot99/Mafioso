@@ -1,0 +1,10 @@
+✔ passes (0.3ms)
+✖ fails (1.2ms)
+ℹ tests 2
+ℹ fail 1
+
+✖ failing tests:
+
+test at test/c.test.js:3:1
+✖ fails (1.2ms)
+  AssertionError [ERR_ASSERTION]: expected true
