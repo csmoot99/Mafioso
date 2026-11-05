@@ -1,0 +1,21 @@
+Running 3 tests using 1 worker
+
+  ✘  1 [chromium] › tests/login.spec.ts:3:5 › login › rejects a bad password (30ms)
+  ✘  2 [chromium] › tests/cart.spec.ts:8:1 › retries once (12ms)
+  ✓  3 [chromium] › tests/cart.spec.ts:8:1 › retries once (retry #1) (12ms)
+
+  1) [chromium] › tests/login.spec.ts:3:5 › login › rejects a bad password ─────────────────────────
+
+    Error: expect(received).toBe(expected)
+
+    Expected: 1
+
+  2) [chromium] › tests/cart.spec.ts:8:1 › retries once ─────────────────────────────────────────────
+
+    Error: flaked
+
+  1 failed
+    [chromium] › tests/login.spec.ts:3:5 › login › rejects a bad password ──────────────────────────
+  1 flaky
+    [chromium] › tests/cart.spec.ts:8:1 › retries once ─────────────────────────────────────────────
+  1 passed (2.1s)

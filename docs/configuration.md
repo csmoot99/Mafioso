@@ -78,6 +78,7 @@ Each effective `FM_HOME` contains private operational directories.
 - Project and secondmate registries.
 - Captain preferences and optional shared captain preferences.
 - Learnings, backlog, briefs, scout reports, the per-attempt worker ledger, and the optional per-task no-mistakes pipeline-spend ledger.
+- The per-project test-failure ledgers under `data/test-failures/` in the root home ([`bin/fm-test-failure.sh`](../bin/fm-test-failure.sh)).
 - Explicitly installed content-addressed extension packages under `data/extensions/packages/`.
 
 `state/` holds runtime records:
@@ -86,6 +87,7 @@ Each effective `FM_HOME` contains private operational directories.
 - Watcher and wake-queue coordination, away-mode state, and generated Relay artifacts.
 - Inactive terminal-outcome receipts under `state/terminal-outcomes/`.
 - Enabled extension working namespaces under `state/extensions/`.
+- Bounded per-job test output under `state/heavy-logs/` in the root home ([`bin/fm-heavy.sh`](../bin/fm-heavy.sh)).
 - Parent-side remote ledger copies under `state/secondmate-summary-cache/`.
 - One-shot Bearings reconcile requests under `state/reconcile-notify/`.
 - Private secondmate config-reread generations with their retry and quarantine state.
@@ -1215,6 +1217,7 @@ A record holds the task, project, command class (test, build, e2e or image), the
 A job stopped by TERM, INT or HUP is recorded too, whether it was running or still queued; the wrapper's header owns the exact fields.
 The command's exit status passes through, so 137 means the memory cap killed the command itself; when the cap kills one of its child processes, systemd stops the whole scope and the status is usually 143, with the peak still recorded.
 [`bin/fm-heavy-summary.sh`](../bin/fm-heavy-summary.sh) prints queue wait against run time and peak memory per project, class and host.
+A failing test or e2e job also records each failing test in the project's ledger, and [`bin/fm-test-failure.sh`](../bin/fm-test-failure.sh) classifies those failures and reports on them.
 The wrapper needs Linux with `flock`, `systemd-run` and `jq`; elsewhere it refuses without running anything.
 
 `config/host-test-slots` is one positive integer in the root home.

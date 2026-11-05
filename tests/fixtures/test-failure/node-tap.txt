@@ -1,0 +1,30 @@
+TAP version 13
+# Subtest: outer
+    # Subtest: inner fails
+    not ok 1 - inner fails
+      ---
+      duration_ms: 0.5
+      location: '/repo/test/a.test.js:4:3'
+      failureType: 'testCodeFailure'
+      error: 'expected true'
+      code: 'ERR_ASSERTION'
+      ...
+    1..1
+not ok 1 - outer
+  ---
+  duration_ms: 1.1
+  location: '/repo/test/a.test.js:3:1'
+  failureType: 'subtestsFailed'
+  error: '1 subtest failed'
+  ...
+ok 2 - passes
+not ok 3 - not ready # TODO later
+not ok 4 - multi line
+  ---
+  location: '/repo/test/b.test.js:9:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    first line of the error
+    second line
+  ...
+1..4

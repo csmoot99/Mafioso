@@ -69,6 +69,17 @@
 # host. Queue wait, preparation, run and collection add up to the job's elapsed
 # time, so local and remote runs compare end to end.
 #
+# Test output: a class test or e2e job, other than a no-mistakes drive call, also
+# keeps its combined stdout and stderr in state/heavy-logs/<job>.log in the root
+# home, where <job> is the fm-heavy-<pid>-<epoch> unit name. A log holds the last
+# 2 MiB, with a marker line when earlier output was dropped; the newest 200 logs
+# are kept. Each stream still reaches its own destination, through a pipe rather
+# than the caller's descriptor, so a command that checks for a terminal sees none.
+# After a non-zero exit the job's failing tests go to the ledger that
+# bin/fm-test-failure.sh owns. The ledger step never changes the exit status; a
+# process that outlives the command with the output open leaves the log unwritten
+# until it exits, and that job's ledger line is "(unparsed)".
+#
 # bin/fm-heavy-summary.sh summarizes the log. Linux with flock, systemd-run and
 # jq only; elsewhere the wrapper exits 69 without running anything.
 #
@@ -82,7 +93,10 @@ set -u
 
 SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 REMOTE="$(dirname "$SELF")/fm-heavy-remote.sh"
+LEDGER="$(dirname "$SELF")/fm-test-failure.sh"
 MEMORY_MAX=6G
+LOG_MAX_BYTES=2097152
+LOGS_KEPT=200
 
 # Scope stage: runs inside the systemd scope, so /proc/self/cgroup names the
 # scope. Counters are trusted only when that cgroup is the scope created for this
@@ -170,6 +184,13 @@ trap 'rm -f "$sample"' EXIT
 mkdir -p "$root/state"
 slot=; started=; signal=; waiter=; host=; fallback=
 sget() { sed -n "s/^$1=//p" "$sample" 2>/dev/null | tail -1; }
+command_line=$*
+logs="$root/state/heavy-logs"
+joblog=
+case "$class:$cmd" in
+  test:no-mistakes) ;;  # a pipeline drive call, not a test run
+  test:*|e2e:*) mkdir -p "$logs" && joblog="$logs/$unit.log" ;;
+esac
 
 record() {  # <exit status, empty when the command never started>
   local now peak cpu ended='' run_s='' wait_s began
@@ -217,6 +238,44 @@ interruptible() {
   return "$rc"
 }
 
+# Runs a job keeping its output in the job log. The readers are started before the
+# scope exists, so they stay out of its memory record and survive it being stopped;
+# they ignore stop signals so the command's last output still gets through. The
+# wait covers the normal case, where they finish with the command, and gives up on
+# a process that keeps the output open.
+run_captured() {  # <command> [args...]
+  local keeper rc tries=0
+  [ -n "$joblog" ] || { "$@" 8>&- 9>&-; return; }
+  exec 7> >(
+    exec 2>/dev/null 8>&- 9>&-
+    trap '' HUP INT TERM
+    tail -c "$LOG_MAX_BYTES" > "$joblog" || exec cat > /dev/null
+    [ "$(wc -c < "$joblog")" -lt "$LOG_MAX_BYTES" ] || sed -i '1c [fm-heavy: earlier output dropped]' "$joblog"
+  )
+  keeper=$!
+  exec 5> >(trap '' HUP INT TERM; exec tee /dev/fd/7 8>&- 9>&-)
+  exec 6> >(trap '' HUP INT TERM; exec tee /dev/fd/7 >&2 5>&- 8>&- 9>&-)
+  "$@" >&5 2>&6 5>&- 6>&- 7>&- 8>&- 9>&-
+  rc=$?
+  exec 5>&- 6>&- 7>&-
+  while kill -0 "$keeper" 2>/dev/null && [ "$tries" -lt 100 ]; do
+    sleep 0.02
+    tries=$((tries + 1))
+  done
+  return "$rc"
+}
+
+finish() {  # <exit status>
+  record "$1"
+  if [ -n "$joblog" ]; then
+    [ "$1" = 0 ] || timeout 10 "$LEDGER" capture --log "$joblog" --job "$unit" --task "$task" \
+      --project "$project" --class "$class" --command "$command_line" </dev/null >/dev/null 2>&1
+    find "$logs" -maxdepth 1 -name '*.log' -printf '%T@ %p\n' | sort -rn | tail -n "+$((LOGS_KEPT + 1))" \
+      | cut -d' ' -f2- | xargs -r -d '\n' rm -f
+  fi
+  exit "$1"
+}
+
 # While the command runs, bash holds this handler until the scope ends, and the
 # main flow below records the job.
 on_signal() {  # <signal number>
@@ -238,15 +297,14 @@ if [ -n "$remote" ]; then
   exec 8>>"$lock.remote.$rhost" || { echo "fm-heavy.sh: cannot open $lock.remote.$rhost" >&2; exit 2; }
   if flock -n 8; then
     started=$(date +%s)  # a signal now is the driver's to handle, as for a running command
-    "$REMOTE" --host "$rhost" --timeout "$rtimeout" --sample "$sample" \
-      --state-dir "$root/state/heavy-remote" -- "$@" 8>&-
+    run_captured "$REMOTE" --host "$rhost" --timeout "$rtimeout" --sample "$sample" \
+      --state-dir "$root/state/heavy-remote" -- "$@"
     rc=$?
     fallback=$(sget fallback)
     if [ -z "$fallback" ]; then
       host=$rhost
       [ -z "$signal" ] || rc=$((128 + signal))
-      record "$rc"
-      exit "$rc"
+      finish "$rc"
     fi
     started=; : > "$sample"
     [ -z "$signal" ] || on_signal "$signal"
@@ -270,12 +328,11 @@ while [ -z "$slot" ]; do
 done
 
 # The command stays in the foreground so it keeps stdin and default signal
-# handling. 9>&-: the lock descriptor is closed in the command, so a process it
-# leaves running (a daemon it auto-starts) cannot keep the slot held after it exits.
+# handling. run_captured closes the lock descriptor in the command, so a process
+# it leaves running (a daemon it auto-starts) cannot keep the slot held after it exits.
 started=$(date +%s)
-systemd-run --user --scope -q -p "MemoryMax=$MEMORY_MAX" -p MemorySwapMax=0 \
-  --unit="$unit" "$SELF" --stage-scoped "$unit" "$sample" "$@" 9>&-
+run_captured systemd-run --user --scope -q -p "MemoryMax=$MEMORY_MAX" -p MemorySwapMax=0 \
+  --unit="$unit" "$SELF" --stage-scoped "$unit" "$sample" "$@"
 rc=$?
 [ -z "$signal" ] || rc=$((128 + signal))
-record "$rc"
-exit "$rc"
+finish "$rc"

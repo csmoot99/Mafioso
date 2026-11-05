@@ -1,0 +1,5 @@
+ FAIL  src/broken.test.ts [ src/broken.test.ts ]
+Error: Failed to resolve import "./gone" from "src/broken.test.ts".
+
+ Test Files  1 failed (1)
+      Tests  no tests

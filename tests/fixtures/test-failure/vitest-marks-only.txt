@@ -1,0 +1,4 @@
+ ❯ src/cart.test.ts (2 tests | 1 failed) 12ms
+   x cart > totals the items 5ms
+     → expected 3 to be 4
+      Tests  1 failed | 1 passed (2)

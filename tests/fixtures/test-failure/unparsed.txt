@@ -1,0 +1,4 @@
+> project@1.0.0 test
+> custom-runner
+
+Error: could not start the database
