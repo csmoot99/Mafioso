@@ -72,6 +72,7 @@ data/                personal fleet records; LOCAL, gitignored as a whole
   <id>/consigliere.json  supervisor-written Consigliere stage record and clear receipt for a builder task, beside its consigliere-gates-<round>.md evidence; bin/fm-consigliere-lib.sh owns the receipt fields
   pipeline-spend.jsonl  optional per-task no-mistakes pipeline spend, written only when config/pipeline-spend is present; bin/fm-pipeline-spend.sh owns the schema
   attempts.jsonl     private per-attempt worker usage and lifecycle ledger (0600), appended at teardown and at a profile-changing relaunch; bin/fm-attempt-record.py owns the schema
+  test-failures/     per-project ledgers of failing tests and their classifications (<project>.jsonl), in the root home only; bin/fm-test-failure.sh owns the schema
 projects/            cloned repos; gitignored; read-only except under hard rule 1's concrete captain-approved project operation exception
 state/               runtime records and signals; gitignored
   <id>.status        append-only wake events, not current-state truth; bin/fm-classify-lib.sh owns their syntax
@@ -111,6 +112,7 @@ state/               runtime records and signals; gitignored
   .mail-seen .mail-woken .mail-retry .mail-retry-pos .mail-turn .mail-seen.lock  mail-plane poll cursor, emission journal, transient-fetch retry set, retry-scan position, contended-slot turn flag, and overlapping-poll lock; written only by bin/fm-mail.sh (mail schema: docs/configuration.md "Mail plane")
   startup-growth.check.sh  generated daily startup-growth poll shim and its .check-trust binding; present only after bin/fm-startup-growth-check.sh arm; its record .startup-growth-check holds the daily gate, the per-file growth baselines, and the last reported finding set, so removing it re-baselines growth silently and repeats a standing finding such as a budget overrun once (docs/configuration.md "Daily startup growth check")
   heavy-jobs.jsonl   machine-wide heavy-command job log, in the root home only, one record per job; bin/fm-heavy.sh is its only writer and owns the schema, and bin/fm-heavy-summary.sh reads it
+  heavy-logs/        bounded output of recent class test and e2e jobs (<job>.log), in the root home only; bin/fm-heavy.sh owns it and bin/fm-test-failure.sh reads it
   heavy-remote/      per-job local copies of remote heavy-command results (result.json, run.log, reconciled.json) and open unknown-job records (unknown-<host>/<job>.json), in the root home only; bin/fm-heavy-remote.sh owns it
   pending-replies/   parent-owned secondmate pending-reply records (correlation id, delivery vs reply, recovery, escalation); fm-pending-reply-lib.sh
   procevent/         registered process-to-event sources, one private record per canonical source id; written only by bin/fm-procevent.sh, and their presence alone keeps supervision required (`process-event-sources` skill)
