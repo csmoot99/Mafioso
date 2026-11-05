@@ -105,10 +105,10 @@
 # replaced on every build. Each page carries a Download link holding the report's
 # original bytes, saved as <YYYY-MM-DD>-<title-slug>.md. Report metadata, relative
 # `src` and plain-text search content (capped by bin/fm-bearings-md.pl --text)
-# live in .reports/index.json, never inline; only `reports_count` enters the page.
-# The automatically generated .reports/index.js transports the same index through
-# a classic script callback because Lavish's opaque-origin sandbox cannot fetch
-# sibling JSON without server CORS support. The page requests it on first opening
+# live in the generated .reports/index.js, never inline; only `reports_count`
+# enters the page. That file delivers the index through a classic script callback
+# because Lavish's opaque-origin sandbox cannot fetch sibling JSON without server
+# CORS support. The page requests it on first opening
 # Reports and shows loading until it arrives, independently of the other sections.
 # Card and report authors keep the same fields and build command.
 # A payload with no `reports`, or an empty
@@ -406,10 +406,9 @@ stage_reports() {  # <payload.json> <stage-dir>; rewrites the payload in place
     .reports |= (to_entries | map(.key as $i | .value
       | {title, repo, date, summary, text: $texts[$i], src: ($dir + "/" + ($i + 1 | tostring) + ".html")}))
   ' "$payload" > "$payload.r" || { rm -f -- "$payload.r"; return 1; }
-  jq -c '.reports' "$payload.r" > "$dir/index.json" || return 1
   # Classic scripts work in Lavish's opaque-origin sandbox and offline file
   # copies; fetch(JSON) cannot read sibling assets without server CORS changes.
-  { printf 'window.fmBearingsReports('; cat "$dir/index.json"; printf ');\n'; } > "$dir/index.js" || return 1
+  { printf 'window.fmBearingsReports('; jq -c '.reports' "$payload.r" && printf ');\n'; } > "$dir/index.js" || return 1
   jq '.reports | length' "$payload.r" > "$dir/count" || return 1
   jq --argjson count "$(cat "$dir/count")" 'del(.reports) | .reports_count = $count' "$payload.r" > "$payload" || return 1
   rm -f -- "$dir/text.jsonl" "$dir/count" "$payload.r"

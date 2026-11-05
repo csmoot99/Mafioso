@@ -188,6 +188,11 @@ extract_payload() {  # <board-path>
     | sed '1d;$d'
 }
 
+# Unwrap the report index from its generated classic-script callback.
+report_index() {  # <assets-dir>
+  perl -0pe 's/\Awindow\.fmBearingsReports\(//; s/\);\n\z//' "$1/.reports/index.js"
+}
+
 test_path_is_stable_and_home_scoped() {
   local home
   home=$(make_home path)
@@ -1037,24 +1042,24 @@ test_build_publishes_each_report_beside_the_board_and_injects_only_relative_srcs
   make_report "$home/data/status-report-2026-11-02.md" '# Status'
   payload_with_reports "$home" "[$(report_entry "Scout A" "$home/data/scout-a/report.md"),$(report_entry "Status" "$home/data/status-report-2026-11-02.md")]"
   run_board "$home" build "$home/payload.json" >/dev/null 2>&1 || fail "a payload with reports did not build"
-  [ "$(find "$assets/.reports" -type f | wc -l | tr -d ' ')" = 4 ] || fail "the reports were not published beside the board"
+  [ "$(find "$assets/.reports" -type f | wc -l | tr -d ' ')" = 3 ] || fail "the reports were not published beside the board"
   assert_present "$assets/.reports/1.html" "the first report was not published"
   grep -q "Scout A" "$assets/.reports/1.html" || fail "the first published page is not the first report"
   grep -q "Status" "$assets/.reports/2.html" || fail "the second published page is not the second report"
   extract_payload "$board" | jq -e '.reports_count == 2 and (has("reports") | not) and ([.. | objects | has("text")] | any | not)' >/dev/null \
     || fail "report metadata or text remained in the inline page data"
-  jq -e '
+  report_index "$assets" | jq -e '
     (map(del(.text))) == [
       {title:"Scout A",repo:"sample",date:"2026-11-02",summary:"One line",src:"bearings-board-assets/.reports/1.html"},
-      {title:"Status",repo:"sample",date:"2026-11-02",summary:"One line",src:"bearings-board-assets/.reports/2.html"}]' "$assets/.reports/index.json" >/dev/null \
+      {title:"Status",repo:"sample",date:"2026-11-02",summary:"One line",src:"bearings-board-assets/.reports/2.html"}]' >/dev/null \
     || fail "the page data does not carry exactly the title, project, date, summary and relative src"
-  jq -e '(.[0].text | startswith("Scout A")) and .[1].text == "Status"' "$assets/.reports/index.json" >/dev/null \
+  report_index "$assets" | jq -e '(.[0].text | startswith("Scout A")) and .[1].text == "Status"' >/dev/null \
     || fail "the external index does not carry each report's search text"
   grep -qF "$home/data" "$board" && fail "the page leaked a local report path"
   # a rebuild replaces the folder, so a dropped report cannot linger
   payload_with_reports "$home" "[$(report_entry "Status" "$home/data/status-report-2026-11-02.md")]"
   run_board "$home" build "$home/payload.json" >/dev/null 2>&1 || fail "the rebuild failed"
-  [ "$(find "$assets/.reports" -type f | wc -l | tr -d ' ')" = 3 ] || fail "a dropped report survived a rebuild"
+  [ "$(find "$assets/.reports" -type f | wc -l | tr -d ' ')" = 2 ] || fail "a dropped report survived a rebuild"
   pass "build publishes each report beside the board and injects only relative srcs"
 }
 
@@ -1156,9 +1161,9 @@ test_each_report_page_downloads_the_original_and_the_board_carries_a_capped_sear
   name=$(sed -n 's/.*<a download="\([^"]*\)".*/\1/p' "$assets/.reports/1.html")
   [ "$name" = "2026-11-02-scout-n-more.md" ] || fail "the download is not named <date>-<title-slug>.md: $name"
   grep -qiE '<script|https?://[^"]*"? *(src|href)=' "$assets/.reports/1.html" && fail "the report page is not inert"
-  jq -e '
+  report_index "$assets" | jq -e '
     (.[0].text | contains("Scout") and (contains("|") | not) and (contains("---") | not) and (contains("```") | not) and contains("link item"))
-    and (.[1].text | length == 6000 and (contains("tail-marker") | not))' "$assets/.reports/index.json" >/dev/null \
+    and (.[1].text | length == 6000 and (contains("tail-marker") | not))' >/dev/null \
     || fail "the search index is not plain, capped text"
   want=$(( $(grep -c . "$board") ))
   [ "$want" -gt 0 ] || fail "empty board"

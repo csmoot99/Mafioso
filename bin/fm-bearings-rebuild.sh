@@ -5,14 +5,18 @@
 # config/bearings-rebuild is an optional, trusted Bash script, run from FM_HOME
 # with FM_HOME exported. Missing configuration does nothing, silently. --run is
 # the detached worker's internal entry point, not another command per answer.
-# Requests coalesce: one build at a time, with one more run if answers arrive
-# during a build. Each build has a 120-second bound (override with the positive
-# integer FM_BEARINGS_REBUILD_TIMEOUT_SECONDS, at most 600). Answer capture never
-# waits for the build. Output goes to state/bearings-rebuild/last.log; failures
+# Requests coalesce: a build starts only after a fixed 20-second quiet period
+# since the last captured answer, because publishing reloads the open board and
+# would discard an answer still being composed. One build runs at a time, and
+# answers arriving during a build lead to one more after their own quiet period.
+# Each build has a fixed 120-second bound. Answer capture never waits for the
+# quiet period or the build. Output goes to state/bearings-rebuild/last.log; failures
 # also append failures.log and publish a check wake. No live board is inferred:
 # the home's configured script must gather fresh inputs and build its own board.
 set -eu
 
+QUIET_SECONDS=20
+BUILD_BOUND_SECONDS=120
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export FM_HOME="${FM_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}/bearings-rebuild"
@@ -46,7 +50,7 @@ failure() {
 
 if [ "${1:-}" != --run ]; then
   fm_lock_acquire_wait_max "$request_lock" 5 || { failure 'Board rebuild request lock timed out'; exit 0; }
-  : > "$WORK/pending"
+  date +%s > "$WORK/pending"
   # Give the worker its own process group and detached stdio, as in deferred
   # startup checks, so the answer intake's exit cannot reap the bounded build.
   set -m
@@ -56,14 +60,6 @@ if [ "${1:-}" != --run ]; then
 fi
 
 fm_lock_try_acquire "$run_lock" || exit 0
-bound=${FM_BEARINGS_REBUILD_TIMEOUT_SECONDS:-120}
-case "$bound" in
-  ''|*[!0-9]*|0*) failure 'Invalid board rebuild timeout'; exit 0 ;;
-esac
-if [ "${#bound}" -gt 3 ] || [ "$bound" -gt 600 ]; then
-  failure 'Invalid board rebuild timeout'
-  exit 0
-fi
 while :; do
   fm_lock_acquire_wait_max "$request_lock" 5 || { failure 'Board rebuild request lock timed out'; exit 0; }
   if [ ! -e "$WORK/pending" ]; then
@@ -73,9 +69,15 @@ while :; do
     fm_lock_release "$request_lock"
     exit 0
   fi
+  remaining=$(( $(cat "$WORK/pending") + QUIET_SECONDS - $(date +%s) ))
+  if [ "$remaining" -gt 0 ]; then
+    fm_lock_release "$request_lock"
+    sleep "$remaining"
+    continue
+  fi
   rm -f "$WORK/pending"
   fm_lock_release "$request_lock"
   rc=0
-  (cd "$FM_HOME" && fm_run_timed "$bound" bash "$CONFIG") > "$WORK/last.log" 2>&1 || rc=$?
+  (cd "$FM_HOME" && fm_run_timed "$BUILD_BOUND_SECONDS" bash "$CONFIG") > "$WORK/last.log" 2>&1 || rc=$?
   [ "$rc" -eq 0 ] || failure "Board rebuild failed (exit $rc); the answer remains recorded"
 done

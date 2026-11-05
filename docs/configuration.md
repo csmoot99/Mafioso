@@ -2367,8 +2367,9 @@ The file is trusted home configuration, not text from a board answer, and runs f
 After a successful `bin/fm-captain-hold.sh answer` records and closes or releases a call, `bin/fm-bearings-rebuild.sh` requests the rebuild; keyed `answers` from Lavish or other channels reach the same owner.
 An absent configuration does nothing and prints nothing.
 Answer capture returns without waiting for a build, and a failed build cannot undo or fail the saved answer.
-Rebuilds are serialized per state root; requests during one build coalesce into one additional run.
-Each run has a 120-second timeout, overridable with `FM_BEARINGS_REBUILD_TIMEOUT_SECONDS` as a positive integer up to 600.
+A build starts after a fixed 20-second quiet period since the last captured answer, because publishing reloads the open board and would discard an answer still being composed; until then a reload can still show the answered card.
+Rebuilds are serialized per state root; requests during one build coalesce into one additional run after their own quiet period.
+Each run has a fixed 120-second timeout.
 The worker keeps its latest output in `state/bearings-rebuild/last.log`, appends failures to `failures.log` beside it, and publishes failures as `check` notifications.
 The helper's header owns the queue and execution mechanics; no extra step or field is required for individual cards, reports, or answers.
 
