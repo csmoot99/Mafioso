@@ -281,11 +281,16 @@ def capture(root, args):
     return 0
 
 
+def path_suffix(path, suffix):
+    return path == suffix or path.endswith("/" + suffix)
+
+
 def matches(entry, test, file):
     name = entry.get("test") or ""
     if name != test and not name.endswith(" > " + test):
         return False
-    return not file or (entry.get("file") or "").endswith(file)
+    stored = entry.get("file")
+    return not file or bool(stored) and (path_suffix(stored, file) or path_suffix(file, stored))
 
 
 def task_project(root, task):

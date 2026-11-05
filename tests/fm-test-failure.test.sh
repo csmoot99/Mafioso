@@ -173,6 +173,28 @@ test_classify_file_in_a_pnpm_package() {
   pass "classify: --file with the repo path links the failure of that pnpm package"
 }
 
+test_classify_repo_path_of_a_package_relative_row() {
+  local home ledger out
+  home=$(make_home classify-relative)
+  ledger="$home/data/test-failures/demo.jsonl"
+  capture "$home" "$FIXTURES/vitest.txt" t1
+
+  out=$(FM_HOME="$home" "$LEDGER" classify t1 --test "applies tax" --file packages/api/xsrc/cart.test.ts \
+    --class stale --cause c 2>&1) || fail "classify failed: $out"
+  assert_contains "$out" "unlinked" "a path that differs inside a component must not link"
+  out=$(FM_HOME="$home" "$LEDGER" classify t1 --test "applies tax" --file art.test.ts \
+    --class stale --cause c 2>&1) || fail "classify failed: $out"
+  assert_contains "$out" "unlinked" "part of a file name must not link"
+
+  out=$(FM_HOME="$home" "$LEDGER" classify t1 --test "applies tax" --file packages/api/src/cart.test.ts \
+    --class stale --cause c 2>&1) || fail "classify failed: $out"
+  [ "$(tail -1 "$ledger" | jq -r '[.file,.job] | join("|")')" = "src/cart.test.ts|job-1" ] \
+    || fail "a repo path did not link the package-relative row: $(tail -1 "$ledger")"
+  out=$(FM_HOME="$home" "$LEDGER" report) || fail "report failed"
+  assert_contains "$out" "unclassified: 1 of 2 (50%)" "the linked failure must count as classified"
+  pass "classify: a repo --file links a package-relative row at a path boundary only"
+}
+
 test_classify_title_as_printed() {
   local home ledger out
   home=$(make_home classify-title)
@@ -330,6 +352,7 @@ test_marks_of_two_files_stay_separate
 test_failure_line_fields
 test_classify
 test_classify_file_in_a_pnpm_package
+test_classify_repo_path_of_a_package_relative_row
 test_classify_title_as_printed
 test_report_and_recent
 test_heavy_capture
