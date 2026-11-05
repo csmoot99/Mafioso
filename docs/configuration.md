@@ -90,6 +90,7 @@ Each effective `FM_HOME` contains private operational directories.
 - Bounded per-job test output under `state/heavy-logs/` in the root home ([`bin/fm-heavy.sh`](../bin/fm-heavy.sh)).
 - Parent-side remote ledger copies under `state/secondmate-summary-cache/`.
 - One-shot Bearings reconcile requests under `state/reconcile-notify/`.
+- The Bearings rebuild queue and logs under `state/bearings-rebuild/` ([`bin/fm-bearings-rebuild.sh`](../bin/fm-bearings-rebuild.sh)).
 - Private secondmate config-reread generations with their retry and quarantine state.
 - Per-task steering-inbox records under `state/<id>.inbox/` (`bin/fm-task-inbox-lib.sh`).
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
@@ -2358,6 +2359,20 @@ Some built-in sources carry the captain's answer to a captain-held task, and wha
 - A built-in source bound with `bin/fm-captain-hold.sh bind` therefore has each captured result passed to `bin/fm-procevent-<adapter>.sh answers <result-file>`, and whatever that prints is piped straight into that intake.
 - A binding can select one decision origin or the script's cross-origin mode; the command header owns the exact forms and key interpretation.
 - The built-in adapter reports only what the captain chose; the intake owns every rule about what happens next, so the runner names no adapter, parses no result, and carries no decision rule, and a future built-in answer source needs nothing here beyond an `answers` command and a binding.
+
+**Rebuild a board after answers**
+
+An optional `config/bearings-rebuild` Bash script declares how this home rebuilds its board from fresh inputs.
+For a home with a private board builder, its contents can be `exec bash "$FM_HOME/data/decision-board/build.sh"`.
+The file is trusted home configuration, not text from a board answer, and runs from `FM_HOME` with `FM_HOME` exported.
+After a successful `bin/fm-captain-hold.sh answer` records and closes or releases a call, `bin/fm-bearings-rebuild.sh` requests the rebuild; keyed `answers` from Lavish or other channels reach the same owner.
+An absent configuration does nothing and prints nothing.
+Answer capture returns without waiting for a build, and a failed build cannot undo or fail the saved answer.
+A build starts after a fixed 20-second quiet period since the last captured answer, because publishing reloads the open board and would discard an answer still being composed; until then a reload can still show the answered card.
+Rebuilds are serialized per state root; requests during one build coalesce into one additional run after their own quiet period.
+Each run has a fixed 120-second timeout.
+The worker keeps its latest output in `state/bearings-rebuild/last.log`, appends failures to `failures.log` beside it, and publishes failures as `check` notifications.
+The helper's header owns the queue and execution mechanics; no extra step or field is required for individual cards, reports, or answers.
 
 **Reconcile selections and handling boundaries**
 

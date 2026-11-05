@@ -112,10 +112,10 @@ Compose the payload from the same snapshot with the same ranking judgment as the
 - Every Charted Next row copies the snapshot gate's durable filed date into `filed`, and the board orders the section by it, newest filed first.
   Follow `bin/fm-bearings-board.sh`'s payload contract for the accepted format.
   Omit it or pass null for a row with no durable filed date - the main-inventory or return-catchup warning, an unavailable secondmate home, or a queued row filed before dates were recorded - and the board keeps those rows in payload order after every dated row.
-- A Captain's Call card whose decision rests on screenshots lists them in `images` (absolute local png, jpg, jpeg or webp paths with alt text and an optional caption); `build` copies them beside the board and shows them as tappable thumbnails, and `bin/fm-bearings-board.sh`'s header owns the field's limits.
+- A Captain's Call card whose decision rests on screenshots lists them in `images` (absolute local png, jpg, jpeg or webp paths with alt text and an optional caption); `build` prepares previews automatically, and `bin/fm-bearings-board.sh`'s header owns staging, fallback and field limits.
 - Every decision card also lets the captain attach reference images (PNG, JPEG, WebP) to an answer; they reach firstmate as local files, and `bin/fm-procevent-lavish.sh read` lists them beside that card's answer, while `answers` still carries the keyed choice only.
 - Every Captain's Call item and every Underway, Recently Landed, and Charted Next row carries an explicit `repo` field. Fill it from the snapshot and task records wherever known; use null or an empty string only as the deliberate genuinely-no-repo marker, in which case the template may show the internal id. Ids otherwise stay in the payload only as the routing channel, and composed reasons name blockers in plain words.
-- The payload carries a `reports` list, the Reports tab of the board: include every report file firstmate wrote for the captain (each `data/<task-id>/report.md` and each `data/status-report-<YYYY-MM-DD>.md`), each with its title, project, date, one-line summary, and the path of its markdown file under this home's `data/`; `bin/fm-bearings-board.sh`'s header owns the field's rules.
+- The payload carries a `reports` list, the Reports tab of the board: include every report file firstmate wrote for the captain (each `data/<task-id>/report.md` and each `data/status-report-<YYYY-MM-DD>.md`), each with its title, project, date, one-line summary, and the path of its markdown file under this home's `data/`; `bin/fm-bearings-board.sh`'s header owns the field's rules and the index loaded on opening Reports.
   Listing these files is a file index for the Reports tab, not fleet-state input, so the rule against scraping reports to supplement current state does not apply to it; never use a report's contents to place or classify any other board row.
 
 Run `build` once after composing the payload.
@@ -139,7 +139,8 @@ Route the non-decision keys yourself:
 - `merge.<task-id>` is the captain's explicit merge order; follow the merge ruling below.
 - `dispatch.charted` carries comma-separated task ids the captain picked to start now; verify each id against the current backlog - still queued, blocker and time gate actually clear - then dispatch through the normal lifecycle, and report any id that no longer qualifies instead of forcing it.
 
-After handling, rebuild the board from a fresh snapshot so acted-on items leave Captain's Call, and echo every action taken in chat so the board and chat never diverge silently.
+For automatic rebuilding after recorded answers, configure the home once through `config/bearings-rebuild`; [the configuration contract](../../../docs/configuration.md) owns setup, and `bin/fm-bearings-rebuild.sh` owns execution.
+After handling, rebuild from a fresh snapshot when no automatic rebuild covers the resulting changes, and echo every action taken in chat so the board and chat never diverge silently.
 
 ### The merge-click ruling (captain-decided)
 

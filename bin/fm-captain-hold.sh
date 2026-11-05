@@ -58,8 +58,11 @@
 # card.
 #
 # `answer` records the captain's exact words and resolves the call in the same
-# act. It requires a non-empty captain decision file of at most 8192 bytes and
-# writes a resolution block while preserving the leading hold-set stamp until
+# act. After success it requests the optional home-configured board rebuild through
+# bin/fm-bearings-rebuild.sh. The same hook covers the `answers` intake below;
+# rebuilds run separately and cannot undo or fail an already-recorded answer.
+# It requires a non-empty decision file of at most 8192 bytes and writes a
+# resolution block while preserving the leading hold-set stamp until
 # the close succeeds (the previous body is preserved and archived through
 # tasks-axi --archive-body). It closes a question with `tasks-axi done` - or,
 # with `--release`, lifts the hold with `tasks-axi unhold` so a captain-gated
@@ -2055,7 +2058,12 @@ command_open() {  # <task-id> [--identity] [--distinguish-absent]
 
 case "${1:-}" in
   hold) shift; command_hold "$@" ;;
-  answer) shift; command_answer "$@" ;;
+  answer)
+    shift
+    command_answer "$@"
+    FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-bearings-rebuild.sh" \
+      || printf 'actionable: answer recorded, but board rebuild could not be requested\n' >&2
+    ;;
   answers) shift; command_answers "$@" ;;
   reconcile-requests) shift; command_reconcile_requests "$@" ;;
   bind) shift; command_bind "$@" ;;
