@@ -37,25 +37,27 @@
 # never runs: wait_s is its wait so far, and started_at, ended_at, run_s, exit
 # and slot are null.
 #
-# Remote destination (opt-in): --remote runs the command on another machine over
-# SSH instead of this machine's slot, only when config/heavy-remote in the root
-# home approves it. Without --remote nothing changes. The file holds lines
-#   host <ssh alias>      the destination, for example fm-mac
-#   command <words...>    the one approved portable command, matched word for word
-#   timeout <seconds>     optional, default 900; the host kills the job's own
-#                         process group when it runs longer
-# and a '#' line is a comment. A missing or malformed file, a command that is not
-# the approved one, or a class other than test refuses with status 2. The
-# destination takes one job at a time; when it is busy, unreachable, still running
-# a job that ended unknown here or cannot prepare the job, or the working tree is
-# not a clean repository root, the command runs locally under the normal slot rule
-# and the record's fallback says why. A signal before the job starts stops it from
-# running anywhere, whichever of the two scripts hears it: the record's outcome is
-# cancelled when the driver did, and otherwise it is a queued job's record with the
-# fallback it would have taken. bin/fm-heavy-remote.sh owns the transfer, the
-# completion record, the failure outcomes and their exit statuses, and reconciling
-# unknown jobs. Its job copies are kept in state/heavy-remote/<job> in the root
-# home, and its open unknown-job records in state/heavy-remote/unknown-<host>.
+# Remote destination (opt-in): config/heavy-remote approves test, build and e2e
+# commands on one SSH host; image always stays local. Lines (comments start #):
+#   host <ssh alias>                    required, one host
+#   command <words...>                  legacy unscoped approval
+#   command <project> -- <words...>     scoped approval (repeatable)
+#   slots <n>                          optional positive integer, default 1
+#   timeout <seconds>                  optional positive integer, default 900
+#   offload                            optional presence line
+# Command words must match argv exactly (whitespace separates words; no shell
+# quoting or expansion). A -- in the approval's second word identifies scoped
+# syntax. Duplicate approvals and malformed config refuse the run. --remote requires an approval and requests remote first.
+# With offload, an approved command automatically tries a remote slot when all
+# local slots are busy; otherwise it runs locally. Without offload or --remote
+# the local behavior is unchanged. A busy/unreachable destination or an unclean
+# repository root falls back to the local queue, recorded in fallback. Missing
+# runtimes, incompatible versions and dependency-install errors on the host fail
+# the remote job and never silently retry locally. A signal before starting
+# prevents execution anywhere. bin/fm-heavy-remote.sh owns transfer, results and
+# unknown-job reconciliation; unknown jobs prevent new remote work until settled.
+# Job copies live in state/heavy-remote/<job> in the root home, and open records
+# in state/heavy-remote/unknown-<host>.
 #
 # A remote job's record has the same fields plus: host (the alias, "local" for a
 # local run), prepare_s (bundle, transfer and checkout until the job started) and
@@ -154,24 +156,47 @@ if [ -e "$root/config/host-test-slots" ]; then
     echo "fm-heavy.sh: config/host-test-slots must hold one positive integer" >&2; exit 2 ;; esac
 fi
 
-rhost=; rcmd=; rtimeout=
-if [ -n "$remote" ]; then
-  [ "$class" = test ] || { echo "fm-heavy.sh: --remote runs class test only" >&2; exit 2; }
+rhost=; rtimeout=; rslots=; offload=; approved=
+if [ -n "$remote" ] || [ -e "$root/config/heavy-remote" ]; then
   [ -r "$root/config/heavy-remote" ] || { echo "fm-heavy.sh: --remote needs config/heavy-remote" >&2; exit 2; }
-  bad=
-  while read -r key rest || [ -n "$key" ]; do  # a last line without a newline counts
+  bad=; approvals=(); request=("$@")
+  while read -r key rest || [ -n "$key" ]; do
     case "$key" in
       ''|'#'*) ;;
       host) [ -z "$rhost" ] && [[ $rest =~ ^[A-Za-z0-9._-]+$ ]] && rhost=$rest || bad=1 ;;
-      command) [ -z "$rcmd" ] && [ -n "$rest" ] && rcmd=$rest || bad=1 ;;
+      command)
+        words=(); read -r -a words <<< "$rest"
+        scope=; offset=0
+        if [ "${words[1]:-}" = -- ]; then
+          scope=${words[0]}; offset=2
+          [[ $scope =~ ^[A-Za-z0-9._-]+$ ]] || bad=1
+        fi
+        [ "${#words[@]}" -gt "$offset" ] || bad=1
+        signature="$scope:"
+        match=1
+        [ -z "$scope" ] || [ "$scope" = "$project" ] || match=
+        [ "$((${#words[@]} - offset))" -eq "${#request[@]}" ] || match=
+        for ((j=offset; j<${#words[@]}; j++)); do
+          signature+=" ${words[j]}"
+          [ "${words[j]}" = "${request[j-offset]:-}" ] || match=
+        done
+        for prior in ${approvals[@]+"${approvals[@]}"}; do [ "$prior" != "$signature" ] || bad=1; done
+        approvals+=("$signature")
+        [ -z "$match" ] || approved=1
+        ;;
       timeout) [ -z "$rtimeout" ] && [[ $rest =~ ^[1-9][0-9]{0,5}$ ]] && rtimeout=$rest || bad=1 ;;
+      slots) [ -z "$rslots" ] && [[ $rest =~ ^[1-9][0-9]{0,3}$ ]] && rslots=$rest || bad=1 ;;
+      offload) [ -z "$offload" ] && [ -z "$rest" ] && offload=1 || bad=1 ;;
       *) bad=1 ;;
     esac
   done < "$root/config/heavy-remote"
-  [ -z "$bad" ] && [ -n "$rhost" ] && [ -n "$rcmd" ] \
-    || { echo "fm-heavy.sh: config/heavy-remote needs one host line, one command line and at most one valid timeout line" >&2; exit 2; }
-  [ "$*" = "$rcmd" ] || { echo "fm-heavy.sh: --remote is approved only for: $rcmd" >&2; exit 2; }
-  rtimeout=${rtimeout:-900}
+  [ -z "$bad" ] && [ -n "$rhost" ] && [ "${#approvals[@]}" -gt 0 ] \
+    || { echo "fm-heavy.sh: malformed config/heavy-remote (see --help)" >&2; exit 2; }
+  case "$class" in image) approved= ;; esac
+  if [ -n "$remote" ] && [ -z "$approved" ]; then
+    echo "fm-heavy.sh: --remote command/class is not approved for this project" >&2; exit 2
+  fi
+  rtimeout=${rtimeout:-900}; rslots=${rslots:-1}
 fi
 
 lock=${FM_HEAVY_LOCK:-/tmp/fm-heavy.lock}
@@ -290,14 +315,38 @@ trap 'on_signal 1' HUP
 trap 'on_signal 2' INT
 trap 'on_signal 15' TERM
 
-# A remote job takes the destination's one place (descriptor 8) instead of a slot.
-# Anything that stops it from starting there, or leaves nothing running, falls
-# through to the local slot below.
+# Try local slots without waiting before automatic offload. Keep the acquired
+# descriptor through execution so another caller cannot steal the free slot.
+try_local() {
+  local i=1 slot_lock
+  while [ "$i" -le "$slots" ]; do
+    slot_lock=$lock; [ "$i" -gt 1 ] && slot_lock=$lock.$i
+    exec 9>>"$slot_lock" || { echo "fm-heavy.sh: cannot open $slot_lock" >&2; exit 2; }
+    if interruptible flock -n 9; then slot=$i; return 0; fi
+    exec 9>&-
+    i=$((i + 1))
+  done
+  return 1
+}
+if [ -z "$remote" ] && [ -n "$offload" ] && [ -n "$approved" ]; then
+  try_local || remote=1
+fi
+
+# Each remote slot has its own descriptor lock; unknown jobs are still reconciled
+# by the driver before admitting new work, even when more slots are configured.
 if [ -n "$remote" ]; then
-  exec 8>>"$lock.remote.$rhost" || { echo "fm-heavy.sh: cannot open $lock.remote.$rhost" >&2; exit 2; }
-  if flock -n 8; then
-    started=$(date +%s)  # a signal now is the driver's to handle, as for a running command
+  rslot=; i=1
+  while [ "$i" -le "$rslots" ]; do
+    rlock=$lock.remote.$rhost; [ "$i" -gt 1 ] && rlock=$rlock.$i
+    exec 8>>"$rlock" || { echo "fm-heavy.sh: cannot open $rlock" >&2; exit 2; }
+    if flock -n 8; then rslot=$i; break; fi
+    exec 8>&-
+    i=$((i + 1))
+  done
+  if [ -n "$rslot" ]; then
+    started=$(date +%s)  # signals now belong to the driver
     run_captured "$REMOTE" --host "$rhost" --timeout "$rtimeout" --sample "$sample" \
+      --project "$project" --class "$class" --slot "$rslot" --slots "$rslots" \
       --state-dir "$root/state/heavy-remote" -- "$@"
     rc=$?
     fallback=$(sget fallback)
@@ -314,17 +363,14 @@ if [ -n "$remote" ]; then
   exec 8>&-
 fi
 
-# This shell holds the lock on descriptor 9 for the life of the job.
-nb=(); [ "$slots" -gt 1 ] && nb=(-n)
+# The blocking single-slot path keeps its signal handling; multiple slots retry.
 while [ -z "$slot" ]; do
-  i=1
-  while [ -z "$slot" ] && [ "$i" -le "$slots" ]; do
-    slot_lock=$lock; [ "$i" -gt 1 ] && slot_lock=$lock.$i
-    exec 9>>"$slot_lock" || { echo "fm-heavy.sh: cannot open $slot_lock" >&2; exit 2; }
-    interruptible flock ${nb[@]+"${nb[@]}"} 9 && slot=$i
-    i=$((i + 1))
-  done
-  [ -n "$slot" ] || interruptible sleep 2
+  if [ "$slots" -eq 1 ]; then
+    exec 9>>"$lock" || { echo "fm-heavy.sh: cannot open $lock" >&2; exit 2; }
+    interruptible flock 9 && slot=1
+  else
+    try_local || interruptible sleep 2
+  fi
 done
 
 # The command stays in the foreground so it keeps stdin and default signal

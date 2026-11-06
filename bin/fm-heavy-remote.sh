@@ -4,7 +4,8 @@
 # it; it is not a user command.
 #
 # usage: fm-heavy-remote.sh --host <ssh alias> --timeout <seconds> --sample <file>
-#          --state-dir <dir> -- <command> [args...]
+#          --state-dir <dir> [--project <name>] [--class test|build|e2e]
+#          [--slot <n>] [--slots <n>] -- <command> [args...]
 #
 # The command must be a repository-relative portable command run from the
 # repository root, and the working tree must be clean: the candidate is exactly
@@ -14,6 +15,8 @@
 #      in one ssh stream; the runner verifies both digests, checks out and
 #      verifies the exact sha, and launches the command detached in its own
 #      process group under ~/.fm-heavy-remote/<job> on the host;
+#      Dependency preparation runs inside the supervised group, using a
+#      per-project cache; runtime/install failures are collected job failures.
 #   2. waits for the runner's durable result.json (the completion record);
 #   3. collects result.json and run.log into <state-dir>/<job>/, checks the job id,
 #      candidate sha, command and bundle digests and the run.log checksum, and
@@ -67,9 +70,13 @@ set -u
 set -o pipefail
 
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-host=; timeout_s=; sample=; state_dir=
+host=; timeout_s=; sample=; state_dir=; project=; class="test"; slot=1; slots=1
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    --project) project=${2:-}; shift 2 || break ;;
+    --class) class=${2:-}; shift 2 || break ;;
+    --slot) slot=${2:-}; shift 2 || break ;;
+    --slots) slots=${2:-}; shift 2 || break ;;
     --host) host=${2:-}; shift 2 || break ;;
     --timeout) timeout_s=${2:-}; shift 2 || break ;;
     --sample) sample=${2:-}; shift 2 || break ;;
@@ -232,6 +239,10 @@ mkdir -p "$jdir" "$open_records" || fallback state-unwritable
 
 for open in "$open_records"/*.json; do
   [ -e "$open" ] || continue
+  # A different configured slot owns its own reconciliation. Older records had
+  # no slot and belong to slot 1. Reducing capacity cannot hide an earlier job.
+  prior_slot=$(jq -r '.slot // 1' "$open" 2>/dev/null)
+  if [[ $prior_slot =~ ^[1-9][0-9]{0,3}$ ]] && [ "$prior_slot" != "$slot" ] && [ "$prior_slot" -le "$slots" ]; then continue; fi
   reconcile_job "$open" && continue
   [ -z "$sig" ] || finish cancelled $((128 + sig))
   fallback "$blocked"
@@ -245,7 +256,8 @@ git bundle create "$stage/src.bundle" HEAD >/dev/null 2>&1 || fallback bundle-fa
 bundle_sha=$(sha256sum "$stage/src.bundle" | cut -d' ' -f1)
 argv=$(printf '%s\0' "$@" | jq -Rsc 'split("\u0000")[:-1]') || fallback manifest-failed
 jq -n --arg id "$id" --arg sha "$sha" --arg cs "$cmd_sha" --arg bs "$bundle_sha" --argjson t "$timeout_s" \
-  --argjson argv "$argv" '{id: $id, sha: $sha, command_sha256: $cs, bundle_sha256: $bs, timeout_s: $t, argv: $argv}' \
+  --arg project "${project:-$top}" --arg class "$class" --argjson slot "$slot" \
+  --argjson argv "$argv" '{project: $project, class: $class, slot: $slot, id: $id, sha: $sha, command_sha256: $cs, bundle_sha256: $bs, timeout_s: $t, argv: $argv}' \
   > "$stage/manifest.json" || fallback manifest-failed
 cp "$SELF_DIR/fm-heavy-remote-runner.py" "$stage/runner.py"
 cp "$stage/manifest.json" "$record" || fallback state-unwritable

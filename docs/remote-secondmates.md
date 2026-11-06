@@ -779,3 +779,28 @@ For a real-host smoke test:
 
 The deterministic suite is automated.
 Real-host validation is still an operator-run smoke test and is not claimed by the repository tests.
+
+## Heavy-job runtimes
+
+Remote heavy jobs use plain SSH, independently of secondmate placement.
+The [heavy-command configuration](configuration.md#heavy-commands-and-concurrency-confighost-test-slots-configheavy-commands-configheavy-remote) owns approvals and automatic offload.
+Before enabling it, run the readiness doctor and verify the plain SSH environment used by these jobs:
+
+```sh
+bin/fm-on.sh fm-mac fm-remote-doctor.sh
+ssh -o BatchMode=yes fm-mac 'command -v python3 git tar ps node npm pnpm; node --version; npm --version; pnpm --version'
+```
+
+The doctor reports node, npm and pnpm versions without installing them.
+For each approved Node project, inspect its `package.json` engines and `packageManager`, `.nvmrc` and lockfile before selecting runtimes on the host.
+If a runtime is missing, log into the Mac and install/select the project's numeric Node version using its existing version manager (for nvm: `nvm install <version>` then `nvm alias default <version>`), or the machine's established Node installer.
+For a pnpm project pinned by `packageManager`, run `npm install --global pnpm@<version>` on the Mac using that selected Node installation; use an exact version satisfying the project's engines when no pin exists.
+Make that installation's `bin` directory available to noninteractive SSH commands, using the account's existing PATH setup, and repeat the plain SSH version check above.
+Resolve aliases such as `lts/*` to a numeric project version before approval; the runner does not resolve moving aliases or install runtimes.
+These are operator actions; the doctor never performs them automatically.
+
+After the runtimes are visible, add only project-approved portable commands to the root home's private `config/heavy-remote`, start with one remote slot, and run each approved command once with `bin/fm-heavy.sh --remote --class <class> --project <project> -- <command>` from a clean repository root.
+The first job transfers the committed candidate and installs dependencies from its lockfile; later candidates reuse the project cache unless the dependency fingerprint changes.
+Inspect the collected result and log, then add `offload` to enable automatic use when the local slot is busy.
+Use `bin/fm-heavy-summary.sh` to compare per-project local and remote wait/run times, including remote transfer and result collection.
+No project repository, coding-agent placement, local slot limit or memory cap changes as part of this setup.

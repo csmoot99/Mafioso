@@ -4,7 +4,12 @@
 Usage: fm-heavy-remote-runner.py start|supervise|status|reconcile|wait|cancel|cleanup <jobdir> [seconds]
 
 The client ships this file with each job, so nothing is installed on the remote
-host. It needs only python3 (stdlib), git and ps, and runs on macOS and Linux.
+host. It needs python3 (stdlib), git and ps, and runs on macOS and Linux.
+Node projects also need compatible node and pnpm/npm on the SSH PATH.
+execute prepares locked dependencies and then execs the approved command in the
+supervised process group; preparation failures exit 78, never a local fallback.
+Dependency copies persist per project under ~/.fm-heavy-remote/cache, keyed by
+lockfile/package settings and runtime versions. Each job has private modules.
 A job directory lives under ~/.fm-heavy-remote and holds manifest.json (job id,
 candidate sha, command argv and its digest, bundle digest, timeout) and
 src.bundle (the candidate revision with its history).
@@ -37,11 +42,13 @@ group are recorded with their start times in owner.json, and a pid whose start
 time differs is left alone.
 """
 
+import fcntl
 import hashlib
 import json
 import os
 import re
 import resource
+import shlex
 import shutil
 import signal
 import socket
@@ -199,6 +206,174 @@ def cmd_start(jdir):
     print("started")
 
 
+def version_tuple(value):
+    match = re.fullmatch(r"v?(\d+)(?:\.(\d+))?(?:\.(\d+))?", value.strip())
+    if not match:
+        raise ValueError("unsupported version: " + value)
+    return tuple(int(part or 0) for part in match.groups())
+
+
+def satisfies(version, requirement):
+    """Common stable npm ranges; unsupported syntax refuses rather than guesses."""
+    actual = version_tuple(version)
+    for alternative in requirement.split("||"):
+        alternative = alternative.strip()
+        hyphen = re.fullmatch(r"(\d+\.\d+\.\d+)\s+-\s+(\d+\.\d+\.\d+)", alternative)
+        if hyphen:
+            if version_tuple(hyphen[1]) <= actual <= version_tuple(hyphen[2]):
+                return True
+            continue
+        terms = re.sub(r"([<>=~^]+)\s+", r"\1", alternative).split()
+        if not terms:
+            raise ValueError("empty runtime requirement")
+        accepted = True
+        for term in terms:
+            if term in ("*", "x", "X"):
+                continue
+            match = re.fullmatch(r"(>=|<=|>|<|=|\^|~)?v?(\d+)(?:\.(\d+|[xX*]))?(?:\.(\d+|[xX*]))?", term)
+            if not match:
+                raise ValueError("unsupported runtime range: " + requirement)
+            op = match[1] or "="
+            parts = match.groups()[1:]
+            precision = next((i for i, part in enumerate(parts) if part is None or part in ("x", "X", "*")), 3)
+            target = tuple(int(part) if part and part.isdigit() else 0 for part in parts)
+            upper = list(target)
+            if op == "^":
+                index = next((i for i, part in enumerate(target[:precision]) if part), precision - 1)
+            elif op == "~":
+                index = min(precision - 1, 1)
+            else:
+                index = precision - 1
+            upper[index] += 1
+            upper[index + 1:] = [0] * (2 - index)
+            upper = tuple(upper)
+            if op in ("^", "~") or (op == "=" and precision < 3):
+                ok = target <= actual < upper
+            else:
+                boundary = upper if precision < 3 and op in (">", "<=") else target
+                ok = {"=": actual == boundary, ">=": actual >= boundary, "<=": actual < boundary if precision < 3 else actual <= boundary,
+                      ">": actual >= boundary if precision < 3 else actual > boundary, "<": actual < boundary}[op]
+            accepted = accepted and ok
+        if accepted:
+            return True
+    return False
+
+
+def runtime_version(tool, requirements):
+    try:
+        found = subprocess.check_output([tool, "--version"], text=True, stderr=subprocess.STDOUT).strip()
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise ValueError("missing runtime %s; install it on the host and expose it on SSH PATH (%s)" % (tool, error)) from error
+    for requirement in requirements:
+        if not isinstance(requirement, str) or not satisfies(found, requirement):
+            raise ValueError("runtime %s %s does not satisfy %s; select the project's version on SSH PATH" % (tool, found, requirement))
+    return found
+
+
+def module_dirs(work):
+    for base, dirs, _ in os.walk(work):
+        dirs[:] = [name for name in dirs if name != ".git"]
+        if "node_modules" in dirs:
+            dirs.remove("node_modules")
+            yield os.path.relpath(os.path.join(base, "node_modules"), work)
+
+
+def prepare_dependencies(work, manifest):
+    package_path = os.path.join(work, "package.json")
+    package = read_json(package_path)
+    if package is None:
+        if os.path.exists(package_path):
+            raise ValueError("invalid package.json")
+        return
+    if not isinstance(package, dict) or not isinstance(package.get("engines", {}), dict) or not isinstance(package.get("packageManager", ""), str):
+        raise ValueError("invalid package.json runtime declarations")
+    locks = [name for name in ("pnpm-lock.yaml", "npm-shrinkwrap.json", "package-lock.json") if os.path.isfile(os.path.join(work, name))]
+    if not locks:
+        raise ValueError("package.json has no supported lockfile (pnpm-lock.yaml, npm-shrinkwrap.json or package-lock.json)")
+    if "pnpm-lock.yaml" in locks and len(locks) != 1:
+        raise ValueError("ambiguous pnpm/npm lockfiles")
+    manager = "pnpm" if locks[0] == "pnpm-lock.yaml" else "npm"
+    engines = package.get("engines", {})
+    node_requirements = [engines["node"]] if "node" in engines else []
+    nvmrc = os.path.join(work, ".nvmrc")
+    if os.path.isfile(nvmrc):
+        with open(nvmrc) as handle:
+            node_requirements.append(handle.read().strip())
+    node = runtime_version("node", node_requirements)
+    requirements = [engines[manager]] if manager in engines else []
+    pinned = package.get("packageManager", "")
+    if pinned:
+        prefix = manager + "@"
+        if not pinned.startswith(prefix):
+            raise ValueError("packageManager disagrees with lockfile: " + pinned)
+        requirements.append(pinned[len(prefix):].split("+", 1)[0])
+    version = runtime_version(manager, requirements)
+    key = hashlib.sha256(manifest.get("project", manifest["sha"]).encode()).hexdigest()
+    cache = os.path.join(ROOT, "cache", key)
+    os.makedirs(cache, exist_ok=True)
+    digest = hashlib.sha256((node + "\0" + manager + version).encode())
+    settings = git("-C", work, "ls-files", "-z", "**/package.json", "**/.npmrc").stdout.split("\0")
+    for name in sorted(set(locks + ["package.json", ".nvmrc", ".npmrc", "pnpm-workspace.yaml"] + settings)):
+        path = os.path.join(work, name)
+        if os.path.isfile(path):
+            digest.update((name + "\0" + sha256_file(path)).encode())
+    fingerprint = digest.hexdigest()
+    # Lock only preparation/copying, never a test run. Concurrent slots can test
+    # independent copies of the same project's modules without mutating the cache.
+    with open(os.path.join(cache, "lock"), "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        marker = read_json(os.path.join(cache, "installed.json"))
+        modules = os.path.join(cache, "modules")
+        if marker and marker.get("fingerprint") == fingerprint and os.path.isdir(modules):
+            for relative in module_dirs(modules):
+                shutil.copytree(os.path.join(modules, relative), os.path.join(work, relative), symlinks=True)
+        else:
+            command = [manager, "install", "--frozen-lockfile", "--prod=false"] if manager == "pnpm" else [manager, "ci", "--include=dev"]
+            subprocess.run(command, cwd=work, check=True)
+            # Never leave a previous marker attesting to a partially replaced cache.
+            try:
+                os.unlink(os.path.join(cache, "installed.json"))
+            except FileNotFoundError:
+                pass
+            shutil.rmtree(modules, ignore_errors=True)
+            os.makedirs(modules)
+            for relative in module_dirs(work):
+                shutil.copytree(os.path.join(work, relative), os.path.join(modules, relative), symlinks=True)
+            write_json(os.path.join(cache, "installed.json"), {"fingerprint": fingerprint})
+    if manifest.get("class") == "e2e" and needs_playwright(manifest["argv"], package):
+        # Playwright itself caches browser revisions per account; its installer
+        # only downloads revisions missing for this checkout's installed version.
+        command = ["pnpm", "exec", "playwright", "install"] if manager == "pnpm" else ["npm", "exec", "--no", "--", "playwright", "install"]
+        subprocess.run(command, cwd=work, check=True)
+
+
+def needs_playwright(argv, package):
+    scripts = package.get("scripts", {})
+    if not isinstance(scripts, dict) or not all(isinstance(value, str) for value in scripts.values()):
+        raise ValueError("invalid package.json scripts")
+    pending = list(argv)
+    seen = set()
+    while pending:
+        word = pending.pop()
+        if os.path.basename(word) == "playwright":
+            return True
+        if word in scripts and word not in seen:
+            seen.add(word)
+            pending.extend(shlex.split(scripts[word]))
+    return False
+
+
+def cmd_execute(jdir):
+    manifest = read_json(os.path.join(jdir, "manifest.json"))
+    work = os.path.join(jdir, "work")
+    try:
+        prepare_dependencies(work, manifest)
+        os.chdir(work)
+        os.execvp(manifest["argv"][0], manifest["argv"])
+    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        die(78, "remote dependency/runtime preparation failed: %s" % error)
+
+
 def cmd_supervise(jdir):
     manifest = read_json(os.path.join(jdir, "manifest.json"))
     work = os.path.join(jdir, "work")
@@ -209,7 +384,7 @@ def cmd_supervise(jdir):
     log = open(os.path.join(jdir, "run.log"), "wb")
     outcome, code = "exited", 127
     try:
-        proc = subprocess.Popen(manifest["argv"], cwd=work, stdin=subprocess.DEVNULL, stdout=log,
+        proc = subprocess.Popen([sys.executable, os.path.abspath(__file__), "execute", jdir], cwd=work, stdin=subprocess.DEVNULL, stdout=log,
                                 stderr=subprocess.STDOUT, start_new_session=True)
     except OSError as error:
         log.write(("cannot run %s: %s\n" % (manifest["argv"][0], error)).encode())
@@ -290,7 +465,7 @@ def cmd_cleanup(jdir):
 
 
 def main():
-    if len(sys.argv) < 3 or sys.argv[1] not in ("start", "supervise", "status", "reconcile", "wait", "cancel", "cleanup"):
+    if len(sys.argv) < 3 or sys.argv[1] not in ("start", "supervise", "execute", "status", "reconcile", "wait", "cancel", "cleanup"):
         die(2, "usage: fm-heavy-remote-runner.py start|supervise|status|reconcile|wait|cancel|cleanup <jobdir> [seconds]")
     action, jdir = sys.argv[1], job_dir(sys.argv[2])
     if action == "status":
@@ -300,7 +475,7 @@ def main():
     elif action == "wait":
         cmd_wait(jdir, float(sys.argv[3]) if len(sys.argv) > 3 else 0)
     else:
-        {"start": cmd_start, "supervise": cmd_supervise, "cancel": cmd_cancel, "cleanup": cmd_cleanup}[action](jdir)
+        {"start": cmd_start, "supervise": cmd_supervise, "execute": cmd_execute, "cancel": cmd_cancel, "cleanup": cmd_cleanup}[action](jdir)
 
 
 if __name__ == "__main__":
