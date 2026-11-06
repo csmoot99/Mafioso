@@ -788,10 +788,11 @@ Before enabling it, run the readiness doctor and list what the plain SSH environ
 
 ```sh
 bin/fm-on.sh fm-mac fm-remote-doctor.sh
-ssh -o BatchMode=yes fm-mac 'command -v python3 git tar ps; ls ~/.nvm/versions/node ~/.fm-heavy-remote/runtimes/*'
+ssh -o BatchMode=yes fm-mac 'command -v python3 git tar ps node npm pnpm; ls ~/.nvm/versions/node ~/.fm-heavy-remote/runtimes/*'
 ```
 
-The doctor reports the node, npm and pnpm on the SSH PATH without installing anything.
+The doctor reports the node, npm and pnpm on its remote runtime PATH without installing anything.
+That PATH adds locations such as `~/.local/bin` and version-manager shims, so only the plain SSH command above shows what heavy jobs can see.
 Each job selects its own runtimes, so projects with different pins share the host and no single default has to suit them all.
 For each approved Node project, inspect its `package.json` engines and `packageManager`, `.nvmrc` and lockfile, then install every pinned version side by side on the Mac:
 
