@@ -105,7 +105,7 @@ setup() {
 # heavy [args before --]: run the wrapper from the repository root.
 heavy() {
   (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" \
-    FAKE_SSH_CTL="$CTL" FAKE_SSH_HOME="$REMOTE_HOME" RUNNER_SRC="$RUNNER" "$HEAVY" --class test --task t --project p "$@" -- bash t/job.sh)
+    FAKE_SSH_CTL="$CTL" FAKE_SSH_HOME="$REMOTE_HOME" RUNNER_SRC="$RUNNER" "$HEAVY" --class test --task t --project p "$@" -- bash t/job.sh) 3>&- 4>&-
 }
 
 last_record() { tail -1 "$LOG"; }
@@ -152,13 +152,13 @@ test_off_by_default_and_refusals() {
   : > "$LOG"
   (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" "$HEAVY" --class test --remote -- bash other.sh) 2>/dev/null
   expect_code 2 "$?" "a command that is not the approved one"
-  (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" "$HEAVY" --class build --remote -- bash t/job.sh) 2>/dev/null
-  expect_code 2 "$?" "a class other than test"
+  (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" "$HEAVY" --class image --remote -- bash t/job.sh) 2>/dev/null
+  expect_code 2 "$?" "image stays local"
   rm "$HOME_FM/config/heavy-remote"
   heavy --remote >/dev/null 2>&1; expect_code 2 "$?" "no config"
   local bad
   for bad in 'host a\n' 'host a\ncommand bash t/job.sh\nhost b\n' 'host a b\ncommand bash t/job.sh\n' \
-    'host a\ncommand bash t/job.sh\ncommand bash t/other.sh\n' 'host a\ncommand bash t/job.sh\ntimeout 0\n' \
+    'host a\ncommand bash t/job.sh\ncommand bash t/job.sh\n' 'host a\ncommand bash t/job.sh\ntimeout 0\n' \
     'host a\ncommand bash t/job.sh\nsurprise 1\n' 'host a\ncommand bash t/job.sh\nsurprise 1' \
     'host a\ncommand bash t/job.sh\ntimeout 0'; do
     # shellcheck disable=SC2059 # the cases are printf formats
@@ -719,11 +719,178 @@ test_summary_compares_hosts() {
 {"task":"c","project":"p","class":"test","requested_at":300,"wait_s":0,"run_s":24,"exit":0,"peak_memory_bytes":null,"host":"fm-mac","prepare_s":8,"collect_s":1,"outcome":"pass"}
 EOF
   out=$("$SUMMARY" --log "$log") || fail "summary failed"
-  printf '%s\n' "$out" | awk '$1 == "p" && $2 == "test" && $3 == 1 && $12 == "local" && $13 == "unknown" && $14 == "unknown" { ok = 1 } END { exit !ok }' \
+  printf '%s\n' "$out" | awk '$1 == "p" && $2 == "test" && $3 == 1 && $5 == 1900 && $7 == 25 && $12 == "local" && $13 == "unknown" && $14 == "unknown" { ok = 1 } END { exit !ok }' \
     || fail "the local row is wrong: $out"
-  printf '%s\n' "$out" | awk '$1 == "p" && $2 == "test" && $3 == 2 && $12 == "fm-mac" && $13 == 7 && $14 == 1 { ok = 1 } END { exit !ok }' \
+  printf '%s\n' "$out" | awk '$1 == "p" && $2 == "test" && $3 == 2 && $5 == 0 && $7 == 23 && $12 == "fm-mac" && $13 == 7 && $14 == 1 { ok = 1 } END { exit !ok }' \
     || fail "the remote row is wrong: $out"
   pass "fm-heavy-summary: local and remote jobs get their own rows with preparation and collection time"
+}
+
+# Hold a fake local slot only until the calling test releases its descriptor.
+hold_local() {
+  exec 4>>"$LOCK"
+  flock 4
+}
+release_local() { exec 4>&-; }
+
+observe_local_queue() {
+  # Report entry to the blocking local queue without relying on scheduler timing.
+  cat > "$FAKEBIN/flock" <<'SH'
+#!/usr/bin/env bash
+[ "$*" != 9 ] || touch "$FAKE_SSH_CTL/local-waiting"
+SH
+  printf 'exec %q "$@"\n' "$(command -v flock)" >> "$FAKEBIN/flock"
+  chmod +x "$FAKEBIN/flock"
+}
+
+test_scoped_offload() {
+  local bad out pid
+  setup offload 'echo remote-or-local'
+  printf 'host fake-mac\ncommand p -- bash t/job.sh\ncommand other -- bash t/other.sh\nslots 2\noffload\n' > "$HOME_FM/config/heavy-remote"
+  heavy >/dev/null 2>&1 || fail "a free local slot stays local"
+  expect_record '.host == "local" and .fallback == null' "free local slot"
+  hold_local
+  heavy >/dev/null 2>&1 || fail "a busy local slot offloads an approved project"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "automatic offload"
+  # The first remote slot is busy too: the configured second slot admits the job.
+  exec 3>>"$LOCK.remote.fake-mac"; flock 3
+  heavy >/dev/null 2>&1 || fail "a configured second remote slot admits work"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "second remote slot"
+  exec 3>&-
+  release_local
+  for class in build e2e; do
+    (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" FAKE_SSH_CTL="$CTL" FAKE_SSH_HOME="$REMOTE_HOME" \
+      "$HEAVY" --class "$class" --project p --remote -- bash t/job.sh) >/dev/null 2>&1 || fail "approved $class"
+    expect_record ".class == \"$class\" and .host == \"fake-mac\"" "$class record"
+  done
+  for bad in 'slots 0' 'slots 2 extra' 'offload yes' 'offload\noffload' 'command p --' 'command p -- bash t/job.sh'; do
+    printf 'host fake-mac\ncommand p -- bash t/job.sh\n%b\n' "$bad" > "$HOME_FM/config/heavy-remote"
+    heavy >/dev/null 2>&1; expect_code 2 "$?" "malformed scoped config $bad"
+  done
+  # Unapproved commands stay in the local queue without ever contacting SSH.
+  setup otherproject 'echo local'
+  observe_local_queue
+  printf 'host fake-mac\ncommand other -- bash t/job.sh\noffload\n' > "$HOME_FM/config/heavy-remote"
+  hold_local
+  heavy >"$CASE/out" 2>&1 4>&- & pid=$!
+  wait_for "$CTL/local-waiting"
+  [ ! -s "$CTL/log" ] || fail "another project's approval may not contact the host"
+  [ ! -s "$LOG" ] || fail "the unapproved job must wait for the local slot"
+  release_local
+  wait "$pid" || fail "other project local run"
+  expect_record '.host == "local" and .fallback == null' "approval scoped to another project"
+  # A down host records its fallback and waits in the same local queue.
+  setup autodown 'echo local'
+  observe_local_queue
+  printf 'host fake-mac\ncommand p -- bash t/job.sh\noffload\n' > "$HOME_FM/config/heavy-remote"
+  rule down drop . -1
+  hold_local
+  heavy >"$CASE/out" 2>&1 4>&- & pid=$!
+  wait_for "$CTL/local-waiting"
+  release_local
+  wait "$pid" || fail "down-host fallback"
+  expect_record '.host == "local" and .fallback == "unreachable" and .exit == 0' "automatic unreachable fallback"
+  pass "fm-heavy: scoped approvals, automatic offload, slots, classes and malformed refusal"
+}
+
+test_remote_slots_run_independently() {
+  local pid
+  setup parallel 'test "$HOME" = "$FAKE_SSH_HOME" || exit 91
+if mkdir "$HOME/first" 2>/dev/null; then
+  touch "$HOME/first-started"
+  until [ -e "$HOME/release" ]; do sleep 0.1; done
+else
+  touch "$HOME/second-finished"
+fi'
+  printf 'host fake-mac\ncommand p -- bash t/job.sh\nslots 2\n' > "$HOME_FM/config/heavy-remote"
+  heavy --remote >"$CASE/first.out" 2>&1 & pid=$!
+  wait_for "$REMOTE_HOME/first-started"
+  heavy --remote >"$CASE/second.out" 2>&1 || fail "second slot must run beside first: $(cat "$CASE/second.out")"
+  assert_present "$REMOTE_HOME/second-finished" "second configured slot finishes independently"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "second slot record"
+  touch "$REMOTE_HOME/release"
+  wait "$pid" || fail "first remote slot must finish"
+  [ "$(wc -l < "$LOG")" -eq 2 ] || fail "each remote slot records its own job"
+  expect_host_clean "both slots clean up their own jobs"
+  pass "fm-heavy: configured remote slots run independently with separate reconciliation"
+}
+
+make_node_project() {
+  cat > "$REPO/package.json" <<'JSON'
+{"engines":{"node":">=20 <23","pnpm":"^9.0.0"},"packageManager":"pnpm@9.1.0","scripts":{"e2e":"playwright test"}}
+JSON
+  printf 'lockfileVersion: 9\n' > "$REPO/pnpm-lock.yaml"
+  printf '22\n' > "$REPO/.nvmrc"
+  cat > "$FAKEBIN/node" <<'SH'
+#!/usr/bin/env bash
+[ "${FAKE_NODE_MISSING:-}" != 1 ] || exit 127
+echo "${FAKE_NODE_VERSION:-v22.1.0}"
+SH
+  cat > "$FAKEBIN/pnpm" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" = --version ]; then echo "${FAKE_MANAGER_VERSION:-9.1.0}"; exit; fi
+printf '%s\n' "$*" >> "$HOME/install.log"
+[ "${FAKE_INSTALL_FAIL:-}" != 1 ] || exit 42
+if [ "$1" = install ] || [ "$1" = ci ]; then mkdir -p node_modules; echo ready > node_modules/proof; fi
+SH
+  chmod +x "$FAKEBIN/node" "$FAKEBIN/pnpm"
+  git -C "$REPO" add -A; git -C "$REPO" commit -q -m dependencies
+}
+
+test_dependency_cache_and_failures() {
+  local out
+  setup dependencies 'test -f node_modules/proof && echo tested >> "$HOME/tested"'
+  make_node_project
+  heavy --remote >"$CASE/out" 2>&1 || fail "first dependency install: $(cat "$CASE/out")"
+  heavy --remote >/dev/null 2>&1 || fail "cached dependency install"
+  [ "$(wc -l < "$REMOTE_HOME/install.log")" -eq 1 ] || fail "unchanged lockfile must reuse installed dependencies"
+  [ "$(wc -l < "$REMOTE_HOME/tested")" -eq 2 ] || fail "both candidates must run with modules"
+  echo '# changed' >> "$REPO/pnpm-lock.yaml"
+  git -C "$REPO" add -A; git -C "$REPO" commit -q -m lockchange
+  heavy --remote >/dev/null 2>&1 || fail "changed lockfile install"
+  [ "$(wc -l < "$REMOTE_HOME/install.log")" -eq 2 ] || fail "changed lockfile must reinstall"
+  FAKE_NODE_MISSING=1 heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "missing runtime"
+  assert_grep 'missing runtime node' "$CASE/out" "missing runtime reason"
+  FAKE_MANAGER_VERSION=8.0.0 heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "incompatible pnpm"
+  FAKE_NODE_VERSION=v18.0.0 heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "incompatible runtime"
+  assert_grep 'does not satisfy' "$CASE/out" "version failure reason"
+  expect_record '.host == "fake-mac" and .outcome == "failed" and .fallback == null' "runtime failure never retries locally"
+  echo '# changed again' >> "$REPO/pnpm-lock.yaml"
+  git -C "$REPO" add -A; git -C "$REPO" commit -q -m failedinstall
+  FAKE_INSTALL_FAIL=1 heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "install error"
+  expect_record '.host == "fake-mac" and .outcome == "failed" and .fallback == null' "install failure never retries locally"
+  [ "$(wc -l < "$REMOTE_HOME/tested")" -eq 3 ] || fail "no candidate runs after runtime/install failure"
+  pass "fm-heavy: cached dependencies refresh on lockfile change; runtime/install failures cannot fall back"
+}
+
+test_npm_dependency_cache() {
+  setup npmdeps 'test -f node_modules/proof'
+  make_node_project
+  mv "$FAKEBIN/pnpm" "$FAKEBIN/npm"
+  rm "$REPO/pnpm-lock.yaml"
+  printf '{}\n' > "$REPO/package-lock.json"
+  printf '{"engines":{"node":"^22.0.0","npm":">=9"},"packageManager":"npm@9.1.0"}\n' > "$REPO/package.json"
+  git -C "$REPO" add -A; git -C "$REPO" commit -q -m npm
+  heavy --remote >"$CASE/out" 2>&1 || fail "npm dependencies: $(cat "$CASE/out")"
+  heavy --remote >/dev/null 2>&1 || fail "npm cached dependencies"
+  grep -Fx 'ci --include=dev' "$REMOTE_HOME/install.log" >/dev/null || fail "npm uses locked dev dependencies"
+  [ "$(wc -l < "$REMOTE_HOME/install.log")" -eq 1 ] || fail "npm lock cache must avoid reinstall"
+  printf '24\n' > "$REPO/.nvmrc"
+  git -C "$REPO" add -A; git -C "$REPO" commit -q -m nvmrc
+  heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "nvmrc mismatch"
+  assert_grep 'does not satisfy 24' "$CASE/out" "nvmrc selects runtime"
+  pass "fm-heavy: npm lock caching and nvmrc compatibility are enforced"
+}
+
+test_e2e_browser_preparation() {
+  setup browsers 'echo ran'
+  make_node_project
+  printf 'host fake-mac\ncommand p -- pnpm run e2e\n' > "$HOME_FM/config/heavy-remote"
+  (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" FAKE_SSH_CTL="$CTL" FAKE_SSH_HOME="$REMOTE_HOME" \
+    "$HEAVY" --class e2e --project p --remote -- pnpm run e2e) >"$CASE/out" 2>&1 || fail "e2e preparation: $(cat "$CASE/out")"
+  grep -Fx 'exec playwright install' "$REMOTE_HOME/install.log" >/dev/null || fail "e2e script installs browsers"
+  [ "$(tail -1 "$REMOTE_HOME/install.log")" = 'run e2e' ] || fail "browsers must be installed before the approved command"
+  pass "fm-heavy: approved Playwright e2e commands prepare browsers before execution"
 }
 
 test_pass_and_record
@@ -753,5 +920,10 @@ test_cancelled_on_host_is_never_green
 test_zombie_group_eperm_keeps_the_result
 test_runner_refuses_bad_input
 test_summary_compares_hosts
+test_scoped_offload
+test_remote_slots_run_independently
+test_dependency_cache_and_failures
+test_e2e_browser_preparation
+test_npm_dependency_cache
 
 echo '# all fm-heavy-remote tests passed'
