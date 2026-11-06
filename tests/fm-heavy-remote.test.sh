@@ -977,6 +977,28 @@ test_each_project_runs_on_its_pinned_runtimes() {
   pass "fm-heavy: each project runs on the node and pnpm it pins; a missing node or no pnpm is a clear refusal"
 }
 
+test_project_without_dependencies_needs_no_lockfile() {
+  local out
+  setup nodeps 'node --version'
+  make_node_project
+  host_tool "$REMOTE_HOME/.nvm/versions/node/v24.7.0/bin" node v24.7.0
+  printf '{"engines":{"node":">=24.7"},"scripts":{"test":"node --test"}}\n' > "$REPO/package.json"
+  git -C "$REPO" rm -q pnpm-lock.yaml .nvmrc
+  git -C "$REPO" add -A; git -C "$REPO" commit -q -m nodeps
+  out=$(heavy --remote 2>&1) || fail "a project with nothing to lock must run: $out"
+  assert_contains "$out" "v24.7.0" "the job still runs on the project's pinned node"
+  [ ! -e "$REMOTE_HOME/install.log" ] || fail "nothing may be installed: $(cat "$REMOTE_HOME/install.log")"
+  printf '{"engines":{"node":">=26.0.0"}}\n' > "$REPO/package.json"
+  git -C "$REPO" add -A; git -C "$REPO" commit -q -m missingnode
+  heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "a pinned node that is not installed"
+  assert_grep 'does not satisfy >=26.0.0' "$CASE/out" "the refusal names the node pin"
+  printf '{"devDependencies":{"left-pad":"1.3.0"}}\n' > "$REPO/package.json"
+  git -C "$REPO" add -A; git -C "$REPO" commit -q -m unlocked
+  heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "declared dependencies with no lockfile"
+  assert_grep 'no supported lockfile' "$CASE/out" "the refusal names the lockfile"
+  pass "fm-heavy: a project with no dependencies needs no lockfile; a pinned node and declared dependencies still refuse"
+}
+
 test_command_missing_on_host_cannot_run() {
   setup nocommand 'echo unused'
   printf 'host fake-mac\ncommand p -- fm-no-such-command\n' > "$HOME_FM/config/heavy-remote"
@@ -1050,6 +1072,7 @@ test_queued_job_moves_to_the_freed_host
 test_queued_job_signal_runs_nowhere
 test_dependency_cache_and_failures
 test_each_project_runs_on_its_pinned_runtimes
+test_project_without_dependencies_needs_no_lockfile
 test_command_missing_on_host_cannot_run
 test_e2e_browser_preparation
 test_npm_dependency_cache

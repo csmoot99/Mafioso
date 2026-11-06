@@ -311,12 +311,6 @@ def prepare_dependencies(work, manifest):
         return
     if not isinstance(package, dict) or not isinstance(package.get("engines", {}), dict) or not isinstance(package.get("packageManager", ""), str):
         raise ValueError("invalid package.json runtime declarations")
-    locks = [name for name in ("pnpm-lock.yaml", "npm-shrinkwrap.json", "package-lock.json") if os.path.isfile(os.path.join(work, name))]
-    if not locks:
-        raise ValueError("package.json has no supported lockfile (pnpm-lock.yaml, npm-shrinkwrap.json or package-lock.json)")
-    if "pnpm-lock.yaml" in locks and len(locks) != 1:
-        raise ValueError("ambiguous pnpm/npm lockfiles")
-    manager = "pnpm" if locks[0] == "pnpm-lock.yaml" else "npm"
     engines = package.get("engines", {})
     node_requirements = [engines["node"]] if "node" in engines else []
     nvmrc = os.path.join(work, ".nvmrc")
@@ -324,6 +318,14 @@ def prepare_dependencies(work, manifest):
         with open(nvmrc) as handle:
             node_requirements.append(handle.read().strip())
     node = select_runtime("node", node_requirements)
+    locks = [name for name in ("pnpm-lock.yaml", "npm-shrinkwrap.json", "package-lock.json") if os.path.isfile(os.path.join(work, name))]
+    if not locks:
+        if any(package.get(field) for field in ("dependencies", "devDependencies", "optionalDependencies", "peerDependencies")):
+            raise ValueError("package.json has no supported lockfile (pnpm-lock.yaml, npm-shrinkwrap.json or package-lock.json)")
+        return
+    if "pnpm-lock.yaml" in locks and len(locks) != 1:
+        raise ValueError("ambiguous pnpm/npm lockfiles")
+    manager = "pnpm" if locks[0] == "pnpm-lock.yaml" else "npm"
     requirements = [engines[manager]] if manager in engines else []
     pinned = package.get("packageManager", "")
     if pinned:
