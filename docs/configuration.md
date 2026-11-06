@@ -1266,9 +1266,9 @@ A result with the wrong commit, command or bundle digest, or a missing or partia
 [`bin/fm-heavy.sh`](../bin/fm-heavy.sh) owns the wrapper mechanics and extra record fields, and [`bin/fm-heavy-remote.sh`](../bin/fm-heavy-remote.sh) owns the transfer, the outcomes and their exit statuses.
 [`bin/fm-heavy-summary.sh`](../bin/fm-heavy-summary.sh) gives local and remote jobs separate rows, so the queue wait a remote run saves can be read against its preparation and collection time.
 The destination needs `python3`, `git`, `tar` and `ps`; the runner is shipped with each job.
-For Node projects, each job runs on the versions of node and the lockfile's pnpm/npm that its own project pins in `package.json` engines, `packageManager` and `.nvmrc`, chosen from those installed on the destination; the runner then installs locked dependencies from the transferred candidate.
+For Node projects, each job runs on the versions of node and the lockfile's pnpm/npm that its own project pins in `package.json` engines, `packageManager` and `.nvmrc`, chosen from those installed on the destination, except that a reachable pnpm may fetch its own pinned version; the runner then installs locked dependencies from the transferred candidate.
 Stable numeric versions, comparison ranges, wildcards, caret, tilde, hyphen ranges and `||` alternatives are supported; unsupported requirements such as `.nvmrc` aliases refuse the job with a clear reason rather than guessing.
-A pinned version that is not installed, missing or ambiguous lockfiles, and installation failures are failed remote jobs with a clear reason, never local fallbacks.
+A pinned Node or npm version that is not installed, no reachable pnpm, missing or ambiguous lockfiles, and installation failures are failed remote jobs with a clear reason, never local fallbacks.
 Dependency copies are cached per project under `~/.fm-heavy-remote/cache/`, refreshed when lockfiles, package settings or runtime versions change, and copied into each isolated candidate before execution.
 An e2e command that invokes Playwright directly or through a package script also installs its required browser revisions, using Playwright's account cache; test jobs never install browsers.
 Dependency preparation shares the job's process group and timeout, and is included in `run_s`; `prepare_s` measures transfer and checkout.

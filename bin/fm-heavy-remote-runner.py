@@ -5,12 +5,14 @@ Usage: fm-heavy-remote-runner.py start|supervise|status|reconcile|wait|cancel|cl
 
 The client ships this file with each job, so nothing is installed on the remote
 host. It needs python3 (stdlib), git and ps, and runs on macOS and Linux.
-Node projects also need the node and pnpm/npm versions they pin installed on the
-host: on the SSH PATH, under ~/.nvm/versions/node, or under
-~/.fm-heavy-remote/runtimes/<tool>/<version>/bin. execute puts the versions this
-job's project pins first on its PATH, prepares locked dependencies and then execs
-the approved command in the supervised process group; preparation failures exit
-78 and a command that cannot run exits 127, never a local fallback.
+Node projects also need the node and npm versions they pin, and any pnpm, installed
+on the host: on the SSH PATH, under ~/.nvm/versions/node, or under
+~/.fm-heavy-remote/runtimes/<tool>/<version>/bin. A reachable pnpm may fetch the
+version a project pins for itself, and then reports that version. execute puts
+the versions this job's project pins first on its PATH, prepares locked
+dependencies and then execs the approved command in the supervised process group;
+preparation failures exit 78 and a command that cannot run exits 127, never a
+local fallback.
 Dependency copies persist per project under ~/.fm-heavy-remote/cache, keyed by
 lockfile/package settings and runtime versions. Each job has private modules.
 A job directory lives under ~/.fm-heavy-remote and holds manifest.json (job id,

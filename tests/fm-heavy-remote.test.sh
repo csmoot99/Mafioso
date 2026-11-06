@@ -891,6 +891,7 @@ echo "${FAKE_NODE_VERSION:-v22.1.0}"
 SH
   cat > "$FAKEBIN/pnpm" <<'SH'
 #!/usr/bin/env bash
+[ "${FAKE_PNPM_MISSING:-}" != 1 ] || exit 127
 if [ "$1" = --version ]; then echo "${FAKE_MANAGER_VERSION:-9.1.0}"; exit; fi
 printf '%s\n' "$*" >> "$HOME/install.log"
 [ "${FAKE_INSTALL_FAIL:-}" != 1 ] || exit 42
@@ -964,10 +965,16 @@ test_each_project_runs_on_its_pinned_runtimes() {
   printf '{"packageManager":"pnpm@9.9.0"}\n' > "$REPO/package.json"
   rm "$REPO/.nvmrc"
   git -C "$REPO" add -A; git -C "$REPO" commit -q -m missingpnpm
-  heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "a pinned pnpm that is not installed"
+  heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "a pnpm that cannot provide the pin"
   assert_grep 'does not satisfy 9.9.0' "$CASE/out" "the refusal names the pnpm pin"
-  expect_record '.host == "fake-mac" and .outcome == "failed" and .fallback == null' "a missing version never retries locally"
-  pass "fm-heavy: each project runs on the node and pnpm it pins, and a missing version is a clear refusal"
+  # A real pnpm reports the pin once it has fetched that version for itself.
+  out=$(FAKE_MANAGER_VERSION=9.9.0 heavy --remote 2>&1) || fail "self-fetched pnpm: $out"
+  assert_contains "$out" "9.9.0" "a pnpm providing its own pin runs the job"
+  rm -rf "$REMOTE_HOME/.fm-heavy-remote/runtimes"
+  FAKE_PNPM_MISSING=1 heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "no pnpm reachable"
+  assert_grep 'missing runtime pnpm' "$CASE/out" "the refusal says no pnpm was found"
+  expect_record '.host == "fake-mac" and .outcome == "failed" and .fallback == null' "a missing runtime never retries locally"
+  pass "fm-heavy: each project runs on the node and pnpm it pins; a missing node or no pnpm is a clear refusal"
 }
 
 test_command_missing_on_host_cannot_run() {

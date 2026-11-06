@@ -794,15 +794,16 @@ ssh -o BatchMode=yes fm-mac 'command -v python3 git tar ps node npm pnpm; ls ~/.
 The doctor reports the node, npm and pnpm on its remote runtime PATH without installing anything.
 That PATH adds locations such as `~/.local/bin` and version-manager shims, so only the plain SSH command above shows what heavy jobs can see.
 Each job selects its own runtimes, so projects with different pins share the host and no single default has to suit them all.
-For each approved Node project, inspect its `package.json` engines and `packageManager`, `.nvmrc` and lockfile, then install every pinned version side by side on the Mac:
+For each approved Node project, inspect its `package.json` engines and `packageManager`, `.nvmrc` and lockfile, then install what they need side by side on the Mac:
 
 - **Node:** run `nvm install <version>` and leave the default alias alone. For a Node installed another way, link its root directory to `~/.fm-heavy-remote/runtimes/node/<version>`.
-- **pnpm:** run `npm install --global --prefix ~/.fm-heavy-remote/runtimes/pnpm/<version> pnpm@<version>` once per pinned version, using an exact version satisfying the project's engines when no pin exists.
+- **pnpm:** keep at least one pnpm reachable, on the SSH PATH or under `~/.fm-heavy-remote/runtimes/pnpm/`. A reachable pnpm fetches the version a project pins in `packageManager` for itself, so the job runs on that pin even if it was never installed. To skip that download, or for a project with no pin, run `npm install --global --prefix ~/.fm-heavy-remote/runtimes/pnpm/<version> pnpm@<version>` with the pinned version or an exact version satisfying the project's engines.
 - **npm:** the selected Node's own npm is used. A project pinning a different npm takes the same per-version install under `~/.fm-heavy-remote/runtimes/npm/<version>`.
 
 For each tool the runner tries the SSH PATH first, then those directories, newest first, and uses the first version satisfying every pin for both dependency installation and the approved command.
-A pinned version that is not installed refuses the job with the versions it found, so add it and run the job again.
-Resolve aliases such as `lts/*` to a numeric project version before approval; the runner does not resolve moving aliases or install runtimes.
+A pinned Node or npm version that is not installed refuses the job with the versions it found, so add it and run the job again.
+With no pnpm reachable the job refuses too, and a pnpm that cannot fetch its pin is reported the same way, as `missing runtime pnpm`.
+Resolve aliases such as `lts/*` to a numeric project version before approval; the runner does not resolve moving aliases or install runtimes, and pnpm's fetch of its own pin is the only install of a runtime a job can trigger.
 These are operator actions; the doctor never performs them automatically.
 
 After the runtimes are installed, add only project-approved portable commands to the root home's private `config/heavy-remote`, and run each approved command once with `bin/fm-heavy.sh --remote --class <class> --project <project> -- <command>` from a clean repository root.
