@@ -760,7 +760,7 @@ test_scoped_offload() {
   heavy --class e2e --remote >/dev/null 2>&1 || fail "approved e2e"
   expect_record '.class == "e2e" and .host == "fake-mac"' "e2e record"
   for bad in 'slots 1' 'offload yes' 'offload\noffload' 'command p --' 'command p -- bash t/job.sh' 'command bash t/job.sh'; do
-    printf 'host fake-mac\ncommand p -- bash t/job.sh\n%b\n' "$bad" > "$HOME_FM/config/heavy-remote"
+    printf 'host fake-mac\ncommand p -- bash t/job.sh\noffload\n%b\n' "$bad" > "$HOME_FM/config/heavy-remote"
     heavy >/dev/null 2>&1; expect_code 2 "$?" "malformed scoped config $bad"
   done
   # Unapproved commands stay in the local queue without ever contacting SSH.
@@ -797,6 +797,41 @@ test_scoped_offload() {
   wait "$pid" || fail "down-host fallback"
   expect_record '.host == "local" and .fallback == "unreachable" and .exit == 0' "automatic unreachable fallback"
   pass "fm-heavy: scoped approvals, automatic offload, classes and malformed refusal"
+}
+
+test_bad_config_refuses_only_offload() {
+  local err conf conf_body
+  setup badconf 'echo local-ran'
+  conf=$HOME_FM/config/heavy-remote
+  printf 'host fake-mac\ncommand p -- bash t/job.sh\noffload\nsurprise 1\n' > "$conf"
+  heavy 2>"$CASE/err" >/dev/null; expect_code 2 "$?" "an approved offload command with a malformed config"
+  err=$(cat "$CASE/err")
+  assert_contains "$err" "malformed $conf: invalid line 4" "the refusal names the file and the bad line"
+  [ ! -s "$LOG" ] || fail "a refused offload must write no record"
+  for conf_body in 'host fake-mac\ncommand p -- bash t/job.sh\nsurprise 1\n' \
+    'host fake-mac\ncommand other -- bash t/job.sh\noffload\nsurprise 1\n'; do
+    # shellcheck disable=SC2059 # the cases are printf formats
+    printf "$conf_body" > "$conf"
+    heavy >"$CASE/out" 2>"$CASE/err" || fail "a job that would not offload runs locally: $(cat "$CASE/err")"
+    assert_contains "$(cat "$CASE/out")" local-ran "the local job ran"
+    [ "$(grep -c 'fm-heavy.sh: warning' "$CASE/err")" = 1 ] || fail "one warning expected: $(cat "$CASE/err")"
+    assert_contains "$(cat "$CASE/err")" "malformed $conf: invalid line" "the warning names the file and problem"
+    expect_record '.host == "local" and .exit == 0 and .slot == 1' "local run beside a malformed config"
+  done
+  heavy --class build >/dev/null 2>&1 || fail "a build runs locally beside a malformed config"
+  if [ "$(id -u)" != 0 ]; then
+    printf 'host fake-mac\ncommand p -- bash t/job.sh\noffload\n' > "$conf"
+    chmod 000 "$conf"
+    heavy >/dev/null 2>"$CASE/err" || fail "an unreadable config must not stop local jobs: $(cat "$CASE/err")"
+    err=$(cat "$CASE/err")
+    assert_contains "$err" "warning: cannot read $conf" "the warning names the unreadable file"
+    case "$err" in *--remote*) fail "the warning must not mention --remote when it was not passed: $err" ;; esac
+    heavy --remote >/dev/null 2>"$CASE/err"; expect_code 2 "$?" "--remote with an unreadable config"
+    assert_contains "$(cat "$CASE/err")" "cannot read $conf" "the --remote refusal names the unreadable file"
+    chmod 600 "$conf"
+  fi
+  [ ! -s "$CTL/log" ] || fail "a bad config must never reach the host"
+  pass "fm-heavy: a bad config refuses only offloading jobs; other jobs warn once and run locally"
 }
 
 # Report each check of the remote slot, so a test can see a queued job re-check it.
@@ -1068,6 +1103,7 @@ test_zombie_group_eperm_keeps_the_result
 test_runner_refuses_bad_input
 test_summary_compares_hosts
 test_scoped_offload
+test_bad_config_refuses_only_offload
 test_queued_job_moves_to_the_freed_host
 test_queued_job_signal_runs_nowhere
 test_dependency_cache_and_failures

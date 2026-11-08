@@ -45,7 +45,9 @@
 #   timeout <seconds>                   optional positive integer, default 900
 #   offload                             optional presence line
 # Command words must match argv exactly (whitespace separates words; no shell
-# quoting or expansion). Duplicate approvals and malformed config refuse the run.
+# quoting or expansion). A malformed or unreadable config, including duplicate
+# approvals, refuses a job that would offload (--remote, or an approved command
+# with offload); every other job warns once and runs locally.
 # --remote requires an approval and requests remote first. With offload, an
 # approved command automatically tries the host when all local slots are busy;
 # otherwise it runs locally. Without offload or --remote the local behavior is
@@ -160,18 +162,22 @@ if [ -e "$root/config/host-test-slots" ]; then
     echo "fm-heavy.sh: config/host-test-slots must hold one positive integer" >&2; exit 2 ;; esac
 fi
 
-rhost=; rtimeout=; offload=; approved=
-if [ -n "$remote" ] || [ -e "$root/config/heavy-remote" ]; then
-  [ -r "$root/config/heavy-remote" ] || { echo "fm-heavy.sh: --remote needs config/heavy-remote" >&2; exit 2; }
-  bad=; approvals=(); request=("$@")
+rhost=; rtimeout=; offload=; approved=; rconf=$root/config/heavy-remote; rproblem=
+if [ -n "$remote" ] && [ ! -e "$rconf" ]; then
+  echo "fm-heavy.sh: --remote needs $rconf" >&2; exit 2
+elif [ -e "$rconf" ] && [ ! -r "$rconf" ]; then
+  rproblem="cannot read $rconf"
+elif [ -e "$rconf" ]; then
+  bad=; approvals=(); request=("$@"); n=0
   while read -r key rest || [ -n "$key" ]; do
+    n=$((n + 1))
     case "$key" in
       ''|'#'*) ;;
-      host) [ -z "$rhost" ] && [[ $rest =~ ^[A-Za-z0-9._-]+$ ]] && rhost=$rest || bad=1 ;;
+      host) [ -z "$rhost" ] && [[ $rest =~ ^[A-Za-z0-9._-]+$ ]] && rhost=$rest || bad=${bad:-$n} ;;
       command)
         words=(); read -r -a words <<< "$rest"
         scope=${words[0]:-}
-        [[ $scope =~ ^[A-Za-z0-9._-]+$ ]] && [ "${words[1]:-}" = -- ] && [ "${#words[@]}" -gt 2 ] || bad=1
+        [[ $scope =~ ^[A-Za-z0-9._-]+$ ]] && [ "${words[1]:-}" = -- ] && [ "${#words[@]}" -gt 2 ] || bad=${bad:-$n}
         signature="$scope:"
         match=1
         [ "$scope" = "$project" ] || match=
@@ -180,18 +186,28 @@ if [ -n "$remote" ] || [ -e "$root/config/heavy-remote" ]; then
           signature+=" ${words[j]}"
           [ "${words[j]}" = "${request[j-2]:-}" ] || match=
         done
-        for prior in ${approvals[@]+"${approvals[@]}"}; do [ "$prior" != "$signature" ] || bad=1; done
+        for prior in ${approvals[@]+"${approvals[@]}"}; do [ "$prior" != "$signature" ] || bad=${bad:-$n}; done
         approvals+=("$signature")
         [ -z "$match" ] || approved=1
         ;;
-      timeout) [ -z "$rtimeout" ] && [[ $rest =~ ^[1-9][0-9]{0,5}$ ]] && rtimeout=$rest || bad=1 ;;
-      offload) [ -z "$offload" ] && [ -z "$rest" ] && offload=1 || bad=1 ;;
-      *) bad=1 ;;
+      timeout) [ -z "$rtimeout" ] && [[ $rest =~ ^[1-9][0-9]{0,5}$ ]] && rtimeout=$rest || bad=${bad:-$n} ;;
+      offload) [ -z "$offload" ] && [ -z "$rest" ] && offload=1 || bad=${bad:-$n} ;;
+      *) bad=${bad:-$n} ;;
     esac
-  done < "$root/config/heavy-remote"
-  [ -z "$bad" ] && [ -n "$rhost" ] && [ "${#approvals[@]}" -gt 0 ] \
-    || { echo "fm-heavy.sh: malformed config/heavy-remote (see --help)" >&2; exit 2; }
+  done < "$rconf"
+  if [ -n "$bad" ]; then rproblem="malformed $rconf: invalid line $bad (see --help)"
+  elif [ -z "$rhost" ]; then rproblem="malformed $rconf: no host line (see --help)"
+  elif [ "${#approvals[@]}" -eq 0 ]; then rproblem="malformed $rconf: no command line (see --help)"
+  fi
   case "$class" in build|image) approved= ;; esac
+fi
+if [ -n "$rproblem" ]; then
+  if [ -n "$remote" ] || { [ -n "$offload" ] && [ -n "$approved" ]; }; then
+    echo "fm-heavy.sh: $rproblem" >&2; exit 2
+  fi
+  echo "fm-heavy.sh: warning: $rproblem; running locally" >&2
+  offload=; approved=
+elif [ -e "$rconf" ]; then
   if [ -n "$remote" ] && [ -z "$approved" ]; then
     echo "fm-heavy.sh: --remote command/class is not approved for this project" >&2; exit 2
   fi

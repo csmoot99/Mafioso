@@ -1232,7 +1232,7 @@ A drive call holds the slot only while it runs a local test step, build or e2e, 
 
 `config/heavy-remote` in the root home is the opt-in for the SSH destination, and without it `fm-heavy.sh --remote` refuses and every job runs locally as before.
 The schema is one `host <ssh-alias>`, one or more `command <project> -- <words...>` approvals, optional `timeout <seconds>` (default 900), and an optional `offload` presence line.
-Blank lines and lines starting with `#` are ignored; duplicate settings, duplicate approvals, unknown keys and invalid values refuse the run.
+Blank lines and lines starting with `#` are ignored; duplicate settings, duplicate approvals, unknown keys, invalid values or an unreadable file refuse a job that would offload (`--remote`, or an approved command with `offload`) with an error naming the file and problem, while every other heavy job prints one warning and runs locally under the local slot.
 An approval covers one project, named by the caller's `--project`, so a job with no project never leaves this machine.
 Approval words are separated by whitespace and must match the caller's argument vector exactly; shell quoting and expansion are not interpreted.
 For example:
