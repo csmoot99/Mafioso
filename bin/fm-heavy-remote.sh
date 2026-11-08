@@ -4,7 +4,7 @@
 # it; it is not a user command.
 #
 # usage: fm-heavy-remote.sh --host <ssh alias> --timeout <seconds> --sample <file>
-#          --state-dir <dir> -- <command> [args...]
+#          --state-dir <dir> --project <name> [--class test|e2e] -- <command> [args...]
 #
 # The command must be a repository-relative portable command run from the
 # repository root, and the working tree must be clean: the candidate is exactly
@@ -14,6 +14,8 @@
 #      in one ssh stream; the runner verifies both digests, checks out and
 #      verifies the exact sha, and launches the command detached in its own
 #      process group under ~/.fm-heavy-remote/<job> on the host;
+#      Dependency preparation runs inside the supervised group, using a
+#      per-project cache; runtime/install failures are collected job failures.
 #   2. waits for the runner's durable result.json (the completion record);
 #   3. collects result.json and run.log into <state-dir>/<job>/, checks the job id,
 #      candidate sha, command and bundle digests and the run.log checksum, and
@@ -24,8 +26,8 @@
 #
 # Nothing started: when the host is unreachable, the tree is dirty, an earlier
 # job is still running there or the host cannot prepare the job, the sample gets
-# fallback=<reason> and the exit status is 0, so the caller runs the command
-# locally under its normal slot. A signalled script ends cancelled instead.
+# fallback=<reason> and the exit status is 0, so the caller keeps the command in
+# its local queue. A signalled script ends cancelled instead.
 #
 # Outcomes (outcome= in the sample; exit status in parentheses):
 #   pass (0), failed (the command's own status), timeout (124: the host killed the
@@ -67,9 +69,11 @@ set -u
 set -o pipefail
 
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-host=; timeout_s=; sample=; state_dir=
+host=; timeout_s=; sample=; state_dir=; project=; class="test"
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    --project) project=${2:-}; shift 2 || break ;;
+    --class) class=${2:-}; shift 2 || break ;;
     --host) host=${2:-}; shift 2 || break ;;
     --timeout) timeout_s=${2:-}; shift 2 || break ;;
     --sample) sample=${2:-}; shift 2 || break ;;
@@ -101,12 +105,12 @@ trap 'sig=15; [ -z "$bg" ] || kill "$bg" 2>/dev/null' TERM
 emit() { printf '%s=%s\n' "$1" "$2" >> "$sample"; }
 rssh() { "${SSH[@]}" "$host" "$@" </dev/null; }
 rrun() { rssh "$runner $1 $rdir ${2:-}"; }  # <runner action> [argument]
-fallback() {  # <reason>: nothing was started; the caller runs the command locally
+fallback() {  # <reason>: nothing was started; the caller keeps the command in its local queue
   rmdir "$jdir" 2>/dev/null
   rm -f "$record"
   [ -z "$sig" ] || finish cancelled $((128 + sig))  # a signalled job never runs, here or locally
   emit fallback "$1"
-  echo "fm-heavy-remote: not running on $host ($1); running locally" >&2
+  echo "fm-heavy-remote: not running on $host ($1); staying in the local queue" >&2
   exit 0
 }
 # Run an ssh step in the background so a signal reaches the trap at once.
@@ -245,7 +249,8 @@ git bundle create "$stage/src.bundle" HEAD >/dev/null 2>&1 || fallback bundle-fa
 bundle_sha=$(sha256sum "$stage/src.bundle" | cut -d' ' -f1)
 argv=$(printf '%s\0' "$@" | jq -Rsc 'split("\u0000")[:-1]') || fallback manifest-failed
 jq -n --arg id "$id" --arg sha "$sha" --arg cs "$cmd_sha" --arg bs "$bundle_sha" --argjson t "$timeout_s" \
-  --argjson argv "$argv" '{id: $id, sha: $sha, command_sha256: $cs, bundle_sha256: $bs, timeout_s: $t, argv: $argv}' \
+  --arg project "$project" --arg class "$class" \
+  --argjson argv "$argv" '{project: $project, class: $class, id: $id, sha: $sha, command_sha256: $cs, bundle_sha256: $bs, timeout_s: $t, argv: $argv}' \
   > "$stage/manifest.json" || fallback manifest-failed
 cp "$SELF_DIR/fm-heavy-remote-runner.py" "$stage/runner.py"
 cp "$stage/manifest.json" "$record" || fallback state-unwritable

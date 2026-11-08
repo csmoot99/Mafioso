@@ -1231,19 +1231,49 @@ The flag is machine-wide like the slot and the log: it is read from the root hom
 A drive call holds the slot only while it runs a local test step, build or e2e, and the pipeline agent never takes the slot again inside that hold.
 
 `config/heavy-remote` in the root home is the opt-in for the SSH destination, and without it `fm-heavy.sh --remote` refuses and every job runs locally as before.
-It names the SSH alias of the destination, the one portable command approved to run there, and an optional timeout in seconds.
-A worker or firstmate passes `--remote` for that command only, and the job then runs on the destination's own capacity instead of the shared slot.
-The destination takes one job at a time; when it is busy or unreachable, or the working tree is not a clean repository root, the command runs locally under the normal slot rule instead of blocking.
+The schema is one `host <ssh-alias>`, one or more `command <project> -- <words...>` approvals, optional `timeout <seconds>` (default 900), and an optional `offload` presence line.
+Blank lines and lines starting with `#` are ignored; duplicate settings, duplicate approvals, unknown keys, invalid values or an unreadable file refuse a job that would offload (`--remote`, or an approved command with `offload`) with an error naming the file and problem, while every other heavy job prints one warning and runs locally under the local slot.
+An approval covers one project, named by the caller's `--project`, so a job with no project never leaves this machine.
+Approval words are separated by whitespace and must match the caller's argument vector exactly; shell quoting and expansion are not interpreted.
+For example:
+
+```text
+host fm-mac
+command firstmate -- bash tests/fm-ci-select.test.sh
+command web-app -- pnpm test
+command web-app -- pnpm exec playwright test
+timeout 900
+offload
+```
+
+The candidate on the destination is a bundle of HEAD alone, so an approved command cannot rely on `origin/main` or any other ref; `fm-test-run.sh --changed` needs one and always fails there.
+Approved classes are test and e2e; build and image stay local, because only the result and log come back from the destination.
+`--remote` explicitly requests the destination first and refuses an unapproved command or class.
+With `offload`, an approved job tries the destination automatically when every local slot is busy and the destination is free, without changing worker commands or instructions.
+Without `offload`, remote execution still requires `--remote`.
+The destination takes one job at a time, independently of local capacity.
+An approved job it cannot take yet, because it is busy, unreachable or still running an unknown job, waits for a local slot while it keeps checking, and moves to whichever frees first, so queued work drains to the destination.
+A busy destination is checked every two seconds and the host itself every 30 seconds.
+When preparation cannot transfer or check out the candidate, or the working tree is not a clean repository root, the command joins the normal local queue instead.
+A job that ends up running locally records its last reason in `fallback`.
 A lost connection never leads to a second run of a job that may still be running: the job is reconciled against its record on the destination first, and a job that cannot be reached is recorded as unknown with its scratch kept.
 A finished job whose result cannot be fetched after the same reconnect attempts is recorded the same way, with the result left on the destination for the next request to collect.
-Every unknown job keeps a durable local record in `state/heavy-remote/unknown-<host>/`, and each new `--remote` request reconciles those records over SSH before it is admitted, from the job's completion file, its started marker and whether its own process group is alive.
-While such a job still runs, no second job starts there and the request runs locally with fallback `unknown-job-running`; a job whose supervisor has died is stopped first, because nothing else would stop it.
-When the destination cannot be reached the record stays and the request runs locally with fallback `unreachable`.
+Every unknown job keeps a durable local record in `state/heavy-remote/unknown-<host>/`, and each new remote request reconciles those records over SSH before it is admitted, from the job's completion file, its started marker and whether its own process group is alive.
+While such a job still runs, no second job starts there and the request stays in the local queue with fallback `unknown-job-running`; a job whose supervisor has died is stopped first, because nothing else would stop it.
+When the destination cannot be reached the record stays and the request stays in the local queue with fallback `unreachable`.
 A finished job's result is collected into `state/heavy-remote/<job>/` for that job alone and never counts as a pass for the new candidate; its scratch is then removed and `reconciled.json` there closes the record with the job's outcome.
 A result with the wrong commit, command or bundle digest, or a missing or partial log, is rejected and is never a pass, and the destination refuses a second start of one job, so a duplicate delivery never runs twice.
-[`bin/fm-heavy.sh`](../bin/fm-heavy.sh) owns the file format and the extra record fields, and [`bin/fm-heavy-remote.sh`](../bin/fm-heavy-remote.sh) owns the transfer, the outcomes and their exit statuses.
+[`bin/fm-heavy.sh`](../bin/fm-heavy.sh) owns the wrapper mechanics and extra record fields, and [`bin/fm-heavy-remote.sh`](../bin/fm-heavy-remote.sh) owns the transfer, the outcomes and their exit statuses.
 [`bin/fm-heavy-summary.sh`](../bin/fm-heavy-summary.sh) gives local and remote jobs separate rows, so the queue wait a remote run saves can be read against its preparation and collection time.
-The destination needs only `python3`, `git`, `tar` and `ps`, and the runner it uses is shipped with each job, so nothing is installed there.
+The destination needs `python3`, `git`, `tar` and `ps`; the runner is shipped with each job.
+For Node projects, each job runs on the versions of node and the lockfile's pnpm/npm that its own project pins in `package.json` engines, `packageManager` and `.nvmrc`, chosen from those installed on the destination, except that a reachable pnpm may fetch its own pinned version; the runner then installs locked dependencies from the transferred candidate.
+Stable numeric versions, comparison ranges, wildcards, caret, tilde, hyphen ranges and `||` alternatives are supported; unsupported requirements such as `.nvmrc` aliases refuse the job with a clear reason rather than guessing.
+A root `package.json` that declares no dependencies of any kind needs no lockfile: the job still runs on its pinned Node and skips installation.
+A pinned Node or npm version that is not installed, no reachable pnpm, declared dependencies with no lockfile, ambiguous lockfiles, and installation failures are failed remote jobs with a clear reason, never local fallbacks.
+Dependency copies are cached per project under `~/.fm-heavy-remote/cache/`, refreshed when lockfiles, package settings or runtime versions change, and copied into each isolated candidate before execution.
+An e2e command that invokes Playwright directly or through a package script also installs its required browser revisions, using Playwright's account cache; test jobs never install browsers.
+Dependency preparation shares the job's process group and timeout, and is included in `run_s`; `prepare_s` measures transfer and checkout.
+[Remote host setup](remote-secondmates.md#heavy-job-runtimes) owns the operator steps for missing runtimes and initial activation.
 
 ## Launch environment values (config/launch-env)
 

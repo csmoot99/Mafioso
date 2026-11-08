@@ -33,6 +33,7 @@
 #   platform=darwin|linux|<uname -s>|unknown
 #   required <tool>=<path>|MISSING
 #   optional <tool>=<path>|absent
+#   runtime node|npm|pnpm=<version> (<path>)|MISSING (on the remote runtime PATH, not the plain SSH PATH heavy jobs use)
 #   fix <check>=applied: <what changed>       (--fix only)
 #   fix <check>=failed: <why the repair did not land>   (--fix only)
 #   check <check>=ok: <evidence>
@@ -917,6 +918,17 @@ for tool in "${OPTIONAL_TOOLS[@]}"; do
     printf 'optional %s=%s\n' "$tool" "$resolved"
   else
     printf 'optional %s=absent\n' "$tool"
+  fi
+done
+
+# Heavy-job runtimes are informational here: each transferred project's engines
+# and lockfile decide which are required, and the job selects a compatible
+# installed version itself.
+for tool in node npm pnpm; do
+  if resolved=$(command -v "$tool" 2>/dev/null) && version=$("$resolved" --version 2>/dev/null); then
+    printf 'runtime %s=%s (%s)\n' "$tool" "$version" "$resolved"
+  else
+    printf 'runtime %s=MISSING on the remote runtime PATH; see Heavy-job runtimes in docs/remote-secondmates.md\n' "$tool"
   fi
 done
 

@@ -779,3 +779,35 @@ For a real-host smoke test:
 
 The deterministic suite is automated.
 Real-host validation is still an operator-run smoke test and is not claimed by the repository tests.
+
+## Heavy-job runtimes
+
+Remote heavy jobs use plain SSH, independently of secondmate placement.
+The [heavy-command configuration](configuration.md#heavy-commands-and-concurrency-confighost-test-slots-configheavy-commands-configheavy-remote) owns approvals and automatic offload.
+Before enabling it, run the readiness doctor and list what the plain SSH environment used by these jobs can see:
+
+```sh
+bin/fm-on.sh fm-mac fm-remote-doctor.sh
+ssh -o BatchMode=yes fm-mac 'command -v python3 git tar ps node npm pnpm; ls ~/.nvm/versions/node ~/.fm-heavy-remote/runtimes/*'
+```
+
+The doctor reports the node, npm and pnpm on its remote runtime PATH without installing anything.
+That PATH adds locations such as `~/.local/bin` and version-manager shims, so only the plain SSH command above shows what heavy jobs can see.
+Each job selects its own runtimes, so projects with different pins share the host and no single default has to suit them all.
+For each approved Node project, inspect its `package.json` engines and `packageManager`, `.nvmrc` and lockfile, then install what they need side by side on the Mac:
+
+- **Node:** run `nvm install <version>` and leave the default alias alone. For a Node installed another way, link its root directory to `~/.fm-heavy-remote/runtimes/node/<version>`.
+- **pnpm:** keep at least one pnpm reachable, on the SSH PATH or under `~/.fm-heavy-remote/runtimes/pnpm/`. A reachable pnpm fetches the version a project pins in `packageManager` for itself, so the job runs on that pin even if it was never installed. To skip that download, or for a project with no pin, run `npm install --global --prefix ~/.fm-heavy-remote/runtimes/pnpm/<version> pnpm@<version>` with the pinned version or an exact version satisfying the project's engines.
+- **npm:** the selected Node's own npm is used. A project pinning a different npm takes the same per-version install under `~/.fm-heavy-remote/runtimes/npm/<version>`.
+
+For each tool the runner tries the SSH PATH first, then those directories, newest first, and uses the first version satisfying every pin for both dependency installation and the approved command.
+A pinned Node or npm version that is not installed refuses the job with the versions it found, so add it and run the job again.
+With no pnpm reachable the job refuses too, and a pnpm that cannot fetch its pin is reported the same way, as `missing runtime pnpm`.
+Resolve aliases such as `lts/*` to a numeric project version before approval; the runner does not resolve moving aliases or install runtimes, and pnpm's fetch of its own pin is the only install of a runtime a job can trigger.
+These are operator actions; the doctor never performs them automatically.
+
+After the runtimes are installed, add only project-approved portable commands to the root home's private `config/heavy-remote`, and run each approved command once with `bin/fm-heavy.sh --remote --class <class> --project <project> -- <command>` from a clean repository root.
+The first job transfers the committed candidate and installs dependencies from its lockfile; later candidates reuse the project cache unless the dependency fingerprint changes.
+Inspect the collected result and log, then add `offload` to enable automatic use when the local slot is busy.
+Use `bin/fm-heavy-summary.sh` to compare per-project local and remote wait/run times, including remote transfer and result collection.
+No project repository, coding-agent placement, local slot limit or memory cap changes as part of this setup.
