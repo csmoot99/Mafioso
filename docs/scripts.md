@@ -53,7 +53,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-heavy.sh`            | Run a heavy command on the machine's shared slot under the 6 GB memory scope and append one job record to `state/heavy-jobs.jsonl` (docs/configuration.md "Heavy commands and concurrency") |
 | `fm-heavy-summary.sh`    | Queue wait versus run time and peak memory per project, command class and host from the heavy-job log |
 | `fm-heavy-remote.sh`     | The SSH destination for `fm-heavy.sh`: exact-candidate transfer, completion record, result checks, cleanup and fallback (docs/configuration.md "Heavy commands and concurrency") |
-| `fm-heavy-remote-runner.py` | The destination half, shipped with each remote job: verified checkout, detached supervised run, timeout and owned-process cleanup |
+| `fm-heavy-remote-runner.py` | The destination half, shipped with each remote job: verified checkout, per-project runtime selection and dependency preparation, detached supervised run, timeout and owned-process cleanup |
 | `fm-test-failure.sh`     | Classify failing tests in the per-project ledger under `data/test-failures/` that `fm-heavy.sh` fills, and report counts or recent lines |
 | `fm-test-failure.py`     | The reporter parsers and ledger reads and writes behind `fm-test-failure.sh` |
 | `fm-guard.sh`            | Warn on primary-checkout tangles, main-session pending wakes, and unhealthy supervision |

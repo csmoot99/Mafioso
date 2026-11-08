@@ -105,7 +105,7 @@ trap 'sig=15; [ -z "$bg" ] || kill "$bg" 2>/dev/null' TERM
 emit() { printf '%s=%s\n' "$1" "$2" >> "$sample"; }
 rssh() { "${SSH[@]}" "$host" "$@" </dev/null; }
 rrun() { rssh "$runner $1 $rdir ${2:-}"; }  # <runner action> [argument]
-fallback() {  # <reason>: nothing was started; the caller runs the command locally
+fallback() {  # <reason>: nothing was started; the caller keeps the command in its local queue
   rmdir "$jdir" 2>/dev/null
   rm -f "$record"
   [ -z "$sig" ] || finish cancelled $((128 + sig))  # a signalled job never runs, here or locally

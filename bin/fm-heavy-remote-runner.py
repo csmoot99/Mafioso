@@ -15,9 +15,9 @@ preparation failures exit 78 and a command that cannot run exits 127, never a
 local fallback.
 Dependency copies persist per project under ~/.fm-heavy-remote/cache, keyed by
 lockfile/package settings and runtime versions. Each job has private modules.
-A job directory lives under ~/.fm-heavy-remote and holds manifest.json (job id,
-candidate sha, command argv and its digest, bundle digest, timeout) and
-src.bundle (the candidate revision with its history).
+A job directory lives under ~/.fm-heavy-remote and holds manifest.json (project,
+class, job id, candidate sha, command argv and its digest, bundle digest,
+timeout) and src.bundle (the candidate revision with its history).
 
 start     Refuses a second start of the same job, verifies the bundle and command
           digests, clones the bundle, checks out and verifies the exact sha, then
