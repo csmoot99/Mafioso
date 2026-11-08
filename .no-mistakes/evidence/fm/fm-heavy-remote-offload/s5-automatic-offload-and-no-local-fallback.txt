@@ -1,0 +1,15 @@
+## local slot free, offload configured, no --remote -> approved job runs locally
+exit=0
+{"project":"nodeps-app","class":"test","host":"local","outcome":null,"exit":0,"fallback":null,"slot":1}
+## local slot held by another job -> same approved job offloads to the host automatically
+exit=0 after 1s (holder still alive: yes)
+{"project":"nodeps-app","class":"test","host":"fm-mac-lab","outcome":"pass","exit":0,"fallback":null,"slot":null}
+## local slot held; approved job whose host prep fails (node 18 pin missing) -> exit 78, never re-run locally
+remote dependency/runtime preparation failed: runtime node v24.22.1, v22.23.4 does not satisfy 18.x; install the project's version on the host
+exit=78
+{"project":"node18-app","class":"test","host":"fm-mac-lab","outcome":"failed","exit":78,"fallback":null,"slot":null}
+records added for that job: 1 (one, remote; local slot released afterwards and nothing ran locally)
+## unapproved words for an approved project, local slot held -> stays local (waits for slot), never offloads
+exit=0 after 24s (waited for local slot)
+{"project":"nodeps-app","class":"test","host":"local","outcome":null,"exit":0,"fallback":null,"slot":1}
+(the 24s wait came from the first holder's orphaned 'sleep 25' child, which kept the inherited slot lock after flock was killed; the job stayed in the local queue the whole time)

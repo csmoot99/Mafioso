@@ -1,0 +1,16 @@
+## /tmp/fm-heavy-lab.tf7zMz/run.sh nodeps-app --class test --remote -- node --version
+fm-heavy.sh: --remote command/class is not approved for this project
+exit=2
+## /tmp/fm-heavy-lab.tf7zMz/run.sh node22-app --class test --remote -- pnpm test --reporter=dot
+fm-heavy.sh: --remote command/class is not approved for this project
+exit=2
+## /tmp/fm-heavy-lab.tf7zMz/run.sh node24-app --class build --remote -- pnpm run build
+fm-heavy.sh: --remote command/class is not approved for this project
+exit=2
+## env -u NO_MISTAKES_GATE PATH=/tmp/fm-heavy-lab.tf7zMz/bin:/home/work/.local/bin:/home/work/go/bin:/home/work/.cargo/bin:/home/work/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:/usr/bin:/bin:/usr/sbin:/sbin FM_LAB=/tmp/fm-heavy-lab.tf7zMz FM_HOME=/tmp/fm-heavy-lab.tf7zMz/home FM_HEAVY_LOCK=/tmp/fm-heavy-lab.tf7zMz/slot.lock /home/work/.no-mistakes/worktrees/5f69104d19ce/01M6YH7TFQZNN4SZR156SX5K28/bin/fm-heavy.sh --class test --task lab --remote -- node --test
+fm-heavy.sh: --remote command/class is not approved for this project
+exit=2
+## build-class approved words with local slot busy -> not offloaded; waits locally
+exit=0 after 6s
+{"project":"node24-app","class":"build","host":"local","outcome":null,"exit":0,"slot":1}
+## ssh calls made during all of the above: 0; new records: 1

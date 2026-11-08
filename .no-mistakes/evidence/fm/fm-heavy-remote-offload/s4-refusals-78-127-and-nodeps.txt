@@ -1,0 +1,58 @@
+## node18-app: fm-heavy.sh --class test --remote -- node --version
+remote dependency/runtime preparation failed: runtime node v24.22.1, v22.23.4 does not satisfy 18.x; install the project's version on the host
+exit=78
+{"project":"node18-app","host":"fm-mac-lab","outcome":"failed","exit":78,"fallback":null}
+
+## nolock-app: fm-heavy.sh --class test --remote -- node --version
+remote dependency/runtime preparation failed: package.json has no supported lockfile (pnpm-lock.yaml, npm-shrinkwrap.json or package-lock.json)
+exit=78
+{"project":"nolock-app","host":"fm-mac-lab","outcome":"failed","exit":78,"fallback":null}
+
+## alias-app: fm-heavy.sh --class test --remote -- node --version
+remote dependency/runtime preparation failed: unsupported runtime range: lts/*
+exit=78
+{"project":"alias-app","host":"fm-mac-lab","outcome":"failed","exit":78,"fallback":null}
+
+## nodeps-app: fm-heavy.sh --class test --remote -- definitely-not-installed --flag
+cannot run definitely-not-installed: [Errno 2] No such file or directory
+exit=127
+{"project":"nodeps-app","host":"fm-mac-lab","outcome":"failed","exit":127,"fallback":null}
+
+## nodeps-app: fm-heavy.sh --class test --remote -- node --test
+NODE=v24.22.1
+✔ runs on host (0.851676ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 41.07429
+exit=0
+{"project":"nodeps-app","host":"fm-mac-lab","outcome":"pass","exit":0,"fallback":null}
+
+## host PATH now has no pnpm: /usr/bin:/bin
+## node24-app: fm-heavy.sh --class test --remote -- pnpm test
+$ node t.js v24. && node -e "console.log(\"isOdd(3)=\"+require(\"is-odd\")(3))"
+PROJECT=node24-app NODE=v24.22.1 PNPM=11.25.0 isNumber(5)=true
+isOdd(3)=true
+exit=0
+{"project":"node24-app","host":"fm-mac-lab","outcome":"pass","exit":0,"fallback":null}
+
+(note: the run above still passed because the fixture's v24 runtime dir was a link to a Node install whose bin/ also holds pnpm, so pnpm was reachable after node selection; corrected below with a node-only v24 runtime)
+
+## host PATH: /usr/bin:/bin; node runtimes: v22.23.4 v24.22.1 (node-only bins, no pnpm anywhere)
+## node24-app: fm-heavy.sh --class test --remote -- pnpm test
+remote dependency/runtime preparation failed: missing runtime pnpm; install the project's version on the host
+exit=78
+{"project":"node24-app","host":"fm-mac-lab","outcome":"failed","exit":78,"fallback":null}
+
+## pnpm restored on host PATH (/usr/bin:/bin:/tmp/fm-heavy-lab.tf7zMz/hostbin) -> same job passes again
+## node24-app: fm-heavy.sh --class test --remote -- pnpm test
+$ node t.js v24. && node -e "console.log(\"isOdd(3)=\"+require(\"is-odd\")(3))"
+PROJECT=node24-app NODE=v24.22.1 PNPM=11.25.0 isNumber(5)=true
+isOdd(3)=true
+exit=0
+{"project":"node24-app","host":"fm-mac-lab","outcome":"pass","exit":0,"fallback":null}
+

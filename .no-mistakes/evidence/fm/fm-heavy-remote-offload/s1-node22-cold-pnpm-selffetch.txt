@@ -1,0 +1,35 @@
++(eval):3> /tmp/fm-heavy-lab.tf7zMz/run.sh node22-app --class test --remote -- pnpm test
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +1
++
+Progress: resolved 1, reused 0, downloaded 1, added 1, done
+
+dependencies:
++ is-number 7.0.0
+
+Done in 464ms using pnpm v10.34.9
+
+   ╭──────────────────────────────────────────────────────────────────────╮
+   │                                                                      │
+   │                 Update available! 10.34.9 → 12.18.0.                 │
+   │                 Changelog: https://pnpm.io/v/12.18.0                 │
+   │   To update, run: curl -fsSL https://get.pnpm.io/install.sh | sh -   │
+   │                                                                      │
+   ╰──────────────────────────────────────────────────────────────────────╯
+
+
+> node22-app@ test /tmp/fm-heavy-lab.tf7zMz/host/.fm-heavy-remote/1794174421-1050362-19730/work
+> node t.js v22.
+
+PROJECT=node22-app NODE=v22.23.4 PNPM=10.34.9 isNumber(5)=true
+exit=0
+# host account after cold run: pnpm fetched its own pin into the host's pnpm home
+# host PATH pnpm (the only installed pnpm):
+/home/work/.local/lib/nodejs/lib/node_modules/pnpm/bin/pnpm.mjs
+# cache dirs:
+01adab43da7c6e4bd8497cd82f9f8730e8118ba537155422677cf62be686df7b
+# fetched pin in host pnpm store (host started with no pnpm cache at all):
+$LAB/host/.local/share/pnpm/store/v11/links/@/pnpm/10.34.9/
+# job record:
+{"project":"node22-app","class":"test","host":"fm-mac-lab","outcome":"pass","exit":0,"fallback":null,"prepare_s":0,"run_s":6,"candidate":"e6d2cf89e8168348b5230d7145e21204ed4bbfd6"}

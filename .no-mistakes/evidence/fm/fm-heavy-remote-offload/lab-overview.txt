@@ -1,0 +1,31 @@
+Disposable lab: FM_HOME, fake SSH host account and fixture projects under a mktemp dir, removed after this run.
+SSH double: a local 'ssh' that runs each command as a clean-env login (env -i, HOME=lab host, PATH from file) — real fm-heavy.sh, fm-heavy-remote.sh and runner, real git/node/pnpm/npm registry.
+Host runtimes: Node v22.23.4 (official tarball) and v24.22.1 under ~/.nvm/versions/node; pnpm 11.25.0 on the host PATH only.
+
+Hosts contacted (from ssh double log):
+     75 fm-mac-lab
+
+All job records written to the lab FM_HOME:
+{"project":"node22-app","class":"test","host":"fm-mac-lab","outcome":"pass","exit":0,"fallback":null,"wait_s":0,"run_s":6}
+{"project":"node24-app","class":"test","host":"fm-mac-lab","outcome":"pass","exit":0,"fallback":null,"wait_s":0,"run_s":2}
+{"project":"node24-app","class":"test","host":"fm-mac-lab","outcome":"pass","exit":0,"fallback":null,"wait_s":1,"run_s":1}
+{"project":"node24-app","class":"test","host":"fm-mac-lab","outcome":"pass","exit":0,"fallback":null,"wait_s":1,"run_s":1}
+{"project":"node18-app","class":"test","host":"fm-mac-lab","outcome":"failed","exit":78,"fallback":null,"wait_s":0,"run_s":0}
+{"project":"nolock-app","class":"test","host":"fm-mac-lab","outcome":"failed","exit":78,"fallback":null,"wait_s":0,"run_s":0}
+{"project":"alias-app","class":"test","host":"fm-mac-lab","outcome":"failed","exit":78,"fallback":null,"wait_s":0,"run_s":0}
+{"project":"nodeps-app","class":"test","host":"fm-mac-lab","outcome":"failed","exit":127,"fallback":null,"wait_s":0,"run_s":0}
+{"project":"nodeps-app","class":"test","host":"fm-mac-lab","outcome":"pass","exit":0,"fallback":null,"wait_s":0,"run_s":0}
+{"project":"node24-app","class":"test","host":"fm-mac-lab","outcome":"pass","exit":0,"fallback":null,"wait_s":0,"run_s":1}
+{"project":"node24-app","class":"test","host":"fm-mac-lab","outcome":"failed","exit":78,"fallback":null,"wait_s":0,"run_s":0}
+{"project":"node24-app","class":"test","host":"fm-mac-lab","outcome":"pass","exit":0,"fallback":null,"wait_s":0,"run_s":1}
+{"project":"nodeps-app","class":"test","host":"local","outcome":null,"exit":0,"fallback":null,"wait_s":0,"run_s":0}
+{"project":"nodeps-app","class":"test","host":"fm-mac-lab","outcome":"pass","exit":0,"fallback":null,"wait_s":0,"run_s":0}
+{"project":"node18-app","class":"test","host":"fm-mac-lab","outcome":"failed","exit":78,"fallback":null,"wait_s":0,"run_s":0}
+{"project":"nodeps-app","class":"test","host":"local","outcome":null,"exit":0,"fallback":null,"wait_s":24,"run_s":0}
+{"project":"node22-app","class":"test","host":"fm-mac-lab","outcome":"pass","exit":0,"fallback":null,"wait_s":6,"run_s":2}
+{"project":"node24-app","class":"build","host":"local","outcome":null,"exit":0,"fallback":null,"wait_s":3,"run_s":2}
+{"project":"nodeps-app","class":"build","host":"local","outcome":null,"exit":0,"fallback":null,"wait_s":1,"run_s":0}
+{"project":"nolock-app","class":"test","host":"local","outcome":null,"exit":0,"fallback":null,"wait_s":0,"run_s":0}
+{"project":"nolock-app","class":"test","host":"local","outcome":null,"exit":0,"fallback":null,"wait_s":0,"run_s":0}
+{"project":"nodeps-app","class":"test","host":"local","outcome":null,"exit":0,"fallback":null,"wait_s":0,"run_s":0}
+{"project":"nodeps-app","class":"test","host":"local","outcome":null,"exit":0,"fallback":null,"wait_s":0,"run_s":0}

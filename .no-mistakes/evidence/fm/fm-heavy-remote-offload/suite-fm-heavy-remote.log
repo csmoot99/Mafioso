@@ -1,0 +1,39 @@
+ok - fm-heavy --remote: the exact candidate runs on the host and the record has every stage
+ok - fm-heavy --remote: off unless asked, and only the one approved command from a valid config
+ok - fm-heavy --remote: an unreachable, busy or ineligible destination runs the command locally and says why
+ok - fm-heavy --remote: a failing command is a failure with its own status, log kept
+ok - fm-heavy --remote: a timeout stops the job's own process group and nothing else
+ok - fm-heavy --remote: a process the job leaves behind is stopped with it
+ok - fm-heavy --remote: a killed job or a dead supervisor is never a pass, and its processes are cleaned up
+ok - fm-heavy --remote: a lost connection is reconciled with the job's record, never answered with a second run
+ok - fm-heavy --remote: a job that cannot be reached is unknown, kept, and never retried
+ok - fm-heavy --remote: a missing, wrong-candidate, wrong-command, partial or replayed result is rejected, never green
+ok - fm-heavy --remote: a duplicate delivery is refused by the host's started marker and never runs twice
+ok - fm-heavy --remote: an unknown job blocks a second job while it runs, then is collected for its own record and cleaned up
+ok - fm-heavy --remote: dropped collections, bad results, jobs that never arrived and orphaned groups all reconcile safely
+ok - fm-heavy-remote-runner: a start that died before recording an owner cannot hold the destination for ever
+ok - fm-heavy --remote: a signalled wrapper stops its own job, records it, and leaves the rest alone
+ok - fm-heavy --remote: the last config line counts without a trailing newline
+ok - fm-heavy --remote: a signal while the destination is probed or the bundle made cancels the job instead of running it locally
+ok - fm-heavy --remote: a signal only the wrapper hears still stops a fallback from running locally
+ok - fm-heavy --remote: a signal from collection to the final cleanup cancels the job instead of judging its result
+ok - fm-heavy --remote: a signal while an earlier job is checked leaves its record open and starts nothing
+ok - fm-heavy --remote: a result check that dies on its own rejects the result
+ok - fm-heavy --remote: a dropped collection is retried, and an unreachable one keeps the result for reconciliation
+ok - fm-heavy --remote: a transfer cut short leaves nothing on the host and the destination usable
+ok - fm-heavy --remote: a job cancelled on the host is never green, even when its command exits 0
+ok - fm-heavy-remote-runner: EPERM from a group of zombies means the group is gone, so the result is still published
+ok - fm-heavy-remote-runner: digest mismatches and foreign directories are refused before anything runs
+ok - fm-heavy-summary: local and remote jobs get their own rows with preparation and collection time
+ok - fm-heavy: scoped approvals, automatic offload, classes and malformed refusal
+ok - fm-heavy: a bad config refuses only offloading jobs; other jobs warn once and run locally
+ok - fm-heavy: a queued approved job moves to the host once it frees, and an ineligible one stays queued
+ok - fm-heavy: a signal while a job checks both queues stops it before it runs anywhere
+ok - fm-heavy: cached dependencies refresh on lockfile change; runtime/install failures cannot fall back
+ok - fm-heavy: each project runs on the node and pnpm it pins; a missing node or no pnpm is a clear refusal
+ok - fm-heavy: a project with no dependencies needs no lockfile; a pinned node and declared dependencies still refuse
+ok - fm-heavy --remote: a command missing on the host is a cannot-run failure, not a preparation failure
+ok - fm-heavy: approved Playwright e2e commands prepare browsers before execution
+ok - fm-heavy: npm lock caching and nvmrc compatibility are enforced
+# all fm-heavy-remote tests passed
+exit=0

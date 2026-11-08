@@ -1,0 +1,8 @@
+16:49:18 local slot held (60s) and host slot held (6s) by other jobs; starting approved offload job
+
+> node22-app@ test /tmp/fm-heavy-lab.tf7zMz/host/.fm-heavy-remote/1794174564-1128903-29097/work
+> node t.js v22.
+
+PROJECT=node22-app NODE=v22.23.4 PNPM=10.34.9 isNumber(5)=true
+16:49:26 exit=0 after 8s; local holder still alive: yes
+{"project":"node22-app","host":"fm-mac-lab","outcome":"pass","exit":0,"fallback":null,"wait_s":6,"slot":null}

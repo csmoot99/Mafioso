@@ -1,0 +1,34 @@
+## run 2: same lockfile -> cache reuse (expect no pnpm install output)
+fingerprint before: 9161166f3c019d59346224fd9108ec5ed932bd1e3ed8fc514aff8a9bef233fca
+$ node t.js v24.
+PROJECT=node24-app NODE=v24.22.1 PNPM=11.25.0 isNumber(5)=true
+exit=0
+fingerprint after:  9161166f3c019d59346224fd9108ec5ed932bd1e3ed8fc514aff8a9bef233fca
+
+## run 3: lockfile changed (added is-odd) -> cache refreshed (expect install output and new fingerprint)
+? Verifying lockfile against supply-chain policies (3 entries)...
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +3
++++
+Packages are hard linked from the content-addressable store to the virtual store.
+  Content-addressable store is at: /tmp/fm-heavy-lab.tf7zMz/host/.local/share/pnpm/store/v11
+  Virtual store is at:             node_modules/.pnpm
+Progress: resolved 3, reused 1, downloaded 2, added 3, done
+✓ Lockfile passes supply-chain policies (3 entries in 353ms)
+
+dependencies:
++ is-number 7.0.0
++ is-odd 3.0.1
+
+Done in 639ms using pnpm v11.25.0
+$ node t.js v24. && node -e "console.log(\"isOdd(3)=\"+require(\"is-odd\")(3))"
+PROJECT=node24-app NODE=v24.22.1 PNPM=11.25.0 isNumber(5)=true
+isOdd(3)=true
+exit=0
+fingerprint now:    cdc1da1713d8fcbbf50bbdfc4752a99c7cf6b4c54bdef274ed707b3df4482fbd
+cached modules: is-number is-odd 
+
+## records
+{"project":"node24-app","host":"fm-mac-lab","outcome":"pass","exit":0,"fallback":null,"run_s":1,"candidate":"52eff1e6890258d5e4404f4cde714c21d080e143"}
+{"project":"node24-app","host":"fm-mac-lab","outcome":"pass","exit":0,"fallback":null,"run_s":1,"candidate":"70e9da69ed4e15541dcd1e7cd00acd2b36a6e2bf"}

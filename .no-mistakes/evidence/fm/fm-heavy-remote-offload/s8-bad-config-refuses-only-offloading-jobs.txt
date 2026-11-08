@@ -1,0 +1,71 @@
+### config now has a duplicate approval (last line repeats 'command nodeps-app -- node --test')
+## /tmp/fm-heavy-lab.tf7zMz/run.sh nodeps-app --class build -- node --version
+fm-heavy.sh: warning: malformed /tmp/fm-heavy-lab.tf7zMz/home/config/heavy-remote: invalid line 13 (see --help); running locally
+v24.22.1
+exit=0; warnings printed: 1
+{"project":"nodeps-app","class":"build","host":"local","exit":0}
+
+## /tmp/fm-heavy-lab.tf7zMz/run.sh nolock-app --class test -- node -e console.log("unapproved job ran locally")
+fm-heavy.sh: warning: malformed /tmp/fm-heavy-lab.tf7zMz/home/config/heavy-remote: invalid line 13 (see --help); running locally
+unapproved job ran locally
+exit=0; warnings printed: 1
+{"project":"nolock-app","class":"test","host":"local","exit":0}
+
+## /tmp/fm-heavy-lab.tf7zMz/run.sh nodeps-app --class test --remote -- node --test
+fm-heavy.sh: malformed /tmp/fm-heavy-lab.tf7zMz/home/config/heavy-remote: invalid line 13 (see --help)
+exit=2; warnings printed: 0
+{"project":"nolock-app","class":"test","host":"local","exit":0}
+
+## /tmp/fm-heavy-lab.tf7zMz/run.sh nodeps-app --class test -- node --test
+fm-heavy.sh: malformed /tmp/fm-heavy-lab.tf7zMz/home/config/heavy-remote: invalid line 13 (see --help)
+exit=2; warnings printed: 0
+{"project":"nolock-app","class":"test","host":"local","exit":0}
+
+### config is unreadable (chmod 000)
+## /tmp/fm-heavy-lab.tf7zMz/run.sh nolock-app --class test -- node -e console.log("unapproved job ran locally")
+fm-heavy.sh: warning: cannot read /tmp/fm-heavy-lab.tf7zMz/home/config/heavy-remote; running locally
+unapproved job ran locally
+exit=0; warnings printed: 1
+{"project":"nolock-app","class":"test","host":"local","exit":0}
+
+## /tmp/fm-heavy-lab.tf7zMz/run.sh nodeps-app --class test -- node --test
+fm-heavy.sh: warning: cannot read /tmp/fm-heavy-lab.tf7zMz/home/config/heavy-remote; running locally
+NODE=v24.22.1
+✔ runs on host (2.441334ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 114.388029
+exit=0; warnings printed: 1
+{"project":"nodeps-app","class":"test","host":"local","exit":0}
+
+## /tmp/fm-heavy-lab.tf7zMz/run.sh nodeps-app --class test --remote -- node --test
+fm-heavy.sh: cannot read /tmp/fm-heavy-lab.tf7zMz/home/config/heavy-remote
+exit=2; warnings printed: 0
+{"project":"nodeps-app","class":"test","host":"local","exit":0}
+
+### config removed entirely
+## /tmp/fm-heavy-lab.tf7zMz/run.sh nodeps-app --class test --remote -- node --test
+fm-heavy.sh: --remote needs /tmp/fm-heavy-lab.tf7zMz/home/config/heavy-remote
+exit=2; warnings printed: 0
+{"project":"nodeps-app","class":"test","host":"local","exit":0}
+
+## /tmp/fm-heavy-lab.tf7zMz/run.sh nodeps-app --class test -- node --test
+NODE=v24.22.1
+✔ runs on host (4.561593ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 260.561366
+exit=0; warnings printed: 0
+{"project":"nodeps-app","class":"test","host":"local","exit":0}
+
+ssh calls during bad-config runs: 0

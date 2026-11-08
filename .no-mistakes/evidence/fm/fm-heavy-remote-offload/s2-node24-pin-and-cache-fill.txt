@@ -1,0 +1,19 @@
+? Verifying lockfile against supply-chain policies (1 entry)...
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +1
++
+✓ Lockfile passes supply-chain policies (1 entry in 270ms)
+Packages are hard linked from the content-addressable store to the virtual store.
+  Content-addressable store is at: /tmp/fm-heavy-lab.tf7zMz/host/.local/share/pnpm/store/v11
+  Virtual store is at:             node_modules/.pnpm
+Progress: resolved 1, reused 0, downloaded 1, added 1, done
+
+dependencies:
++ is-number 7.0.0
+
+Done in 638ms using pnpm v11.25.0
+$ node t.js v24.
+PROJECT=node24-app NODE=v24.22.1 PNPM=11.25.0 isNumber(5)=true
+exit=0
+{"project":"node24-app","host":"fm-mac-lab","outcome":"pass","exit":0,"fallback":null,"run_s":2}
