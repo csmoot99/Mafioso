@@ -25,6 +25,7 @@
 // The shim records listeners so the harness can drive the page the way a
 // captain does: tap each summary card, type past the note cap, press the arrows.
 import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 
 const html = readFileSync(process.argv[2], "utf8");
 
@@ -72,6 +73,7 @@ class Node {
   focus() { globalThis.document.activeElement = this; }
   insertAdjacentHTML() {}
   removeAttribute(k) { delete this.attributes[k]; if (k === "src") this.src = undefined; }
+  remove() { this.parentNode?.removeChild(this); }
   removeChild(n) { this.children = this.children.filter((c) => c !== n); n.parentNode = null; }
   querySelectorAll(sel) {
     const want = sel.replace(/^\./, "").replace(/:checked$/, "");
@@ -97,6 +99,7 @@ const payload = JSON.parse(payloadText);
 // The elements the shipped markup carries before the script runs.
 const seedPage = () => {
   byId.clear();
+  if (globalThis.document?.body) document.body.textContent = "";
   const dataNode = new Node("script");
   dataNode.textContent = payloadText;
   byId.set("bearings-data", dataNode);
@@ -110,6 +113,7 @@ seedPage();
 
 globalThis.document = {
   documentElement: new Node("html"),
+  body: new Node("body"),
   activeElement: null,
   createElement: (tag) => new Node(tag),
   // Lazily mint any element the page asks for: the shim tracks whatever ids
@@ -179,6 +183,11 @@ const loadPage = () => {
   return posted.splice(0).map((message, i) => ({ message, origin: origins[i] }));
 };
 const ready = loadPage();
+const reportScripts = () => document.body.children.filter((n) => n.tagName === "script");
+const reportLazy = { initialRequests: reportScripts().length };
+const deliverReports = () => {
+  for (const n of reportScripts()) new Function(readFileSync(resolve(dirname(process.argv[2]), n.src), "utf8"))();
+};
 
 const PANELS = ["call", "underway", "landed", "charted", "reports"];
 const visiblePanels = () => PANELS.filter((p) => !byId.get("bb-sec-" + p)?.hidden);
@@ -259,10 +268,17 @@ const cards = call.children
   .map((card) => ({
     title: card.querySelectorAll(".bb-decision__title")[0]?.textContent ?? "",
     images: card.querySelectorAll(".bb-shot__img").map((i) => ({
-      src: i.src, alt: i.alt, lazy: i.loading === "lazy",
+      src: i.src, alt: i.alt, lazy: i.loading === "lazy", async: i.decoding === "async", width: i.width, height: i.height,
     })),
     note: noteOf(card, "\u00e9".repeat(700)),
   }));
+let lightboxOriginal = null;
+const firstShot = call.querySelectorAll(".bb-shot")[0];
+if (firstShot) {
+  firstShot.dispatch("click");
+  lightboxOriginal = byId.get("bb-lb-img").src;
+  byId.get("bb-lb-close").dispatch("click");
+}
 // Press "next" once: the shown card changes and its top is brought into view.
 const nextBtn = byId.get("bb-stack-next");
 const beforeNext = scrolls.length;
@@ -396,6 +412,20 @@ const repQ = byId.get("bb-rep-q") || new Node("input");
 const repProj = byId.get("bb-rep-proj") || new Node("select");
 const repMore = byId.get("bb-rep-more") || new Node("button");
 const repStatus = () => byId.get("bb-rep-status")?.textContent ?? "";
+if (payload.reports_count) {
+  tabButtons().find((b) => b.id === "bb-tab-reports").dispatch("click");
+  reportLazy.loading = { requests: reportScripts().length, disabled: repQ.disabled, placeholder: repQ.placeholder, status: repStatus(), rows: repRows() };
+  tabButtons().find((b) => b.id === "bb-tab-reports").dispatch("click");
+  reportLazy.repeatedRequests = reportScripts().length;
+  if (process.env.BOARD_REPORT_FAIL) {
+    reportScripts()[0].onerror();
+    reportLazy.failed = { disabled: repQ.disabled, status: repStatus(), rows: repRows() };
+    tabButtons().find((b) => b.id === "bb-tab-reports").dispatch("click");
+    reportLazy.retryRequests = reportScripts().length;
+  }
+  deliverReports();
+  reportLazy.loaded = { disabled: repQ.disabled, placeholder: repQ.placeholder, pending: reportScripts().length };
+}
 const reports = { rows: repRows(), status: repStatus(), moreHidden: repMore.hidden,
   moreLabel: repMore.textContent, count: byId.get("bb-rep-count")?.textContent ?? "",
   projects: repProj.children.map((o) => ({ value: o.value, label: o.textContent })) };
@@ -456,6 +486,7 @@ posted.length = 0;
 postedOrigins.length = 0;
 seedPage();
 const reloaded = { ready: loadPage(), loaded: deckState() };
+deliverReports();
 const callKeys = (payload.captains_call || []).map((c) => c.key);
 const callTitles = (payload.captains_call || []).map((c) => c.title);
 const keyed = (key, n, title) => ({ key, ...item(n, title, "yes") });
@@ -472,4 +503,4 @@ if (callKeys.length >= 2) {
 }
 
 process.stdout.write(
-  JSON.stringify({ tabs, loaded, tabClicks, keys, answerKeepsTab, reports, underway, charted, empty, more, cards, arrow, send, attach, ready, reloaded, error: errorText }) + "\n");
+  JSON.stringify({ tabs, loaded, tabClicks, keys, answerKeepsTab, reportLazy, reports, underway, charted, empty, more, cards, lightboxOriginal, arrow, send, attach, ready, reloaded, error: errorText }) + "\n");

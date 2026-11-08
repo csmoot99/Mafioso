@@ -35,7 +35,7 @@ my $raw = do {
 };
 if ($text_mode) {
     # one line of words for board search: markdown syntax dropped, whitespace
-    # collapsed, and capped at $TEXT_CAP characters so the whole board stays small
+    # collapsed, and capped at $TEXT_CAP characters so the report index stays small
     my $TEXT_CAP = 6000;
     my $t = do { open(my $th, '<:encoding(UTF-8)', $file) or die "fm-bearings-md: cannot read $file\n"; local $/; <$th> // '' };
     $t =~ s/\A\x{FEFF}//;

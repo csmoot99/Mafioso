@@ -93,7 +93,7 @@ setup() {
   make_fake_ssh "$fakebin"
   make_unscoped_systemd_run "$fakebin"
   FAKEBIN=$fakebin
-  printf '%s\n' '# approved for these tests only' 'host fake-mac' 'command bash t/job.sh' "timeout ${3:-30}" \
+  printf '%s\n' '# approved for these tests only' 'host fake-mac' 'command p -- bash t/job.sh' "timeout ${3:-30}" \
     > "$HOME_FM/config/heavy-remote"
   printf '%s\n' "$2" > "$REPO/t/job.sh"
   git -C "$REPO" init -q
@@ -150,17 +150,21 @@ test_off_by_default_and_refusals() {
     and .job == null and .fallback == null and .slot == 1 and .exit == 0' "local record"
   [ ! -s "$CTL/log" ] || fail "without --remote nothing may reach the host"
   : > "$LOG"
-  (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" "$HEAVY" --class test --remote -- bash other.sh) 2>/dev/null
+  (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" "$HEAVY" --class test --project p --remote -- bash other.sh) 2>/dev/null
   expect_code 2 "$?" "a command that is not the approved one"
-  (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" "$HEAVY" --class image --remote -- bash t/job.sh) 2>/dev/null
+  (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" "$HEAVY" --class image --project p --remote -- bash t/job.sh) 2>/dev/null
   expect_code 2 "$?" "image stays local"
+  (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" "$HEAVY" --class build --project p --remote -- bash t/job.sh) 2>/dev/null
+  expect_code 2 "$?" "build stays local"
+  (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" "$HEAVY" --class test --remote -- bash t/job.sh) 2>/dev/null
+  expect_code 2 "$?" "a job with no project has no approval"
   rm "$HOME_FM/config/heavy-remote"
   heavy --remote >/dev/null 2>&1; expect_code 2 "$?" "no config"
   local bad
-  for bad in 'host a\n' 'host a\ncommand bash t/job.sh\nhost b\n' 'host a b\ncommand bash t/job.sh\n' \
-    'host a\ncommand bash t/job.sh\ncommand bash t/job.sh\n' 'host a\ncommand bash t/job.sh\ntimeout 0\n' \
-    'host a\ncommand bash t/job.sh\nsurprise 1\n' 'host a\ncommand bash t/job.sh\nsurprise 1' \
-    'host a\ncommand bash t/job.sh\ntimeout 0'; do
+  for bad in 'host a\n' 'host a\ncommand p -- bash t/job.sh\nhost b\n' 'host a b\ncommand p -- bash t/job.sh\n' \
+    'host a\ncommand p -- bash t/job.sh\ncommand p -- bash t/job.sh\n' 'host a\ncommand p -- bash t/job.sh\ntimeout 0\n' \
+    'host a\ncommand p -- bash t/job.sh\nsurprise 1\n' 'host a\ncommand p -- bash t/job.sh\nsurprise 1' \
+    'host a\ncommand p -- bash t/job.sh\ntimeout 0'; do
     # shellcheck disable=SC2059 # the cases are printf formats
     printf "$bad" > "$HOME_FM/config/heavy-remote"
     heavy --remote >/dev/null 2>&1; expect_code 2 "$?" "malformed config: $bad"
@@ -466,7 +470,7 @@ test_signalled_wrapper_stops_only_its_job() {
   sleep 300 &
   foreign=$!
   (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" FAKE_SSH_CTL="$CTL" FAKE_SSH_HOME="$REMOTE_HOME" \
-    exec setsid env --default-signal=INT "$HEAVY" --class test --remote -- bash t/job.sh >/dev/null 2>&1) &
+    exec setsid env --default-signal=INT "$HEAVY" --class test --project p --remote -- bash t/job.sh >/dev/null 2>&1) &
   pid=$!
   until [ -s "$REMOTE_HOME/child.pid" ]; do n=$((n + 1)); [ "$n" -le 100 ] || fail "the job never started"; sleep 0.1; done
   kill -TERM -- "-$pid"
@@ -539,7 +543,7 @@ PY
 
 test_unterminated_config_last_line() {
   setup lastline 'sleep 4' 
-  printf 'host fake-mac\ncommand bash t/job.sh\ntimeout 1' > "$HOME_FM/config/heavy-remote"
+  printf 'host fake-mac\ncommand p -- bash t/job.sh\ntimeout 1' > "$HOME_FM/config/heavy-remote"
   heavy --remote >/dev/null 2>&1; expect_code 124 "$?" "an unterminated timeout line must apply"
   expect_record '.outcome == "timeout"' "timeout from the last config line"
   pass "fm-heavy --remote: the last config line counts without a trailing newline"
@@ -550,7 +554,7 @@ test_signal_during_eligibility_never_runs_locally() {
   setup eligibility "echo ran >> $TMP_ROOT/eligibility/ran"
   rule slowprobe pre '^true$' 1 'sleep 3'
   (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" FAKE_SSH_CTL="$CTL" FAKE_SSH_HOME="$REMOTE_HOME" \
-    exec setsid env --default-signal=INT "$HEAVY" --class test --remote -- bash t/job.sh >/dev/null 2>&1) &
+    exec setsid env --default-signal=INT "$HEAVY" --class test --project p --remote -- bash t/job.sh >/dev/null 2>&1) &
   pid=$!
   until [ -s "$CTL/log" ]; do n=$((n + 1)); [ "$n" -le 100 ] || fail "the probe never started"; sleep 0.1; done
   kill -TERM -- "-$pid"
@@ -569,7 +573,7 @@ test_wrapper_only_signal_never_runs_locally() {
   # The host is down, so the driver falls back; only the wrapper hears the signal.
   rule slowprobe partial '^true$' 1 ': > "$HOME/probing"; sleep 1'
   (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" FAKE_SSH_CTL="$CTL" FAKE_SSH_HOME="$REMOTE_HOME" \
-    exec "$HEAVY" --class test --remote -- bash t/job.sh >/dev/null 2>&1) &
+    exec "$HEAVY" --class test --project p --remote -- bash t/job.sh >/dev/null 2>&1) &
   pid=$!
   wait_for "$REMOTE_HOME/probing"
   kill -TERM "$pid"
@@ -586,7 +590,7 @@ test_wrapper_only_signal_never_runs_locally() {
 stop_group_at() {
   local pid
   (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" FAKE_SSH_CTL="$CTL" FAKE_SSH_HOME="$REMOTE_HOME" \
-    exec setsid env --default-signal=INT "$HEAVY" --class test --remote -- bash t/job.sh >/dev/null 2>&1) &
+    exec setsid env --default-signal=INT "$HEAVY" --class test --project p --remote -- bash t/job.sh >/dev/null 2>&1) &
   pid=$!
   wait_for "$1"
   kill -TERM -- "-$pid"
@@ -746,24 +750,16 @@ SH
 test_scoped_offload() {
   local bad out pid
   setup offload 'echo remote-or-local'
-  printf 'host fake-mac\ncommand p -- bash t/job.sh\ncommand other -- bash t/other.sh\nslots 2\noffload\n' > "$HOME_FM/config/heavy-remote"
+  printf 'host fake-mac\ncommand p -- bash t/job.sh\ncommand other -- bash t/other.sh\noffload\n' > "$HOME_FM/config/heavy-remote"
   heavy >/dev/null 2>&1 || fail "a free local slot stays local"
   expect_record '.host == "local" and .fallback == null' "free local slot"
   hold_local
   heavy >/dev/null 2>&1 || fail "a busy local slot offloads an approved project"
   expect_record '.host == "fake-mac" and .outcome == "pass"' "automatic offload"
-  # The first remote slot is busy too: the configured second slot admits the job.
-  exec 3>>"$LOCK.remote.fake-mac"; flock 3
-  heavy >/dev/null 2>&1 || fail "a configured second remote slot admits work"
-  expect_record '.host == "fake-mac" and .outcome == "pass"' "second remote slot"
-  exec 3>&-
   release_local
-  for class in build e2e; do
-    (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" FAKE_SSH_CTL="$CTL" FAKE_SSH_HOME="$REMOTE_HOME" \
-      "$HEAVY" --class "$class" --project p --remote -- bash t/job.sh) >/dev/null 2>&1 || fail "approved $class"
-    expect_record ".class == \"$class\" and .host == \"fake-mac\"" "$class record"
-  done
-  for bad in 'slots 0' 'slots 2 extra' 'offload yes' 'offload\noffload' 'command p --' 'command p -- bash t/job.sh'; do
+  heavy --class e2e --remote >/dev/null 2>&1 || fail "approved e2e"
+  expect_record '.class == "e2e" and .host == "fake-mac"' "e2e record"
+  for bad in 'slots 1' 'offload yes' 'offload\noffload' 'command p --' 'command p -- bash t/job.sh' 'command bash t/job.sh'; do
     printf 'host fake-mac\ncommand p -- bash t/job.sh\n%b\n' "$bad" > "$HOME_FM/config/heavy-remote"
     heavy >/dev/null 2>&1; expect_code 2 "$?" "malformed scoped config $bad"
   done
@@ -779,40 +775,107 @@ test_scoped_offload() {
   release_local
   wait "$pid" || fail "other project local run"
   expect_record '.host == "local" and .fallback == null' "approval scoped to another project"
-  # A down host records its fallback and waits in the same local queue.
-  setup autodown 'echo local'
+  # A build's output has to exist here, so a busy local slot never offloads one.
+  setup buildstays 'echo local'
   observe_local_queue
+  printf 'host fake-mac\ncommand p -- bash t/job.sh\noffload\n' > "$HOME_FM/config/heavy-remote"
+  hold_local
+  heavy --class build >"$CASE/out" 2>&1 4>&- & pid=$!
+  wait_for "$CTL/local-waiting"
+  [ ! -s "$CTL/log" ] || fail "a build may not contact the host"
+  release_local
+  wait "$pid" || fail "local build"
+  expect_record '.class == "build" and .host == "local" and .fallback == null' "build stays local"
+  # A down host records its fallback when the local slot frees first.
+  setup autodown 'echo local'
   printf 'host fake-mac\ncommand p -- bash t/job.sh\noffload\n' > "$HOME_FM/config/heavy-remote"
   rule down drop . -1
   hold_local
   heavy >"$CASE/out" 2>&1 4>&- & pid=$!
-  wait_for "$CTL/local-waiting"
+  wait_for "$CTL/log"
   release_local
   wait "$pid" || fail "down-host fallback"
   expect_record '.host == "local" and .fallback == "unreachable" and .exit == 0' "automatic unreachable fallback"
-  pass "fm-heavy: scoped approvals, automatic offload, slots, classes and malformed refusal"
+  pass "fm-heavy: scoped approvals, automatic offload, classes and malformed refusal"
 }
 
-test_remote_slots_run_independently() {
+# Report each check of the remote slot, so a test can see a queued job re-check it.
+observe_remote_checks() {
+  cat > "$FAKEBIN/flock" <<'SH'
+#!/usr/bin/env bash
+[ "$*" != "-n 8" ] || touch "$FAKE_SSH_CTL/remote-checked"
+SH
+  printf 'exec %q "$@"\n' "$(command -v flock)" >> "$FAKEBIN/flock"
+  chmod +x "$FAKEBIN/flock"
+}
+hold_remote() {
+  exec 3>>"$LOCK.remote.fake-mac"
+  flock 3
+}
+release_remote() { exec 3>&-; }
+# Wait until the job has checked the remote slot again after its first look.
+wait_for_recheck() {
+  wait_for "$CTL/remote-checked"
+  rm "$CTL/remote-checked"
+  wait_for "$CTL/remote-checked"
+}
+
+test_queued_job_moves_to_the_freed_host() {
   local pid
-  setup parallel 'test "$HOME" = "$FAKE_SSH_HOME" || exit 91
-if mkdir "$HOME/first" 2>/dev/null; then
-  touch "$HOME/first-started"
-  until [ -e "$HOME/release" ]; do sleep 0.1; done
-else
-  touch "$HOME/second-finished"
-fi'
-  printf 'host fake-mac\ncommand p -- bash t/job.sh\nslots 2\n' > "$HOME_FM/config/heavy-remote"
-  heavy --remote >"$CASE/first.out" 2>&1 & pid=$!
-  wait_for "$REMOTE_HOME/first-started"
-  heavy --remote >"$CASE/second.out" 2>&1 || fail "second slot must run beside first: $(cat "$CASE/second.out")"
-  assert_present "$REMOTE_HOME/second-finished" "second configured slot finishes independently"
-  expect_record '.host == "fake-mac" and .outcome == "pass"' "second slot record"
-  touch "$REMOTE_HOME/release"
-  wait "$pid" || fail "first remote slot must finish"
-  [ "$(wc -l < "$LOG")" -eq 2 ] || fail "each remote slot records its own job"
-  expect_host_clean "both slots clean up their own jobs"
-  pass "fm-heavy: configured remote slots run independently with separate reconciliation"
+  setup drain 'echo ran >> "$HOME/runs"'
+  observe_remote_checks
+  printf 'host fake-mac\ncommand p -- bash t/job.sh\noffload\n' > "$HOME_FM/config/heavy-remote"
+  hold_local
+  hold_remote
+  heavy >"$CASE/out" 2>&1 3>&- 4>&- & pid=$!
+  wait_for_recheck
+  [ ! -s "$LOG" ] || fail "the job must still be queued: $(cat "$LOG")"
+  release_remote
+  wait_for "$LOG"
+  wait "$pid" || fail "a queued job must pass on the freed host: $(cat "$CASE/out")"
+  release_local
+  expect_record '.host == "fake-mac" and .outcome == "pass" and .fallback == null and .wait_s >= 0' "drained job"
+  [ "$(wc -l < "$REMOTE_HOME/runs")" -eq 1 ] || fail "the moved job runs once"
+
+  # A host that was unreachable at admission is tried again while the job queues.
+  setup recovered 'echo ran >> "$HOME/runs"'
+  printf 'host fake-mac\ncommand p -- bash t/job.sh\noffload\n' > "$HOME_FM/config/heavy-remote"
+  rule blip drop '^true$' 1
+  hold_local
+  FM_HEAVY_REMOTE_RECHECK=0 heavy >"$CASE/out" 2>&1 3>&- 4>&- & pid=$!
+  wait_for "$LOG"
+  wait "$pid" || fail "a recovered host must take the queued job: $(cat "$CASE/out")"
+  release_local
+  expect_record '.host == "fake-mac" and .outcome == "pass" and .fallback == null' "recovered host"
+
+  # Nothing changes a dirty tree while it queues, so it stops asking.
+  setup stilldirty 'echo local'
+  observe_local_queue
+  printf 'host fake-mac\ncommand p -- bash t/job.sh\noffload\n' > "$HOME_FM/config/heavy-remote"
+  echo dirty > "$REPO/untracked-change"
+  hold_local
+  heavy >"$CASE/out" 2>&1 3>&- 4>&- & pid=$!
+  wait_for "$CTL/local-waiting"
+  [ ! -s "$CTL/log" ] || fail "a dirty tree may not contact the host"
+  release_local
+  wait "$pid" || fail "dirty tree local run"
+  expect_record '.host == "local" and .fallback == "dirty-tree"' "dirty tree queues locally"
+  pass "fm-heavy: a queued approved job moves to the host once it frees, and an ineligible one stays queued"
+}
+
+test_queued_job_signal_runs_nowhere() {
+  setup queuedstop "echo ran >> $TMP_ROOT/queuedstop/ran"
+  observe_remote_checks
+  hold_local
+  hold_remote
+  stop_group_at "$CTL/remote-checked"
+  expect_code 143 "$?" "a job signalled while checking both queues"
+  release_remote
+  release_local
+  expect_record '.host == "local" and .started_at == null and .exit == null' "queued record"
+  [ ! -e "$CASE/ran" ] || fail "a signalled job must not run"
+  [ ! -s "$CTL/log" ] || fail "a signalled job must not reach the host"
+  pass "fm-heavy: a signal while a job checks both queues stops it before it runs anywhere"
 }
 
 make_node_project() {
@@ -828,6 +891,7 @@ echo "${FAKE_NODE_VERSION:-v22.1.0}"
 SH
   cat > "$FAKEBIN/pnpm" <<'SH'
 #!/usr/bin/env bash
+[ "${FAKE_PNPM_MISSING:-}" != 1 ] || exit 127
 if [ "$1" = --version ]; then echo "${FAKE_MANAGER_VERSION:-9.1.0}"; exit; fi
 printf '%s\n' "$*" >> "$HOME/install.log"
 [ "${FAKE_INSTALL_FAIL:-}" != 1 ] || exit 42
@@ -863,6 +927,89 @@ test_dependency_cache_and_failures() {
   pass "fm-heavy: cached dependencies refresh on lockfile change; runtime/install failures cannot fall back"
 }
 
+# host_tool <bin dir> <tool> <version>: one installed version of a tool on the host.
+host_tool() {
+  mkdir -p "$1"
+  cat > "$1/$2" <<SH
+#!/usr/bin/env bash
+if [ "\$1" = --version ]; then echo $3; exit; fi
+printf '%s\n' "$2 $3 \$*" >> "\$HOME/install.log"
+mkdir -p node_modules; echo ready > node_modules/proof
+SH
+  chmod +x "$1/$2"
+}
+
+test_each_project_runs_on_its_pinned_runtimes() {
+  local out
+  setup runtimes 'test -f node_modules/proof && node --version && pnpm --version'
+  make_node_project
+  host_tool "$REMOTE_HOME/.nvm/versions/node/v22.4.0/bin" node v22.4.0
+  host_tool "$REMOTE_HOME/.nvm/versions/node/v24.9.0/bin" node v24.9.0
+  host_tool "$REMOTE_HOME/.nvm/versions/node/v24.10.0/bin" node v24.10.0
+  host_tool "$REMOTE_HOME/.fm-heavy-remote/runtimes/pnpm/9.2.0/bin" pnpm 9.2.0
+  # This project's pins are the host's defaults.
+  out=$(heavy --remote 2>&1) || fail "default runtimes: $out"
+  assert_contains "$out" "v22.1.0" "the SSH PATH node meets this project's pin"
+  # The same host, pinned elsewhere: neither default can run this one.
+  printf '{"engines":{"node":">=24.0.0"},"packageManager":"pnpm@9.2.0"}\n' > "$REPO/package.json"
+  printf '24\n' > "$REPO/.nvmrc"
+  git -C "$REPO" add -A; git -C "$REPO" commit -q -m pins
+  out=$(heavy --remote 2>&1) || fail "pinned runtimes: $out"
+  assert_contains "$out" "v24.10.0" "the newest installed node meeting the pins runs the job"
+  assert_contains "$out" "9.2.0" "the pinned pnpm runs the job"
+  grep -F 'pnpm 9.2.0 install' "$REMOTE_HOME/install.log" >/dev/null || fail "the pinned pnpm installs dependencies"
+  printf '{"engines":{"node":">=26.0.0"},"packageManager":"pnpm@9.2.0"}\n' > "$REPO/package.json"
+  git -C "$REPO" add -A; git -C "$REPO" commit -q -m missingnode
+  heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "a pinned node that is not installed"
+  assert_grep 'does not satisfy >=26.0.0' "$CASE/out" "the refusal names the node pin"
+  printf '{"packageManager":"pnpm@9.9.0"}\n' > "$REPO/package.json"
+  rm "$REPO/.nvmrc"
+  git -C "$REPO" add -A; git -C "$REPO" commit -q -m missingpnpm
+  heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "a pnpm that cannot provide the pin"
+  assert_grep 'does not satisfy 9.9.0' "$CASE/out" "the refusal names the pnpm pin"
+  # A real pnpm reports the pin once it has fetched that version for itself.
+  out=$(FAKE_MANAGER_VERSION=9.9.0 heavy --remote 2>&1) || fail "self-fetched pnpm: $out"
+  assert_contains "$out" "9.9.0" "a pnpm providing its own pin runs the job"
+  rm -rf "$REMOTE_HOME/.fm-heavy-remote/runtimes"
+  FAKE_PNPM_MISSING=1 heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "no pnpm reachable"
+  assert_grep 'missing runtime pnpm' "$CASE/out" "the refusal says no pnpm was found"
+  expect_record '.host == "fake-mac" and .outcome == "failed" and .fallback == null' "a missing runtime never retries locally"
+  pass "fm-heavy: each project runs on the node and pnpm it pins; a missing node or no pnpm is a clear refusal"
+}
+
+test_project_without_dependencies_needs_no_lockfile() {
+  local out
+  setup nodeps 'node --version'
+  make_node_project
+  host_tool "$REMOTE_HOME/.nvm/versions/node/v24.7.0/bin" node v24.7.0
+  printf '{"engines":{"node":">=24.7"},"scripts":{"test":"node --test"}}\n' > "$REPO/package.json"
+  git -C "$REPO" rm -q pnpm-lock.yaml .nvmrc
+  git -C "$REPO" add -A; git -C "$REPO" commit -q -m nodeps
+  out=$(heavy --remote 2>&1) || fail "a project with nothing to lock must run: $out"
+  assert_contains "$out" "v24.7.0" "the job still runs on the project's pinned node"
+  [ ! -e "$REMOTE_HOME/install.log" ] || fail "nothing may be installed: $(cat "$REMOTE_HOME/install.log")"
+  printf '{"engines":{"node":">=26.0.0"}}\n' > "$REPO/package.json"
+  git -C "$REPO" add -A; git -C "$REPO" commit -q -m missingnode
+  heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "a pinned node that is not installed"
+  assert_grep 'does not satisfy >=26.0.0' "$CASE/out" "the refusal names the node pin"
+  printf '{"devDependencies":{"left-pad":"1.3.0"}}\n' > "$REPO/package.json"
+  git -C "$REPO" add -A; git -C "$REPO" commit -q -m unlocked
+  heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "declared dependencies with no lockfile"
+  assert_grep 'no supported lockfile' "$CASE/out" "the refusal names the lockfile"
+  pass "fm-heavy: a project with no dependencies needs no lockfile; a pinned node and declared dependencies still refuse"
+}
+
+test_command_missing_on_host_cannot_run() {
+  setup nocommand 'echo unused'
+  printf 'host fake-mac\ncommand p -- fm-no-such-command\n' > "$HOME_FM/config/heavy-remote"
+  (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" FAKE_SSH_CTL="$CTL" FAKE_SSH_HOME="$REMOTE_HOME" \
+    "$HEAVY" --class test --project p --remote -- fm-no-such-command) >"$CASE/out" 2>&1
+  expect_code 127 "$?" "an approved command the host does not have"
+  assert_grep 'cannot run fm-no-such-command' "$CASE/out" "the failure names the command"
+  expect_record '.host == "fake-mac" and .outcome == "failed" and .exit == 127' "cannot-run record"
+  pass "fm-heavy --remote: a command missing on the host is a cannot-run failure, not a preparation failure"
+}
+
 test_npm_dependency_cache() {
   setup npmdeps 'test -f node_modules/proof'
   make_node_project
@@ -878,7 +1025,7 @@ test_npm_dependency_cache() {
   printf '24\n' > "$REPO/.nvmrc"
   git -C "$REPO" add -A; git -C "$REPO" commit -q -m nvmrc
   heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "nvmrc mismatch"
-  assert_grep 'does not satisfy 24' "$CASE/out" "nvmrc selects runtime"
+  assert_grep 'does not satisfy ^22.0.0 and 24' "$CASE/out" "nvmrc selects runtime"
   pass "fm-heavy: npm lock caching and nvmrc compatibility are enforced"
 }
 
@@ -921,8 +1068,12 @@ test_zombie_group_eperm_keeps_the_result
 test_runner_refuses_bad_input
 test_summary_compares_hosts
 test_scoped_offload
-test_remote_slots_run_independently
+test_queued_job_moves_to_the_freed_host
+test_queued_job_signal_runs_nowhere
 test_dependency_cache_and_failures
+test_each_project_runs_on_its_pinned_runtimes
+test_project_without_dependencies_needs_no_lockfile
+test_command_missing_on_host_cannot_run
 test_e2e_browser_preparation
 test_npm_dependency_cache
 

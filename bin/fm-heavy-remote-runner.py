@@ -5,9 +5,14 @@ Usage: fm-heavy-remote-runner.py start|supervise|status|reconcile|wait|cancel|cl
 
 The client ships this file with each job, so nothing is installed on the remote
 host. It needs python3 (stdlib), git and ps, and runs on macOS and Linux.
-Node projects also need compatible node and pnpm/npm on the SSH PATH.
-execute prepares locked dependencies and then execs the approved command in the
-supervised process group; preparation failures exit 78, never a local fallback.
+Node projects also need the node and npm versions they pin, and any pnpm, installed
+on the host: on the SSH PATH, under ~/.nvm/versions/node, or under
+~/.fm-heavy-remote/runtimes/<tool>/<version>/bin. A reachable pnpm may fetch the
+version a project pins for itself, and then reports that version. execute puts
+the versions this job's project pins first on its PATH, prepares locked
+dependencies and then execs the approved command in the supervised process group;
+preparation failures exit 78 and a command that cannot run exits 127, never a
+local fallback.
 Dependency copies persist per project under ~/.fm-heavy-remote/cache, keyed by
 lockfile/package settings and runtime versions. Each job has private modules.
 A job directory lives under ~/.fm-heavy-remote and holds manifest.json (job id,
@@ -43,6 +48,7 @@ time differs is left alone.
 """
 
 import fcntl
+import glob
 import hashlib
 import json
 import os
@@ -259,15 +265,33 @@ def satisfies(version, requirement):
     return False
 
 
-def runtime_version(tool, requirements):
-    try:
-        found = subprocess.check_output([tool, "--version"], text=True, stderr=subprocess.STDOUT).strip()
-    except (OSError, subprocess.CalledProcessError) as error:
-        raise ValueError("missing runtime %s; install it on the host and expose it on SSH PATH (%s)" % (tool, error)) from error
-    for requirement in requirements:
-        if not isinstance(requirement, str) or not satisfies(found, requirement):
-            raise ValueError("runtime %s %s does not satisfy %s; select the project's version on SSH PATH" % (tool, found, requirement))
-    return found
+def installed_bins(tool):
+    """Bin directories of the tool's versions installed on this host, newest first."""
+    roots = [os.path.join(ROOT, "runtimes", tool)]
+    if tool == "node":
+        roots.append(os.path.join(os.path.expanduser("~"), ".nvm", "versions", "node"))
+    bins = [path for root in roots for path in glob.glob(os.path.join(root, "*", "bin"))]
+    return sorted(bins, key=lambda path: [int(part) for part in re.findall(r"\d+", os.path.basename(os.path.dirname(path)))], reverse=True)
+
+
+def select_runtime(tool, requirements):
+    """Put the first version meeting the project's pins first on this job's PATH."""
+    found = []
+    for directory in [None] + installed_bins(tool):
+        try:
+            version = subprocess.check_output([os.path.join(directory, tool) if directory else tool, "--version"],
+                                              text=True, stderr=subprocess.STDOUT).strip()
+        except (OSError, subprocess.CalledProcessError):
+            continue
+        found.append(version)
+        if all(isinstance(requirement, str) and satisfies(version, requirement) for requirement in requirements):
+            if directory:
+                os.environ["PATH"] = directory + os.pathsep + os.environ["PATH"]
+            return version
+    if not found:
+        raise ValueError("missing runtime %s; install the project's version on the host" % tool)
+    raise ValueError("runtime %s %s does not satisfy %s; install the project's version on the host"
+                     % (tool, ", ".join(found), " and ".join(str(requirement) for requirement in requirements)))
 
 
 def module_dirs(work):
@@ -287,19 +311,21 @@ def prepare_dependencies(work, manifest):
         return
     if not isinstance(package, dict) or not isinstance(package.get("engines", {}), dict) or not isinstance(package.get("packageManager", ""), str):
         raise ValueError("invalid package.json runtime declarations")
-    locks = [name for name in ("pnpm-lock.yaml", "npm-shrinkwrap.json", "package-lock.json") if os.path.isfile(os.path.join(work, name))]
-    if not locks:
-        raise ValueError("package.json has no supported lockfile (pnpm-lock.yaml, npm-shrinkwrap.json or package-lock.json)")
-    if "pnpm-lock.yaml" in locks and len(locks) != 1:
-        raise ValueError("ambiguous pnpm/npm lockfiles")
-    manager = "pnpm" if locks[0] == "pnpm-lock.yaml" else "npm"
     engines = package.get("engines", {})
     node_requirements = [engines["node"]] if "node" in engines else []
     nvmrc = os.path.join(work, ".nvmrc")
     if os.path.isfile(nvmrc):
         with open(nvmrc) as handle:
             node_requirements.append(handle.read().strip())
-    node = runtime_version("node", node_requirements)
+    node = select_runtime("node", node_requirements)
+    locks = [name for name in ("pnpm-lock.yaml", "npm-shrinkwrap.json", "package-lock.json") if os.path.isfile(os.path.join(work, name))]
+    if not locks:
+        if any(package.get(field) for field in ("dependencies", "devDependencies", "optionalDependencies", "peerDependencies")):
+            raise ValueError("package.json has no supported lockfile (pnpm-lock.yaml, npm-shrinkwrap.json or package-lock.json)")
+        return
+    if "pnpm-lock.yaml" in locks and len(locks) != 1:
+        raise ValueError("ambiguous pnpm/npm lockfiles")
+    manager = "pnpm" if locks[0] == "pnpm-lock.yaml" else "npm"
     requirements = [engines[manager]] if manager in engines else []
     pinned = package.get("packageManager", "")
     if pinned:
@@ -307,8 +333,8 @@ def prepare_dependencies(work, manifest):
         if not pinned.startswith(prefix):
             raise ValueError("packageManager disagrees with lockfile: " + pinned)
         requirements.append(pinned[len(prefix):].split("+", 1)[0])
-    version = runtime_version(manager, requirements)
-    key = hashlib.sha256(manifest.get("project", manifest["sha"]).encode()).hexdigest()
+    version = select_runtime(manager, requirements)
+    key = hashlib.sha256(manifest["project"].encode()).hexdigest()
     cache = os.path.join(ROOT, "cache", key)
     os.makedirs(cache, exist_ok=True)
     digest = hashlib.sha256((node + "\0" + manager + version).encode())
@@ -318,8 +344,7 @@ def prepare_dependencies(work, manifest):
         if os.path.isfile(path):
             digest.update((name + "\0" + sha256_file(path)).encode())
     fingerprint = digest.hexdigest()
-    # Lock only preparation/copying, never a test run. Concurrent slots can test
-    # independent copies of the same project's modules without mutating the cache.
+    # Lock only preparation/copying, never a test run.
     with open(os.path.join(cache, "lock"), "w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         marker = read_json(os.path.join(cache, "installed.json"))
@@ -365,13 +390,14 @@ def needs_playwright(argv, package):
 
 def cmd_execute(jdir):
     manifest = read_json(os.path.join(jdir, "manifest.json"))
-    work = os.path.join(jdir, "work")
     try:
-        prepare_dependencies(work, manifest)
-        os.chdir(work)
-        os.execvp(manifest["argv"][0], manifest["argv"])
+        prepare_dependencies(os.path.join(jdir, "work"), manifest)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         die(78, "remote dependency/runtime preparation failed: %s" % error)
+    try:
+        os.execvp(manifest["argv"][0], manifest["argv"])
+    except OSError as error:
+        die(127, "cannot run %s: %s" % (manifest["argv"][0], error))
 
 
 def cmd_supervise(jdir):

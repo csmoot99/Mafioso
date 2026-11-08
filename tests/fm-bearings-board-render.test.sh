@@ -338,11 +338,31 @@ test_a_card_with_images_renders_one_lazy_thumbnail_per_image() {
     (.cards | length) == 2
       and (.cards[0] | .title == "Has screenshots"
         and .images == [
-          {src:"bearings-board-assets/with-shots/1.png",alt:"First screen",lazy:true},
-          {src:"bearings-board-assets/with-shots/2.png",alt:"Second screen",lazy:true}])
+          {src:"bearings-board-assets/with-shots/1.png",alt:"First screen",lazy:true,async:true,width:160,height:213},
+          {src:"bearings-board-assets/with-shots/2.png",alt:"Second screen",lazy:true,async:true,width:160,height:213}])
       and (.cards[1].images == [])
   ' >/dev/null || fail "a card did not render its screenshots as lazy thumbnails with alt text: $out"
   pass "a card with images renders one lazy thumbnail per image and a card without renders none"
+}
+
+test_thumbnail_tiles_open_the_original_image() {
+  local board_home out
+  board_home=$(make_home card-thumbnail)
+  mkdir -p "$board_home/src"
+  printf 'original screenshot bytes' > "$board_home/src/a.png"
+  # The builder supplies the thumbnail field; this fixture isolates how the page consumes it.
+  cat > "$board_home/fakebin/ffmpeg" <<'SH'
+#!/usr/bin/env bash
+printf 'x' > "${!#}"
+SH
+  chmod +x "$board_home/fakebin/ffmpeg"
+  out=$(render_cards "$board_home" "$(jq -n --arg p "$board_home/src/a.png" '[
+    {key:"shots",type:"decision",repo:"sample",title:"Screens",options:[{value:"yes",label:"Yes"}],images:[{path:$p,alt:"Screen"}]}]')")
+  printf '%s' "$out" | jq -e '
+    .cards[0].images == [{src:"bearings-board-assets/shots/1.thumb.jpg",alt:"Screen",lazy:true,async:true,width:160,height:213}]
+    and .lightboxOriginal == "bearings-board-assets/shots/1.png"
+  ' >/dev/null || fail "the tile did not use the thumbnail and preserve the original for the lightbox: $out"
+  pass "thumbnail tiles open the original image"
 }
 
 test_an_image_outside_the_board_assets_folder_is_not_rendered() {
@@ -496,6 +516,22 @@ test_a_board_with_reports_gets_a_reports_tab_listing_them_newest_first() {
   printf '%s' "$out" | jq -e '.tabClicks[-1] | .visible == ["reports"]' >/dev/null \
     || fail "the Reports tab did not show its own section: $out"
   pass "a board with reports gets a Reports tab listing them newest first"
+}
+
+test_reports_load_only_on_open_show_loading_and_retry_a_failed_request() {
+  local board_home out
+  board_home=$(make_home reports-lazy)
+  out=$(BOARD_REPORT_FAIL=1 render_reports "$board_home" "$(reports_json "$board_home")")
+  printf '%s' "$out" | jq -e '
+    .reportLazy.initialRequests == 0
+    and .reportLazy.loading == {requests:1,disabled:true,placeholder:"Loading reports…",status:"Loading report list and search…",rows:[]}
+    and .reportLazy.repeatedRequests == 1
+    and (.reportLazy.failed | .disabled == false and (.status | contains("retry")) and .rows == [])
+    and .reportLazy.retryRequests == 1
+    and .reportLazy.loaded == {disabled:false,placeholder:"Search reports",pending:0}
+    and (.reports.rows | length) == 3
+  ' >/dev/null || fail "reports did not load lazily with loading and retry states: $out"
+  pass "Reports loads on first open, shows loading, and retries a failed request"
 }
 
 test_the_reports_filters_narrow_the_list_by_text_and_project() {
@@ -689,12 +725,14 @@ test_a_board_of_only_warnings_still_reports_nothing_queued
 test_omitted_warnings_never_count_as_more_queued
 test_an_omitted_kind_keeps_the_existing_queued_rendering
 test_a_card_with_images_renders_one_lazy_thumbnail_per_image
+test_thumbnail_tiles_open_the_original_image
 test_an_image_outside_the_board_assets_folder_is_not_rendered
 test_the_sections_are_tabs_with_counts_and_only_the_selected_one_shows
 test_the_tab_bar_answers_to_the_arrow_home_and_end_keys
 test_queuing_an_answer_keeps_the_captains_call_tab_selected
 test_the_selected_tab_is_restored_from_the_hash_then_storage_then_the_frame_name
 test_a_board_with_reports_gets_a_reports_tab_listing_them_newest_first
+test_reports_load_only_on_open_show_loading_and_retry_a_failed_request
 test_the_reports_filters_narrow_the_list_by_text_and_project
 test_a_report_opens_in_a_scriptless_reader_with_a_way_back
 test_a_board_without_reports_has_no_reports_tab

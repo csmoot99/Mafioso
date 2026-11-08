@@ -57,6 +57,7 @@ config/cmux-socket-password  optional cmux control-socket password; LOCAL, gitig
 config/wedge-alarm  optional away-mode wedge-alarm active-alert directives; LOCAL, gitignored; absent means auto (macOS Notification Center when available); see docs/wedge-alarm.md
 config/watched-tools.json  optional list of the tools this home depends on, read by the update check armed with bin/fm-tool-update-check.sh; LOCAL, gitignored, firstmate-maintained but human-editable, and NOT inherited by secondmate homes; see docs/configuration.md "Watched tool updates"
 config/consigliere  optional on/off switch for the default-off Consigliere PR review stage; LOCAL, gitignored, and not inherited; see docs/configuration.md "Consigliere review"
+config/bearings-rebuild  optional trusted Bash script that rebuilds this home's board after captured answers; LOCAL, gitignored, and not inherited; see docs/configuration.md "Rebuild a board after answers"
 config/watch.env     optional home-local watcher tuning as exported shell assignments; LOCAL, gitignored, never removed by bootstrap; loaded by bin/fm-watch-arm.sh before x-mode.env; see docs/configuration.md "Relay (.env)"
 config/x-mode.env    generated Relay watcher cadence; LOCAL, gitignored; source before arming watcher when present
 data/                personal fleet records; LOCAL, gitignored as a whole
@@ -119,6 +120,7 @@ state/               runtime records and signals; gitignored
   procevent-inbox/   private captured results and their durable handled-acknowledgement markers; source output lives here and never in an event line
   decision-bindings/ private records marking a captured-answer source as feeding the keyed-answer intake, with a legacy origin on pre-collapse records; written only by bin/fm-captain-hold.sh bind, dropped by unbind and by source retirement (`process-event-sources` and `captain-hold-lifecycle` skills; docs/captain-hold-lifecycle.md)
   reconcile-requests/ private open obligations to re-check a captain call whose board selection was `reconcile`; written only by bin/fm-captain-hold.sh, retired by its verify-then-decide outcomes or a normal answer that settles the call (`process-event-sources` and `captain-hold-lifecycle` skills; docs/captain-hold-lifecycle.md)
+  bearings-rebuild/  private board-rebuild queue, locks and logs; written only by bin/fm-bearings-rebuild.sh
   when/              private condition->action watch specs, their trust bindings, and single-fire markers; written only by bin/fm-procevent-when.sh (`process-event-sources` skill)
   inbox/             captain notes captured out of band by bin/fm-inbox.sh, including the voice handover's queued requests; each note appends one `check` wake and stays pending until acknowledged with `bin/fm-inbox.sh drain --ack <id>`, which moves it to inbox/handled/; request-id reservations, announcement markers, and primary replies live beside the notes (bin/fm-inbox.sh; docs/voice-relay.md)
   x-inbox/           generated Relay pending mention payloads; fmx-respond drains it (section 14)
