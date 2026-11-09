@@ -43,7 +43,8 @@
 #   host <ssh alias>                    required, one host
 #   command <project> -- <words...>     approval for one command of one project
 #   project <project>|*                 approval for every test and e2e command of
-#                                       one project, or of every project (repeatable)
+#                                       one project, or of every project (repeatable),
+#                                       except no-mistakes drive calls
 #   image <ref>                         optional Linux container image the host runs
 #                                       each job in (see bin/fm-heavy-remote-runner.py)
 #   timeout <seconds>                   optional positive integer, default 900
@@ -211,7 +212,8 @@ elif [ -e "$rconf" ]; then
         signature=" project $rest"
         for prior in ${approvals[@]+"${approvals[@]}"}; do [ "$prior" != "$signature" ] || bad=${bad:-$n}; done
         approvals+=("$signature")
-        if [ -n "$project" ] && { [ "$rest" = '*' ] || [ "$rest" = "$project" ]; }; then approved=1; fi
+        if [ -n "$project" ] && { [ "$rest" = '*' ] || [ "$rest" = "$project" ]; } \
+          && [ "$(basename -- "${1:-}")" != no-mistakes ]; then approved=1; fi
         ;;
       image) [ -z "$rimage" ] && [[ $rest =~ ^[A-Za-z0-9._/:@-]+$ ]] && rimage=$rest || bad=${bad:-$n} ;;
       timeout) [ -z "$rtimeout" ] && [[ $rest =~ ^[1-9][0-9]{0,5}$ ]] && rtimeout=$rest || bad=${bad:-$n} ;;

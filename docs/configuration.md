@@ -1234,6 +1234,7 @@ A drive call holds the slot only while it runs a local test step, build or e2e, 
 `config/heavy-remote` in the root home is the opt-in for the SSH destination, and without it `fm-heavy.sh --remote` refuses and every job runs locally as before.
 The schema is one `host <ssh-alias>`, one or more approvals, an optional `image <ref>`, optional `timeout <seconds>` (default 900), and an optional `offload` presence line.
 An approval is `command <project> -- <words...>` for one command, `project <project>` for every test and e2e command of one project, or `project *` for every project.
+A project approval never covers a `no-mistakes` drive call, which needs this machine's gate.
 Blank lines and lines starting with `#` are ignored; duplicate settings, duplicate approvals, unknown keys, invalid values or an unreadable file refuse a job that would offload (`--remote`, or an approved command with `offload`) with an error naming the file and problem, while every other heavy job prints one warning and runs locally under the local slot.
 An approval covers the project named by the caller's `--project`, so a job with no project never leaves this machine.
 Command approval words are separated by whitespace and must match the caller's argument vector exactly; shell quoting and expansion are not interpreted.
@@ -1272,7 +1273,7 @@ A result with the wrong commit, command or bundle digest, or a missing or partia
 [`bin/fm-heavy-summary.sh`](../bin/fm-heavy-summary.sh) gives local and remote jobs separate rows, so the queue wait a remote run saves can be read against its preparation and collection time.
 The destination needs `python3`, `git`, `tar` and `ps`; the runner is shipped with each job.
 With `image <ref>`, each job runs inside that Linux container image through the destination's `docker`, under a 6 GB memory cap, so its tools and results match a Linux machine; the image needs `python3` and `git` plus the projects' own system tools, and the container is removed when the job ends or is stopped.
-Inside the image, Node runtimes come from `~/.fm-heavy-remote/linux/runtimes` on the destination instead of its own runtimes, and dependency caches from `~/.fm-heavy-remote/linux/cache`.
+Inside the image, Node runtimes come from `~/.fm-heavy-remote/linux/runtimes` on the destination instead of its own runtimes, and dependency caches, Playwright browsers, the pnpm store and the npm cache from `~/.fm-heavy-remote/linux/cache`.
 For Node projects, each job runs on the versions of node and the lockfile's pnpm/npm that its own project pins in `package.json` engines, `packageManager` and `.nvmrc`, chosen from those installed on the destination, except that a reachable pnpm may fetch its own pinned version; the runner then installs locked dependencies from the transferred candidate.
 Stable numeric versions, comparison ranges, wildcards, caret, tilde, hyphen ranges and `||` alternatives are supported; unsupported requirements such as `.nvmrc` aliases refuse the job with a clear reason rather than guessing.
 A root `package.json` that declares no dependencies of any kind needs no lockfile: the job still runs on its pinned Node and skips installation.

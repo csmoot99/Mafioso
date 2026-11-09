@@ -58,7 +58,8 @@ docker (on the SSH PATH, /opt/homebrew/bin or /usr/local/bin), named
 fm-heavy-<job>, capped at 6g with no swap, the job directory mounted at the same
 path and ~/.fm-heavy-remote/linux/runtimes and linux/cache standing in for
 runtimes and cache, so Linux runtimes and dependency copies never mix with the
-host's own. Stopping the job also removes that container. A missing docker fails
+host's own. The container's Playwright browsers, pnpm store and npm cache live
+under that cache's tools directory, so they persist across jobs. Stopping the job also removes that container. A missing docker fails
 the job with exit 127, never a local retry.
 
 Only processes this job started are ever signalled: the supervisor and the command
@@ -259,8 +260,12 @@ def group_command(jdir, manifest):
     linux = os.path.join(ROOT, "linux")
     for sub in ("runtimes", "cache"):
         os.makedirs(os.path.join(linux, sub), exist_ok=True)
+    tools = os.path.join(ROOT, "cache", "tools")
     return [docker, "run", "--rm", "--init", "--name", container(manifest), "--memory", "6g", "--memory-swap", "6g",
             "-e", "HOME=" + os.path.expanduser("~"), "-e", "GIT_CONFIG_COUNT=1",
+            "-e", "PLAYWRIGHT_BROWSERS_PATH=" + os.path.join(tools, "ms-playwright"),
+            "-e", "npm_config_store_dir=" + os.path.join(tools, "pnpm-store"),
+            "-e", "npm_config_cache=" + os.path.join(tools, "npm"),
             "-e", "GIT_CONFIG_KEY_0=safe.directory", "-e", "GIT_CONFIG_VALUE_0=*",
             "-v", jdir + ":" + jdir, "-v", os.path.join(linux, "runtimes") + ":" + os.path.join(ROOT, "runtimes") + ":ro",
             "-v", os.path.join(linux, "cache") + ":" + os.path.join(ROOT, "cache"),
@@ -464,8 +469,9 @@ def prepare_dependencies(work, manifest):
                 shutil.copytree(os.path.join(work, relative), os.path.join(modules, relative), symlinks=True)
             write_json(os.path.join(cache, "installed.json"), {"fingerprint": fingerprint})
     if manifest.get("class") == "e2e" and needs_playwright(manifest["argv"], package):
-        # Playwright itself caches browser revisions per account; its installer
-        # only downloads revisions missing for this checkout's installed version.
+        # Playwright caches browser revisions per account, or under the container's
+        # persistent cache; its installer only downloads revisions missing for this
+        # checkout's installed version.
         command = ["pnpm", "exec", "playwright", "install"] if manager == "pnpm" else ["npm", "exec", "--no", "--", "playwright", "install"]
         subprocess.run(command, cwd=work, check=True)
 

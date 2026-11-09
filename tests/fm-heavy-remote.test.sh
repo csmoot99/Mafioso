@@ -1105,7 +1105,27 @@ test_project_approvals() {
   release_local
   wait "$pid" || fail "local build"
   expect_record '.class == "build" and .host == "local"' "build stays local under project *"
-  pass "fm-heavy: project and every-project approvals cover tests and e2e only, with a project"
+  # A no-mistakes drive call needs this machine's gate, so a project approval never offloads it.
+  setup drivestays 'echo local'
+  observe_local_queue
+  printf '#!/bin/sh\necho drove >> "$FAKE_SSH_CTL/drives"\n' > "$FAKEBIN/no-mistakes"
+  chmod +x "$FAKEBIN/no-mistakes"
+  printf 'host fake-mac\nproject *\noffload\n' > "$HOME_FM/config/heavy-remote"
+  hold_local
+  (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" FAKE_SSH_CTL="$CTL" \
+    FAKE_SSH_HOME="$REMOTE_HOME" RUNNER_SRC="$RUNNER" "$HEAVY" --class test --task t --project p -- no-mistakes axi run) \
+    >"$CASE/out" 2>&1 3>&- 4>&- & pid=$!
+  wait_for "$CTL/local-waiting"
+  [ ! -s "$CTL/log" ] || fail "a drive call may not contact the host"
+  release_local
+  wait "$pid" || fail "local drive call: $(cat "$CASE/out")"
+  expect_record '.cmd == "no-mistakes" and .host == "local" and .fallback == null' "drive call stays local under project *"
+  [ "$(cat "$CTL/drives")" = drove ] || fail "the drive call ran here once"
+  (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" FAKE_SSH_CTL="$CTL" \
+    FAKE_SSH_HOME="$REMOTE_HOME" RUNNER_SRC="$RUNNER" "$HEAVY" --class test --task t --project p --remote -- no-mistakes axi run) \
+    >/dev/null 2>&1 3>&- 4>&-
+  expect_code 2 "$?" "a project approval does not cover --remote drive calls"
+  pass "fm-heavy: project and every-project approvals cover tests and e2e only, with a project, never drive calls"
 }
 
 hold_host() { exec 5>>"$FM_HEAVY_HOST_LOCK"; flock 5; }
@@ -1160,7 +1180,7 @@ printf '%s\n' "$*" >> "$FAKE_SSH_CTL/docker.log"
 shift
 dir=.
 while [ "$#" -gt 0 ]; do
-  case "$1" in --rm|--init) shift ;; -w) dir=$2; shift 2 ;; -*) shift 2 ;; *) break ;; esac
+  case "$1" in --rm|--init) shift ;; -w) dir=$2; shift 2 ;; -e) export "${2?}"; shift 2 ;; -*) shift 2 ;; *) break ;; esac
 done
 shift
 cd "$dir" && exec "$@"
@@ -1170,7 +1190,7 @@ SH
 
 test_image_runs_in_a_container() {
   local id
-  setup container 'echo ran >> "$HOME/runs"'
+  setup container 'echo ran >> "$HOME/runs"; printf "%s\n" "$PLAYWRIGHT_BROWSERS_PATH" "$npm_config_store_dir" "$npm_config_cache" | grep . > "$HOME/tool-caches"'
   make_fake_docker "$FAKEBIN"
   printf 'host fake-mac\nproject p\nimage fm-heavy-linux:1\n' > "$HOME_FM/config/heavy-remote"
   heavy --remote >"$CASE/out" 2>&1 || fail "a job in the image: $(cat "$CASE/out")"
@@ -1179,6 +1199,12 @@ test_image_runs_in_a_container() {
   grep -E "^run --rm --init --name $id --memory 6g --memory-swap 6g .* fm-heavy-linux:1 python3 " "$CTL/docker.log" >/dev/null \
     || fail "docker run argv: $(cat "$CTL/docker.log")"
   grep -F "/.fm-heavy-remote/linux/runtimes:" "$CTL/docker.log" >/dev/null || fail "linux runtimes are mounted"
+  grep -F -- "-v $REMOTE_HOME/.fm-heavy-remote/linux/cache:$REMOTE_HOME/.fm-heavy-remote/cache " "$CTL/docker.log" >/dev/null \
+    || fail "linux cache is mounted: $(cat "$CTL/docker.log")"
+  [ "$(wc -l < "$REMOTE_HOME/tool-caches")" -eq 3 ] || fail "three tool caches: $(cat "$REMOTE_HOME/tool-caches")"
+  while read -r dir; do
+    case "$dir" in "$REMOTE_HOME/.fm-heavy-remote/cache/"?*) ;; *) fail "tool cache outside the mounted cache: $dir" ;; esac
+  done < "$REMOTE_HOME/tool-caches"
   grep -Fx "rm -f $id" "$CTL/docker.log" >/dev/null || fail "the container is removed: $(cat "$CTL/docker.log")"
   [ "$(ls "$REMOTE_HOME/.fm-heavy-remote")" = linux ] || fail "only the linux cache remains: $(ls "$REMOTE_HOME/.fm-heavy-remote")"
   pass "fm-heavy: an image line runs the job inside that container and removes it"
