@@ -1090,7 +1090,10 @@ test_project_approvals() {
   printf 'host fake-mac\nproject *\n' > "$HOME_FM/config/heavy-remote"
   heavy --project '' --remote >/dev/null 2>&1; expect_code 2 "$?" "a job with no project never leaves"
   [ "$(wc -l < "$REMOTE_HOME/runs")" -eq 2 ] || fail "only the approved jobs ran on the host"
-  for bad in 'project p\nproject p' 'project a b' 'project' 'image bad image!' 'image a\nimage b'; do
+  for bad in 'project p\nproject p' 'project a b' 'project' 'image bad image!' 'image a\nimage b' \
+    'image i\nproject q service=nope' 'service db pg 5432 1g\nproject q service=db' 'project q bogus=1' 'project q env=nokey' \
+    'image i\nservice a x 5432 1g\nservice b y 5432 1g\nproject q service=a service=b' 'service DB pg 5432 1g' \
+    'service db pg port 1g' 'service db pg 5432 1t' 'service db pg 5432 1g\nservice db pg 5433 1g' 'service db pg 5432 1g bad'; do
     printf 'host fake-mac\nproject p\noffload\n%b\n' "$bad" > "$HOME_FM/config/heavy-remote"
     heavy >/dev/null 2>&1; expect_code 2 "$?" "malformed approval $bad"
   done
@@ -1176,6 +1179,18 @@ make_fake_docker() {  # <fakebin>: runs the container's command on the host, log
   cat > "$1/docker" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$FAKE_SSH_CTL/docker.log"
+case "$1 ${2:-}" in
+  "info "*) echo "${FAKE_DOCKER_MEM:-20928077824}"; exit 0 ;;
+  "rm -f") [ ! -e "$FAKE_SSH_CTL/$3.pid" ] || { kill "$(cat "$FAKE_SSH_CTL/$3.pid")"; rm -f "$FAKE_SSH_CTL/$3.pid"; }; exit 0 ;;
+  "run -d")  # a service: a detached listener on its declared PORT, owned by "the daemon"
+    shift 2
+    while [ "$#" -gt 1 ]; do case "$1" in --name) name=$2; shift 2 ;; -e) export "${2?}"; shift 2 ;; *) shift 2 ;; esac; done
+    setsid python3 -c 'import os, socket, time
+s = socket.socket(); s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(("127.0.0.1", int(os.environ["PORT"]))); s.listen(); time.sleep(600)' </dev/null >/dev/null 2>&1 &
+    echo $! > "$FAKE_SSH_CTL/$name.pid"
+    exit 0 ;;
+esac
 [ "$1" = run ] || exit 0
 shift
 dir=.
@@ -1214,6 +1229,98 @@ SH
   grep -Fx "rm -f $id" "$CTL/docker.log" >/dev/null || fail "the container is removed: $(cat "$CTL/docker.log")"
   [ "$(ls "$REMOTE_HOME/.fm-heavy-remote")" = linux ] || fail "only the linux cache remains: $(ls "$REMOTE_HOME/.fm-heavy-remote")"
   pass "fm-heavy: an image line runs the job inside that container and removes it"
+}
+
+free_port() { python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])'; }
+
+# setup_services <name> <job body> [timeout]: a job approved with two services.
+setup_services() {
+  setup "$1" "$2" "${3:-30}"
+  make_fake_docker "$FAKEBIN"
+  P1=$(free_port); P2=$(free_port)
+  printf '%s\n' 'host fake-mac' 'image fm-heavy-linux:1' "timeout ${3:-30}" \
+    "service db postgres:16 $P1 512m PORT=$P1 POSTGRES_DB=t" "service cache redis:7 $P2 256m PORT=$P2" \
+    "project p service=db service=cache env=DATABASE_URL=postgres://localhost:$P1/t" > "$HOME_FM/config/heavy-remote"
+}
+
+# Every service, the job container and the network are removed by name, and nothing else.
+expect_services_removed() {  # <message>
+  local id name line pids
+  id=$(sed -n 's/^network create //p' "$CTL/docker.log" | head -1)
+  [ -n "$id" ] || fail "$1: no network was created: $(cat "$CTL/docker.log")"
+  for name in "$id" "$id-cache" "$id-db"; do
+    grep -Fx "rm -f $name" "$CTL/docker.log" >/dev/null || fail "$1: $name is not removed: $(cat "$CTL/docker.log")"
+  done
+  grep -Fx "network rm $id" "$CTL/docker.log" >/dev/null || fail "$1: the network is not removed"
+  while read -r line; do
+    case "$line" in "rm -f $id"|"rm -f $id-db"|"rm -f $id-cache"|"network rm $id") ;; *) fail "$1: touched something else: $line" ;; esac
+  done < <(grep -E '^(rm|network rm|stop|kill|volume|image|system)' "$CTL/docker.log")
+  pids=$(cat "$CTL"/*.pid 2>/dev/null)
+  [ -z "$pids" ] || fail "$1: a service is still running"
+}
+
+test_services_start_with_the_job_and_are_removed() {
+  local id pid n=0
+  setup_services svcpass 'echo "$DATABASE_URL" > "$HOME/url"'
+  heavy --remote >"$CASE/out" 2>&1 || fail "a job with services: $(cat "$CASE/out")"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "services job"
+  id=$(sed -n 's/^network create //p' "$CTL/docker.log")
+  [ "$(grep -E '^(network create|run )' "$CTL/docker.log" | cut -c1-60 | sed "s/$id/ID/g" | awk '{print $1, $2, $3, $4}')" = \
+"network create ID 
+run -d --name ID-db
+run -d --name ID-cache
+run --rm --init --name" ] || fail "services start before the job: $(cat "$CTL/docker.log")"
+  grep -Fx "run -d --name $id-db --memory 512m --memory-swap 512m --network $id -e PORT=$P1 -e POSTGRES_DB=t postgres:16" "$CTL/docker.log" >/dev/null \
+    || fail "the first service's settings: $(cat "$CTL/docker.log")"
+  grep -Fx "run -d --name $id-cache --memory 256m --memory-swap 256m --network container:$id-db -e PORT=$P2 redis:7" "$CTL/docker.log" >/dev/null \
+    || fail "a later service shares the first one's network: $(cat "$CTL/docker.log")"
+  grep -E "^run --rm --init --name $id --memory 6g --memory-swap 6g --network container:$id-db " "$CTL/docker.log" >/dev/null \
+    || fail "the job joins the services' network: $(cat "$CTL/docker.log")"
+  [ "$(cat "$REMOTE_HOME/url")" = "postgres://localhost:$P1/t" ] || fail "the job sees its env"
+  expect_services_removed "after a pass"
+
+  setup_services svcspaced 'echo "$DATABASE_URL" > "$HOME/url"'
+  printf '%b\n' 'host fake-mac' 'image fm-heavy-linux:1' 'timeout 30' \
+    "service  db\tpostgres:16   $P1  512m\tPORT=$P1  POSTGRES_DB=t" "service cache redis:7 $P2 256m PORT=$P2" \
+    "project p  service=db\tservice=cache   env=DATABASE_URL=postgres://localhost:$P1/t" > "$HOME_FM/config/heavy-remote"
+  heavy --remote >"$CASE/out" 2>&1 || fail "a service line with repeated spaces and tabs: $(cat "$CASE/out")"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "a service line with repeated spaces and tabs"
+  id=$(sed -n 's/^network create //p' "$CTL/docker.log")
+  grep -Fx "run -d --name $id-db --memory 512m --memory-swap 512m --network $id -e PORT=$P1 -e POSTGRES_DB=t postgres:16" "$CTL/docker.log" >/dev/null \
+    || fail "a spaced service line keeps its settings: $(cat "$CTL/docker.log")"
+  [ "$(cat "$REMOTE_HOME/url")" = "postgres://localhost:$P1/t" ] || fail "the job sees its env with a spaced approval"
+  expect_services_removed "after a spaced service line"
+
+  setup_services svcfail 'exit 3'
+  heavy --remote >/dev/null 2>&1; expect_code 3 "$?" "a failing job with services"
+  expect_record '.outcome == "failed"' "failed services job"
+  expect_services_removed "after a failure"
+
+  setup_services svctimeout 'sleep 300' 2
+  heavy --remote >/dev/null 2>&1; expect_code 124 "$?" "a timed-out job with services"
+  expect_record '.outcome == "timeout"' "timed-out services job"
+  expect_services_removed "after a timeout"
+
+  setup_services svccancel 'touch "$HOME/started"; sleep 300'
+  (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" FAKE_SSH_CTL="$CTL" FAKE_SSH_HOME="$REMOTE_HOME" \
+    exec setsid env --default-signal=INT "$HEAVY" --class test --project p --remote -- bash t/job.sh >/dev/null 2>&1) &
+  pid=$!
+  until [ -e "$REMOTE_HOME/started" ]; do n=$((n + 1)); [ "$n" -le 100 ] || fail "the job never started"; sleep 0.1; done
+  kill -TERM -- "-$pid"
+  wait "$pid"
+  expect_code 143 "$?" "a cancelled job with services"
+  expect_services_removed "after a cancel"
+
+  setup_services svclost 'sleep 1'
+  rule wait drop 'runner.py wait' 1
+  heavy --remote >/dev/null 2>&1 || fail "a services job found again after a dropped wait"
+  expect_services_removed "after lost-connection reconciliation"
+
+  setup_services svcfit 'echo ran >> "'"$TMP_ROOT"'/svcfit-runs"'
+  FAKE_DOCKER_MEM=$((6 << 30)) heavy --remote >/dev/null 2>&1 || fail "a job whose services do not fit runs here"
+  expect_record '.host == "local" and .fallback == "services-do-not-fit"' "services-do-not-fit record"
+  ! grep -E '^(run|network create)' "$CTL/docker.log" >/dev/null || fail "nothing starts on the host when services do not fit"
+  pass "fm-heavy --remote: services start before the job with their settings and are removed on pass, failure, timeout, cancel and reconciliation, whatever the spacing of their lines"
 }
 
 test_pass_and_record
@@ -1256,5 +1363,6 @@ test_npm_dependency_cache
 test_project_approvals
 test_host_jobs_go_first_and_none_is_stopped
 test_image_runs_in_a_container
+test_services_start_with_the_job_and_are_removed
 
 echo '# all fm-heavy-remote tests passed'

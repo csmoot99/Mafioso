@@ -816,6 +816,7 @@ No project repository, coding-agent placement, local slot limit or memory cap ch
 
 Jobs run directly on macOS can fail for macOS reasons alone, such as missing Linux system tools, BSD `stat` or different tool versions, so a Mac destination should run sent jobs in a Linux image.
 Add `image <ref>` to `config/heavy-remote` and build that image on the Mac's existing container engine without stopping, restarting or reconfiguring it; it needs `python3`, `git`, `ca-certificates` and the system tools the projects' tests use.
+Tests that need a database, Redis or a search engine declare `service` lines at the versions the project's CI pins and name them on the project's approval, so each sent job gets its own throwaway copies; browser tests name an image with the project's pinned browsers through `image=` (see `config/heavy-remote` in [configuration](configuration.md)).
 For Node projects, install Linux runtimes for the image's architecture under `~/.fm-heavy-remote/linux/runtimes/<tool>/<version>`, with the same layout and selection as the macOS runtimes above.
 The Mac home's own workers keep running their jobs on macOS, but through its `bin/fm-heavy.sh` and slot lock, so they share one queue with sent jobs and always go first.
 To enable that, update the Mac home to a Firstmate version with this support, install `bash`, `flock` and `jq` on its workers' PATH, and create `config/heavy-commands` in the Mac's root home so its worker instructions point at the wrapper.

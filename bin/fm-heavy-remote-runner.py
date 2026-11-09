@@ -2,7 +2,7 @@
 """Remote half of bin/fm-heavy-remote.sh: run one transferred job and report it.
 
 Usage: fm-heavy-remote-runner.py busy
-       fm-heavy-remote-runner.py start|supervise|status|reconcile|wait|cancel|cleanup <jobdir> [seconds]
+       fm-heavy-remote-runner.py start|supervise|container|execute|status|reconcile|wait|cancel|cleanup <jobdir> [seconds]
 
 The client ships this file with each job, so nothing is installed on the remote
 host. It needs python3 (stdlib), git and ps, and runs on macOS and Linux.
@@ -18,7 +18,7 @@ Dependency copies persist per project under ~/.fm-heavy-remote/cache, keyed by
 lockfile/package settings and runtime versions. Each job has private modules.
 A job directory lives under ~/.fm-heavy-remote and holds manifest.json (project,
 class, job id, candidate sha, command argv and its digest, bundle digest,
-timeout) and src.bundle (the candidate revision with its history).
+timeout, image, services and job env) and src.bundle (the candidate revision with its history).
 
 Host slot: the host's own bin/fm-heavy.sh jobs and transferred jobs share one slot
 lock (FM_HEAVY_HOST_LOCK, default /tmp/fm-heavy.lock). A transferred job takes it
@@ -61,6 +61,18 @@ runtimes and cache, so Linux runtimes and dependency copies never mix with the
 host's own. The container's Playwright browsers, pnpm store and npm cache live
 under that cache's tools directory, so they persist across jobs. Stopping the job also removes that container. A missing docker fails
 the job with exit 127, never a local retry.
+
+Services: each manifest service runs as its own container, fm-heavy-<job>-<name>,
+capped at its declared memory with no swap and given its declared env. The first
+joins a new private network fm-heavy-<job> that publishes no port; the others and
+the job container share its network namespace, so the job reaches each service on
+localhost:<port> and nothing else reaches them. The container step starts them
+inside the supervised group, so the job's timeout and cancel cover image pulls;
+execute applies the manifest env and waits up to 180 s for every service port
+(exit 78 otherwise). start refuses with exit 13 when 6 GiB plus the services'
+memory exceeds docker's total memory. Whenever the job ends, the job container,
+its services and its network are removed by those exact names; no other docker
+object is ever touched.
 
 Only processes this job started are ever signalled: the supervisor and the command
 group are recorded with their start times in owner.json, and a pid whose start
@@ -236,12 +248,23 @@ def container(manifest):
     return "fm-heavy-" + manifest["id"]
 
 
+def service_name(manifest, service):
+    return container(manifest) + "-" + service["name"]
+
+
 def remove_container(manifest):
-    """Killing the docker client does not stop its container, so remove it by name."""
+    """Killing the docker client does not stop its containers, so remove them and the network by name."""
     docker = find_docker()
-    if manifest.get("image") and docker:
-        subprocess.run([docker, "rm", "-f", container(manifest)], stdin=subprocess.DEVNULL,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if not (manifest.get("image") and docker):
+        return
+    services = manifest.get("services") or []
+    names = [container(manifest)] + [service_name(manifest, s) for s in reversed(services)]
+    for args in [["rm", "-f", name] for name in names] + ([["network", "rm", container(manifest)]] if services else []):
+        subprocess.run([docker, *args], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def memory_bytes(value):
+    return int(value[:-1]) << (30 if value[-1] == "g" else 20)
 
 
 def find_docker():
@@ -249,19 +272,41 @@ def find_docker():
 
 
 def group_command(jdir, manifest):
-    """The supervised command: the runner's execute step, inside the image when one is set."""
-    command = [sys.executable, os.path.abspath(__file__), "execute", jdir]
-    image = manifest.get("image")
-    if not image:
-        return command
+    """The supervised command: the runner's execute step, or its container step when an image is set."""
+    return [sys.executable, os.path.abspath(__file__), "container" if manifest.get("image") else "execute", jdir]
+
+
+def cmd_container(jdir):
+    """Start the job's private network and services, then become the job container's docker client."""
+    manifest = read_json(os.path.join(jdir, "manifest.json"))
+    image, services = manifest["image"], manifest.get("services") or []
     docker = find_docker()
     if not docker:
-        raise OSError("docker is not installed for image %s" % image)
+        die(127, "cannot run %s: docker is not installed for image %s" % (manifest["argv"][0], image))
+    network = []
+    if services:
+        made = subprocess.run([docker, "network", "create", container(manifest)], stdin=subprocess.DEVNULL,
+                              stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        if made.returncode:
+            die(78, "could not create network %s: %s" % (container(manifest), made.stderr.strip()))
+        network = ["--network", container(manifest)]
+    for service in services:
+        env = [arg for key, value in service["env"].items() for arg in ("-e", key + "=" + value)]
+        ran = subprocess.run([docker, "run", "-d", "--name", service_name(manifest, service), "--memory", service["memory"],
+                              "--memory-swap", service["memory"], *network, *env, service["image"]],
+                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        if ran.returncode:
+            die(78, "service %s did not start: %s" % (service["name"], ran.stderr.strip()))
+        network = ["--network", "container:" + service_name(manifest, services[0])]
+    os.execv(docker, job_container_argv(jdir, manifest, docker, network))
+
+
+def job_container_argv(jdir, manifest, docker, network):
     linux = os.path.join(ROOT, "linux")
     for sub in ("runtimes", "cache"):
         os.makedirs(os.path.join(linux, sub), exist_ok=True)
     tools = os.path.join(ROOT, "cache", "tools")
-    return [docker, "run", "--rm", "--init", "--name", container(manifest), "--memory", "6g", "--memory-swap", "6g",
+    return [docker, "run", "--rm", "--init", "--name", container(manifest), "--memory", "6g", "--memory-swap", "6g", *network,
             "-e", "HOME=" + os.path.expanduser("~"), "-e", "GIT_CONFIG_COUNT=1",
             "-e", "PLAYWRIGHT_BROWSERS_PATH=" + os.path.join(tools, "ms-playwright"),
             "-e", "pnpm_config_store_dir=" + os.path.join(tools, "pnpm-store"),  # pnpm 11+
@@ -270,7 +315,7 @@ def group_command(jdir, manifest):
             "-e", "GIT_CONFIG_KEY_0=safe.directory", "-e", "GIT_CONFIG_VALUE_0=*",
             "-v", jdir + ":" + jdir, "-v", os.path.join(linux, "runtimes") + ":" + os.path.join(ROOT, "runtimes") + ":ro",
             "-v", os.path.join(linux, "cache") + ":" + os.path.join(ROOT, "cache"),
-            "-w", os.path.join(jdir, "work"), image, "python3", os.path.join(jdir, "runner.py"), "execute", jdir]
+            "-w", os.path.join(jdir, "work"), manifest["image"], "python3", os.path.join(jdir, "runner.py"), "execute", jdir]
 
 
 def git(*args):
@@ -295,6 +340,13 @@ def cmd_start(jdir):
         die(10, "refused: manifest timeout or sha invalid")
     if hashlib.sha256(b"".join(a.encode() + b"\0" for a in argv)).hexdigest() != manifest.get("command_sha256"):
         die(10, "refused: command digest mismatch")
+    services = manifest.get("services") or []
+    if services:
+        docker = find_docker()
+        info = subprocess.run([docker, "info", "--format", "{{.MemTotal}}"], capture_output=True, text=True) if docker else None
+        need = (6 << 30) + sum(memory_bytes(s["memory"]) for s in services)
+        if info and info.returncode == 0 and info.stdout.strip().isdigit() and need > int(info.stdout):
+            die(13, "refused: the job and its services need %d MiB, docker has %d MiB" % (need >> 20, int(info.stdout) >> 20))
     bundle = os.path.join(jdir, "src.bundle")
     if not os.path.isfile(bundle) or sha256_file(bundle) != manifest.get("bundle_sha256"):
         die(10, "refused: source bundle digest mismatch")
@@ -495,6 +547,17 @@ def needs_playwright(argv, package):
 
 def cmd_execute(jdir):
     manifest = read_json(os.path.join(jdir, "manifest.json"))
+    os.environ.update(manifest.get("env") or {})
+    for service in manifest.get("services") or []:
+        end = time.monotonic() + 180
+        while True:
+            try:
+                socket.create_connection(("127.0.0.1", service["port"]), 1).close()
+                break
+            except OSError:
+                if time.monotonic() > end:
+                    die(78, "service %s did not open port %d" % (service["name"], service["port"]))
+                time.sleep(0.5)
     try:
         prepare_dependencies(os.path.join(jdir, "work"), manifest)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
@@ -597,7 +660,7 @@ def cmd_cleanup(jdir):
             while alive(owner["supervisor_pid"], owner["supervisor_start"]) and time.monotonic() < end:
                 time.sleep(0.2)
         kill_group(owner)
-        remove_container(read_json(os.path.join(jdir, "manifest.json")) or {})
+    remove_container(read_json(os.path.join(jdir, "manifest.json")) or {})
     shutil.rmtree(jdir, ignore_errors=True)
 
 
@@ -605,8 +668,8 @@ def main():
     if sys.argv[1:] == ["busy"]:
         cmd_busy()
         return
-    if len(sys.argv) < 3 or sys.argv[1] not in ("start", "supervise", "execute", "status", "reconcile", "wait", "cancel", "cleanup"):
-        die(2, "usage: fm-heavy-remote-runner.py busy | start|supervise|status|reconcile|wait|cancel|cleanup <jobdir> [seconds]")
+    if len(sys.argv) < 3 or sys.argv[1] not in ("start", "supervise", "container", "execute", "status", "reconcile", "wait", "cancel", "cleanup"):
+        die(2, "usage: fm-heavy-remote-runner.py busy | start|supervise|container|execute|status|reconcile|wait|cancel|cleanup <jobdir> [seconds]")
     action, jdir = sys.argv[1], job_dir(sys.argv[2])
     if action == "supervise":
         cmd_supervise(jdir, sys.argv[3] if len(sys.argv) > 3 else None)
@@ -617,7 +680,7 @@ def main():
     elif action == "wait":
         cmd_wait(jdir, float(sys.argv[3]) if len(sys.argv) > 3 else 0)
     else:
-        {"start": cmd_start, "supervise": cmd_supervise, "execute": cmd_execute, "cancel": cmd_cancel, "cleanup": cmd_cleanup}[action](jdir)
+        {"start": cmd_start, "supervise": cmd_supervise, "container": cmd_container, "execute": cmd_execute, "cancel": cmd_cancel, "cleanup": cmd_cleanup}[action](jdir)
 
 
 if __name__ == "__main__":
