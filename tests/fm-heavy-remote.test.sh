@@ -1190,8 +1190,14 @@ SH
 
 test_image_runs_in_a_container() {
   local id
-  setup container 'echo ran >> "$HOME/runs"; printf "%s\n" "$PLAYWRIGHT_BROWSERS_PATH" "$npm_config_store_dir" "$npm_config_cache" | grep . > "$HOME/tool-caches"'
+  setup container 'echo ran >> "$HOME/runs"; { printf "%s\n" "$PLAYWRIGHT_BROWSERS_PATH" "$npm_config_store_dir" "$npm_config_cache"; pnpm store path; } | grep . > "$HOME/tool-caches"'
   make_fake_docker "$FAKEBIN"
+  # pnpm 11 resolves its store from pnpm_config_store_dir only; npm_config_store_dir serves older pinned pnpm.
+  cat > "$FAKEBIN/pnpm" <<'SH'
+#!/usr/bin/env bash
+[ "$*" = "store path" ] && echo "${pnpm_config_store_dir:-$HOME/.local/share/pnpm/store}/v11"
+SH
+  chmod +x "$FAKEBIN/pnpm"
   printf 'host fake-mac\nproject p\nimage fm-heavy-linux:1\n' > "$HOME_FM/config/heavy-remote"
   heavy --remote >"$CASE/out" 2>&1 || fail "a job in the image: $(cat "$CASE/out")"
   expect_record '.host == "fake-mac" and .outcome == "pass"' "container job"
@@ -1201,7 +1207,7 @@ test_image_runs_in_a_container() {
   grep -F "/.fm-heavy-remote/linux/runtimes:" "$CTL/docker.log" >/dev/null || fail "linux runtimes are mounted"
   grep -F -- "-v $REMOTE_HOME/.fm-heavy-remote/linux/cache:$REMOTE_HOME/.fm-heavy-remote/cache " "$CTL/docker.log" >/dev/null \
     || fail "linux cache is mounted: $(cat "$CTL/docker.log")"
-  [ "$(wc -l < "$REMOTE_HOME/tool-caches")" -eq 3 ] || fail "three tool caches: $(cat "$REMOTE_HOME/tool-caches")"
+  [ "$(wc -l < "$REMOTE_HOME/tool-caches")" -eq 4 ] || fail "four tool cache paths: $(cat "$REMOTE_HOME/tool-caches")"
   while read -r dir; do
     case "$dir" in "$REMOTE_HOME/.fm-heavy-remote/cache/"?*) ;; *) fail "tool cache outside the mounted cache: $dir" ;; esac
   done < "$REMOTE_HOME/tool-caches"

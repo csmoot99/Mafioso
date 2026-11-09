@@ -264,7 +264,8 @@ def group_command(jdir, manifest):
     return [docker, "run", "--rm", "--init", "--name", container(manifest), "--memory", "6g", "--memory-swap", "6g",
             "-e", "HOME=" + os.path.expanduser("~"), "-e", "GIT_CONFIG_COUNT=1",
             "-e", "PLAYWRIGHT_BROWSERS_PATH=" + os.path.join(tools, "ms-playwright"),
-            "-e", "npm_config_store_dir=" + os.path.join(tools, "pnpm-store"),
+            "-e", "pnpm_config_store_dir=" + os.path.join(tools, "pnpm-store"),  # pnpm 11+
+            "-e", "npm_config_store_dir=" + os.path.join(tools, "pnpm-store"),  # older pinned pnpm
             "-e", "npm_config_cache=" + os.path.join(tools, "npm"),
             "-e", "GIT_CONFIG_KEY_0=safe.directory", "-e", "GIT_CONFIG_VALUE_0=*",
             "-v", jdir + ":" + jdir, "-v", os.path.join(linux, "runtimes") + ":" + os.path.join(ROOT, "runtimes") + ":ro",
