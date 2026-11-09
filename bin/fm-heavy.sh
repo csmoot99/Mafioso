@@ -41,12 +41,22 @@
 # on one SSH host, which takes one job at a time; build and image always stay
 # local, since only the result and log come back. Lines (comments start #):
 #   host <ssh alias>                    required, one host
-#   command <project> -- <words...>     approval for one command of one project
-#   project <project>|*                 approval for every test and e2e command of
+#   command <project> [opt...] -- <words...>
+#                                       approval for one command of one project
+#   project <project>|* [opt...]        approval for every test and e2e command of
 #                                       one project, or of every project (repeatable),
 #                                       except no-mistakes drive calls
 #   image <ref>                         optional Linux container image the host runs
 #                                       each job in (see bin/fm-heavy-remote-runner.py)
+#   service <name> <image> <port> <memory> [KEY=VALUE...]
+#                                       a throwaway service container (lowercase name,
+#                                       memory like 512m or 1g, container env) that an
+#                                       approval can start beside each of its jobs
+# Approval options: image=<ref> (overrides the image line), service=<name>
+# (repeatable) and env=KEY=VALUE (repeatable, job environment). The most specific
+# matching approval supplies them: a command line, then project <name>, then
+# project *. An approval with services needs an image and distinct service ports;
+# its jobs reach every service on localhost:<port>.
 #   timeout <seconds>                   optional positive integer, default 900
 #   offload                             optional presence line
 # Command words must match argv exactly (whitespace separates words; no shell
@@ -180,12 +190,40 @@ if [ -e "$root/config/host-test-slots" ]; then
 fi
 
 rhost=; rtimeout=; rimage=; offload=; approved=; rconf=$root/config/heavy-remote; rproblem=
+remote_opts=()
+# The most specific matching approval (level 3 command, 2 project, 1 project *) supplies options.
+select_approval() {
+  [ "$1" -gt "$level" ] || return 0
+  level=$1; sel_image=$o_image; sel_services=${o_services[*]-}; sel_env=${o_env[*]-}
+}
+# The declared service line's words after the name, or status 1 when undeclared.
+service_spec() {
+  local j
+  for ((j=0; j<${#svc_names[@]}; j++)); do
+    [ "${svc_names[j]}" != "$1" ] || { echo "${svc_specs[j]#* }"; return 0; }
+  done
+  return 1
+}
+# Approval options into o_image, o_services and o_env; returns 1 on an invalid option.
+approval_opts() {
+  o_image=; o_services=(); o_env=()
+  local o
+  for o; do
+    case $o in
+      image=*) [ -z "$o_image" ] && [[ ${o#image=} =~ ^[A-Za-z0-9._/:@-]+$ ]] && o_image=${o#image=} || return 1 ;;
+      service=*) [[ ${o#service=} =~ ^[a-z0-9][a-z0-9-]*$ ]] || return 1; o_services+=("${o#service=}") ;;
+      env=*) [[ ${o#env=} =~ ^[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*$ ]] || return 1; o_env+=("${o#env=}") ;;
+      *) return 1 ;;
+    esac
+  done
+}
 if [ -n "$remote" ] && [ ! -e "$rconf" ]; then
   echo "fm-heavy.sh: --remote needs $rconf" >&2; exit 2
 elif [ -e "$rconf" ] && [ ! -r "$rconf" ]; then
   rproblem="cannot read $rconf"
 elif [ -e "$rconf" ]; then
   bad=; approvals=(); request=("$@"); n=0
+  svc_names=(); svc_specs=(); checks=(); level=0; sel_image=; sel_services=; sel_env=
   while read -r key rest || [ -n "$key" ]; do
     n=$((n + 1))
     case "$key" in
@@ -193,27 +231,49 @@ elif [ -e "$rconf" ]; then
       host) [ -z "$rhost" ] && [[ $rest =~ ^[A-Za-z0-9._-]+$ ]] && rhost=$rest || bad=${bad:-$n} ;;
       command)
         words=(); read -r -a words <<< "$rest"
-        scope=${words[0]:-}
-        [[ $scope =~ ^[A-Za-z0-9._-]+$ ]] && [ "${words[1]:-}" = -- ] && [ "${#words[@]}" -gt 2 ] || bad=${bad:-$n}
+        scope=${words[0]:-}; d=1
+        while [ "$d" -lt "${#words[@]}" ] && [ "${words[d]}" != -- ]; do d=$((d + 1)); done
+        approval_opts ${words[@]+"${words[@]:1:d-1}"} || bad=${bad:-$n}
+        checks+=("$n|$o_image|${o_services[*]-}")
+        [[ $scope =~ ^[A-Za-z0-9._-]+$ ]] && [ "${words[d]:-}" = -- ] && [ "${#words[@]}" -gt $((d + 1)) ] || bad=${bad:-$n}
         signature="$scope:"
         match=1
         [ "$scope" = "$project" ] || match=
-        [ "$((${#words[@]} - 2))" -eq "${#request[@]}" ] || match=
-        for ((j=2; j<${#words[@]}; j++)); do
+        [ "$((${#words[@]} - d - 1))" -eq "${#request[@]}" ] || match=
+        for ((j=d+1; j<${#words[@]}; j++)); do
           signature+=" ${words[j]}"
-          [ "${words[j]}" = "${request[j-2]:-}" ] || match=
+          [ "${words[j]}" = "${request[j-d-1]:-}" ] || match=
         done
         for prior in ${approvals[@]+"${approvals[@]}"}; do [ "$prior" != "$signature" ] || bad=${bad:-$n}; done
         approvals+=("$signature")
         [ -z "$match" ] || approved=1
+        [ -z "$match" ] || select_approval 3
         ;;
       project)
-        [[ $rest =~ ^([A-Za-z0-9._-]+|\*)$ ]] || bad=${bad:-$n}
-        signature=" project $rest"
+        words=(); read -r -a words <<< "$rest"
+        scope=${words[0]:-}
+        approval_opts ${words[@]+"${words[@]:1}"} || bad=${bad:-$n}
+        checks+=("$n|$o_image|${o_services[*]-}")
+        [[ $scope =~ ^([A-Za-z0-9._-]+|\*)$ ]] || bad=${bad:-$n}
+        signature=" project $scope"
         for prior in ${approvals[@]+"${approvals[@]}"}; do [ "$prior" != "$signature" ] || bad=${bad:-$n}; done
         approvals+=("$signature")
-        if [ -n "$project" ] && { [ "$rest" = '*' ] || [ "$rest" = "$project" ]; } \
-          && [ "$(basename -- "${1:-}")" != no-mistakes ]; then approved=1; fi
+        if [ -n "$project" ] && { [ "$scope" = '*' ] || [ "$scope" = "$project" ]; } \
+          && [ "$(basename -- "${1:-}")" != no-mistakes ]; then
+          approved=1
+          if [ "$scope" = '*' ]; then select_approval 1; else select_approval 2; fi
+        fi
+        ;;
+      service)
+        words=(); read -r -a words <<< "$rest"
+        [[ ${words[0]:-} =~ ^[a-z0-9][a-z0-9-]*$ ]] && [[ ${words[1]:-} =~ ^[A-Za-z0-9._/:@-]+$ ]] \
+          && [[ ${words[2]:-} =~ ^[1-9][0-9]{0,4}$ ]] && [ "${words[2]}" -le 65535 ] \
+          && [[ ${words[3]:-} =~ ^[1-9][0-9]{0,5}[mg]$ ]] || bad=${bad:-$n}
+        for ((j=4; j<${#words[@]}; j++)); do
+          [[ ${words[j]} =~ ^[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*$ ]] || bad=${bad:-$n}
+        done
+        for prior in ${svc_names[@]+"${svc_names[@]}"}; do [ "$prior" != "${words[0]:-}" ] || bad=${bad:-$n}; done
+        svc_names+=("${words[0]:-}"); svc_specs+=("$rest")
         ;;
       image) [ -z "$rimage" ] && [[ $rest =~ ^[A-Za-z0-9._/:@-]+$ ]] && rimage=$rest || bad=${bad:-$n} ;;
       timeout) [ -z "$rtimeout" ] && [[ $rest =~ ^[1-9][0-9]{0,5}$ ]] && rtimeout=$rest || bad=${bad:-$n} ;;
@@ -221,6 +281,23 @@ elif [ -e "$rconf" ]; then
       *) bad=${bad:-$n} ;;
     esac
   done < "$rconf"
+  # Each approval's services must be declared, have an image to run beside and distinct ports.
+  for check in ${checks[@]+"${checks[@]}"}; do
+    IFS='|' read -r cline cimage cservices <<< "$check"
+    ports=" "
+    for name in $cservices; do
+      spec=$(service_spec "$name") || { bad=${bad:-$cline}; continue; }
+      [ -n "$cimage$rimage" ] || bad=${bad:-$cline}
+      read -r _ port _ <<< "$spec"
+      case $ports in *" $port "*) bad=${bad:-$cline} ;; esac
+      ports+="$port "
+    done
+  done
+  if [ -z "$bad" ] && [ -n "$sel_image" ]; then rimage=$sel_image; fi
+  if [ -z "$bad" ]; then
+    for name in $sel_services; do remote_opts+=(--service "$name $(service_spec "$name")"); done
+    for kv in $sel_env; do remote_opts+=(--env "$kv"); done
+  fi
   if [ -n "$bad" ]; then rproblem="malformed $rconf: invalid line $bad (see --help)"
   elif [ -z "$rhost" ]; then rproblem="malformed $rconf: no host line (see --help)"
   elif [ "${#approvals[@]}" -eq 0 ]; then rproblem="malformed $rconf: no approval line (see --help)"
@@ -381,7 +458,7 @@ try_remote() {
   if flock -n 8; then
     started=$(date +%s)  # signals now belong to the driver
     run_captured "$REMOTE" --host "$rhost" --timeout "$rtimeout" --sample "$sample" \
-      --project "$project" --class "$class" ${rimage:+--image "$rimage"} \
+      --project "$project" --class "$class" ${rimage:+--image "$rimage"} ${remote_opts[@]+"${remote_opts[@]}"} \
       --state-dir "$root/state/heavy-remote" -- "$@"
     rc=$?
     fallback=$(sget fallback)

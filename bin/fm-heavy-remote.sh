@@ -5,6 +5,7 @@
 #
 # usage: fm-heavy-remote.sh --host <ssh alias> --timeout <seconds> --sample <file>
 #          --state-dir <dir> --project <name> [--class test|e2e] [--image <ref>]
+#          [--service "<name> <image> <port> <memory> [KEY=VALUE...]"]... [--env KEY=VALUE]...
 #          -- <command> [args...]
 #
 # The command must be a repository-relative portable command run from the
@@ -75,12 +76,14 @@ set -u
 set -o pipefail
 
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-host=; timeout_s=; sample=; state_dir=; project=; class="test"; image=
+host=; timeout_s=; sample=; state_dir=; project=; class="test"; image=; services=(); envs=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --project) project=${2:-}; shift 2 || break ;;
     --class) class=${2:-}; shift 2 || break ;;
     --image) image=${2:-}; shift 2 || break ;;
+    --service) services+=("${2:-}"); shift 2 || break ;;
+    --env) envs+=("${2:-}"); shift 2 || break ;;
     --host) host=${2:-}; shift 2 || break ;;
     --timeout) timeout_s=${2:-}; shift 2 || break ;;
     --sample) sample=${2:-}; shift 2 || break ;;
@@ -258,9 +261,13 @@ cmd_sha=$(printf '%s\0' "$@" | sha256sum | cut -d' ' -f1)
 git bundle create "$stage/src.bundle" HEAD >/dev/null 2>&1 || fallback bundle-failed
 bundle_sha=$(sha256sum "$stage/src.bundle" | cut -d' ' -f1)
 argv=$(printf '%s\0' "$@" | jq -Rsc 'split("\u0000")[:-1]') || fallback manifest-failed
+pairs='map(capture("^(?<key>[^=]+)=(?<value>.*)$")) | from_entries'
+svcs=$(printf '%s\0' ${services[@]+"${services[@]}"} | jq -Rsc "split(\"\\u0000\")[:-1] | map(select(. != \"\") | split(\" \")
+  | {name: .[0], image: .[1], port: (.[2] | tonumber), memory: .[3], env: (.[4:] | $pairs)})") || fallback manifest-failed
+jenv=$(printf '%s\0' ${envs[@]+"${envs[@]}"} | jq -Rsc "split(\"\\u0000\")[:-1] | $pairs") || fallback manifest-failed
 jq -n --arg id "$id" --arg sha "$sha" --arg cs "$cmd_sha" --arg bs "$bundle_sha" --argjson t "$timeout_s" \
-  --arg project "$project" --arg class "$class" --arg image "$image" \
-  --argjson argv "$argv" '{project: $project, class: $class, image: $image, id: $id, sha: $sha, command_sha256: $cs, bundle_sha256: $bs, timeout_s: $t, argv: $argv}' \
+  --arg project "$project" --arg class "$class" --arg image "$image" --argjson services "$svcs" --argjson env "$jenv" \
+  --argjson argv "$argv" '{project: $project, class: $class, image: $image, services: $services, env: $env, id: $id, sha: $sha, command_sha256: $cs, bundle_sha256: $bs, timeout_s: $t, argv: $argv}' \
   > "$stage/manifest.json" || fallback manifest-failed
 cp "$SELF_DIR/fm-heavy-remote-runner.py" "$stage/runner.py"
 cp "$stage/manifest.json" "$record" || fallback state-unwritable
@@ -286,6 +293,9 @@ if [ "$rc" -ne 0 ]; then
   elif [ "$rc" -eq 12 ]; then  # the host's slot was taken or awaited meanwhile: nothing was launched
     cleanup_remote
     fallback destination-busy
+  elif [ "$rc" -eq 13 ]; then  # the job and its services would not fit the host's docker memory
+    cleanup_remote
+    fallback services-do-not-fit
   else  # the runner refused, or mkdir, tar or python failed: nothing was launched
     cleanup_remote
     fallback prepare-failed
