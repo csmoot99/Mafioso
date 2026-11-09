@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Remote half of bin/fm-heavy-remote.sh: run one transferred job and report it.
 
-Usage: fm-heavy-remote-runner.py start|supervise|status|reconcile|wait|cancel|cleanup <jobdir> [seconds]
+Usage: fm-heavy-remote-runner.py busy
+       fm-heavy-remote-runner.py start|supervise|status|reconcile|wait|cancel|cleanup <jobdir> [seconds]
 
 The client ships this file with each job, so nothing is installed on the remote
 host. It needs python3 (stdlib), git and ps, and runs on macOS and Linux.
@@ -19,12 +20,22 @@ A job directory lives under ~/.fm-heavy-remote and holds manifest.json (project,
 class, job id, candidate sha, command argv and its digest, bundle digest,
 timeout) and src.bundle (the candidate revision with its history).
 
-start     Refuses a second start of the same job, verifies the bundle and command
+Host slot: the host's own bin/fm-heavy.sh jobs and transferred jobs share one slot
+lock (FM_HEAVY_HOST_LOCK, default /tmp/fm-heavy.lock). A transferred job takes it
+only when it is free and no live local job waits for it (a pid file in
+<lock>.waiting), so the host's own work goes first; once taken, the supervisor
+holds it until the job ends, and nothing ever stops a running job of either kind
+for the other.
+
+busy      Prints busy and exits 12 when the host slot is taken or awaited, else
+          prints free. It needs no job directory.
+start     Exits 12, having created nothing, when the host slot is busy. Otherwise
+          it refuses a second start of the same job, verifies the bundle and command
           digests, clones the bundle, checks out and verifies the exact sha, then
           launches a detached supervisor and prints "started". It exits 10 on any
           refusal, having launched nothing, and 11 when the supervisor it launched
           recorded no owner in time, so the job may still have started.
-supervise Runs the command in its own process group with cwd the checkout, output
+supervise Holds the host slot passed by start and runs the command in its own process group with cwd the checkout, output
           to run.log, enforcing the timeout and killing the whole group on
           timeout, cancel or exit. It then publishes result.json atomically; that
           file is the durable completion record. Its fields: schema, id, sha and
@@ -41,6 +52,14 @@ wait      status, polled until it stops being running or preparing or the second
           given elapse.
 cancel    Asks the supervisor to stop the job's own group and waits for the result.
 cleanup   Stops anything the job still owns, then removes the job directory.
+
+Container: a manifest image runs the execute step inside that Linux image with
+docker (on the SSH PATH, /opt/homebrew/bin or /usr/local/bin), named
+fm-heavy-<job>, capped at 6g with no swap, the job directory mounted at the same
+path and ~/.fm-heavy-remote/linux/runtimes and linux/cache standing in for
+runtimes and cache, so Linux runtimes and dependency copies never mix with the
+host's own. Stopping the job also removes that container. A missing docker fails
+the job with exit 127, never a local retry.
 
 Only processes this job started are ever signalled: the supervisor and the command
 group are recorded with their start times in owner.json, and a pid whose start
@@ -64,6 +83,8 @@ import time
 
 ROOT = os.path.join(os.path.expanduser("~"), ".fm-heavy-remote")
 SCHEMA = "fm-heavy-remote.v1"
+HOST_LOCK = os.environ.get("FM_HEAVY_HOST_LOCK", "/tmp/fm-heavy.lock")
+BUSY = 12
 
 
 def die(code, message):
@@ -174,11 +195,86 @@ def reconcile_state(jdir):
     return state
 
 
+def take_host_slot():
+    """The host's own slot lock, held without waiting, or None when it is taken or awaited.
+
+    A pid file in <lock>.waiting is a local bin/fm-heavy.sh job queued for the slot;
+    while one is alive the host's own work goes first.
+    """
+    try:
+        fd = os.open(HOST_LOCK, os.O_CREAT | os.O_WRONLY | os.O_APPEND, 0o666)
+    except OSError as error:
+        die(BUSY, "busy: cannot open %s: %s" % (HOST_LOCK, error))
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        os.close(fd)
+        return None
+    for marker in glob.glob(glob.escape(HOST_LOCK) + ".waiting/*"):
+        try:
+            os.kill(int(os.path.basename(marker)), 0)
+        except (ValueError, ProcessLookupError):
+            continue
+        except PermissionError:
+            pass
+        os.close(fd)
+        return None
+    return fd
+
+
+def cmd_busy():
+    fd = take_host_slot()
+    if fd is None:
+        print("busy")
+        sys.exit(BUSY)
+    os.close(fd)
+    print("free")
+
+
+def container(manifest):
+    return "fm-heavy-" + manifest["id"]
+
+
+def remove_container(manifest):
+    """Killing the docker client does not stop its container, so remove it by name."""
+    docker = find_docker()
+    if manifest.get("image") and docker:
+        subprocess.run([docker, "rm", "-f", container(manifest)], stdin=subprocess.DEVNULL,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def find_docker():
+    return shutil.which("docker", path=os.environ.get("PATH", "") + ":/opt/homebrew/bin:/usr/local/bin")
+
+
+def group_command(jdir, manifest):
+    """The supervised command: the runner's execute step, inside the image when one is set."""
+    command = [sys.executable, os.path.abspath(__file__), "execute", jdir]
+    image = manifest.get("image")
+    if not image:
+        return command
+    docker = find_docker()
+    if not docker:
+        raise OSError("docker is not installed for image %s" % image)
+    linux = os.path.join(ROOT, "linux")
+    for sub in ("runtimes", "cache"):
+        os.makedirs(os.path.join(linux, sub), exist_ok=True)
+    return [docker, "run", "--rm", "--init", "--name", container(manifest), "--memory", "6g", "--memory-swap", "6g",
+            "-e", "HOME=" + os.path.expanduser("~"), "-e", "GIT_CONFIG_COUNT=1",
+            "-e", "GIT_CONFIG_KEY_0=safe.directory", "-e", "GIT_CONFIG_VALUE_0=*",
+            "-v", jdir + ":" + jdir, "-v", os.path.join(linux, "runtimes") + ":" + os.path.join(ROOT, "runtimes") + ":ro",
+            "-v", os.path.join(linux, "cache") + ":" + os.path.join(ROOT, "cache"),
+            "-w", os.path.join(jdir, "work"), image, "python3", os.path.join(jdir, "runner.py"), "execute", jdir]
+
+
 def git(*args):
     return subprocess.run(["git", *args], capture_output=True, text=True)
 
 
 def cmd_start(jdir):
+    slot = take_host_slot()
+    if slot is None:
+        die(BUSY, "busy: the host's heavy slot is taken or awaited")
     try:
         os.close(os.open(os.path.join(jdir, "started"), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600))
     except FileExistsError:
@@ -202,8 +298,10 @@ def cmd_start(jdir):
         die(10, "refused: could not check out %s: %s" % (sha, cloned.stderr.strip()))
     if git("-C", work, "rev-parse", "HEAD").stdout.strip() != sha:
         die(10, "refused: checkout is not %s" % sha)
-    subprocess.Popen([sys.executable, os.path.abspath(__file__), "supervise", jdir], start_new_session=True,
-                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True)
+    # The supervisor holds the host slot until the job ends; the command does not inherit it.
+    subprocess.Popen([sys.executable, os.path.abspath(__file__), "supervise", jdir, str(slot)], start_new_session=True,
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True,
+                     pass_fds=(slot,))
     end = time.monotonic() + 15
     while not os.path.exists(os.path.join(jdir, "owner.json")):
         if time.monotonic() > end:
@@ -400,7 +498,9 @@ def cmd_execute(jdir):
         die(127, "cannot run %s: %s" % (manifest["argv"][0], error))
 
 
-def cmd_supervise(jdir):
+def cmd_supervise(jdir, slot=None):
+    if slot is not None:
+        os.set_inheritable(int(slot), False)
     manifest = read_json(os.path.join(jdir, "manifest.json"))
     work = os.path.join(jdir, "work")
     stops = []
@@ -410,7 +510,7 @@ def cmd_supervise(jdir):
     log = open(os.path.join(jdir, "run.log"), "wb")
     outcome, code = "exited", 127
     try:
-        proc = subprocess.Popen([sys.executable, os.path.abspath(__file__), "execute", jdir], cwd=work, stdin=subprocess.DEVNULL, stdout=log,
+        proc = subprocess.Popen(group_command(jdir, manifest), cwd=work, stdin=subprocess.DEVNULL, stdout=log,
                                 stderr=subprocess.STDOUT, start_new_session=True)
     except OSError as error:
         log.write(("cannot run %s: %s\n" % (manifest["argv"][0], error)).encode())
@@ -428,9 +528,11 @@ def cmd_supervise(jdir):
                 time.sleep(0.2)
                 continue
             kill_group(owner, proc)
+            remove_container(manifest)
         code = proc.wait()
         code = 128 - code if code < 0 else code
         kill_group(owner)  # anything the command left running
+        remove_container(manifest)
         if stops and outcome == "exited":
             outcome = "cancelled"
     log.close()
@@ -474,6 +576,7 @@ def cmd_cancel(jdir):
             time.sleep(0.2)
     elif owner:
         kill_group(owner)
+        remove_container(read_json(os.path.join(jdir, "manifest.json")) or {})
     print(status(jdir))
 
 
@@ -487,14 +590,20 @@ def cmd_cleanup(jdir):
             while alive(owner["supervisor_pid"], owner["supervisor_start"]) and time.monotonic() < end:
                 time.sleep(0.2)
         kill_group(owner)
+        remove_container(read_json(os.path.join(jdir, "manifest.json")) or {})
     shutil.rmtree(jdir, ignore_errors=True)
 
 
 def main():
+    if sys.argv[1:] == ["busy"]:
+        cmd_busy()
+        return
     if len(sys.argv) < 3 or sys.argv[1] not in ("start", "supervise", "execute", "status", "reconcile", "wait", "cancel", "cleanup"):
-        die(2, "usage: fm-heavy-remote-runner.py start|supervise|status|reconcile|wait|cancel|cleanup <jobdir> [seconds]")
+        die(2, "usage: fm-heavy-remote-runner.py busy | start|supervise|status|reconcile|wait|cancel|cleanup <jobdir> [seconds]")
     action, jdir = sys.argv[1], job_dir(sys.argv[2])
-    if action == "status":
+    if action == "supervise":
+        cmd_supervise(jdir, sys.argv[3] if len(sys.argv) > 3 else None)
+    elif action == "status":
         print(status(jdir))
     elif action == "reconcile":
         print(reconcile_state(jdir))
