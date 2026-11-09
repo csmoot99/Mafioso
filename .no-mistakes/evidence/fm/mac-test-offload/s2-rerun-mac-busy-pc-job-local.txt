@@ -1,0 +1,14 @@
+
+### S2 (re-run, local-safe command) the Mac's own test is running; this PC's queued job waits and takes this PC's slot when it frees  [13:28:22]
+Mac lab slot: busy
+fm-heavy-remote: not running on fm-mac (destination-busy); staying in the local queue
+fm-heavy-remote: not running on fm-mac (destination-busy); staying in the local queue
+GAMMA start 13:28:34 on Linux DESKTOP-NKCLCNH
+GAMMA end 13:28:35
+PC job rc=0
+{"project":"gamma-web","class":"test","cmd":"check.sh","host":"local","outcome":null,"exit":0,"fallback":"destination-busy","wait_s":7,"run_s":2}
+Mac job A rc=0
+timeline:
+MAC-A start 13:28:18
+MAC-A end 13:28:30
+{"project":"mac-own-A","exit":0,"run_s":12}

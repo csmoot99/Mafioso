@@ -1,0 +1,18 @@
+ok - fm-heavy: one record per job and the command's exit status
+ok - fm-heavy: the command keeps its environment and stdin, and leftovers do not hold the slot
+Hangup                     "$@"
+Terminated                 "$@"
+ok - fm-heavy: a job killed while running is recorded with exit 128+n
+ok - fm-heavy: a job killed while queued records its wait and never runs
+ok - fm-heavy: peak memory and CPU come from the job's own scope
+Terminated                 "$@"
+ok - fm-heavy: a scope-wide stop still records peak memory and CPU
+ok - fm-heavy: a reading outside the job's own scope is recorded as null
+ok - fm-heavy: queue wait is measured and config/host-test-slots opens more slots
+ok - fm-heavy: usage and configuration errors refuse without a record
+ok - fm-heavy-summary: wait versus run time and peak memory per project and class
+ok - fm-brief: config/heavy-commands points ship and scout workers at the wrapper
+ok - fm-brief: config/heavy-commands is read from the root home
+ok - fm-heavy: macOS runs jobs on the shared slot without systemd-run; Linux still requires it
+# all fm-heavy tests passed
+bash tests/fm-heavy.test.sh  7.31s user 5.10s system 64% cpu 19.190 total

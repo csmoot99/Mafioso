@@ -1,0 +1,13 @@
+# Does pnpm honor the store variable the runner sets in image mode (npm_config_store_dir)?
+## this PC: pnpm 11.25.0
+$ npm_config_store_dir=/tmp/tmp.ilrMWMuT3a/store pnpm store path
+/home/work/.local/share/pnpm/store/v11
+$ pnpm_config_store_dir=/tmp/tmp.ilrMWMuT3a/store pnpm store path
+/tmp/tmp.ilrMWMuT3a/store/v11
+$ npm_config_cache=/tmp/tmp.ilrMWMuT3a/npmc npm config get cache   # npm cache variable for comparison
+/tmp/tmp.ilrMWMuT3a/npmc
+## fm-mac host: pnpm 11.25.0
+$ npm_config_store_dir=/tmp/fm-lab-probe-store pnpm store path
+/Users/chris/Library/pnpm/store/v11
+$ pnpm_config_store_dir=/tmp/fm-lab-probe-store pnpm store path
+/tmp/fm-lab-probe-store/v11

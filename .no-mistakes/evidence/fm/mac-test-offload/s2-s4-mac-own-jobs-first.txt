@@ -1,0 +1,61 @@
+
+### S2 the Mac's own test job (macOS fm-heavy.sh, no systemd-run) is running; this PC's queued job never goes there and the Mac job is not stopped  [13:27:11]
+Mac lab slot: busy
+fm-heavy-remote: not running on fm-mac (destination-busy); staying in the local queue
+fm-heavy-remote: not running on fm-mac (destination-busy); staying in the local queue
+/tmp/fm-lab-offload.MQ5iMB/timeline: No such file or directory (os error 2)
+GAMMA start 13:27:23 on Linux DESKTOP-NKCLCNH
+/tmp/fm-lab-offload.MQ5iMB/timeline: No such file or directory (os error 2)
+GAMMA end 13:27:24
+PC job rc=1
+{"project":"gamma-web","class":"test","cmd":"check.sh","host":"local","outcome":null,"exit":1,"fallback":"destination-busy","wait_s":8,"run_s":1}
+Mac job A rc=0
+
+### S2b --remote while the Mac's own job runs: destination-busy, runs here  [13:27:24]
+fm-heavy-remote: not running on fm-mac (destination-busy); staying in the local queue
+GAMMA-REMOTE start 13:27:28 on Linux DESKTOP-NKCLCNH
+GAMMA-REMOTE end 13:27:28
+PC job rc=0
+{"project":"gamma-web","class":"test","cmd":"check.sh","host":"local","outcome":null,"exit":0,"fallback":"destination-busy","wait_s":1,"run_s":0}
+Mac job A2 rc=0
+
+### S3 the Mac's worker queues its own next test while one runs: both go before this PC's queued job  [13:27:33]
+Mac waiter markers while B2 queues: 1; Mac lab slot: busy
+fm-heavy-remote: not running on fm-mac (destination-busy); staying in the local queue
+fm-heavy-remote: not running on fm-mac (destination-busy); staying in the local queue
+DELTA start 13:27:46 on Darwin Chriss-MacBook-Pro
+DELTA end 13:27:48
+PC job rc=0
+{"project":"delta-svc","class":"test","cmd":"check.sh","host":"fm-mac","outcome":"pass","exit":0,"fallback":null,"wait_s":10,"run_s":2}
+Mac B1 rc=0
+Mac B2 rc=0
+timeline:
+MAC-B1 start 13:27:29
+MAC-B1 end 13:27:39
+MAC-B2 start 13:27:39
+MAC-B2 end 13:27:45
+DELTA start 13:27:46 on Darwin Chriss-MacBook-Pro
+DELTA end 13:27:48
+
+### S4 this PC's job is running on the Mac when the Mac's worker starts its own test: the Mac job waits, the sent job is not stopped  [13:27:55]
+sent job started on the Mac; Mac lab slot: busy
+Mac waiter markers while C queues: 1
+PC job rc=0
+EPSILON start 13:27:52 on Darwin Chriss-MacBook-Pro
+EPSILON end 13:28:04
+{"project":"epsilon-app","class":"test","cmd":"check.sh","host":"fm-mac","outcome":"pass","exit":0,"fallback":null,"wait_s":1,"run_s":13}
+Mac C rc=0
+timeline:
+EPSILON start 13:27:52 on Darwin Chriss-MacBook-Pro
+EPSILON end 13:28:04
+MAC-C start 13:28:04
+MAC-C end 13:28:06
+
+### Mac's own job records (macOS: no memory scope, counters null)  [13:28:11]
+{"project":"mac-own-A","host":"local","exit":0,"slot":1,"wait_s":0,"run_s":12,"peak_memory_bytes":null,"cpu_usec":null}
+{"project":"mac-own-A2","host":"local","exit":0,"slot":1,"wait_s":0,"run_s":8,"peak_memory_bytes":null,"cpu_usec":null}
+{"project":"mac-own-B1","host":"local","exit":0,"slot":1,"wait_s":0,"run_s":10,"peak_memory_bytes":null,"cpu_usec":null}
+{"project":"mac-own-B2","host":"local","exit":0,"slot":1,"wait_s":7,"run_s":6,"peak_memory_bytes":null,"cpu_usec":null}
+{"project":"mac-own-C","host":"local","exit":0,"slot":1,"wait_s":11,"run_s":2,"peak_memory_bytes":null,"cpu_usec":null}
+
+### Mac lab waiter markers left: 0; Mac scratch job dirs left: 0  [13:28:12]

@@ -1,0 +1,37 @@
+
+### config/heavy-remote  [13:29:42]
+host fm-mac
+project *
+image mia-tailscale-lab:local
+timeout 300
+
+### S7a job 1 in the image writes into each tool cache  [13:29:42]
+kernel: Linux aarch64; in container: yes
+PLAYWRIGHT_BROWSERS_PATH=/Users/chris/.fm-heavy-remote/cache/tools/ms-playwright
+npm_config_store_dir=/Users/chris/.fm-heavy-remote/cache/tools/pnpm-store
+npm_config_cache=/Users/chris/.fm-heavy-remote/cache/tools/npm
+wrote /Users/chris/.fm-heavy-remote/cache/tools/ms-playwright/fm-lab-marker
+wrote /Users/chris/.fm-heavy-remote/cache/tools/pnpm-store/fm-lab-marker
+wrote /Users/chris/.fm-heavy-remote/cache/tools/npm/fm-lab-marker
+rc=0
+{"project":"alpha-shop","class":"e2e","cmd":"cache.sh","host":"fm-mac","outcome":"pass","exit":0,"fallback":null,"wait_s":1,"run_s":1}
+
+### S7b job 2, a fresh container, reads what job 1 cached  [13:29:46]
+kernel: Linux aarch64; in container: yes
+PLAYWRIGHT_BROWSERS_PATH=/Users/chris/.fm-heavy-remote/cache/tools/ms-playwright
+npm_config_store_dir=/Users/chris/.fm-heavy-remote/cache/tools/pnpm-store
+npm_config_cache=/Users/chris/.fm-heavy-remote/cache/tools/npm
+read /Users/chris/.fm-heavy-remote/cache/tools/ms-playwright/fm-lab-marker: cached by job 7
+read /Users/chris/.fm-heavy-remote/cache/tools/pnpm-store/fm-lab-marker: cached by job 7
+read /Users/chris/.fm-heavy-remote/cache/tools/npm/fm-lab-marker: cached by job 7
+rc=0
+{"project":"beta-api","class":"e2e","cmd":"cache.sh","host":"fm-mac","outcome":"pass","exit":0,"fallback":null,"wait_s":1,"run_s":1}
+
+### On the Mac host: the caches live under the mounted ~/.fm-heavy-remote/linux/cache  [13:29:48]
+/Users/chris/.fm-heavy-remote/linux/cache/tools/pnpm-store/fm-lab-marker
+/Users/chris/.fm-heavy-remote/linux/cache/tools/ms-playwright/fm-lab-marker
+/Users/chris/.fm-heavy-remote/linux/cache/tools/npm/fm-lab-marker
+
+### No fm-heavy containers remain: []  [13:29:49]
+
+### Mac scratch: linux  [13:29:50]

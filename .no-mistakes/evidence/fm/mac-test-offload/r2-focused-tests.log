@@ -1,0 +1,4 @@
+ok - fm-heavy: an image line runs the job inside that container and removes it
+ok - fm-heavy: project and every-project approvals cover tests and e2e only, with a project, never drive calls
+ok - fm-heavy: the host's own jobs go first, and no running job is stopped for another
+# selected fm-heavy-remote tests passed

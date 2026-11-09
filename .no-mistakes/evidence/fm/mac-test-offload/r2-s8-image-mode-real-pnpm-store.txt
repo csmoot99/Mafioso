@@ -1,0 +1,40 @@
+
+### config/heavy-remote  [13:35:43]
+host fm-mac
+project *
+image fm-ci-177l-runner:prepared
+timeout 600
+zsh:1: no matches found: /Users/chris/.fm-heavy-remote/linux/cache/tools/pnpm-store/v*/fm-lab-marker
+
+### S8a job 1 (project alpha-shop) in a fresh container: real pnpm resolves the store, job writes into it  [13:35:44]
+WARNING: The requested image's platform (linux/amd64) does not match the detected host platform (linux/arm64/v8) and no specific platform was requested
+kernel: Linux x86_64; in container: yes; pnpm 12.11.2
+PLAYWRIGHT_BROWSERS_PATH=/Users/chris/.fm-heavy-remote/cache/tools/ms-playwright
+pnpm_config_store_dir=/Users/chris/.fm-heavy-remote/cache/tools/pnpm-store
+npm_config_store_dir=/Users/chris/.fm-heavy-remote/cache/tools/pnpm-store
+npm_config_cache=/Users/chris/.fm-heavy-remote/cache/tools/npm
+pnpm store path -> /Users/chris/.fm-heavy-remote/cache/tools/pnpm-store/v11
+npm config get cache -> /Users/chris/.fm-heavy-remote/cache/tools/npm
+wrote /Users/chris/.fm-heavy-remote/cache/tools/pnpm-store/v11/fm-lab-marker
+rc=0
+{"project":"alpha-shop","class":"e2e","cmd":"pnpm-cache.sh","host":"fm-mac","outcome":"pass","exit":0,"fallback":null,"wait_s":1,"run_s":2}
+
+### S8b job 2 (project beta-api), another fresh container: real pnpm resolves the same store and finds job 1's file  [13:35:49]
+WARNING: The requested image's platform (linux/amd64) does not match the detected host platform (linux/arm64/v8) and no specific platform was requested
+kernel: Linux x86_64; in container: yes; pnpm 12.11.2
+PLAYWRIGHT_BROWSERS_PATH=/Users/chris/.fm-heavy-remote/cache/tools/ms-playwright
+pnpm_config_store_dir=/Users/chris/.fm-heavy-remote/cache/tools/pnpm-store
+npm_config_store_dir=/Users/chris/.fm-heavy-remote/cache/tools/pnpm-store
+npm_config_cache=/Users/chris/.fm-heavy-remote/cache/tools/npm
+pnpm store path -> /Users/chris/.fm-heavy-remote/cache/tools/pnpm-store/v11
+npm config get cache -> /Users/chris/.fm-heavy-remote/cache/tools/npm
+read /Users/chris/.fm-heavy-remote/cache/tools/pnpm-store/v11/fm-lab-marker: written by job 18:35:43
+rc=0
+{"project":"beta-api","class":"e2e","cmd":"pnpm-cache.sh","host":"fm-mac","outcome":"pass","exit":0,"fallback":null,"wait_s":1,"run_s":1}
+
+### On the Mac host: where the store file really lives (the mounted ~/.fm-heavy-remote/linux/cache)  [13:35:54]
+/Users/chris/.fm-heavy-remote/linux/cache/tools/pnpm-store/v11/fm-lab-marker
+
+### No fm-heavy containers remain: []  [13:35:55]
+
+### Mac scratch job dirs left: 0  [13:35:55]

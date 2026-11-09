@@ -1,0 +1,30 @@
+
+### S5 this PC's slot is busy and the Mac is free; a worker's pipeline drive call under project * + offload  [13:36:22]
+no-mistakes axi run ran on Linux
+rc=0
+{"project":"alpha-shop","class":"test","cmd":"no-mistakes","host":"local","outcome":null,"exit":0,"fallback":null,"wait_s":5,"run_s":0}
+ssh calls during S5: 0
+
+### S5b --remote drive call under project *: refused (exit 2), nothing sent  [13:36:27]
+fm-heavy.sh: --remote command/class is not approved for this project
+rc=2
+ssh calls: 0
+
+### S6 a build under project * + offload with this PC's slot busy waits here  [13:36:27]
+BUILD start 13:36:31 on Linux DESKTOP-NKCLCNH
+BUILD end 13:36:31
+rc=0
+{"project":"alpha-shop","class":"build","cmd":"check.sh","host":"local","outcome":null,"exit":0,"fallback":null,"wait_s":4,"run_s":0}
+ssh calls: 0
+
+### S6b a job with no --project under project * never leaves (--remote refused)  [13:36:31]
+fm-heavy.sh: --remote command/class is not approved for this project
+rc=2
+
+### S6c project <name> approval covers only that project  [13:36:31]
+fm-heavy.sh: --remote command/class is not approved for this project
+zeta-other --remote rc=2
+ALPHA-NAMED start 13:36:28 on Darwin Chriss-MacBook-Pro
+ALPHA-NAMED end 13:36:28
+alpha-shop --remote rc=0
+{"project":"alpha-shop","class":"test","cmd":"check.sh","host":"fm-mac","outcome":"pass","exit":0,"fallback":null,"wait_s":1,"run_s":0}

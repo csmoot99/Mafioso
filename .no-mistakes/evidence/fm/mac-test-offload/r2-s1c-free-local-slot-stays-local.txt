@@ -1,0 +1,8 @@
+
+### S1c this PC's slot is free: an approved job under project * + offload runs here, no ssh  [13:36:10]
+PC slot free
+ALPHA-LOCAL start 13:36:10 on Linux DESKTOP-NKCLCNH
+ALPHA-LOCAL end 13:36:10
+rc=0
+{"project":"alpha-shop","class":"test","cmd":"check.sh","host":"local","outcome":null,"exit":0,"fallback":null,"wait_s":0,"run_s":0}
+ssh calls: 0

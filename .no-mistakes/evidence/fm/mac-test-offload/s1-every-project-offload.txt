@@ -1,0 +1,30 @@
+
+### config/heavy-remote  [13:26:42]
+host fm-mac
+project *
+offload
+timeout 300
+
+### Mac lab slot before: free
+ rc=0  [13:26:42]
+
+### S1a this PC's only slot is held; a test job of project alpha-shop queues  [13:26:43]
+ALPHA start 13:26:40 on Darwin Chriss-MacBook-Pro
+ALPHA end 13:26:42
+rc=0
+{"project":"alpha-shop","class":"test","cmd":"check.sh","host":"fm-mac","outcome":"pass","exit":0,"fallback":null,"wait_s":1,"run_s":2}
+
+### S1b another project, beta-api, e2e class  [13:26:48]
+BETA start 13:26:45 on Darwin Chriss-MacBook-Pro
+BETA end 13:26:46
+rc=0
+{"project":"beta-api","class":"e2e","cmd":"check.sh","host":"fm-mac","outcome":"pass","exit":0,"fallback":null,"wait_s":1,"run_s":2}
+local holder still alive: yes
+
+### Mac timeline  [13:26:52]
+ALPHA start 13:26:40 on Darwin Chriss-MacBook-Pro
+ALPHA end 13:26:42
+BETA start 13:26:45 on Darwin Chriss-MacBook-Pro
+BETA end 13:26:46
+
+### Mac scratch left behind: 0 job dirs  [13:26:52]

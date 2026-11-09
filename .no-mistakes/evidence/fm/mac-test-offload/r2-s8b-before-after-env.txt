@@ -1,0 +1,5 @@
+# same image (pnpm 12.11.2), env as the runner set it BEFORE vs AFTER commit a840177
+$ npm_config_store_dir=/Users/chris/.fm-heavy-remote/cache/tools/pnpm-store pnpm store path     # before: only the npm_ form
+/Users/chris/.local/share/pnpm/store/v11
+$ pnpm_config_store_dir=/Users/chris/.fm-heavy-remote/cache/tools/pnpm-store npm_config_store_dir=/Users/chris/.fm-heavy-remote/cache/tools/pnpm-store pnpm store path     # after: both forms
+/Users/chris/.fm-heavy-remote/cache/tools/pnpm-store/v11
