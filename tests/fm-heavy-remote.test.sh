@@ -1279,6 +1279,18 @@ run --rm --init --name" ] || fail "services start before the job: $(cat "$CTL/do
   [ "$(cat "$REMOTE_HOME/url")" = "postgres://localhost:$P1/t" ] || fail "the job sees its env"
   expect_services_removed "after a pass"
 
+  setup_services svcspaced 'echo "$DATABASE_URL" > "$HOME/url"'
+  printf '%b\n' 'host fake-mac' 'image fm-heavy-linux:1' 'timeout 30' \
+    "service  db\tpostgres:16   $P1  512m\tPORT=$P1  POSTGRES_DB=t" "service cache redis:7 $P2 256m PORT=$P2" \
+    "project p  service=db\tservice=cache   env=DATABASE_URL=postgres://localhost:$P1/t" > "$HOME_FM/config/heavy-remote"
+  heavy --remote >"$CASE/out" 2>&1 || fail "a service line with repeated spaces and tabs: $(cat "$CASE/out")"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "a service line with repeated spaces and tabs"
+  id=$(sed -n 's/^network create //p' "$CTL/docker.log")
+  grep -Fx "run -d --name $id-db --memory 512m --memory-swap 512m --network $id -e PORT=$P1 -e POSTGRES_DB=t postgres:16" "$CTL/docker.log" >/dev/null \
+    || fail "a spaced service line keeps its settings: $(cat "$CTL/docker.log")"
+  [ "$(cat "$REMOTE_HOME/url")" = "postgres://localhost:$P1/t" ] || fail "the job sees its env with a spaced approval"
+  expect_services_removed "after a spaced service line"
+
   setup_services svcfail 'exit 3'
   heavy --remote >/dev/null 2>&1; expect_code 3 "$?" "a failing job with services"
   expect_record '.outcome == "failed"' "failed services job"
@@ -1308,7 +1320,7 @@ run --rm --init --name" ] || fail "services start before the job: $(cat "$CTL/do
   FAKE_DOCKER_MEM=$((6 << 30)) heavy --remote >/dev/null 2>&1 || fail "a job whose services do not fit runs here"
   expect_record '.host == "local" and .fallback == "services-do-not-fit"' "services-do-not-fit record"
   ! grep -E '^(run|network create)' "$CTL/docker.log" >/dev/null || fail "nothing starts on the host when services do not fit"
-  pass "fm-heavy --remote: services start before the job with their settings and are removed on pass, failure, timeout, cancel and reconciliation"
+  pass "fm-heavy --remote: services start before the job with their settings and are removed on pass, failure, timeout, cancel and reconciliation, whatever the spacing of their lines"
 }
 
 test_pass_and_record

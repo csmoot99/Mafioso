@@ -273,7 +273,7 @@ elif [ -e "$rconf" ]; then
           [[ ${words[j]} =~ ^[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*$ ]] || bad=${bad:-$n}
         done
         for prior in ${svc_names[@]+"${svc_names[@]}"}; do [ "$prior" != "${words[0]:-}" ] || bad=${bad:-$n}; done
-        svc_names+=("${words[0]:-}"); svc_specs+=("$rest")
+        svc_names+=("${words[0]:-}"); svc_specs+=("${words[*]-}")
         ;;
       image) [ -z "$rimage" ] && [[ $rest =~ ^[A-Za-z0-9._/:@-]+$ ]] && rimage=$rest || bad=${bad:-$n} ;;
       timeout) [ -z "$rtimeout" ] && [[ $rest =~ ^[1-9][0-9]{0,5}$ ]] && rtimeout=$rest || bad=${bad:-$n} ;;
