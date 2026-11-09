@@ -87,6 +87,7 @@ setup() {
   CTL=$CASE/ctl
   REMOTE_HOME=$CASE/host
   LOCK=$CASE/slot.lock
+  export FM_HEAVY_HOST_LOCK=$CASE/host.lock  # the host's own slot, shared with its local jobs
   LOG=$HOME_FM/state/heavy-jobs.jsonl
   mkdir -p "$HOME_FM/state" "$HOME_FM/config" "$CTL/rules" "$REMOTE_HOME" "$REPO/t"
   fakebin=$(fm_fakebin "$CASE")
@@ -1075,6 +1076,146 @@ test_e2e_browser_preparation() {
   pass "fm-heavy: approved Playwright e2e commands prepare browsers before execution"
 }
 
+test_project_approvals() {
+  local bad pid
+  setup projectwide 'echo ran >> "$HOME/runs"'
+  printf 'host fake-mac\nproject p\n' > "$HOME_FM/config/heavy-remote"
+  heavy --remote >/dev/null 2>&1 || fail "a project approval covers the project's test command"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "project approval"
+  printf 'host fake-mac\nproject *\n' > "$HOME_FM/config/heavy-remote"
+  heavy --class e2e --remote >/dev/null 2>&1 || fail "an every-project approval covers e2e"
+  expect_record '.class == "e2e" and .host == "fake-mac" and .outcome == "pass"' "every-project approval"
+  printf 'host fake-mac\nproject other\n' > "$HOME_FM/config/heavy-remote"
+  heavy --remote >/dev/null 2>&1; expect_code 2 "$?" "another project's approval"
+  printf 'host fake-mac\nproject *\n' > "$HOME_FM/config/heavy-remote"
+  heavy --project '' --remote >/dev/null 2>&1; expect_code 2 "$?" "a job with no project never leaves"
+  [ "$(wc -l < "$REMOTE_HOME/runs")" -eq 2 ] || fail "only the approved jobs ran on the host"
+  for bad in 'project p\nproject p' 'project a b' 'project' 'image bad image!' 'image a\nimage b'; do
+    printf 'host fake-mac\nproject p\noffload\n%b\n' "$bad" > "$HOME_FM/config/heavy-remote"
+    heavy >/dev/null 2>&1; expect_code 2 "$?" "malformed approval $bad"
+  done
+  # Builds stay here even under an every-project approval.
+  setup buildstays2 'echo local'
+  observe_local_queue
+  printf 'host fake-mac\nproject *\noffload\n' > "$HOME_FM/config/heavy-remote"
+  hold_local
+  heavy --class build >"$CASE/out" 2>&1 4>&- & pid=$!
+  wait_for "$CTL/local-waiting"
+  [ ! -s "$CTL/log" ] || fail "a build may not contact the host"
+  release_local
+  wait "$pid" || fail "local build"
+  expect_record '.class == "build" and .host == "local"' "build stays local under project *"
+  # A no-mistakes drive call needs this machine's gate, so a project approval never offloads it.
+  setup drivestays 'echo local'
+  observe_local_queue
+  printf '#!/bin/sh\necho drove >> "$FAKE_SSH_CTL/drives"\n' > "$FAKEBIN/no-mistakes"
+  chmod +x "$FAKEBIN/no-mistakes"
+  printf 'host fake-mac\nproject *\noffload\n' > "$HOME_FM/config/heavy-remote"
+  hold_local
+  (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" FAKE_SSH_CTL="$CTL" \
+    FAKE_SSH_HOME="$REMOTE_HOME" RUNNER_SRC="$RUNNER" "$HEAVY" --class test --task t --project p -- no-mistakes axi run) \
+    >"$CASE/out" 2>&1 3>&- 4>&- & pid=$!
+  wait_for "$CTL/local-waiting"
+  [ ! -s "$CTL/log" ] || fail "a drive call may not contact the host"
+  release_local
+  wait "$pid" || fail "local drive call: $(cat "$CASE/out")"
+  expect_record '.cmd == "no-mistakes" and .host == "local" and .fallback == null' "drive call stays local under project *"
+  [ "$(cat "$CTL/drives")" = drove ] || fail "the drive call ran here once"
+  (cd "$REPO" && PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_FM" FM_HEAVY_LOCK="$LOCK" FAKE_SSH_CTL="$CTL" \
+    FAKE_SSH_HOME="$REMOTE_HOME" RUNNER_SRC="$RUNNER" "$HEAVY" --class test --task t --project p --remote -- no-mistakes axi run) \
+    >/dev/null 2>&1 3>&- 4>&-
+  expect_code 2 "$?" "a project approval does not cover --remote drive calls"
+  pass "fm-heavy: project and every-project approvals cover tests and e2e only, with a project, never drive calls"
+}
+
+hold_host() { exec 5>>"$FM_HEAVY_HOST_LOCK"; flock 5; }
+release_host() { exec 5>&-; }
+
+test_host_jobs_go_first_and_none_is_stopped() {
+  local pid dead
+  setup hostfirst 'echo ran >> "$HOME/runs"'
+  printf 'host fake-mac\nproject p\n' > "$HOME_FM/config/heavy-remote"
+  FM_HEAVY_HOST_LOCK=$FM_HEAVY_HOST_LOCK python3 "$RUNNER" busy >/dev/null; expect_code 0 "$?" "a free host slot"
+  hold_host
+  FM_HEAVY_HOST_LOCK=$FM_HEAVY_HOST_LOCK python3 "$RUNNER" busy >/dev/null; expect_code 12 "$?" "a held host slot"
+  heavy --remote >/dev/null 2>&1 5>&- || fail "a busy host leaves the job here"
+  expect_record '.host == "local" and .fallback == "destination-busy"' "held host slot"
+  release_host
+  # A host job waiting for its own slot goes before a sent job.
+  mkdir "$FM_HEAVY_HOST_LOCK.waiting"
+  : > "$FM_HEAVY_HOST_LOCK.waiting/$$"
+  heavy --remote >/dev/null 2>&1 || fail "an awaited host slot leaves the job here"
+  expect_record '.host == "local" and .fallback == "destination-busy"' "awaited host slot"
+  rm "$FM_HEAVY_HOST_LOCK.waiting/$$"
+  sh -c 'exit 0' & dead=$!; wait "$dead"
+  : > "$FM_HEAVY_HOST_LOCK.waiting/$dead"
+  heavy --remote >/dev/null 2>&1 || fail "a dead waiter does not hold the host"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "dead waiter ignored"
+  [ "$(wc -l < "$REMOTE_HOME/runs")" -eq 1 ] || fail "busy jobs never ran on the host"
+  # A sent job holds the host slot to the end; a host job then waits instead of stopping it.
+  setup nopreempt 'touch "$HOME/started"; sleep 1; echo ran >> "$HOME/runs"'
+  printf 'host fake-mac\nproject p\n' > "$HOME_FM/config/heavy-remote"
+  heavy --remote >"$CASE/out" 2>&1 & pid=$!
+  wait_for "$REMOTE_HOME/started"
+  ! flock -n "$FM_HEAVY_HOST_LOCK" true || fail "a running sent job holds the host slot"
+  flock "$FM_HEAVY_HOST_LOCK" true
+  [ "$(wc -l < "$REMOTE_HOME/runs" 2>/dev/null)" = 1 ] || fail "the host job waited for the sent job to finish"
+  wait "$pid" || fail "the sent job passes: $(cat "$CASE/out")"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "sent job not preempted"
+  # A running host job is never stopped for a sent one.
+  ( flock "$FM_HEAVY_HOST_LOCK" sh -c 'sleep 1; echo done > "$0"' "$CASE/hostjob" ) & pid=$!
+  until ! flock -n "$FM_HEAVY_HOST_LOCK" true; do sleep 0.1; done
+  heavy --remote >/dev/null 2>&1 || fail "a sent job beside a running host job"
+  expect_record '.host == "local" and .fallback == "destination-busy"' "running host job keeps the slot"
+  wait "$pid" || fail "the host job finishes"
+  [ "$(cat "$CASE/hostjob")" = "done" ] || fail "the host job ran to its end"
+  pass "fm-heavy: the host's own jobs go first, and no running job is stopped for another"
+}
+
+make_fake_docker() {  # <fakebin>: runs the container's command on the host, logging its argv
+  cat > "$1/docker" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FAKE_SSH_CTL/docker.log"
+[ "$1" = run ] || exit 0
+shift
+dir=.
+while [ "$#" -gt 0 ]; do
+  case "$1" in --rm|--init) shift ;; -w) dir=$2; shift 2 ;; -e) export "${2?}"; shift 2 ;; -*) shift 2 ;; *) break ;; esac
+done
+shift
+cd "$dir" && exec "$@"
+SH
+  chmod +x "$1/docker"
+}
+
+test_image_runs_in_a_container() {
+  local id
+  setup container 'echo ran >> "$HOME/runs"; { printf "%s\n" "$PLAYWRIGHT_BROWSERS_PATH" "$npm_config_store_dir" "$npm_config_cache"; pnpm store path; } | grep . > "$HOME/tool-caches"'
+  make_fake_docker "$FAKEBIN"
+  # pnpm 11 resolves its store from pnpm_config_store_dir only; npm_config_store_dir serves older pinned pnpm.
+  cat > "$FAKEBIN/pnpm" <<'SH'
+#!/usr/bin/env bash
+[ "$*" = "store path" ] && echo "${pnpm_config_store_dir:-$HOME/.local/share/pnpm/store}/v11"
+SH
+  chmod +x "$FAKEBIN/pnpm"
+  printf 'host fake-mac\nproject p\nimage fm-heavy-linux:1\n' > "$HOME_FM/config/heavy-remote"
+  heavy --remote >"$CASE/out" 2>&1 || fail "a job in the image: $(cat "$CASE/out")"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "container job"
+  id=$(grep -o 'fm-heavy-[^ ]*' "$CTL/docker.log" | head -1)
+  grep -E "^run --rm --init --name $id --memory 6g --memory-swap 6g .* fm-heavy-linux:1 python3 " "$CTL/docker.log" >/dev/null \
+    || fail "docker run argv: $(cat "$CTL/docker.log")"
+  grep -F "/.fm-heavy-remote/linux/runtimes:" "$CTL/docker.log" >/dev/null || fail "linux runtimes are mounted"
+  grep -F -- "-v $REMOTE_HOME/.fm-heavy-remote/linux/cache:$REMOTE_HOME/.fm-heavy-remote/cache " "$CTL/docker.log" >/dev/null \
+    || fail "linux cache is mounted: $(cat "$CTL/docker.log")"
+  [ "$(wc -l < "$REMOTE_HOME/tool-caches")" -eq 4 ] || fail "four tool cache paths: $(cat "$REMOTE_HOME/tool-caches")"
+  while read -r dir; do
+    case "$dir" in "$REMOTE_HOME/.fm-heavy-remote/cache/"?*) ;; *) fail "tool cache outside the mounted cache: $dir" ;; esac
+  done < "$REMOTE_HOME/tool-caches"
+  grep -Fx "rm -f $id" "$CTL/docker.log" >/dev/null || fail "the container is removed: $(cat "$CTL/docker.log")"
+  [ "$(ls "$REMOTE_HOME/.fm-heavy-remote")" = linux ] || fail "only the linux cache remains: $(ls "$REMOTE_HOME/.fm-heavy-remote")"
+  pass "fm-heavy: an image line runs the job inside that container and removes it"
+}
+
 test_pass_and_record
 test_off_by_default_and_refusals
 test_fallbacks_run_locally
@@ -1112,5 +1253,8 @@ test_project_without_dependencies_needs_no_lockfile
 test_command_missing_on_host_cannot_run
 test_e2e_browser_preparation
 test_npm_dependency_cache
+test_project_approvals
+test_host_jobs_go_first_and_none_is_stopped
+test_image_runs_in_a_container
 
 echo '# all fm-heavy-remote tests passed'

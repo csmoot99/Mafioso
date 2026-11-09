@@ -41,17 +41,27 @@
 # on one SSH host, which takes one job at a time; build and image always stay
 # local, since only the result and log come back. Lines (comments start #):
 #   host <ssh alias>                    required, one host
-#   command <project> -- <words...>     approval for one project (repeatable)
+#   command <project> -- <words...>     approval for one command of one project
+#   project <project>|*                 approval for every test and e2e command of
+#                                       one project, or of every project (repeatable),
+#                                       except no-mistakes drive calls
+#   image <ref>                         optional Linux container image the host runs
+#                                       each job in (see bin/fm-heavy-remote-runner.py)
 #   timeout <seconds>                   optional positive integer, default 900
 #   offload                             optional presence line
 # Command words must match argv exactly (whitespace separates words; no shell
 # quoting or expansion). A malformed or unreadable config, including duplicate
 # approvals, refuses a job that would offload (--remote, or an approved command
 # with offload); every other job warns once and runs locally.
+# A job with an empty --project is never approved.
 # --remote requires an approval and requests remote first. With offload, an
 # approved command automatically tries the host when all local slots are busy;
 # otherwise it runs locally. Without offload or --remote the local behavior is
-# unchanged. An approved job the host cannot take yet because it is busy,
+# unchanged. The host's own heavy jobs share its slot with the jobs sent there and
+# go first: a job is sent only while that slot is free and none of the host's jobs
+# waits for it, and no running job of either kind is stopped for another. Each job
+# waiting for a local slot leaves a <lock>.waiting/<pid> marker for that check.
+# An approved job the host cannot take yet because it is busy,
 # unreachable or still running an unknown job waits for a local slot while it
 # keeps checking: the remote slot every two seconds, the host itself every
 # FM_HEAVY_REMOTE_RECHECK seconds, and it moves to whichever frees first. Any other
@@ -87,15 +97,17 @@
 # process that outlives the command with the output open leaves the log unwritten
 # until it exits, and that job's ledger line is "(unparsed)".
 #
-# bin/fm-heavy-summary.sh summarizes the log. Linux with flock, systemd-run and
-# jq only; elsewhere the wrapper exits 69 without running anything.
+# bin/fm-heavy-summary.sh summarizes the log. Needs flock and jq, and systemd-run
+# everywhere except macOS, where the job runs on the same slot lock without a
+# memory scope, so peak_memory_bytes and cpu_usec are null; otherwise the wrapper
+# exits 69 without running anything.
 #
 # Environment: FM_HOME selects the home (the root home is used for the log and
 # config); FM_HEAVY_LOCK overrides the slot lock path for tests;
 # FM_HEAVY_REMOTE_RECHECK is the seconds between host checks for a queued job (30).
 #
 # Exit status: the command's, 128+n when the wrapper was signalled, 2 on a usage
-# or configuration error, or 69 when flock, systemd-run or jq is missing. A remote
+# or configuration error, or 69 when a required tool is missing. A remote
 # job that did not pass exits with its outcome's status from bin/fm-heavy-remote.sh.
 set -u
 
@@ -147,9 +159,14 @@ case "$class" in test|build|e2e|image) ;; *)
   echo "fm-heavy.sh: --class must be test, build, e2e or image" >&2; exit 2 ;;
 esac
 [ "$#" -gt 0 ] || { echo "fm-heavy.sh: no command after --" >&2; exit 2; }
-for tool in flock systemd-run jq; do
+for tool in flock jq; do
   command -v "$tool" >/dev/null 2>&1 || { echo "fm-heavy.sh: $tool is required" >&2; exit 69; }
 done
+scoped=1
+if ! command -v systemd-run >/dev/null 2>&1; then
+  [ "$(uname -s)" = Darwin ] || { echo "fm-heavy.sh: systemd-run is required" >&2; exit 69; }
+  scoped=
+fi
 
 # shellcheck source=/dev/null # Isolated in this subshell; linted as its own root.
 root=$(. "$(dirname "$SELF")/fm-wake-lib.sh" && fm_firstmate_root_home) || {
@@ -162,7 +179,7 @@ if [ -e "$root/config/host-test-slots" ]; then
     echo "fm-heavy.sh: config/host-test-slots must hold one positive integer" >&2; exit 2 ;; esac
 fi
 
-rhost=; rtimeout=; offload=; approved=; rconf=$root/config/heavy-remote; rproblem=
+rhost=; rtimeout=; rimage=; offload=; approved=; rconf=$root/config/heavy-remote; rproblem=
 if [ -n "$remote" ] && [ ! -e "$rconf" ]; then
   echo "fm-heavy.sh: --remote needs $rconf" >&2; exit 2
 elif [ -e "$rconf" ] && [ ! -r "$rconf" ]; then
@@ -190,6 +207,15 @@ elif [ -e "$rconf" ]; then
         approvals+=("$signature")
         [ -z "$match" ] || approved=1
         ;;
+      project)
+        [[ $rest =~ ^([A-Za-z0-9._-]+|\*)$ ]] || bad=${bad:-$n}
+        signature=" project $rest"
+        for prior in ${approvals[@]+"${approvals[@]}"}; do [ "$prior" != "$signature" ] || bad=${bad:-$n}; done
+        approvals+=("$signature")
+        if [ -n "$project" ] && { [ "$rest" = '*' ] || [ "$rest" = "$project" ]; } \
+          && [ "$(basename -- "${1:-}")" != no-mistakes ]; then approved=1; fi
+        ;;
+      image) [ -z "$rimage" ] && [[ $rest =~ ^[A-Za-z0-9._/:@-]+$ ]] && rimage=$rest || bad=${bad:-$n} ;;
       timeout) [ -z "$rtimeout" ] && [[ $rest =~ ^[1-9][0-9]{0,5}$ ]] && rtimeout=$rest || bad=${bad:-$n} ;;
       offload) [ -z "$offload" ] && [ -z "$rest" ] && offload=1 || bad=${bad:-$n} ;;
       *) bad=${bad:-$n} ;;
@@ -197,7 +223,7 @@ elif [ -e "$rconf" ]; then
   done < "$rconf"
   if [ -n "$bad" ]; then rproblem="malformed $rconf: invalid line $bad (see --help)"
   elif [ -z "$rhost" ]; then rproblem="malformed $rconf: no host line (see --help)"
-  elif [ "${#approvals[@]}" -eq 0 ]; then rproblem="malformed $rconf: no command line (see --help)"
+  elif [ "${#approvals[@]}" -eq 0 ]; then rproblem="malformed $rconf: no approval line (see --help)"
   fi
   case "$class" in build|image) approved= ;; esac
 fi
@@ -220,7 +246,7 @@ cmd=$(basename -- "$1")
 requested=$(date +%s)
 unit="fm-heavy-$$-$requested"
 sample=$(mktemp)
-trap 'rm -f "$sample"' EXIT
+trap 'rm -f "$sample" "$lock.waiting/$$"' EXIT
 mkdir -p "$root/state"
 slot=; started=; signal=; waiter=; host=; fallback=
 sget() { sed -n "s/^$1=//p" "$sample" 2>/dev/null | tail -1; }
@@ -290,7 +316,9 @@ run_captured() {  # <command> [args...]
     exec 2>/dev/null 8>&- 9>&-
     trap '' HUP INT TERM
     tail -c "$LOG_MAX_BYTES" > "$joblog" || exec cat > /dev/null
-    [ "$(wc -c < "$joblog")" -lt "$LOG_MAX_BYTES" ] || sed -i '1c [fm-heavy: earlier output dropped]' "$joblog"
+    [ "$(wc -c < "$joblog")" -lt "$LOG_MAX_BYTES" ] || {
+      { echo '[fm-heavy: earlier output dropped]'; tail -n +2 "$joblog"; } > "$joblog.cut" && mv -f "$joblog.cut" "$joblog"
+    }
   )
   keeper=$!
   exec 5> >(trap '' HUP INT TERM; exec tee /dev/fd/7 8>&- 9>&-)
@@ -308,10 +336,11 @@ run_captured() {  # <command> [args...]
 finish() {  # <exit status>
   record "$1"
   if [ -n "$joblog" ]; then
-    [ "$1" = 0 ] || timeout 10 "$LEDGER" capture --log "$joblog" --job "$unit" --task "$task" \
+    limit=(); command -v timeout >/dev/null 2>&1 && limit=(timeout 10)
+    [ "$1" = 0 ] || ${limit[@]+"${limit[@]}"} "$LEDGER" capture --log "$joblog" --job "$unit" --task "$task" \
       --project "$project" --class "$class" --command "$command_line" </dev/null >/dev/null 2>&1
-    find "$logs" -maxdepth 1 -name '*.log' -printf '%T@ %p\n' | sort -rn | tail -n "+$((LOGS_KEPT + 1))" \
-      | cut -d' ' -f2- | xargs -r -d '\n' rm -f
+    # shellcheck disable=SC2012 # Job log names are generated and contain no newlines.
+    ls -t "$logs"/*.log 2>/dev/null | tail -n "+$((LOGS_KEPT + 1))" | while IFS= read -r old; do rm -f "$old"; done
   fi
   exit "$1"
 }
@@ -352,7 +381,8 @@ try_remote() {
   if flock -n 8; then
     started=$(date +%s)  # signals now belong to the driver
     run_captured "$REMOTE" --host "$rhost" --timeout "$rtimeout" --sample "$sample" \
-      --project "$project" --class "$class" --state-dir "$root/state/heavy-remote" -- "$@"
+      --project "$project" --class "$class" ${rimage:+--image "$rimage"} \
+      --state-dir "$root/state/heavy-remote" -- "$@"
     rc=$?
     fallback=$(sget fallback)
     if [ -z "$fallback" ]; then
@@ -376,6 +406,11 @@ fi
 
 # A job the host may still take polls both destinations; every other job keeps
 # the blocking single-slot path and its signal handling, and multiple slots retry.
+# A waiting job leaves a marker beside the lock, so a remote job offered to this
+# machine (bin/fm-heavy-remote-runner.py) yields to it.
+if [ -z "$slot" ]; then
+  { [ -d "$lock.waiting" ] || mkdir "$lock.waiting" 2>/dev/null; } && : > "$lock.waiting/$$"
+fi
 while [ -z "$slot" ]; do
   case "$remote:$fallback" in
     1:destination-busy|1:unreachable|1:unknown-job-running)
@@ -393,13 +428,18 @@ while [ -z "$slot" ]; do
       ;;
   esac
 done
+rm -f "$lock.waiting/$$"
 
 # The command stays in the foreground so it keeps stdin and default signal
 # handling. run_captured closes the lock descriptor in the command, so a process
 # it leaves running (a daemon it auto-starts) cannot keep the slot held after it exits.
 started=$(date +%s)
-run_captured systemd-run --user --scope -q -p "MemoryMax=$MEMORY_MAX" -p MemorySwapMax=0 \
-  --unit="$unit" "$SELF" --stage-scoped "$unit" "$sample" "$@"
+if [ -n "$scoped" ]; then
+  run_captured systemd-run --user --scope -q -p "MemoryMax=$MEMORY_MAX" -p MemorySwapMax=0 \
+    --unit="$unit" "$SELF" --stage-scoped "$unit" "$sample" "$@"
+else
+  run_captured "$@"
+fi
 rc=$?
 [ -z "$signal" ] || rc=$((128 + signal))
 finish "$rc"

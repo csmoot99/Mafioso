@@ -4,7 +4,8 @@
 # it; it is not a user command.
 #
 # usage: fm-heavy-remote.sh --host <ssh alias> --timeout <seconds> --sample <file>
-#          --state-dir <dir> --project <name> [--class test|e2e] -- <command> [args...]
+#          --state-dir <dir> --project <name> [--class test|e2e] [--image <ref>]
+#          -- <command> [args...]
 #
 # The command must be a repository-relative portable command run from the
 # repository root, and the working tree must be clean: the candidate is exactly
@@ -24,7 +25,12 @@
 # A job counts as passed only when every check holds and the command exited 0. The
 # job's stages are written to the --sample file for bin/fm-heavy.sh's record.
 #
-# Nothing started: when the host is unreachable, the tree is dirty, an earlier
+# The host's own heavy jobs (bin/fm-heavy.sh there) and the jobs sent here share its
+# slot lock: a job is sent only while that slot is free and no local job there is
+# waiting for it, and neither kind is ever stopped for the other. With --image the
+# command runs inside that Linux container image on the host (see the runner).
+#
+# Nothing started: when the host is unreachable or busy, the tree is dirty, an earlier
 # job is still running there or the host cannot prepare the job, the sample gets
 # fallback=<reason> and the exit status is 0, so the caller keeps the command in
 # its local queue. A signalled script ends cancelled instead.
@@ -69,11 +75,12 @@ set -u
 set -o pipefail
 
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-host=; timeout_s=; sample=; state_dir=; project=; class="test"
+host=; timeout_s=; sample=; state_dir=; project=; class="test"; image=
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --project) project=${2:-}; shift 2 || break ;;
     --class) class=${2:-}; shift 2 || break ;;
+    --image) image=${2:-}; shift 2 || break ;;
     --host) host=${2:-}; shift 2 || break ;;
     --timeout) timeout_s=${2:-}; shift 2 || break ;;
     --sample) sample=${2:-}; shift 2 || break ;;
@@ -240,6 +247,9 @@ for open in "$open_records"/*.json; do
   [ -z "$sig" ] || finish cancelled $((128 + sig))
   fallback "$blocked"
 done
+# The host's own heavy jobs come first: a held or awaited host slot keeps this job here.
+"${SSH[@]}" "$host" "python3 - busy" < "$SELF_DIR/fm-heavy-remote-runner.py" >/dev/null 2>>"$stage/ssh.err"
+case $? in 0) ;; 12) fallback destination-busy ;; *) fallback unreachable ;; esac
 
 emit candidate "$sha"
 prepare_began=$(date +%s)
@@ -249,8 +259,8 @@ git bundle create "$stage/src.bundle" HEAD >/dev/null 2>&1 || fallback bundle-fa
 bundle_sha=$(sha256sum "$stage/src.bundle" | cut -d' ' -f1)
 argv=$(printf '%s\0' "$@" | jq -Rsc 'split("\u0000")[:-1]') || fallback manifest-failed
 jq -n --arg id "$id" --arg sha "$sha" --arg cs "$cmd_sha" --arg bs "$bundle_sha" --argjson t "$timeout_s" \
-  --arg project "$project" --arg class "$class" \
-  --argjson argv "$argv" '{project: $project, class: $class, id: $id, sha: $sha, command_sha256: $cs, bundle_sha256: $bs, timeout_s: $t, argv: $argv}' \
+  --arg project "$project" --arg class "$class" --arg image "$image" \
+  --argjson argv "$argv" '{project: $project, class: $class, image: $image, id: $id, sha: $sha, command_sha256: $cs, bundle_sha256: $bs, timeout_s: $t, argv: $argv}' \
   > "$stage/manifest.json" || fallback manifest-failed
 cp "$SELF_DIR/fm-heavy-remote-runner.py" "$stage/runner.py"
 cp "$stage/manifest.json" "$record" || fallback state-unwritable
@@ -273,6 +283,9 @@ if [ "$rc" -ne 0 ]; then
         ;;
       unreachable) emit prepare_s "$(($(date +%s) - prepare_began))"; finish unknown 75 ;;
     esac
+  elif [ "$rc" -eq 12 ]; then  # the host's slot was taken or awaited meanwhile: nothing was launched
+    cleanup_remote
+    fallback destination-busy
   else  # the runner refused, or mkdir, tar or python failed: nothing was launched
     cleanup_remote
     fallback prepare-failed

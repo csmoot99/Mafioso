@@ -811,3 +811,12 @@ The first job transfers the committed candidate and installs dependencies from i
 Inspect the collected result and log, then add `offload` to enable automatic use when the local slot is busy.
 Use `bin/fm-heavy-summary.sh` to compare per-project local and remote wait/run times, including remote transfer and result collection.
 No project repository, coding-agent placement, local slot limit or memory cap changes as part of this setup.
+
+### Linux container jobs and the shared Mac queue
+
+Jobs run directly on macOS can fail for macOS reasons alone, such as missing Linux system tools, BSD `stat` or different tool versions, so a Mac destination should run sent jobs in a Linux image.
+Add `image <ref>` to `config/heavy-remote` and build that image on the Mac's existing container engine without stopping, restarting or reconfiguring it; it needs `python3`, `git`, `ca-certificates` and the system tools the projects' tests use.
+For Node projects, install Linux runtimes for the image's architecture under `~/.fm-heavy-remote/linux/runtimes/<tool>/<version>`, with the same layout and selection as the macOS runtimes above.
+The Mac home's own workers keep running their jobs on macOS, but through its `bin/fm-heavy.sh` and slot lock, so they share one queue with sent jobs and always go first.
+To enable that, update the Mac home to a Firstmate version with this support, install `bash`, `flock` and `jq` on its workers' PATH, and create `config/heavy-commands` in the Mac's root home so its worker instructions point at the wrapper.
+Check that `docker version` works over plain non-interactive SSH, then run one approved job with `--remote` while no job holds the Mac's slot, and confirm that `~/.fm-heavy-remote` keeps only `linux/`, `runtimes/` and `cache/` afterwards.

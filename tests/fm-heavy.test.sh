@@ -337,6 +337,41 @@ test_brief_rule() {
   pass "fm-brief: config/heavy-commands points ship and scout workers at the wrapper"
 }
 
+# A PATH holding every tool here except systemd-run, and uname reporting <os>.
+make_unscoped_path() {  # <dir> <os>
+  local fakebin d f
+  fakebin=$(fm_fakebin "$1")
+  IFS=: read -ra dirs <<< "$PATH"
+  for d in "${dirs[@]}"; do
+    for f in "$d"/*; do
+      [ -x "$f" ] && [ ! -e "$fakebin/${f##*/}" ] && [ "${f##*/}" != systemd-run ] && ln -s "$f" "$fakebin/${f##*/}"
+    done
+  done
+  rm -f "$fakebin/uname"
+  printf '#!/bin/sh\necho %s\n' "$2" > "$fakebin/uname"
+  chmod +x "$fakebin/uname"
+  printf '%s\n' "$fakebin"
+}
+
+test_macos_runs_without_systemd() {
+  local home lock fakebin log
+  home=$(make_home darwin)
+  lock=$TMP_ROOT/darwin.lock
+  log=$home/state/heavy-jobs.jsonl
+  fakebin=$(make_unscoped_path "$TMP_ROOT/darwin" Darwin)
+  PATH=$fakebin heavy "$home" "$lock" --class test --task mac --project demo -- sh -c 'echo out; exit 3' > "$TMP_ROOT/darwin.out"
+  expect_code 3 "$?" "the job's exit status on macOS"
+  [ "$(cat "$TMP_ROOT/darwin.out")" = out ] || fail "macOS job output: $(cat "$TMP_ROOT/darwin.out")"
+  jq -e '.exit == 3 and .slot == 1 and .peak_memory_bytes == null and .cpu_usec == null' "$log" >/dev/null \
+    || fail "macOS record: $(cat "$log")"
+  [ -z "$(ls -A "$lock.waiting" 2>/dev/null)" ] || fail "no waiter marker remains"
+  fakebin=$(make_unscoped_path "$TMP_ROOT/linux-nosystemd" Linux)
+  PATH=$fakebin heavy "$home" "$lock" --class test --task mac --project demo -- true 2>/dev/null
+  expect_code 69 "$?" "Linux without systemd-run"
+  [ "$(wc -l < "$log")" -eq 1 ] || fail "the refusal writes no record"
+  pass "fm-heavy: macOS runs jobs on the shared slot without systemd-run; Linux still requires it"
+}
+
 test_brief_rule_is_machine_wide() {
   local root mate
   root=$(make_home brief-root)
@@ -365,5 +400,6 @@ test_refusals_write_no_record
 test_summary
 test_brief_rule
 test_brief_rule_is_machine_wide
+test_macos_runs_without_systemd
 
 echo '# all fm-heavy tests passed'

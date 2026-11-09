@@ -1220,7 +1220,8 @@ The command's exit status passes through, so 137 means the memory cap killed the
 [`bin/fm-heavy-summary.sh`](../bin/fm-heavy-summary.sh) prints queue wait against run time and peak memory per project, class and host.
 A failing test or e2e job also records each failing test in the project's ledger, and [`bin/fm-test-failure.sh`](../bin/fm-test-failure.sh) classifies those failures and reports on them.
 The weekly rollup is `bin/fm-test-failure.sh report --since 7d`, run on demand until a schedule is added.
-The wrapper needs Linux with `flock`, `systemd-run` and `jq`; elsewhere it refuses without running anything.
+The wrapper needs `flock` and `jq`, and `systemd-run` everywhere except macOS; elsewhere it refuses without running anything.
+On macOS a job takes the same slot lock without a memory scope, so its record has no peak memory or CPU time.
 
 `config/host-test-slots` is one positive integer in the root home.
 Absent means 1, the single machine-wide lock; a malformed file refuses the run.
@@ -1231,10 +1232,12 @@ The flag is machine-wide like the slot and the log: it is read from the root hom
 A drive call holds the slot only while it runs a local test step, build or e2e, and the pipeline agent never takes the slot again inside that hold.
 
 `config/heavy-remote` in the root home is the opt-in for the SSH destination, and without it `fm-heavy.sh --remote` refuses and every job runs locally as before.
-The schema is one `host <ssh-alias>`, one or more `command <project> -- <words...>` approvals, optional `timeout <seconds>` (default 900), and an optional `offload` presence line.
+The schema is one `host <ssh-alias>`, one or more approvals, an optional `image <ref>`, optional `timeout <seconds>` (default 900), and an optional `offload` presence line.
+An approval is `command <project> -- <words...>` for one command, `project <project>` for every test and e2e command of one project, or `project *` for every project.
+A project approval never covers a `no-mistakes` drive call, which needs this machine's gate.
 Blank lines and lines starting with `#` are ignored; duplicate settings, duplicate approvals, unknown keys, invalid values or an unreadable file refuse a job that would offload (`--remote`, or an approved command with `offload`) with an error naming the file and problem, while every other heavy job prints one warning and runs locally under the local slot.
-An approval covers one project, named by the caller's `--project`, so a job with no project never leaves this machine.
-Approval words are separated by whitespace and must match the caller's argument vector exactly; shell quoting and expansion are not interpreted.
+An approval covers the project named by the caller's `--project`, so a job with no project never leaves this machine.
+Command approval words are separated by whitespace and must match the caller's argument vector exactly; shell quoting and expansion are not interpreted.
 For example:
 
 ```text
@@ -1242,6 +1245,7 @@ host fm-mac
 command firstmate -- bash tests/fm-ci-select.test.sh
 command web-app -- pnpm test
 command web-app -- pnpm exec playwright test
+project api
 timeout 900
 offload
 ```
@@ -1251,7 +1255,9 @@ Approved classes are test and e2e; build and image stay local, because only the 
 `--remote` explicitly requests the destination first and refuses an unapproved command or class.
 With `offload`, an approved job tries the destination automatically when every local slot is busy and the destination is free, without changing worker commands or instructions.
 Without `offload`, remote execution still requires `--remote`.
-The destination takes one job at a time, independently of local capacity.
+The destination takes one job at a time, independently of local capacity, and shares that slot with its own heavy jobs.
+A job is sent only while the destination's slot is free and none of its own jobs waits for it, so its own work goes first; no running job of either kind is ever stopped for another.
+The destination's own workers run their heavy jobs through `bin/fm-heavy.sh` in its home, enabled there by `config/heavy-commands`, and each queued job there leaves a waiter marker beside the slot lock for that check.
 An approved job it cannot take yet, because it is busy, unreachable or still running an unknown job, waits for a local slot while it keeps checking, and moves to whichever frees first, so queued work drains to the destination.
 A busy destination is checked every two seconds and the host itself every 30 seconds.
 When preparation cannot transfer or check out the candidate, or the working tree is not a clean repository root, the command joins the normal local queue instead.
@@ -1266,6 +1272,8 @@ A result with the wrong commit, command or bundle digest, or a missing or partia
 [`bin/fm-heavy.sh`](../bin/fm-heavy.sh) owns the wrapper mechanics and extra record fields, and [`bin/fm-heavy-remote.sh`](../bin/fm-heavy-remote.sh) owns the transfer, the outcomes and their exit statuses.
 [`bin/fm-heavy-summary.sh`](../bin/fm-heavy-summary.sh) gives local and remote jobs separate rows, so the queue wait a remote run saves can be read against its preparation and collection time.
 The destination needs `python3`, `git`, `tar` and `ps`; the runner is shipped with each job.
+With `image <ref>`, each job runs inside that Linux container image through the destination's `docker`, under a 6 GB memory cap, so its tools and results match a Linux machine; the image needs `python3` and `git` plus the projects' own system tools, and the container is removed when the job ends or is stopped.
+Inside the image, Node runtimes come from `~/.fm-heavy-remote/linux/runtimes` on the destination instead of its own runtimes, and dependency caches, Playwright browsers, the pnpm store and the npm cache from `~/.fm-heavy-remote/linux/cache`.
 For Node projects, each job runs on the versions of node and the lockfile's pnpm/npm that its own project pins in `package.json` engines, `packageManager` and `.nvmrc`, chosen from those installed on the destination, except that a reachable pnpm may fetch its own pinned version; the runner then installs locked dependencies from the transferred candidate.
 Stable numeric versions, comparison ranges, wildcards, caret, tilde, hyphen ranges and `||` alternatives are supported; unsupported requirements such as `.nvmrc` aliases refuse the job with a clear reason rather than guessing.
 A root `package.json` that declares no dependencies of any kind needs no lockfile: the job still runs on its pinned Node and skips installation.
