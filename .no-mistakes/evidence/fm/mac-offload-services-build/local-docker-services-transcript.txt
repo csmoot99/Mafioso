@@ -1,0 +1,71 @@
+# Live transcripts: per-job service containers (target 923bb65)
+
+## Config used for local real-docker runs (cat -A shows tabs/repeated spaces)
+host live-local$
+image fm-heavy-linux:1$
+timeout 300$
+service  usadb^Ipostgres:16-alpine   5432  1g^IPOSTGRES_USER=mia  POSTGRES_PASSWORD=mia POSTGRES_DB=mia$
+service usaredis redis:7.4.11-alpine 6379 256m$
+service usameili  getmeili/meilisearch:v1.55.0 7700 1g MEILI_MASTER_KEY=ci-only-key MEILI_NO_ANALYTICS=true$
+project p  image=mcr.microsoft.com/playwright:v1.64.1-noble^Iservice=usadb service=usaredis  service=usameili env=DATABASE_URL=postgres://mia:mia@localhost:5432/mia env=REDIS_URL=redis://localhost:6379 env=HOLD=/tmp/fm-svc-live.Nwbm5a/host/.fm-heavy-remote/cache/started$
+
+## Job script t/check.py
+import os, socket, sys, urllib.request
+print("DATABASE_URL=" + os.environ.get("DATABASE_URL", "<unset>"))
+print("REDIS_URL=" + os.environ.get("REDIS_URL", "<unset>"))
+print("browser image: /ms-playwright present =", os.path.isdir("/ms-playwright"))
+def pg(port):
+    s = socket.create_connection(("127.0.0.1", port), 5)
+    s.sendall((8).to_bytes(4, "big") + (80877103).to_bytes(4, "big"))  # SSLRequest
+    r = s.recv(1); s.close(); return r
+def redis(port):
+    s = socket.create_connection(("127.0.0.1", port), 5); s.sendall(b"PING\r\n"); r = s.recv(16); s.close(); return r
+ok = True
+r = pg(5432); print("postgres :5432 SSLRequest reply:", r); ok &= r in (b"N", b"S")
+r = redis(6379); print("redis :6379 PING reply:", r); ok &= r.startswith(b"+PONG")
+body = urllib.request.urlopen("http://127.0.0.1:7700/health", timeout=5).read(); print("meilisearch :7700 /health:", body); ok &= b"available" in body
+if os.environ.get("HOLD"): import time; open(os.environ["HOLD"], "w").close(); time.sleep(600)
+sys.exit(0 if ok else 1)
+
+## Run 1: --remote, real postgres/redis/meilisearch + playwright image (local docker, ssh transport shim)
+DATABASE_URL=postgres://mia:mia@localhost:5432/mia
+REDIS_URL=redis://localhost:6379
+browser image: /ms-playwright present = True
+postgres :5432 SSLRequest reply: b'N'
+redis :6379 PING reply: b'+PONG\r\n'
+meilisearch :7700 /health: b'{"status":"available"}'
+
+## Records (state/heavy-jobs.jsonl)
+{"task":"live","project":"p","class":"test","cmd":"python3","requested_at":1794260790,"started_at":1794260790,"ended_at":1794260794,"wait_s":0,"run_s":4,"exit":0,"slot":null,"peak_memory_bytes":null,"cpu_usec":621016,"host":"live-local","prepare_s":0,"collect_s":0,"outcome":"pass","job":"1794260790-2396777-15089","candidate":"c164ef339368a139b50f6132fa2be0b5249ca2f6","fallback":null}
+{"task":"live","project":"p","class":"test","cmd":"python3","requested_at":1794260888,"started_at":1794260889,"ended_at":null,"wait_s":0,"run_s":null,"exit":143,"slot":null,"peak_memory_bytes":null,"cpu_usec":null,"host":"live-local","prepare_s":1,"collect_s":null,"outcome":"cancelled","job":"1794260888-2417595-12329","candidate":"c164ef339368a139b50f6132fa2be0b5249ca2f6","fallback":null}
+{"task":"live","project":"p","class":"test","cmd":"python3","requested_at":1794260916,"started_at":1794260917,"ended_at":1794260926,"wait_s":0,"run_s":9,"exit":124,"slot":null,"peak_memory_bytes":null,"cpu_usec":776208,"host":"live-local","prepare_s":1,"collect_s":0,"outcome":"timeout","job":"1794260916-2420696-27281","candidate":"c164ef339368a139b50f6132fa2be0b5249ca2f6","fallback":null}
+{"task":"live","project":"p","class":"test","cmd":"sh","requested_at":1794260927,"started_at":1794260932,"ended_at":1794260932,"wait_s":5,"run_s":0,"exit":0,"slot":1,"peak_memory_bytes":4796416,"cpu_usec":18178,"host":"local","prepare_s":null,"collect_s":null,"outcome":null,"job":null,"candidate":null,"fallback":"services-do-not-fit"}
+{"task":"live","project":"p","class":"test","cmd":"python3","requested_at":1794260974,"started_at":1794260974,"ended_at":1794260974,"wait_s":0,"run_s":0,"exit":1,"slot":1,"peak_memory_bytes":19562496,"cpu_usec":82220,"host":"local","prepare_s":null,"collect_s":null,"outcome":null,"job":null,"candidate":null,"fallback":null}
+{"task":"live","project":"other","class":"test","cmd":"sh","requested_at":1794260974,"started_at":1794260974,"ended_at":1794260974,"wait_s":0,"run_s":0,"exit":0,"slot":1,"peak_memory_bytes":4317184,"cpu_usec":16454,"host":"local","prepare_s":null,"collect_s":null,"outcome":null,"job":null,"candidate":null,"fallback":null}
+{"task":"live","project":"p","class":"test","cmd":"python3","requested_at":1794260995,"started_at":1794260996,"ended_at":1794261000,"wait_s":1,"run_s":4,"exit":0,"slot":null,"peak_memory_bytes":null,"cpu_usec":620401,"host":"live-local","prepare_s":0,"collect_s":0,"outcome":"pass","job":"1794260996-2437239-5205","candidate":"c164ef339368a139b50f6132fa2be0b5249ca2f6","fallback":null}
+{"task":"live","project":"other","class":"test","cmd":"sh","requested_at":1794261000,"started_at":1794261000,"ended_at":1794261001,"wait_s":0,"run_s":1,"exit":125,"slot":null,"peak_memory_bytes":null,"cpu_usec":424197,"host":"live-local","prepare_s":0,"collect_s":0,"outcome":"failed","job":"1794261000-2438384-11768","candidate":"c164ef339368a139b50f6132fa2be0b5249ca2f6","fallback":null}
+{"task":"live","project":"other","class":"test","cmd":"sh","requested_at":1794261014,"started_at":1794261015,"ended_at":1794261016,"wait_s":0,"run_s":1,"exit":0,"slot":null,"peak_memory_bytes":null,"cpu_usec":436671,"host":"live-local","prepare_s":1,"collect_s":0,"outcome":"pass","job":"1794261014-2442531-26547","candidate":"c164ef339368a139b50f6132fa2be0b5249ca2f6","fallback":null}
+
+## Run 4: services do not fit (usameili 11g vs docker MemTotal 16317108224)
+fm-heavy-remote: not running on live-local (services-do-not-fit); staying in the local queue
+ran-on-this-pc
+docker events for fm-heavy-*: none
+
+## Run 5: approval names undeclared service
+fm-heavy.sh: malformed /tmp/fm-svc-live.Nwbm5a/home/config/heavy-remote: invalid line 7 (see --help)
+
+## Run 6: offload, local slot held, project p (no --remote)
+DATABASE_URL=postgres://mia:mia@localhost:5432/mia
+REDIS_URL=redis://localhost:6379
+browser image: /ms-playwright present = True
+postgres :5432 SSLRequest reply: b'N'
+redis :6379 PING reply: b'+PONG\r\n'
+meilisearch :7700 /health: b'{"status":"available"}'
+
+## Run 7: offload, project * only
+DATABASE_URL=unset
+create fm-heavy-1794261014-2442531-26547 mcr.microsoft.com/playwright:v1.63.0-noble
+attach fm-heavy-1794261014-2442531-26547 mcr.microsoft.com/playwright:v1.63.0-noble
+start fm-heavy-1794261014-2442531-26547 mcr.microsoft.com/playwright:v1.63.0-noble
+die fm-heavy-1794261014-2442531-26547 mcr.microsoft.com/playwright:v1.63.0-noble
+destroy fm-heavy-1794261014-2442531-26547 mcr.microsoft.com/playwright:v1.63.0-noble

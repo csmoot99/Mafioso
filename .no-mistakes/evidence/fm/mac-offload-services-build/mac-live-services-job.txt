@@ -1,0 +1,18 @@
+# Real Mac (ssh fm-mac) job at 923bb65, spaced service lines, fm-heavy-playwright:1
+host fm-mac$
+image fm-heavy-linux:1$
+timeout 300$
+service  usadb^Ipostgres:16-alpine   5432  1g^IPOSTGRES_USER=mia  POSTGRES_PASSWORD=mia POSTGRES_DB=mia$
+service usaredis redis:7.4.11-alpine 6379 256m$
+service usameili  getmeili/meilisearch:v1.55.0 7700 1g MEILI_MASTER_KEY=ci-only-key MEILI_NO_ANALYTICS=true$
+project p  image=fm-heavy-playwright:1^Iservice=usadb service=usaredis  service=usameili env=DATABASE_URL=postgres://mia:mia@localhost:5432/mia env=REDIS_URL=redis://localhost:6379$
+
+DATABASE_URL=postgres://mia:mia@localhost:5432/mia
+REDIS_URL=redis://localhost:6379
+browser image: /ms-playwright present = True
+postgres :5432 SSLRequest reply: b'N'
+redis :6379 PING reply: b'+PONG\r\n'
+meilisearch :7700 /health: b'{"status":"available"}'
+{"task":"live-mac","project":"p","class":"test","cmd":"python3","requested_at":1794260952,"started_at":1794260956,"ended_at":1794260958,"wait_s":3,"run_s":2,"exit":0,"slot":null,"peak_memory_bytes":null,"cpu_usec":179920,"host":"fm-mac","prepare_s":1,"collect_s":1,"outcome":"pass","job":"1794260952-2431896-23847","candidate":"c164ef339368a139b50f6132fa2be0b5249ca2f6","fallback":null}
+
+Post-job on fm-mac: docker ps -a --filter name=fm-heavy- -> (empty); docker network ls --filter name=fm-heavy- -> (empty); ~/.fm-heavy-remote/<job> -> No such file or directory
