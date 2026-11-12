@@ -1,0 +1,56 @@
+[
+  {
+    "revision": "base",
+    "exit": 78,
+    "record": {
+      "task": null,
+      "project": "p",
+      "class": "test",
+      "cmd": "python3",
+      "requested_at": 1794516735,
+      "started_at": 1794516736,
+      "ended_at": 1794516737,
+      "wait_s": 1,
+      "run_s": 1,
+      "exit": 78,
+      "slot": null,
+      "peak_memory_bytes": null,
+      "cpu_usec": 133709,
+      "host": "heavy-loopback",
+      "prepare_s": 0,
+      "collect_s": 0,
+      "outcome": "failed",
+      "job": "1794516735-1132287-13608",
+      "candidate": "abc7981b63ec8f1b7d4503013f970062b74c104b",
+      "fallback": null
+    }
+  },
+  {
+    "revision": "target",
+    "exit": 0,
+    "record": {
+      "task": null,
+      "project": "p",
+      "class": "test",
+      "cmd": "python3",
+      "requested_at": 1794516737,
+      "started_at": 1794516739,
+      "ended_at": 1794516739,
+      "wait_s": 2,
+      "run_s": 0,
+      "exit": 0,
+      "slot": 1,
+      "peak_memory_bytes": 7426048,
+      "cpu_usec": 38717,
+      "host": "local",
+      "prepare_s": null,
+      "collect_s": null,
+      "outcome": null,
+      "job": null,
+      "candidate": null,
+      "preparation_step": "dependencies",
+      "preparation_log": "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/comparison-target/state/heavy-remote/1794516737-1134696-23043/run.log",
+      "fallback": "prepare-failed"
+    }
+  }
+]

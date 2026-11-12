@@ -1,0 +1,17 @@
+COMMAND: bin/fm-heavy.sh --class test --task many-files-default --project p --remote -- python3 t/job.py
+Already up to date
+$ python3 -c "import resource; print('NOFILE',resource.getrlimit(resource.RLIMIT_NOFILE),flush=True); f=[open('/dev/null') for _ in range(4096)]; print('OPENED',len(f),'FILES')"
+NOFILE (65536, 65536)
+OPENED 4096 FILES
+
+Done in 346ms using pnpm v11.25.0
+
+   ╭──────────────────────────────────────────────────────────────────────╮
+   │                                                                      │
+   │                 Update available! 11.25.0 → 12.18.0.                 │
+   │                 Changelog: https://pnpm.io/v/12.18.0                 │
+   │   To update, run: curl -fsSL https://get.pnpm.io/install.sh | sh -   │
+   │                                                                      │
+   ╰──────────────────────────────────────────────────────────────────────╯
+
+TEST EXECUTED home=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/remotehome

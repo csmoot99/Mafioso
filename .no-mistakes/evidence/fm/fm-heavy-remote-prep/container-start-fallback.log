@@ -1,0 +1,7 @@
+COMMAND: bin/fm-heavy.sh --class test --task container-start-fallback --project p --remote -- python3 t/job.py
+Unable to find image 'fm-heavy-live-01m78q:missing' locally
+docker: Error response from daemon: pull access denied for fm-heavy-live-01m78q, repository does not exist or may require 'docker login'
+
+Run 'docker run --help' for more information
+fm-heavy-remote: not running on heavy-loopback (prepare-failed); staying in the local queue
+TEST EXECUTED home=/home/work

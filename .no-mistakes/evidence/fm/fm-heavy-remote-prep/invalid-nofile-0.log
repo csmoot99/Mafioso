@@ -1,0 +1,2 @@
+COMMAND: bin/fm-heavy.sh --class test --task invalid-nofile-0 --project p --remote -- python3 t/job.py
+fm-heavy.sh: malformed /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/invalid-nofile-0/home/config/heavy-remote: invalid line 5 (see --help)

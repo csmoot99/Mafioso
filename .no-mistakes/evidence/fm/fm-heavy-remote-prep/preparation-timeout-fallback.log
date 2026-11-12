@@ -1,0 +1,10 @@
+COMMAND: bin/fm-heavy.sh --class test --task preparation-timeout-fallback --project p --remote -- python3 t/job.py
+npm warn Unknown env config "store-dir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "build-from-source". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> live-heavy-preparation-timeout-fallback@1.0.0 postinstall
+> node -e "console.log('INSTALL WAITING'); setTimeout(()=>{},300000)"
+
+INSTALL WAITING
+fm-heavy-remote: not running on heavy-loopback (prepare-failed); staying in the local queue
+TEST EXECUTED home=/home/work

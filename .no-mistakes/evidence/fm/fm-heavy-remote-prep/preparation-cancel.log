@@ -1,0 +1,1 @@
+COMMAND: bin/fm-heavy.sh --class test --task preparation-cancel --project p --remote -- python3 t/job.py

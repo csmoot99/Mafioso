@@ -1,0 +1,13 @@
+COMMAND: bin/fm-heavy.sh --class test --task many-files-low-fallback --project p --remote -- python3 t/job.py
+Already up to date
+$ python3 -c "import resource; print('NOFILE',resource.getrlimit(resource.RLIMIT_NOFILE),flush=True); f=[open('/dev/null') for _ in range(4096)]; print('OPENED',len(f),'FILES')"
+NOFILE (256, 256)
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import resource; print('NOFILE',resource.getrlimit(resource.RLIMIT_NOFILE),flush=True); f=[open('/dev/null') for _ in range(4096)]; print('OPENED',len(f),'FILES')
+                                                                                               ~~~~^^^^^^^^^^^^^
+OSError: [Errno 24] Too many open files: '/dev/null'
+[ELIFECYCLE] Command failed with exit code 1.
+remote dependency/runtime preparation failed: Command '['pnpm', 'install', '--frozen-lockfile', '--prod=false']' returned non-zero exit status 1.
+fm-heavy-remote: not running on heavy-loopback (prepare-failed); staying in the local queue
+TEST EXECUTED home=/home/work

@@ -1,0 +1,28 @@
+
+up to date in 919ms
+npm notice
+npm notice New major version of npm available! 11.19.1 -> 12.2.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.2
+npm notice To update run: npm install -g npm@12.2.2
+npm notice
+
+native-build {"task": "native-build", "project": "p", "class": "test", "cmd": "python3", "requested_at": 1794516539, "started_at": 1794516539, "ended_at": 1794516548, "wait_s": 0, "run_s": 9, "exit": 0, "slot": null, "peak_memory_bytes": null, "cpu_usec": 120433, "host": "heavy-loopback", "prepare_s": 0, "collect_s": 0, "outcome": "pass", "job": "1794516539-1080782-14625", "candidate": "14b0e0e87b481fa265b198fa65001dda1ce8c45b", "preparation_step": null, "preparation_log": null, "fallback": null}
+
+up to date in 118ms
+
+many-files-default {"task": "many-files-default", "project": "p", "class": "test", "cmd": "python3", "requested_at": 1794516548, "started_at": 1794516549, "ended_at": 1794516550, "wait_s": 0, "run_s": 1, "exit": 0, "slot": null, "peak_memory_bytes": null, "cpu_usec": 124551, "host": "heavy-loopback", "prepare_s": 1, "collect_s": 0, "outcome": "pass", "job": "1794516548-1081993-312", "candidate": "6b4c157774ed844b57a5548e6889073089cd7dcc", "preparation_step": null, "preparation_log": null, "fallback": null}
+
+up to date in 116ms
+
+many-files-custom {"task": "many-files-custom", "project": "p", "class": "test", "cmd": "python3", "requested_at": 1794516550, "started_at": 1794516551, "ended_at": 1794516552, "wait_s": 1, "run_s": 1, "exit": 0, "slot": null, "peak_memory_bytes": null, "cpu_usec": 124764, "host": "heavy-loopback", "prepare_s": 0, "collect_s": 0, "outcome": "pass", "job": "1794516550-1082814-21253", "candidate": "b2e48f5c8dc39e0d55739b9d915e73afab847dd1", "preparation_step": null, "preparation_log": null, "fallback": null}
+
+up to date in 118ms
+
+Traceback (most recent call last):
+  File "/home/work/.no-mistakes/evidence/01M78QZ3R87TWXYC2Q39EHFTAP/live-heavy-driver.py", line 85, in <module>
+    drive('many-files-low-fallback',many,limit=256,step='dependencies')
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/work/.no-mistakes/evidence/01M78QZ3R87TWXYC2Q39EHFTAP/live-heavy-driver.py", line 52, in drive
+    assert record['host']==expected_host,record
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: {'task': 'many-files-low-fallback', 'project': 'p', 'class': 'test', 'cmd': 'python3', 'requested_at': 1794516553, 'started_at': 1794516553, 'ended_at': 1794516554, 'wait_s': 0, 'run_s': 1, 'exit': 0, 'slot': None, 'peak_memory_bytes': None, 'cpu_usec': 127979, 'host': 'heavy-loopback', 'prepare_s': 0, 'collect_s': 0, 'outcome': 'pass', 'job': '1794516553-1083210-15409', 'candidate': '0c9fec61df6dda2e12228cd2b7b7fd4c610c5217', 'preparation_step': None, 'preparation_log': None, 'fallback': None}

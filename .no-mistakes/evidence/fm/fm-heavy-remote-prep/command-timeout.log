@@ -1,0 +1,2 @@
+COMMAND: bin/fm-heavy.sh --class test --task command-timeout --project p --remote -- python3 t/job.py
+PROJECT COMMAND STARTED; waiting

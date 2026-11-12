@@ -1,0 +1,87 @@
+
+SCENARIO runtime-fallback
+COMMAND: bin/fm-heavy.sh --class test --task runtime-fallback --project p --remote -- python3 t/job.py
+remote dependency/runtime preparation failed: runtime node v24.22.1 does not satisfy >=99.0.0; install the project's version on the host
+fm-heavy-remote: not running on heavy-loopback (prepare-failed); staying in the local queue
+TEST EXECUTED home=/home/work
+
+SCENARIO dependency-fallback
+COMMAND: bin/fm-heavy.sh --class test --task dependency-fallback --project p --remote -- python3 t/job.py
+npm warn Unknown env config "store-dir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "build-from-source". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> live-heavy-dependency-fallback@1.0.0 postinstall
+> node -e "console.error('INTENTIONAL INSTALL FAILURE'); process.exit(42)"
+
+INTENTIONAL INSTALL FAILURE
+npm error code 42
+npm error path /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/remotehome/.fm-heavy-remote/1794516623-1107570-29777/work
+npm error command failed
+npm error command sh -c node -e "console.error('INTENTIONAL INSTALL FAILURE'); process.exit(42)"
+npm error A complete log of this run can be found in: /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/remotehome/.fm-heavy-remote/cache/tools/npm/_logs/2026-11-12T20_50_24_291Z-debug-0.log
+remote dependency/runtime preparation failed: Command '['npm', 'ci', '--include=dev']' returned non-zero exit status 42.
+fm-heavy-remote: not running on heavy-loopback (prepare-failed); staying in the local queue
+TEST EXECUTED home=/home/work
+
+SCENARIO prepare-failure-waits-local-slot
+COMMAND: bin/fm-heavy.sh --class test --task prepare-failure-waits-local-slot --project p --remote -- python3 t/job.py
+npm warn Unknown env config "store-dir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "build-from-source". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> live-heavy-prepare-failure-waits-local-slot@1.0.0 postinstall
+> node -e "console.error('INTENTIONAL INSTALL FAILURE'); process.exit(42)"
+
+INTENTIONAL INSTALL FAILURE
+npm error code 42
+npm error path /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/remotehome/.fm-heavy-remote/1794516710-1124881-5623/work
+npm error command failed
+npm error command sh -c node -e "console.error('INTENTIONAL INSTALL FAILURE'); process.exit(42)"
+npm error A complete log of this run can be found in: /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/remotehome/.fm-heavy-remote/cache/tools/npm/_logs/2026-11-12T20_51_51_040Z-debug-0.log
+remote dependency/runtime preparation failed: Command '['npm', 'ci', '--include=dev']' returned non-zero exit status 42.
+fm-heavy-remote: not running on heavy-loopback (prepare-failed); staying in the local queue
+OBSERVED: preparation failed; command remains queued while local slot is held
+TEST EXECUTED home=/home/work
+
+SCENARIO preparation-timeout-fallback
+COMMAND: bin/fm-heavy.sh --class test --task preparation-timeout-fallback --project p --remote -- python3 t/job.py
+npm warn Unknown env config "store-dir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "build-from-source". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> live-heavy-preparation-timeout-fallback@1.0.0 postinstall
+> node -e "console.log('INSTALL WAITING'); setTimeout(()=>{},300000)"
+
+INSTALL WAITING
+fm-heavy-remote: not running on heavy-loopback (prepare-failed); staying in the local queue
+TEST EXECUTED home=/home/work
+
+SCENARIO container-start-fallback
+COMMAND: bin/fm-heavy.sh --class test --task container-start-fallback --project p --remote -- python3 t/job.py
+Unable to find image 'fm-heavy-live-01m78q:missing' locally
+docker: Error response from daemon: pull access denied for fm-heavy-live-01m78q, repository does not exist or may require 'docker login'
+
+Run 'docker run --help' for more information
+fm-heavy-remote: not running on heavy-loopback (prepare-failed); staying in the local queue
+TEST EXECUTED home=/home/work
+
+SCENARIO preparation-cancel
+COMMAND: bin/fm-heavy.sh --class test --task preparation-cancel --project p --remote -- python3 t/job.py
+
+SCENARIO command-exit78
+COMMAND: bin/fm-heavy.sh --class test --task command-exit78 --project p --remote -- python3 t/job.py
+PROJECT COMMAND STARTED; exit=78
+
+SCENARIO command-timeout
+COMMAND: bin/fm-heavy.sh --class test --task command-timeout --project p --remote -- python3 t/job.py
+PROJECT COMMAND STARTED; waiting
+
+SCENARIO invalid-nofile-0
+COMMAND: bin/fm-heavy.sh --class test --task invalid-nofile-0 --project p --remote -- python3 t/job.py
+fm-heavy.sh: malformed /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/invalid-nofile-0/home/config/heavy-remote: invalid line 5 (see --help)
+
+SCENARIO invalid-nofile-1048577
+COMMAND: bin/fm-heavy.sh --class test --task invalid-nofile-1048577 --project p --remote -- python3 t/job.py
+fm-heavy.sh: malformed /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/invalid-nofile-1048577/home/config/heavy-remote: invalid line 5 (see --help)
+
+SCENARIO invalid-nofile-oops
+COMMAND: bin/fm-heavy.sh --class test --task invalid-nofile-oops --project p --remote -- python3 t/job.py
+fm-heavy.sh: malformed /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/invalid-nofile-oops/home/config/heavy-remote: invalid line 5 (see --help)

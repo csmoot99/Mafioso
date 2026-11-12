@@ -1,0 +1,71 @@
+COMMAND: bin/fm-heavy.sh --class test --task native-build --project p --remote -- python3 t/job.py
+npm warn Unknown env config "store-dir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "build-from-source". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> live-heavy-native-build@1.0.0 postinstall
+> cd node_modules/tree-sitter-html && node-gyp rebuild
+
+gyp info it worked if it ends with ok
+gyp info using node-gyp@12.4.0
+gyp info using node@24.22.1 | linux | x64
+gyp info find Python using Python version 3.14.4 found at "/usr/bin/python3"
+
+gyp info spawn /usr/bin/python3
+gyp info spawn args [
+gyp info spawn args '/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/remotehome/.fm-heavy-remote/runtimes/node/24.22.1/lib/node_modules/npm/node_modules/node-gyp/gyp/gyp_main.py',
+gyp info spawn args 'binding.gyp',
+gyp info spawn args '-f',
+gyp info spawn args 'make',
+gyp info spawn args '-I',
+gyp info spawn args '/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/remotehome/.fm-heavy-remote/1794516601-1097170-27338/work/node_modules/tree-sitter-html/build/config.gypi',
+gyp info spawn args '-I',
+gyp info spawn args '/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/remotehome/.fm-heavy-remote/runtimes/node/24.22.1/lib/node_modules/npm/node_modules/node-gyp/addon.gypi',
+gyp info spawn args '-I',
+gyp info spawn args '/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/remotehome/.cache/node-gyp/24.22.1/include/node/common.gypi',
+gyp info spawn args '-Dlibrary=shared_library',
+gyp info spawn args '-Dvisibility=default',
+gyp info spawn args '-Dnode_root_dir=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/remotehome/.cache/node-gyp/24.22.1',
+gyp info spawn args '-Dnode_gyp_dir=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/remotehome/.fm-heavy-remote/runtimes/node/24.22.1/lib/node_modules/npm/node_modules/node-gyp',
+gyp info spawn args '-Dnode_lib_file=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/remotehome/.cache/node-gyp/24.22.1/<(target_arch)/node.lib',
+gyp info spawn args '-Dmodule_root_dir=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/remotehome/.fm-heavy-remote/1794516601-1097170-27338/work/node_modules/tree-sitter-html',
+gyp info spawn args '-Dnode_engine=v8',
+gyp info spawn args '--depth=.',
+gyp info spawn args '--no-parallel',
+gyp info spawn args '--generator-output',
+gyp info spawn args 'build',
+gyp info spawn args '-Goutput_dir=.'
+gyp info spawn args ]
+gyp info spawn make
+gyp info spawn args [ 'BUILDTYPE=Release', '-C', 'build' ]
+make: Entering directory '/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/remotehome/.fm-heavy-remote/1794516601-1097170-27338/work/node_modules/tree-sitter-html/build'
+  TOUCH Release/obj.target/../node-addon-api/node_addon_api_except.stamp
+  CXX(target) Release/obj.target/tree_sitter_html_binding/bindings/node/binding.o
+  CC(target) Release/obj.target/tree_sitter_html_binding/src/parser.o
+  CC(target) Release/obj.target/tree_sitter_html_binding/src/scanner.o
+../src/scanner.c: In function ‘scan_raw_text’:
+../src/scanner.c:154:40: warning: comparison of integer expressions of different signedness: ‘wint_t’ {aka ‘unsigned int’} and ‘char’ [-Wsign-compare]
+  154 |         if (towupper(lexer->lookahead) == end_delimiter[delimiter_index]) {
+      |                                        ^~
+../src/scanner.c: In function ‘scan_comment’:
+../src/scanner.c:129:20: warning: this statement may fall through [-Wimplicit-fallthrough=]
+  129 |                 if (dashes >= 2) {
+      |                    ^
+../src/scanner.c:135:13: note: here
+  135 |             default:
+      |             ^~~~~~~
+  SOLINK_MODULE(target) Release/obj.target/tree_sitter_html_binding.node
+  COPY Release/tree_sitter_html_binding.node
+make: Leaving directory '/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/remotehome/.fm-heavy-remote/1794516601-1097170-27338/work/node_modules/tree-sitter-html/build'
+gyp info ok 
+
+added 3 packages, and audited 4 packages in 9s
+
+found 0 vulnerabilities
+npm warn install-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn install-scripts   tree-sitter-html@0.23.2 (install: node-gyp-build)
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+NATIVE MODULE LOADED html
+
+g++ (Ubuntu 15.2.0-16ubuntu1) 15.2.0
+TEST EXECUTED home=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/remotehome

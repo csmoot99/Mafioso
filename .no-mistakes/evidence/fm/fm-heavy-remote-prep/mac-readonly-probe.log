@@ -1,0 +1,6 @@
+Darwin
+/Users/chris/.local/bin/docker
+
+Error response from daemon: No such image: fm-heavy-linux:2
+
+exit=1

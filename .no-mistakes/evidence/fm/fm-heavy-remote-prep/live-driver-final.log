@@ -1,0 +1,45 @@
+
+up to date in 154ms
+
+native-build {"task": "native-build", "project": "p", "class": "test", "cmd": "python3", "requested_at": 1794516601, "started_at": 1794516601, "ended_at": 1794516611, "wait_s": 0, "run_s": 10, "exit": 0, "slot": null, "peak_memory_bytes": null, "cpu_usec": 124424, "host": "heavy-loopback", "prepare_s": 0, "collect_s": 0, "outcome": "pass", "job": "1794516601-1097170-27338", "candidate": "aad27f99e3681e91acae50b77cbb4eb0f2dc1774", "preparation_step": null, "preparation_log": null, "fallback": null}
+
+Done in 261ms using pnpm v11.25.0
+
+many-files-default {"task": "many-files-default", "project": "p", "class": "test", "cmd": "python3", "requested_at": 1794516612, "started_at": 1794516612, "ended_at": 1794516614, "wait_s": 0, "run_s": 2, "exit": 0, "slot": null, "peak_memory_bytes": null, "cpu_usec": 126583, "host": "heavy-loopback", "prepare_s": 0, "collect_s": 0, "outcome": "pass", "job": "1794516612-1100996-7930", "candidate": "5e01042486bfb779ecdb48eb37ef369701fa5b5b", "preparation_step": null, "preparation_log": null, "fallback": null}
+
+Done in 267ms using pnpm v11.25.0
+
+many-files-custom {"task": "many-files-custom", "project": "p", "class": "test", "cmd": "python3", "requested_at": 1794516615, "started_at": 1794516615, "ended_at": 1794516617, "wait_s": 0, "run_s": 2, "exit": 0, "slot": null, "peak_memory_bytes": null, "cpu_usec": 128145, "host": "heavy-loopback", "prepare_s": 0, "collect_s": 0, "outcome": "pass", "job": "1794516615-1101883-5536", "candidate": "a62612bdd9a1f0aa1f3a33d87d39f565dd31fdc2", "preparation_step": null, "preparation_log": null, "fallback": null}
+
+Done in 266ms using pnpm v11.25.0
+
+many-files-low-fallback {"task": "many-files-low-fallback", "project": "p", "class": "test", "cmd": "python3", "requested_at": 1794516618, "started_at": 1794516621, "ended_at": 1794516621, "wait_s": 3, "run_s": 0, "exit": 0, "slot": 1, "peak_memory_bytes": 7659520, "cpu_usec": 33490, "host": "local", "prepare_s": null, "collect_s": null, "outcome": null, "job": null, "candidate": null, "preparation_step": "dependencies", "preparation_log": "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/many-files-low-fallback/home/state/heavy-remote/1794516618-1102679-394/run.log", "fallback": "prepare-failed"}
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: 'live-heavy-runtime-fallback@1.0.0',
+npm warn EBADENGINE   required: { node: '>=99.0.0' },
+npm warn EBADENGINE   current: { node: 'v24.22.1', npm: '11.19.1' }
+npm warn EBADENGINE }
+
+up to date in 121ms
+
+runtime-fallback {"task": "runtime-fallback", "project": "p", "class": "test", "cmd": "python3", "requested_at": 1794516621, "started_at": 1794516623, "ended_at": 1794516623, "wait_s": 2, "run_s": 0, "exit": 0, "slot": 1, "peak_memory_bytes": 7229440, "cpu_usec": 33133, "host": "local", "prepare_s": null, "collect_s": null, "outcome": null, "job": null, "candidate": null, "preparation_step": "runtime", "preparation_log": "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/runtime-fallback/home/state/heavy-remote/1794516621-1105526-15276/run.log", "fallback": "prepare-failed"}
+
+up to date in 126ms
+
+dependency-fallback {"task": "dependency-fallback", "project": "p", "class": "test", "cmd": "python3", "requested_at": 1794516623, "started_at": 1794516625, "ended_at": 1794516625, "wait_s": 2, "run_s": 0, "exit": 0, "slot": 1, "peak_memory_bytes": 7258112, "cpu_usec": 34333, "host": "local", "prepare_s": null, "collect_s": null, "outcome": null, "job": null, "candidate": null, "preparation_step": "dependencies", "preparation_log": "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/dependency-fallback/home/state/heavy-remote/1794516623-1107570-29777/run.log", "fallback": "prepare-failed"}
+
+up to date in 137ms
+
+preparation-timeout-fallback {"task": "preparation-timeout-fallback", "project": "p", "class": "test", "cmd": "python3", "requested_at": 1794516625, "started_at": 1794516630, "ended_at": 1794516630, "wait_s": 5, "run_s": 0, "exit": 0, "slot": 1, "peak_memory_bytes": 7835648, "cpu_usec": 32895, "host": "local", "prepare_s": null, "collect_s": null, "outcome": null, "job": null, "candidate": null, "preparation_step": "dependencies", "preparation_log": "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/preparation-timeout-fallback/home/state/heavy-remote/1794516625-1109377-6796/run.log", "fallback": "prepare-failed"}
+container-start-fallback {"task": "container-start-fallback", "project": "p", "class": "test", "cmd": "python3", "requested_at": 1794516630, "started_at": 1794516632, "ended_at": 1794516632, "wait_s": 2, "run_s": 0, "exit": 0, "slot": 1, "peak_memory_bytes": 7245824, "cpu_usec": 34058, "host": "local", "prepare_s": null, "collect_s": null, "outcome": null, "job": null, "candidate": null, "preparation_step": "container-start", "preparation_log": "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/container-start-fallback/home/state/heavy-remote/1794516630-1109980-14522/run.log", "fallback": "prepare-failed"}
+
+up to date in 116ms
+
+Traceback (most recent call last):
+  File "/home/work/.no-mistakes/evidence/01M78QZ3R87TWXYC2Q39EHFTAP/live-heavy-driver.py", line 97, in <module>
+    drive('preparation-cancel',hang,timeout=30,cancel=True,expected_exit=143,expected_host='heavy-loopback',fallback=None)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/work/.no-mistakes/evidence/01M78QZ3R87TWXYC2Q39EHFTAP/live-heavy-driver.py", line 57, in drive
+    assert record['host']==expected_host,record
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: {'task': 'preparation-cancel', 'project': 'p', 'class': 'test', 'cmd': 'python3', 'requested_at': 1794516632, 'started_at': None, 'ended_at': None, 'wait_s': 31, 'run_s': None, 'exit': None, 'slot': None, 'peak_memory_bytes': None, 'cpu_usec': None, 'host': 'local', 'prepare_s': None, 'collect_s': None, 'outcome': None, 'job': None, 'candidate': None, 'preparation_step': 'dependencies', 'preparation_log': '/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/preparation-cancel/home/state/heavy-remote/1794516632-1110252-17809/run.log', 'fallback': 'prepare-failed'}

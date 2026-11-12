@@ -1,0 +1,22 @@
+{
+  "task": null,
+  "project": "p",
+  "class": "test",
+  "cmd": "python3",
+  "requested_at": 1794516735,
+  "started_at": 1794516736,
+  "ended_at": 1794516737,
+  "wait_s": 1,
+  "run_s": 1,
+  "exit": 78,
+  "slot": null,
+  "peak_memory_bytes": null,
+  "cpu_usec": 133709,
+  "host": "heavy-loopback",
+  "prepare_s": 0,
+  "collect_s": 0,
+  "outcome": "failed",
+  "job": "1794516735-1132287-13608",
+  "candidate": "abc7981b63ec8f1b7d4503013f970062b74c104b",
+  "fallback": null
+}

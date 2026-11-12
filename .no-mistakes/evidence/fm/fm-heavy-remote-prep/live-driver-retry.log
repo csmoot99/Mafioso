@@ -1,0 +1,14 @@
+
+Done in 363ms using pnpm v11.25.0
+
+Traceback (most recent call last):
+  File "/home/work/.no-mistakes/evidence/01M78QZ3R87TWXYC2Q39EHFTAP/live-heavy-driver.py", line 90, in <module>
+    drive('many-files-default',many,expected_host='heavy-loopback',fallback=None)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/work/.no-mistakes/evidence/01M78QZ3R87TWXYC2Q39EHFTAP/live-heavy-driver.py", line 64, in drive
+    savedir=EV/name;savedir.mkdir()
+                    ~~~~~~~~~~~~~^^
+  File "/usr/lib/python3.14/pathlib/__init__.py", line 1012, in mkdir
+    os.mkdir(self, mode)
+    ~~~~~~~~^^^^^^^^^^^^
+FileExistsError: [Errno 17] File exists: '/home/work/.no-mistakes/evidence/01M78QZ3R87TWXYC2Q39EHFTAP/many-files-default'

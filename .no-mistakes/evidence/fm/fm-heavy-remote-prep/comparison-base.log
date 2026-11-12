@@ -1,0 +1,12 @@
+npm warn Unknown env config "store-dir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> live-heavy-dependency-fallback@1.0.0 postinstall
+> node -e "console.error('INTENTIONAL INSTALL FAILURE'); process.exit(42)"
+
+INTENTIONAL INSTALL FAILURE
+npm error code 42
+npm error path /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/remotehome/.fm-heavy-remote/1794516735-1132287-13608/work
+npm error command failed
+npm error command sh -c node -e "console.error('INTENTIONAL INSTALL FAILURE'); process.exit(42)"
+npm error A complete log of this run can be found in: /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78QZ3R87TWXYC2Q39EHFTAP/.nm-heavy-lab/remotehome/.fm-heavy-remote/cache/tools/npm/_logs/2026-11-12T20_52_16_640Z-debug-0.log
+remote dependency/runtime preparation failed: Command '['npm', 'ci', '--include=dev']' returned non-zero exit status 42.

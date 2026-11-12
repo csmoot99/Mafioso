@@ -1,0 +1,4 @@
+COMMAND: bin/fm-heavy.sh --class test --task runtime-fallback --project p --remote -- python3 t/job.py
+remote dependency/runtime preparation failed: runtime node v24.22.1 does not satisfy >=99.0.0; install the project's version on the host
+fm-heavy-remote: not running on heavy-loopback (prepare-failed); staying in the local queue
+TEST EXECUTED home=/home/work
