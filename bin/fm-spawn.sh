@@ -454,7 +454,7 @@
 #                  own trailing space)
 #     __CODEXBROWSER__ quoted task-browser launch helper path
 #     __CODEXDEVELOPER__ quoted developer_instructions (codex_developer_flag
-#                  below), including remote-source consent only when this home
+#                  below), including remote-source consent only when the root home
 #                  configures a host in config/heavy-remote; supplies trailing space
 #     __CODEXCOMPACT__ optional -c model_auto_compact_token_limit and its
 #                  scope, the launch-env threshold share of the selected
@@ -3422,7 +3422,9 @@ codex_writable_roots_flag() {  # <state-dir> <data-dir> <task-id>
 # fm-heavy remains the approval gate; no exec-policy prefix can express its
 # project/command checks, and none is added. No configured host, no new grant.
 codex_developer_flag() {
-  local statement host config=$FM_HOME/config/heavy-remote
+  local statement host root config
+  root=$(fm_firstmate_root_home "$FM_HOME") || return 1
+  config=$root/config/heavy-remote
   statement="$TASK_WORKER_TRUST_STATEMENT $CODEX_TASK_BROWSER_STATEMENT"
   host=$(awk '$1 == "host" && NF == 2 && $2 ~ /^[A-Za-z0-9._-]+$/ { print $2; exit }' "$config" 2>/dev/null) || host=
   if [ -n "$host" ]; then

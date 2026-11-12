@@ -473,26 +473,42 @@ SH
 }
 
 test_codex_remote_authorization() {
-  local setting rec out grant args
-  for setting in absent hostless configured; do
+  local setting rec out grant args root_home
+  for setting in absent hostless configured child-ship child-scout child-unapproved; do
     rec=$(make_case "remote-$setting" codex "remote-$setting")
     read_case "$rec"
+    root_home=$HOME_DIR
+    case "$setting" in
+      child-*)
+        root_home=$CASE_DIR/root-home
+        fm_test_spawn_home "$root_home" codex
+        printf '%s\n' schema=fm-secondmate-parent.v1 route=local "parent_home=$root_home" > "$HOME_DIR/.fm-secondmate-parent"
+        ;;
+    esac
     case "$setting" in
       hostless) printf 'project firstmate\n' > "$HOME_DIR/config/heavy-remote" ;;
-      configured) printf 'host fm-mac\nproject firstmate\n' > "$HOME_DIR/config/heavy-remote" ;;
+      configured|child-ship|child-scout) printf 'host fm-mac\nproject firstmate\n' > "$root_home/config/heavy-remote" ;;
     esac
-    out=$(run_case_spawn "remote-$setting" "$PROJ_DIR" --mode no-mistakes --yolo off)
+    case "$setting" in
+      child-scout|child-unapproved) printf 'host child-host\nproject firstmate\n' > "$HOME_DIR/config/heavy-remote" ;;
+    esac
+    if [ "$setting" = child-scout ]; then
+      out=$(run_case_spawn "remote-$setting" "$PROJ_DIR" --scout)
+    else
+      out=$(run_case_spawn "remote-$setting" "$PROJ_DIR" --mode no-mistakes --yolo off)
+    fi
     expect_code 0 "$?" "remote authorization spawn should succeed: $out"
     fm_test_codex_launch_argv "$LAUNCH_LOG" "$CASE_DIR/argv" >/dev/null 2>&1 || fail 'could not record Codex argv'
     args=$(tr '\0' '\n' < "$CASE_DIR/argv/args")
     grant=$(printf '%s\n' "$args" | grep '^developer_instructions=')
     case "$setting" in
-      configured)
+      configured|child-ship|child-scout)
         for out in "$ROOT/bin/fm-heavy.sh" "FM_HOME=$HOME_DIR" '--class test or --class e2e, --remote' \
-          "$HOME_DIR/config/heavy-remote" 'full Git bundle including repository history' \
+          "$root_home/config/heavy-remote" 'full Git bundle including repository history' \
           'session-kit, localvault and dotfiles must never be sent' 'operator-controlled test host fm-mac' 'does not authorize direct ssh, scp, rsync'; do
           assert_contains "$grant" "$out" 'Codex remote grant lost a boundary'
         done
+        case "$grant" in *'test host child-host'*) fail 'child host replaced the root approval host' ;; esac
         ;;
       *)
         case "$grant" in *'operator authorizes remote test execution'*) fail "$setting config granted remote-source consent" ;; esac
@@ -502,7 +518,7 @@ test_codex_remote_authorization() {
       assert_contains "$args" "$out" 'remote grant changed the safety posture'
     done
   done
-  pass 'Codex remote-source consent is scoped to the configured gate and absent without a host'
+  pass 'Codex remote-source consent uses root approvals and retains the invoking home'
 }
 
 test_codex_remote_authorization
