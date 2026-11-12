@@ -1250,7 +1250,8 @@ timeout 900
 offload
 ```
 
-The destination receives private source at the committed HEAD and its reachable history as a Git bundle, plus the job manifest and runner; other refs such as `origin/main` are not exported, so `fm-test-run.sh --changed`, which needs a base ref, always fails there.
+The destination receives private source for the selected candidate and its reachable history as a Git bundle, plus the job manifest and runner; other refs such as `origin/main` are not exported, so `fm-test-run.sh --changed`, which needs a base ref, always fails there.
+Uncommitted work is eligible through the snapshot mechanism; [`bin/fm-heavy-remote.sh`](../bin/fm-heavy-remote.sh)'s header owns candidate selection, file inclusion and source-state preservation.
 When the root home's `config/heavy-remote` configures a host, Codex ship and scout launches carry operator consent for this approved payload in their launch-time developer instructions.
 Workers launched by local secondmates use that same root configuration for the consent's host and approvals, while the authorized command retains the invoking `FM_HOME`; a child-only configuration grants no consent.
 [`bin/fm-spawn.sh`](../bin/fm-spawn.sh)'s `codex_developer_flag` owns the exact command scope and exclusions: consent is limited to the unmodified `fm-heavy.sh` entry point enforcing the existing approvals, with no policy or configuration overrides, and does not authorize other source-transfer routes.
@@ -1264,7 +1265,7 @@ A job is sent only while the destination's slot is free and none of its own jobs
 The destination's own workers run their heavy jobs through `bin/fm-heavy.sh` in its home, enabled there by `config/heavy-commands`, and each queued job there leaves a waiter marker beside the slot lock for that check.
 An approved job it cannot take yet, because it is busy, unreachable or still running an unknown job, waits for a local slot while it keeps checking, and moves to whichever frees first, so queued work drains to the destination.
 A busy destination is checked every two seconds and the host itself every 30 seconds.
-When preparation cannot transfer or check out the candidate, or the working tree is not a clean repository root, the command joins the normal local queue instead.
+When snapshot creation fails, preparation cannot transfer or check out the candidate, or the command is not run from a repository root, the command joins the normal local queue instead.
 A job that ends up running locally records its last reason in `fallback`.
 A lost connection never leads to a second run of a job that may still be running: the job is reconciled against its record on the destination first, and a job that cannot be reached is recorded as unknown with its scratch kept.
 A finished job whose result cannot be fetched after the same reconnect attempts is recorded the same way, with the result left on the destination for the next request to collect.

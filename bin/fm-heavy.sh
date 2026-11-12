@@ -93,7 +93,7 @@
 # collect_s (fetching and checking the result; both null for a local run),
 # outcome (pass, failed, timeout, rejected, lost, unknown or cancelled; null for
 # a local run), job (the remote job id), candidate (the commit run),
-# snapshot (true for uncommitted work, otherwise false), and
+# snapshot (true when an uncommitted-work snapshot was created, otherwise false), and
 # fallback (why an approved remote job ran locally). wait_s is the time before
 # preparation began; started_at is when the job started on the host and ended_at
 # when its completion was seen, both read on this machine's clock; peak_memory_bytes
