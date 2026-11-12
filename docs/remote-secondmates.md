@@ -801,8 +801,8 @@ For each approved Node project, inspect its `package.json` engines and `packageM
 - **npm:** the selected Node's own npm is used. A project pinning a different npm takes the same per-version install under `~/.fm-heavy-remote/runtimes/npm/<version>`.
 
 For each tool the runner tries the SSH PATH first, then those directories, newest first, and uses the first version satisfying every pin for both dependency installation and the approved command.
-A pinned Node or npm version that is not installed refuses the job with the versions it found, so add it and run the job again.
-With no pnpm reachable the job refuses too, and a pnpm that cannot fetch its pin is reported the same way, as `missing runtime pnpm`.
+Use the collected preparation log to identify missing or incompatible runtimes, including `missing runtime pnpm` when no usable pnpm is available, and provision them before expecting remote execution.
+The [heavy-command configuration](configuration.md#heavy-commands-and-concurrency-confighost-test-slots-configheavy-commands-configheavy-remote) owns preparation fallback behavior.
 Resolve aliases such as `lts/*` to a numeric project version before approval; the runner does not resolve moving aliases or install runtimes, and pnpm's fetch of its own pin is the only install of a runtime a job can trigger.
 These are operator actions; the doctor never performs them automatically.
 

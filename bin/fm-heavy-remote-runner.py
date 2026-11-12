@@ -12,7 +12,8 @@ on the host: on the SSH PATH, under ~/.nvm/versions/node, or under
 version a project pins for itself, and then reports that version. execute puts
 the versions this job's project pins first on its PATH, prepares locked
 dependencies and then execs the approved command in the supervised process group;
-preparation failures exit 78 and report prepare-failed for local fallback; a
+runtime/dependency preparation errors exit 78; supervised preparation failures
+report prepare-failed for local fallback, preserving their exit status. A
 command that cannot run exits 127 and remains a command failure.
 Dependency copies persist per project under ~/.fm-heavy-remote/cache, keyed by
 lockfile/package settings and runtime versions. Each job has private modules.
@@ -43,6 +44,9 @@ supervise Holds the host slot passed by start and runs the command in its own pr
           outcome (exited, prepare-failed, timeout or cancelled), preparation_step, exit_code (128+n for a signal),
           started_at, ended_at, run_s, cpu_usec, host, and artifacts (bytes and
           sha256 of run.log).
+          preparation_step is container-start, services, runtime, dependencies,
+          browsers or command. A nonzero exit or timeout before command is
+          prepare-failed; cancellation remains cancelled at every step.
 status    Prints absent, preparing, running, done, or lost (the supervisor died
           without publishing a result).
 reconcile status, for a job its client lost touch with: lost becomes orphaned when

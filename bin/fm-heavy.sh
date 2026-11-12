@@ -96,8 +96,11 @@
 # local run), prepare_s (bundle, transfer and checkout until the job started) and
 # collect_s (fetching and checking the result; both null for a local run),
 # outcome (pass, failed, timeout, rejected, lost, unknown or cancelled; null for
-# a local run), job (the remote job id), candidate (the commit run), and
-# fallback (why an approved remote job ran locally). wait_s is the time before
+# a local run), job (the remote job id), candidate (the commit run),
+# fallback (why an approved remote job ran locally), preparation_step (the failed
+# preparation stage) and preparation_log (its retained, verified host log path).
+# The preparation fields are null unless collected for a preparation fallback.
+# wait_s is the time before
 # preparation began; started_at is when the job started on the host and ended_at
 # when its completion was seen, both read on this machine's clock; peak_memory_bytes
 # is null because no whole-job peak is read remotely, cpu_usec comes from the
