@@ -1,0 +1,44 @@
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/dirty/repo worktree add --detach /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/linked-worker HEAD
+Preparing worktree (detached HEAD 1687545)
+HEAD is now at 1687545 fixtures
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/linked-worker add tracked
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/linked-worker add -f ignored-force
+[exit 0]
+
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/bin/fm-heavy.sh --class test --task live-validation --project p --remote -- bash t/job.sh
+{"deleted": false, "executable": true, "head": "8008ce31f7bb6d1d978eda3fc06d3f3a3aa59fa5", "ignored_secret": false, "new": "untracked", "parent": "1687545788d9ecb54b747c464965f4b95beb689d", "symlink": "tracked", "tracked": "modified", "tracked_ignored": "force-added"}
+[exit 0]
+
+$ git show b5d0b6d1557caba0d8ef49b14b40bfbe4f80db94:bin/fm-heavy.sh
+[base script exported into worktree fixture; exit 0]
+
+$ git show b5d0b6d1557caba0d8ef49b14b40bfbe4f80db94:bin/fm-heavy-remote.sh
+[base script exported into worktree fixture; exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/regression/repo init -q
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/regression/repo add -A
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/regression/repo commit -qm candidate
+[exit 0]
+
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/bin/fm-heavy.sh --class test --task live-validation --project p -- bash t/job.sh
+test-command-ran
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/cancel/repo init -q
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/cancel/repo add -A
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/cancel/repo commit -qm candidate
+[exit 0]
+
+Linked worktree, base-vs-target queued regression, and real snapshot cancellation passed.

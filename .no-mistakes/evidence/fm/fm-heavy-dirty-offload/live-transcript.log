@@ -1,0 +1,85 @@
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/openssh/usr/sbin/sshd -t -f /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/sshd_config
+[exit 0]
+
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/bin/ssh fm-loopback 'printf "real-ssh-ready\n"; pwd; python3 --version'
+real-ssh-ready
+/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/ssh-home
+Python 3.14.4
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/clean/repo init -q
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/clean/repo add -A
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/clean/repo commit -qm candidate
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/clean/repo rev-parse HEAD
+314264155e05b2202c5e050a0545883658e75f0c
+[exit 0]
+
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/bin/fm-heavy.sh --class test --task live-validation --project p --remote -- bash t/job.sh
+314264155e05b2202c5e050a0545883658e75f0c
+Linux
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/dirty/repo init -q
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/dirty/repo add -A
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/dirty/repo commit -qm candidate
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/dirty/repo add -A
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/dirty/repo commit -qm fixtures
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/dirty/repo rev-parse HEAD
+1687545788d9ecb54b747c464965f4b95beb689d
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/dirty/repo stash push -qm preserve
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/dirty/repo add tracked
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/dirty/repo add -f ignored-force
+[exit 0]
+
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/bin/fm-heavy.sh --class test --task live-validation --project p --remote -- bash t/job.sh
+{"deleted": false, "executable": true, "head": "96f154d844c7124435361dbc4ce07a1b3734d30b", "ignored_secret": false, "new": "untracked", "parent": "1687545788d9ecb54b747c464965f4b95beb689d", "symlink": "tracked", "tracked": "modified", "tracked_ignored": "force-added"}
+[exit 0]
+
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/bin/fm-heavy.sh --class test --task live-validation --project p -- bash t/job.sh
+{"deleted": false, "executable": true, "head": "fbfc248a10297f099fdee5c3c80f306d0ecaf7e6", "ignored_secret": false, "new": "untracked", "parent": "1687545788d9ecb54b747c464965f4b95beb689d", "symlink": "tracked", "tracked": "modified", "tracked_ignored": "force-added"}
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/snapshot-failure/repo init -q
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/snapshot-failure/repo add -A
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/snapshot-failure/repo commit -qm candidate
+[exit 0]
+
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/bin/fm-heavy.sh --class test --task live-validation --project p --remote -- bash t/job.sh
+error: open("unreadable"): Permission denied
+error: unable to index file 'unreadable'
+fatal: adding files failed
+fm-heavy-remote: not running on fm-loopback (snapshot-failed); staying in the local queue
+local-fallback-ran
+[exit 0]
+
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/bin/fm-heavy.sh --class test --task live-validation --project p --project unapproved --remote -- bash t/job.sh
+fm-heavy.sh: --remote command/class is not approved for this project
+[exit 2]
+
+All real-SSH scenarios passed; remote scratch is empty.

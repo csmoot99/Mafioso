@@ -1,0 +1,1 @@
+{"task":"t","project":"p","class":"test","cmd":"bash","requested_at":1794514999,"started_at":1794514999,"ended_at":1794515000,"wait_s":0,"run_s":1,"exit":0,"slot":1,"peak_memory_bytes":null,"cpu_usec":null,"host":"local","prepare_s":null,"collect_s":null,"outcome":null,"job":null,"candidate":null,"snapshot":false,"fallback":"snapshot-failed"}

@@ -1,0 +1,7 @@
+test_pass_and_record
+test_dirty_snapshot
+test_snapshot_failure
+test_snapshot_bundle_failure
+test_scoped_offload
+test_queued_job_moves_to_the_freed_host
+test_signal_during_eligibility_never_runs_locally

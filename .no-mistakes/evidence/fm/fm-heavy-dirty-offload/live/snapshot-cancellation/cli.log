@@ -1,0 +1,1 @@
+Terminated                 GIT_INDEX_FILE="$stage/index" git add -A

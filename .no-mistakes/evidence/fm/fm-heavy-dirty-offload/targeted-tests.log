@@ -1,0 +1,7 @@
+ok - fm-heavy --remote: the exact candidate runs on the host and the record has every stage
+ok - fm-heavy --remote: snapshot contains current files, excludes ignored files and preserves source state
+ok - fm-heavy --remote: snapshot failures stay local without sending content or changing source state
+ok - fm-heavy --remote: bundle failures and signals preserve source state
+ok - fm-heavy: scoped approvals, automatic offload, classes and malformed refusal
+ok - fm-heavy: queued approved jobs, including dirty work, move to the free host
+ok - fm-heavy --remote: a signal while the destination is probed or the bundle made cancels the job instead of running it locally

@@ -1,0 +1,23 @@
+{
+  "task": "live-validation",
+  "project": "p",
+  "class": "test",
+  "cmd": "bash",
+  "requested_at": 1794515168,
+  "started_at": 1794515169,
+  "ended_at": 1794515169,
+  "wait_s": 1,
+  "run_s": 0,
+  "exit": 0,
+  "slot": null,
+  "peak_memory_bytes": null,
+  "cpu_usec": 113481,
+  "host": "fm-loopback",
+  "prepare_s": 0,
+  "collect_s": 0,
+  "outcome": "pass",
+  "job": "1794515168-512437-24842",
+  "candidate": "96f154d844c7124435361dbc4ce07a1b3734d30b",
+  "snapshot": true,
+  "fallback": null
+}

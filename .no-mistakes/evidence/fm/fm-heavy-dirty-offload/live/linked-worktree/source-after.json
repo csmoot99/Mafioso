@@ -1,0 +1,38 @@
+{
+  ".env": [
+    33204,
+    "18b0350d3b7ddfc1437f80440ed5b1ee0a41fac0aad32b492dea2f55ebbbe41f"
+  ],
+  ".git": [
+    33204,
+    "11e3a045783fbcfbba1abb3f11c4445b82e43cbdb029ebe1b634844c11986ff8"
+  ],
+  ".gitignore": [
+    33204,
+    "011302fd866cbb41d03356435fde928d9563054b9cd28fb7b4d495a3a6eb63d4"
+  ],
+  "execfile": [
+    33261,
+    "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
+  ],
+  "ignored-force": [
+    33204,
+    "93a17a2196b99096335507963d3429ddae669ee8c7d1c88c8f38d745ba85742a"
+  ],
+  "link": [
+    41471,
+    "b605596c21a636235853af73584ed98d38483ae21e864bb8c2998ead32c4b1f5"
+  ],
+  "new": [
+    33204,
+    "528eee7ba2c0adea12842fd3eab1088d4d8402d115182154b0baef559f2164f2"
+  ],
+  "t/job.sh": [
+    33204,
+    "85010b2b6d355b1cae60db7ba4db35ec3a153b9fb00efb38b104ba2be18fb301"
+  ],
+  "tracked": [
+    33204,
+    "4487e24377581c1a43c957c7700c8b49920de7b8500c05590cee74996ef73f42"
+  ]
+}

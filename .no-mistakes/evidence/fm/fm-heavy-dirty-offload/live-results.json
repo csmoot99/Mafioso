@@ -1,0 +1,72 @@
+[
+  {
+    "scenario": "clean",
+    "host": "fm-loopback",
+    "snapshot": false,
+    "outcome": "pass",
+    "fallback": null,
+    "exit": 0,
+    "candidate": "314264155e05b2202c5e050a0545883658e75f0c",
+    "wait_s": 0
+  },
+  {
+    "scenario": "dirty",
+    "host": "fm-loopback",
+    "snapshot": true,
+    "outcome": "pass",
+    "fallback": null,
+    "exit": 0,
+    "candidate": "96f154d844c7124435361dbc4ce07a1b3734d30b",
+    "wait_s": 1
+  },
+  {
+    "scenario": "automatic-two-busy-slots",
+    "host": "fm-loopback",
+    "snapshot": true,
+    "outcome": "pass",
+    "fallback": null,
+    "exit": 0,
+    "candidate": "fbfc248a10297f099fdee5c3c80f306d0ecaf7e6",
+    "wait_s": 0
+  },
+  {
+    "scenario": "linked-worktree",
+    "host": "fm-loopback",
+    "snapshot": true,
+    "outcome": "pass",
+    "fallback": null,
+    "exit": 0,
+    "candidate": "8008ce31f7bb6d1d978eda3fc06d3f3a3aa59fa5",
+    "wait_s": 0
+  },
+  {
+    "scenario": "snapshot-failure",
+    "host": "local",
+    "snapshot": false,
+    "outcome": null,
+    "fallback": "snapshot-failed",
+    "exit": 0,
+    "candidate": null,
+    "wait_s": 0
+  },
+  {
+    "scenario": "regression-fixed",
+    "host": "fm-loopback",
+    "snapshot": true,
+    "outcome": "pass",
+    "fallback": null,
+    "exit": 0,
+    "candidate": "84d19554ca9b302c3d2060a1248570e13de6a623",
+    "wait_s": 0
+  },
+  {
+    "scenario": "snapshot-cancellation",
+    "host": "fm-loopback",
+    "snapshot": false,
+    "outcome": "cancelled",
+    "fallback": null,
+    "exit": 143,
+    "candidate": null,
+    "wait_s": 1
+  }
+]

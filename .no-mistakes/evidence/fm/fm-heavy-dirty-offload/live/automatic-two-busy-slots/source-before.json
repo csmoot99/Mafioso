@@ -1,0 +1,138 @@
+{
+  ".env": [
+    33204,
+    "18b0350d3b7ddfc1437f80440ed5b1ee0a41fac0aad32b492dea2f55ebbbe41f"
+  ],
+  ".git/COMMIT_EDITMSG": [
+    33204,
+    "0581fd6f1cccbc4b29f3eceadf108f5f19cc86a7db18fef85b06db76889b2112"
+  ],
+  ".git/HEAD": [
+    33204,
+    "f6f2b945f6c411b02ba3da9c7ace88dcf71b6af65ba2e0d89aa82900042b5a10"
+  ],
+  ".git/ORIG_HEAD": [
+    33204,
+    "b76f213dacd2fe18be8e99b0f86945a7707da5119a493556b9502a555f3d803f"
+  ],
+  ".git/config": [
+    33204,
+    "cfe7ba1238c9a78be7535d7c63bcaf5a4d5011d46b07c9b45d3bbf7d6c312dfe"
+  ],
+  ".git/description": [
+    33204,
+    "85ab6c163d43a17ea9cf7788308bca1466f1b0a8d1cc92e26e9bf63da4062aee"
+  ],
+  ".git/hooks/applypatch-msg.sample": [
+    33277,
+    "0223497a0b8b033aa58a3a521b8629869386cf7ab0e2f101963d328aa62193f7"
+  ],
+  ".git/hooks/commit-msg.sample": [
+    33277,
+    "1f74d5e9292979b573ebd59741d46cb93ff391acdd083d340b94370753d92437"
+  ],
+  ".git/hooks/fsmonitor-watchman.sample": [
+    33277,
+    "e0549964e93897b519bd8e333c037e51fff0f88ba13e086a331592bf801fa1d0"
+  ],
+  ".git/hooks/post-update.sample": [
+    33277,
+    "81765af2daef323061dcbc5e61fc16481cb74b3bac9ad8a174b186523586f6c5"
+  ],
+  ".git/hooks/pre-applypatch.sample": [
+    33277,
+    "e15c5b469ea3e0a695bea6f2c82bcf8e62821074939ddd85b77e0007ff165475"
+  ],
+  ".git/hooks/pre-commit.sample": [
+    33277,
+    "57185b7b9f05239d7ab52db045f5b89eb31348d7b2177eab214f5eb872e1971b"
+  ],
+  ".git/hooks/pre-merge-commit.sample": [
+    33277,
+    "d3825a70337940ebbd0a5c072984e13245920cdf8898bd225c8d27a6dfc9cb53"
+  ],
+  ".git/hooks/pre-push.sample": [
+    33277,
+    "ecce9c7e04d3f5dd9d8ada81753dd1d549a9634b26770042b58dda00217d086a"
+  ],
+  ".git/hooks/pre-rebase.sample": [
+    33277,
+    "4febce867790052338076f4e66cc47efb14879d18097d1d61c8261859eaaa7b3"
+  ],
+  ".git/hooks/pre-receive.sample": [
+    33277,
+    "a4c3d2b9c7bb3fd8d1441c31bd4ee71a595d66b44fcf49ddb310252320169989"
+  ],
+  ".git/hooks/prepare-commit-msg.sample": [
+    33277,
+    "e9ddcaa4189fddd25ed97fc8c789eca7b6ca16390b2392ae3276f0c8e1aa4619"
+  ],
+  ".git/hooks/push-to-checkout.sample": [
+    33277,
+    "a53d0741798b287c6dd7afa64aee473f305e65d3f49463bb9d7408ec3b12bf5f"
+  ],
+  ".git/hooks/sendemail-validate.sample": [
+    33277,
+    "44ebfc923dc5466bc009602f0ecf067b9c65459abfe8868ddc49b78e6ced7a92"
+  ],
+  ".git/hooks/update.sample": [
+    33277,
+    "8d5f2fa83e103cf08b57eaa67521df9194f45cbdbcb37da52ad586097a14d106"
+  ],
+  ".git/index": [
+    33204,
+    "d88f3b8932ee096a71ce2dabfd82a05ae940e5899af14525a675975a4ea47143"
+  ],
+  ".git/info/exclude": [
+    33204,
+    "6671fe83b7a07c8932ee89164d1f2793b2318058eb8b98dc5c06ee0a5a3b0ec1"
+  ],
+  ".git/logs/HEAD": [
+    33204,
+    "1ab96bf92eda82a80a7cf5c1d945b9438f724e91d2f785dc991c51d33440ee44"
+  ],
+  ".git/logs/refs/heads/master": [
+    33204,
+    "29d3c7918131cb3a8259d4f1bb3d482c0072dd389140945cba33757d43215d16"
+  ],
+  ".git/logs/refs/stash": [
+    33204,
+    "2dbadfa7489b5a4e8aed85ea794d7dbf6a864cae73fa5aedeecb7b5e79350029"
+  ],
+  ".git/refs/heads/master": [
+    33204,
+    "b76f213dacd2fe18be8e99b0f86945a7707da5119a493556b9502a555f3d803f"
+  ],
+  ".git/refs/stash": [
+    33204,
+    "308bf718964f720e6d80a1e08077e5f5dbae2ecbffff51645286033e296d614b"
+  ],
+  ".gitignore": [
+    33204,
+    "011302fd866cbb41d03356435fde928d9563054b9cd28fb7b4d495a3a6eb63d4"
+  ],
+  "execfile": [
+    33261,
+    "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
+  ],
+  "ignored-force": [
+    33204,
+    "93a17a2196b99096335507963d3429ddae669ee8c7d1c88c8f38d745ba85742a"
+  ],
+  "link": [
+    41471,
+    "b605596c21a636235853af73584ed98d38483ae21e864bb8c2998ead32c4b1f5"
+  ],
+  "new": [
+    33204,
+    "528eee7ba2c0adea12842fd3eab1088d4d8402d115182154b0baef559f2164f2"
+  ],
+  "t/job.sh": [
+    33204,
+    "85010b2b6d355b1cae60db7ba4db35ec3a153b9fb00efb38b104ba2be18fb301"
+  ],
+  "tracked": [
+    33204,
+    "4487e24377581c1a43c957c7700c8b49920de7b8500c05590cee74996ef73f42"
+  ]
+}

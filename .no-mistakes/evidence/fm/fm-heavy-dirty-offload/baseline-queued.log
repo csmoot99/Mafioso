@@ -1,0 +1,2 @@
+fm-heavy-remote: not running on fm-loopback (dirty-tree); staying in the local queue
+Observed: base wrapper remains queued with the sole local slot occupied.

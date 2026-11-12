@@ -1,0 +1,38 @@
+Server listening on 127.0.0.1 port 54359.
+Accepted publickey for work from 127.0.0.1 port 53372 ssh2: ED25519 SHA256:0eH+MXvzn2bHp4dPyn2nqryweEiT5TtNM663cY+uyBE
+Received disconnect from 127.0.0.1 port 53372:11: disconnected by user
+Disconnected from user work 127.0.0.1 port 53372
+Accepted publickey for work from 127.0.0.1 port 53386 ssh2: ED25519 SHA256:0eH+MXvzn2bHp4dPyn2nqryweEiT5TtNM663cY+uyBE
+Received disconnect from 127.0.0.1 port 53386:11: disconnected by user
+Disconnected from user work 127.0.0.1 port 53386
+Accepted publickey for work from 127.0.0.1 port 53402 ssh2: ED25519 SHA256:0eH+MXvzn2bHp4dPyn2nqryweEiT5TtNM663cY+uyBE
+Received disconnect from 127.0.0.1 port 53402:11: disconnected by user
+Disconnected from user work 127.0.0.1 port 53402
+Accepted publickey for work from 127.0.0.1 port 53414 ssh2: ED25519 SHA256:0eH+MXvzn2bHp4dPyn2nqryweEiT5TtNM663cY+uyBE
+Received disconnect from 127.0.0.1 port 53414:11: disconnected by user
+Disconnected from user work 127.0.0.1 port 53414
+Accepted publickey for work from 127.0.0.1 port 53424 ssh2: ED25519 SHA256:0eH+MXvzn2bHp4dPyn2nqryweEiT5TtNM663cY+uyBE
+Received disconnect from 127.0.0.1 port 53424:11: disconnected by user
+Disconnected from user work 127.0.0.1 port 53424
+Accepted publickey for work from 127.0.0.1 port 53432 ssh2: ED25519 SHA256:0eH+MXvzn2bHp4dPyn2nqryweEiT5TtNM663cY+uyBE
+Received disconnect from 127.0.0.1 port 53432:11: disconnected by user
+Disconnected from user work 127.0.0.1 port 53432
+Accepted publickey for work from 127.0.0.1 port 53446 ssh2: ED25519 SHA256:0eH+MXvzn2bHp4dPyn2nqryweEiT5TtNM663cY+uyBE
+Received disconnect from 127.0.0.1 port 53446:11: disconnected by user
+Disconnected from user work 127.0.0.1 port 53446
+Accepted publickey for work from 127.0.0.1 port 53454 ssh2: ED25519 SHA256:0eH+MXvzn2bHp4dPyn2nqryweEiT5TtNM663cY+uyBE
+Received disconnect from 127.0.0.1 port 53454:11: disconnected by user
+Disconnected from user work 127.0.0.1 port 53454
+Accepted publickey for work from 127.0.0.1 port 53466 ssh2: ED25519 SHA256:0eH+MXvzn2bHp4dPyn2nqryweEiT5TtNM663cY+uyBE
+Received disconnect from 127.0.0.1 port 53466:11: disconnected by user
+Disconnected from user work 127.0.0.1 port 53466
+Accepted publickey for work from 127.0.0.1 port 53482 ssh2: ED25519 SHA256:0eH+MXvzn2bHp4dPyn2nqryweEiT5TtNM663cY+uyBE
+Received disconnect from 127.0.0.1 port 53482:11: disconnected by user
+Disconnected from user work 127.0.0.1 port 53482
+Accepted publickey for work from 127.0.0.1 port 53492 ssh2: ED25519 SHA256:0eH+MXvzn2bHp4dPyn2nqryweEiT5TtNM663cY+uyBE
+Received disconnect from 127.0.0.1 port 53492:11: disconnected by user
+Disconnected from user work 127.0.0.1 port 53492
+Accepted publickey for work from 127.0.0.1 port 53506 ssh2: ED25519 SHA256:0eH+MXvzn2bHp4dPyn2nqryweEiT5TtNM663cY+uyBE
+Received disconnect from 127.0.0.1 port 53506:11: disconnected by user
+Disconnected from user work 127.0.0.1 port 53506
+Received signal 15; terminating.

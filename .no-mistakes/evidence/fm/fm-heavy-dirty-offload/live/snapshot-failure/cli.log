@@ -1,0 +1,5 @@
+error: open("unreadable"): Permission denied
+error: unable to index file 'unreadable'
+fatal: adding files failed
+fm-heavy-remote: not running on fm-loopback (snapshot-failed); staying in the local queue
+local-fallback-ran

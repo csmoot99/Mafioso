@@ -1,0 +1,1 @@
+{"task":null,"project":"p","class":"test","cmd":"bash","requested_at":1794515009,"started_at":null,"ended_at":null,"wait_s":0,"run_s":null,"exit":143,"slot":null,"peak_memory_bytes":null,"cpu_usec":null,"host":"fake-mac","prepare_s":null,"collect_s":null,"outcome":"cancelled","job":"1794515009-445929-13072","candidate":null,"snapshot":false,"fallback":null}

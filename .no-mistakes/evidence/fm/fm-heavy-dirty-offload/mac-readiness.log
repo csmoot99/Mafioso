@@ -1,0 +1,9 @@
+$ ssh -o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=yes -o UpdateHostKeys=no fm-mac 'uname -s; command -v python3 git tar ps'
+Darwin
+/usr/bin/python3
+/usr/bin/git
+/usr/bin/tar
+/bin/ps
+[exit 0]
+
+Execution on the Mac was not attempted: the product writes remote job state under ~/.fm-heavy-remote and /tmp, outside this run's permitted worktree. Grant a scoped remote scratch-directory exception to exercise the Mac. Existing login was only read; no credential changes.
