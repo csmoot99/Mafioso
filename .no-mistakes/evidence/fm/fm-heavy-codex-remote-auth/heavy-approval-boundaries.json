@@ -1,0 +1,200 @@
+[
+  {
+    "scenario": "missing-config",
+    "command": [
+      "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/bin/fm-heavy.sh",
+      "--class",
+      "test",
+      "--remote",
+      "--project",
+      "420usa",
+      "--",
+      "bash",
+      "-c",
+      "touch /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/unexpected-command-ran"
+    ],
+    "FM_HOME": "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/root",
+    "root_approval_config": null,
+    "child_approval_config": null,
+    "exit": 2,
+    "stdout": "",
+    "stderr": "fm-heavy.sh: --remote needs /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/root/config/heavy-remote\n",
+    "payload_executed": false
+  },
+  {
+    "scenario": "hostless-config",
+    "command": [
+      "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/bin/fm-heavy.sh",
+      "--class",
+      "test",
+      "--remote",
+      "--project",
+      "420usa",
+      "--",
+      "bash",
+      "-c",
+      "touch /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/unexpected-command-ran"
+    ],
+    "FM_HOME": "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/root",
+    "root_approval_config": "project 420usa\n",
+    "child_approval_config": null,
+    "exit": 2,
+    "stdout": "",
+    "stderr": "fm-heavy.sh: malformed /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/root/config/heavy-remote: no host line (see --help)\n",
+    "payload_executed": false
+  },
+  {
+    "scenario": "unapproved-command",
+    "command": [
+      "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/bin/fm-heavy.sh",
+      "--class",
+      "test",
+      "--remote",
+      "--project",
+      "420usa",
+      "--",
+      "bash",
+      "-c",
+      "touch /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/unexpected-command-ran"
+    ],
+    "FM_HOME": "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/root",
+    "root_approval_config": "host fm-mac\ncommand 420usa -- true\n",
+    "child_approval_config": null,
+    "exit": 2,
+    "stdout": "",
+    "stderr": "fm-heavy.sh: --remote command/class is not approved for this project\n",
+    "payload_executed": false
+  },
+  {
+    "scenario": "unapproved-e2e-command",
+    "command": [
+      "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/bin/fm-heavy.sh",
+      "--class",
+      "e2e",
+      "--remote",
+      "--project",
+      "420usa",
+      "--",
+      "bash",
+      "-c",
+      "touch /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/unexpected-command-ran"
+    ],
+    "FM_HOME": "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/root",
+    "root_approval_config": "host fm-mac\ncommand 420usa -- true\n",
+    "child_approval_config": null,
+    "exit": 2,
+    "stdout": "",
+    "stderr": "fm-heavy.sh: --remote command/class is not approved for this project\n",
+    "payload_executed": false
+  },
+  {
+    "scenario": "child-config-cannot-expand-root-approvals",
+    "command": [
+      "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/bin/fm-heavy.sh",
+      "--class",
+      "test",
+      "--remote",
+      "--project",
+      "420usa",
+      "--",
+      "bash",
+      "-c",
+      "touch /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/unexpected-command-ran"
+    ],
+    "FM_HOME": "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/child",
+    "root_approval_config": "host fm-mac\ncommand 420usa -- true\n",
+    "child_approval_config": "host child-host\nproject 420usa\n",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "fm-heavy.sh: --remote command/class is not approved for this project\n",
+    "payload_executed": false
+  },
+  {
+    "scenario": "child-config-cannot-create-missing-root-approval",
+    "command": [
+      "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/bin/fm-heavy.sh",
+      "--class",
+      "test",
+      "--remote",
+      "--project",
+      "420usa",
+      "--",
+      "bash",
+      "-c",
+      "touch /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/unexpected-command-ran"
+    ],
+    "FM_HOME": "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/child",
+    "root_approval_config": null,
+    "child_approval_config": "host child-host\nproject 420usa\n",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "fm-heavy.sh: --remote needs /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/root/config/heavy-remote\n",
+    "payload_executed": false
+  },
+  {
+    "scenario": "unapproved-project",
+    "command": [
+      "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/bin/fm-heavy.sh",
+      "--class",
+      "test",
+      "--remote",
+      "--project",
+      "not-approved",
+      "--",
+      "bash",
+      "-c",
+      "touch /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/unexpected-command-ran"
+    ],
+    "FM_HOME": "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/root",
+    "root_approval_config": "host fm-mac\nproject 420usa\n",
+    "child_approval_config": null,
+    "exit": 2,
+    "stdout": "",
+    "stderr": "fm-heavy.sh: --remote command/class is not approved for this project\n",
+    "payload_executed": false
+  },
+  {
+    "scenario": "build-class-excluded",
+    "command": [
+      "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/bin/fm-heavy.sh",
+      "--class",
+      "build",
+      "--remote",
+      "--project",
+      "420usa",
+      "--",
+      "bash",
+      "-c",
+      "touch /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/unexpected-command-ran"
+    ],
+    "FM_HOME": "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/root",
+    "root_approval_config": "host fm-mac\nproject 420usa\n",
+    "child_approval_config": null,
+    "exit": 2,
+    "stdout": "",
+    "stderr": "fm-heavy.sh: --remote command/class is not approved for this project\n",
+    "payload_executed": false
+  },
+  {
+    "scenario": "malformed-config",
+    "command": [
+      "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/bin/fm-heavy.sh",
+      "--class",
+      "test",
+      "--remote",
+      "--project",
+      "420usa",
+      "--",
+      "bash",
+      "-c",
+      "touch /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/unexpected-command-ran"
+    ],
+    "FM_HOME": "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/root",
+    "root_approval_config": "host fm-mac\nhost child-host\nproject 420usa\n",
+    "child_approval_config": null,
+    "exit": 2,
+    "stdout": "",
+    "stderr": "fm-heavy.sh: malformed /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/root/config/heavy-remote: invalid line 2 (see --help)\n",
+    "payload_executed": false
+  }
+]

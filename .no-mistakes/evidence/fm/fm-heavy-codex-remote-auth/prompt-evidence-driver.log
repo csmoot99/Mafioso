@@ -1,0 +1,12 @@
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+configured: real Codex rendered consent=True; sandbox and automatic reviewer retained
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+child-ship: real Codex rendered consent=True; sandbox and automatic reviewer retained
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+child-scout: real Codex rendered consent=True; sandbox and automatic reviewer retained
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+child-unapproved: real Codex rendered consent=False; sandbox and automatic reviewer retained
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+absent: real Codex rendered consent=False; sandbox and automatic reviewer retained
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+hostless: real Codex rendered consent=False; sandbox and automatic reviewer retained

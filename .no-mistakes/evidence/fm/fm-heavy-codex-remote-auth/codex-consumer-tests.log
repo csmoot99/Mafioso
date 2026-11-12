@@ -1,0 +1,19 @@
+ok - codex codex-cli 0.167.0 still publishes the hook feature flag firstmate enables
+ok - codex codex-cli 0.167.0 accepts a firstmate crewmate launch with its hook layer enabled
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+ok - codex codex-cli 0.167.0 loads every firstmate session-flag hook from the crewmate launch with its exact command (handoff-first)
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+ok - codex codex-cli 0.167.0 loads every firstmate session-flag hook from the crewmate launch with its exact command (compact-first)
+ok - codex codex-cli 0.167.0 renders the crewmate launch sandboxed under auto-review with only its task channels writable
+ok - codex codex-cli 0.167.0 renders remote consent for configured ships and scouts only
+# all fm-codex-hook-layer-live-e2e tests passed

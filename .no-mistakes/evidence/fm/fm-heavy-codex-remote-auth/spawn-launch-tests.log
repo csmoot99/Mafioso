@@ -1,0 +1,11 @@
+ok - Codex remote-source consent uses root approvals and retains the invoking home
+ok - Codex gets isolated browser environment, unchanged safety flags, and owned cleanup on success/failure
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+ok - ship launch with no allowlist starts its agent with the configured values, from the pane export and the launch command alike
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+ok - ship launch under an enabled allowlist carries the configured values through the cleared environment, overriding a contrary pane value
+warning: no Playwright Chromium in the user cache; Codex browser setup skipped
+ok - an absent config/launch-env changes nothing about the launch
+not ok - secondmate spawn should succeed: error: secondmate home cannot be inside the firstmate repo: /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/fm-spawn-launch-env.kw3mbw/secondmate/secondmate-home: expected exit 0, got 1

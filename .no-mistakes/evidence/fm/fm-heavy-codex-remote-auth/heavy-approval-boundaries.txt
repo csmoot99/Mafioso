@@ -1,0 +1,45 @@
+missing-config
+$ FM_HOME=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/root /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/bin/fm-heavy.sh --class test --remote --project 420usa -- bash -c touch /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/unexpected-command-ran
+fm-heavy.sh: --remote needs /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/root/config/heavy-remote
+exit=2; payload_executed=False
+
+hostless-config
+$ FM_HOME=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/root /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/bin/fm-heavy.sh --class test --remote --project 420usa -- bash -c touch /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/unexpected-command-ran
+fm-heavy.sh: malformed /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/root/config/heavy-remote: no host line (see --help)
+exit=2; payload_executed=False
+
+unapproved-command
+$ FM_HOME=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/root /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/bin/fm-heavy.sh --class test --remote --project 420usa -- bash -c touch /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/unexpected-command-ran
+fm-heavy.sh: --remote command/class is not approved for this project
+exit=2; payload_executed=False
+
+unapproved-e2e-command
+$ FM_HOME=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/root /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/bin/fm-heavy.sh --class e2e --remote --project 420usa -- bash -c touch /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/unexpected-command-ran
+fm-heavy.sh: --remote command/class is not approved for this project
+exit=2; payload_executed=False
+
+child-config-cannot-expand-root-approvals
+$ FM_HOME=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/child /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/bin/fm-heavy.sh --class test --remote --project 420usa -- bash -c touch /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/unexpected-command-ran
+fm-heavy.sh: --remote command/class is not approved for this project
+exit=2; payload_executed=False
+
+child-config-cannot-create-missing-root-approval
+$ FM_HOME=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/child /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/bin/fm-heavy.sh --class test --remote --project 420usa -- bash -c touch /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/unexpected-command-ran
+fm-heavy.sh: --remote needs /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/root/config/heavy-remote
+exit=2; payload_executed=False
+
+unapproved-project
+$ FM_HOME=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/root /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/bin/fm-heavy.sh --class test --remote --project not-approved -- bash -c touch /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/unexpected-command-ran
+fm-heavy.sh: --remote command/class is not approved for this project
+exit=2; payload_executed=False
+
+build-class-excluded
+$ FM_HOME=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/root /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/bin/fm-heavy.sh --class build --remote --project 420usa -- bash -c touch /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/unexpected-command-ran
+fm-heavy.sh: --remote command/class is not approved for this project
+exit=2; payload_executed=False
+
+malformed-config
+$ FM_HOME=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/root /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/bin/fm-heavy.sh --class test --remote --project 420usa -- bash -c touch /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/unexpected-command-ran
+fm-heavy.sh: malformed /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78EJVQ754X0B7H1ZZQDJF1D/.test-tmp/approval-lab-h3ng979q/root/config/heavy-remote: invalid line 2 (see --help)
+exit=2; payload_executed=False
+
