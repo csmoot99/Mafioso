@@ -34,8 +34,10 @@
 # No project command started: when the host is unreachable or busy, the tree is dirty, an earlier
 # job is still running there or the host cannot prepare the job, the sample gets
 # fallback=<reason> and the exit status is 0, so the caller keeps the command in
-# its local queue. prepare-failed includes preparation_step and preparation_log
-# (the retained, verified run.log). A command failure, even exit 78, stays failed.
+# its local queue. A verified prepare-failed result adds preparation_step and
+# preparation_log (the retained, verified run.log) only after remote cleanup
+# succeeds; a refusal before launch may have neither field.
+# A command failure, even exit 78, stays failed.
 # A signalled script ends cancelled instead.
 #
 # Outcomes (outcome= in the sample; exit status in parentheses):
@@ -54,7 +56,8 @@
 #   command itself exited with).
 # After a lost connection the job is reconciled against its record on the host
 # before anything else happens: a job found running or done is waited for and
-# collected, never run again.
+# collected. Local fallback follows only a verified preparation failure and
+# successful cleanup; an uncertain result never authorizes another execution.
 #
 # Open records: <state-dir>/unknown-<host>/<job>.json is written before anything
 # reaches the host and removed only once the host's scratch is gone or nothing was
