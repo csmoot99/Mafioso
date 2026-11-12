@@ -1,0 +1,178 @@
+[
+  {
+    "schema": "fm-heavy-remote.v1",
+    "id": "alongside-native",
+    "sha": "f8ec0c6cd28d7abacc6e59f3553ce2da615715f6",
+    "tree": "5e424534b18ba5b36faaedbcf1554eef238aa0bb",
+    "command_sha256": "7d0ecb349c8b9f5544dcf5c1d9fe366b522e24f763ebfb6a8af68587913c93e4",
+    "bundle_sha256": "2e018b4d06ccbcbc0afe610dc9c222314a397db01a3cc5d55ba0fe17d106e504",
+    "outcome": "exited",
+    "preparation_step": "command",
+    "exit_code": 0,
+    "started_at": 1794522511,
+    "ended_at": 1794522511,
+    "run_s": 0.476,
+    "cpu_usec": 130614,
+    "host": "DESKTOP-NKCLCNH",
+    "artifacts": {
+      "run.log": {
+        "bytes": 44,
+        "sha256": "5485ed22ed5cc1ff804346709822bc6e432a5a26760a97a773ffbf749462d688"
+      }
+    }
+  },
+  {
+    "schema": "fm-heavy-remote.v1",
+    "id": "bad-preparation",
+    "sha": "1e6c482ee1ff7b7bded7d716992757eb010281fa",
+    "tree": "e5ebeafd3d772e98c0feca5d3d46def4b5d5d903",
+    "command_sha256": "7d0ecb349c8b9f5544dcf5c1d9fe366b522e24f763ebfb6a8af68587913c93e4",
+    "bundle_sha256": "49fa8f1a568ae803bae178ba8aeda72eca37327df4b0170454efa77301ad31b3",
+    "outcome": "prepare-failed",
+    "preparation_step": "runtime",
+    "exit_code": 78,
+    "started_at": 1794522515,
+    "ended_at": 1794522515,
+    "run_s": 0.267,
+    "cpu_usec": 105365,
+    "host": "DESKTOP-NKCLCNH",
+    "artifacts": {
+      "run.log": {
+        "bytes": 67,
+        "sha256": "4f502a99cac242bcf28f070f725883d81ce0ac0f22c177dd3b391a0eac7092fe"
+      }
+    }
+  },
+  {
+    "schema": "fm-heavy-remote.v1",
+    "id": "command-exit-78",
+    "sha": "00d44a175dbfc186c4e33859e72dd0a8969c3cb1",
+    "tree": "5e65504e7c433f3e2e2e9246a27cb6804642534e",
+    "command_sha256": "7d0ecb349c8b9f5544dcf5c1d9fe366b522e24f763ebfb6a8af68587913c93e4",
+    "bundle_sha256": "6ac783c92921b30ebd86d6b82709e5504929f27c81c71e19f1dee64b85c816e0",
+    "outcome": "exited",
+    "preparation_step": "command",
+    "exit_code": 78,
+    "started_at": 1794522515,
+    "ended_at": 1794522516,
+    "run_s": 0.268,
+    "cpu_usec": 105619,
+    "host": "DESKTOP-NKCLCNH",
+    "artifacts": {
+      "run.log": {
+        "bytes": 17,
+        "sha256": "f99883eb6482bcd57652ef34981851f1d83e9db95f66776a1dc396c36eb35480"
+      }
+    }
+  },
+  {
+    "schema": "fm-heavy-remote.v1",
+    "id": "concurrent-a",
+    "sha": "9cab8f06c3d7f6062797168e72998528d85569ed",
+    "tree": "fbf823c985d3f69d48f8fc921d711a0af1c15712",
+    "command_sha256": "7d0ecb349c8b9f5544dcf5c1d9fe366b522e24f763ebfb6a8af68587913c93e4",
+    "bundle_sha256": "08c789f5529dfda2cb1f98d70e88b7e2a39da6f27005d32e0bdb23df6f3e92e8",
+    "outcome": "exited",
+    "preparation_step": "command",
+    "exit_code": 0,
+    "started_at": 1794522511,
+    "ended_at": 1794522512,
+    "run_s": 0.869,
+    "cpu_usec": 123834,
+    "host": "DESKTOP-NKCLCNH",
+    "artifacts": {
+      "run.log": {
+        "bytes": 36,
+        "sha256": "2b73446f7dc9a909e2ce3d093c331770efcf36e3c404e5d1f64e50376310009e"
+      }
+    }
+  },
+  {
+    "schema": "fm-heavy-remote.v1",
+    "id": "concurrent-b",
+    "sha": "8956136cce8fa03738358ce53940ad8024145a7c",
+    "tree": "2bfcb234ef8f2d58309cbc05d993bf0fffb0ac34",
+    "command_sha256": "7d0ecb349c8b9f5544dcf5c1d9fe366b522e24f763ebfb6a8af68587913c93e4",
+    "bundle_sha256": "ed70bc8078fbc784086b310fc735b72fecc95cf7c60c4270f5a7d3ebc3c351dc",
+    "outcome": "exited",
+    "preparation_step": "command",
+    "exit_code": 0,
+    "started_at": 1794522512,
+    "ended_at": 1794522513,
+    "run_s": 1.267,
+    "cpu_usec": 132744,
+    "host": "DESKTOP-NKCLCNH",
+    "artifacts": {
+      "run.log": {
+        "bytes": 36,
+        "sha256": "fc8a8882e824e0ff5867fd6206ce7c8682e269af4b9de5b59aebf3f6f6551831"
+      }
+    }
+  },
+  {
+    "schema": "fm-heavy-remote.v1",
+    "id": "priority-refused",
+    "sha": "39ec08e2cb1b548aae4be761dc4b85afa4aeedda",
+    "tree": "fa85c07630c01feb27ca0c24c73472ff11d574c9",
+    "command_sha256": "7d0ecb349c8b9f5544dcf5c1d9fe366b522e24f763ebfb6a8af68587913c93e4",
+    "bundle_sha256": "25072ca7926a38449080420b578a09cab39e8518b3a3fe59772d4ea537fb3fbd",
+    "outcome": "exited",
+    "preparation_step": "command",
+    "exit_code": 0,
+    "started_at": 1794522514,
+    "ended_at": 1794522514,
+    "run_s": 0.268,
+    "cpu_usec": 111037,
+    "host": "DESKTOP-NKCLCNH",
+    "artifacts": {
+      "run.log": {
+        "bytes": 44,
+        "sha256": "1d88af46dd698263e828d3d72ee84ec26395942a6bc107ac6b9d3bfa80ee6d9a"
+      }
+    }
+  },
+  {
+    "schema": "fm-heavy-remote.v1",
+    "id": "surviving-peer",
+    "sha": "e68b5cf082ba9294fad51a6fc29e470bcd6abb7b",
+    "tree": "72f9e4b8875418862162e969dbc52ffd4bdf5949",
+    "command_sha256": "7d0ecb349c8b9f5544dcf5c1d9fe366b522e24f763ebfb6a8af68587913c93e4",
+    "bundle_sha256": "f3bb0e91239d85da1f1facde4b0704609738f646576d8936ae9ec249d93d4a5f",
+    "outcome": "exited",
+    "preparation_step": "command",
+    "exit_code": 0,
+    "started_at": 1794522516,
+    "ended_at": 1794522520,
+    "run_s": 4.069,
+    "cpu_usec": 202434,
+    "host": "DESKTOP-NKCLCNH",
+    "artifacts": {
+      "run.log": {
+        "bytes": 40,
+        "sha256": "f45a23ba7d62e8ab8f4f0b8502b169f12d6e8a1c8eb3cd07d3240d037f68a6c8"
+      }
+    }
+  },
+  {
+    "schema": "fm-heavy-remote.v1",
+    "id": "third-refused",
+    "sha": "3c0bfac2459eda78f7bc38a56bcb77e4688f5851",
+    "tree": "fc6f7b3c75e69d46e725bc693ee6c1de529e1d53",
+    "command_sha256": "7d0ecb349c8b9f5544dcf5c1d9fe366b522e24f763ebfb6a8af68587913c93e4",
+    "bundle_sha256": "243f5e4be7ef5f6434a74fe3840a50dcdbe35e6a7f2ad4b310efb438c4c92856",
+    "outcome": "exited",
+    "preparation_step": "command",
+    "exit_code": 0,
+    "started_at": 1794522513,
+    "ended_at": 1794522513,
+    "run_s": 0.468,
+    "cpu_usec": 115100,
+    "host": "DESKTOP-NKCLCNH",
+    "artifacts": {
+      "run.log": {
+        "bytes": 38,
+        "sha256": "c2cbe707b62bde4affba65ddf4c2e68054bd43194f81b88b77896887078edbd8"
+      }
+    }
+  }
+]

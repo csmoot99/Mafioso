@@ -1,0 +1,44 @@
+CONFIG 'host-slots 0' CLI ['bin/fm-heavy.sh', '--class', 'test', '--project', 'validation', '--remote', '--', 'touch', '/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78WSYX8YMJ7PXNCTRM65Z1M/.validation-heavy/config-home/must-not-run'] exit 2
+fm-heavy.sh: malformed /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78WSYX8YMJ7PXNCTRM65Z1M/.validation-heavy/config-home/config/heavy-remote: invalid line 3 (see --help)
+
+CONFIG 'host-slots 02' CLI ['bin/fm-heavy.sh', '--class', 'test', '--project', 'validation', '--remote', '--', 'touch', '/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78WSYX8YMJ7PXNCTRM65Z1M/.validation-heavy/config-home/must-not-run'] exit 2
+fm-heavy.sh: malformed /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78WSYX8YMJ7PXNCTRM65Z1M/.validation-heavy/config-home/config/heavy-remote: invalid line 3 (see --help)
+
+CONFIG 'host-slots 65' CLI ['bin/fm-heavy.sh', '--class', 'test', '--project', 'validation', '--remote', '--', 'touch', '/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78WSYX8YMJ7PXNCTRM65Z1M/.validation-heavy/config-home/must-not-run'] exit 2
+fm-heavy.sh: malformed /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78WSYX8YMJ7PXNCTRM65Z1M/.validation-heavy/config-home/config/heavy-remote: invalid line 3 (see --help)
+
+CONFIG 'host-slots 2\nhost-slots 2' CLI ['bin/fm-heavy.sh', '--class', 'test', '--project', 'validation', '--remote', '--', 'touch', '/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78WSYX8YMJ7PXNCTRM65Z1M/.validation-heavy/config-home/must-not-run'] exit 2
+fm-heavy.sh: malformed /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78WSYX8YMJ7PXNCTRM65Z1M/.validation-heavy/config-home/config/heavy-remote: invalid line 4 (see --help)
+
+CONFIG 'nofile 65536' CLI ['bin/fm-heavy.sh', '--class', 'test', '--project', 'validation', '--remote', '--', 'touch', '/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78WSYX8YMJ7PXNCTRM65Z1M/.validation-heavy/config-home/must-not-run'] exit 2
+fm-heavy.sh: malformed /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78WSYX8YMJ7PXNCTRM65Z1M/.validation-heavy/config-home/config/heavy-remote: invalid line 3 (see --help)
+
+REMOVED FLAG ['bin/fm-heavy-remote.sh', '--host', 'no-heavy-validation.invalid', '--timeout', '10', '--sample', '/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78WSYX8YMJ7PXNCTRM65Z1M/.validation-heavy/config-home/sample', '--state-dir', '/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78WSYX8YMJ7PXNCTRM65Z1M/.validation-heavy/config-home/state', '--project', 'validation', '--nofile', '65536', '--', 'true'] exit 0 warning: adding embedded git repository: .validation-heavy/live/repo-alongside-native
+hint: You've added another git repository inside your current repository.
+hint: Clones of the outer repository will not contain the contents of
+hint: the embedded repository and will not know how to obtain it.
+hint: If you meant to add a submodule, use:
+hint:
+hint: 	git submodule add <url> .validation-heavy/live/repo-alongside-native
+hint:
+hint: If you added this path by mistake, you can remove it from the
+hint: index with:
+hint:
+hint: 	git rm --cached .validation-heavy/live/repo-alongside-native
+hint:
+hint: See "git help submodule" for more information.
+hint: Disable this message with "git config set advice.addEmbeddedRepo false"
+warning: adding embedded git repository: .validation-heavy/live/repo-bad-preparation
+warning: adding embedded git repository: .validation-heavy/live/repo-command-exit-78
+warning: adding embedded git repository: .validation-heavy/live/repo-concurrent-a
+warning: adding embedded git repository: .validation-heavy/live/repo-concurrent-b
+warning: adding embedded git repository: .validation-heavy/live/repo-default-one
+warning: adding embedded git repository: .validation-heavy/live/repo-orphan-original
+warning: adding embedded git repository: .validation-heavy/live/repo-priority-refused
+warning: adding embedded git repository: .validation-heavy/live/repo-surviving-peer
+warning: adding embedded git repository: .validation-heavy/live/repo-third-refused
+fm-heavy-remote: not running on no-heavy-validation.invalid (unreachable); staying in the local queue
+
+Traceback (most recent call last):
+  File "<stdin>", line 17, in <module>
+AssertionError

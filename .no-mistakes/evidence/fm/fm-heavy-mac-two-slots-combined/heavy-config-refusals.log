@@ -1,0 +1,17 @@
+CONFIG 'host-slots 0' exit 2
+fm-heavy.sh: malformed /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78WSYX8YMJ7PXNCTRM65Z1M/.validation-heavy/config-home/config/heavy-remote: invalid line 3 (see --help)
+
+CONFIG 'host-slots 02' exit 2
+fm-heavy.sh: malformed /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78WSYX8YMJ7PXNCTRM65Z1M/.validation-heavy/config-home/config/heavy-remote: invalid line 3 (see --help)
+
+CONFIG 'host-slots 65' exit 2
+fm-heavy.sh: malformed /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78WSYX8YMJ7PXNCTRM65Z1M/.validation-heavy/config-home/config/heavy-remote: invalid line 3 (see --help)
+
+CONFIG 'host-slots 2\nhost-slots 2' exit 2
+fm-heavy.sh: malformed /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78WSYX8YMJ7PXNCTRM65Z1M/.validation-heavy/config-home/config/heavy-remote: invalid line 4 (see --help)
+
+CONFIG 'nofile 65536' exit 2
+fm-heavy.sh: malformed /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78WSYX8YMJ7PXNCTRM65Z1M/.validation-heavy/config-home/config/heavy-remote: invalid line 3 (see --help)
+
+All malformed host-slots and removed nofile configuration runs refused before command execution.
+Setup correction: an initial check expected the internal remote script to reject --nofile as an option. That script treats remaining words as command argv; the probe returned unreachable fallback. The supported wrapper configuration is the rejection contract tested here.

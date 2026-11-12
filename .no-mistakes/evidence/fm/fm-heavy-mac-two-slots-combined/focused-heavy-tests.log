@@ -1,0 +1,13 @@
+ok - fm-heavy --remote: snapshot contains current files, excludes ignored files and preserves source state
+ok - fm-heavy --remote: untracked-only trees are snapshotted when Git status hides untracked files
+ok - fm-heavy --remote: snapshot failures stay local without sending content or changing source state
+ok - fm-heavy --remote: bundle failures and signals preserve source state
+ok - fm-heavy: checkout refusal preserves capacity when follow-up cleanup is unavailable
+ok - fm-heavy --remote: a failing command is a failure with its own status, log kept
+ok - fm-heavy --remote: a missing, wrong-candidate, wrong-command, partial or replayed result is rejected, never green
+ok - fm-heavy: a live collection owner cannot hide orphaned work from admission
+ok - fm-heavy: supervisor loss after reconciliation cannot free an occupied slot for remote admission
+ok - fm-heavy: native and remote admission wait for orphaned command descendants after supervisor loss
+ok - fm-heavy: cached dependencies refresh on lockfile change; runtime/install failures and preparation timeout return locally with evidence
+ok - fm-heavy: the host's own jobs go first, and no running job is stopped for another
+ok - fm-heavy: two host slots include native jobs, preserve native priority and admit two sent jobs
