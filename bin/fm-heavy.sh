@@ -85,7 +85,7 @@
 # incompatible versions and dependency-install errors on the host fail the remote
 # job and never silently retry locally. A signal before starting prevents
 # execution anywhere. bin/fm-heavy-remote.sh owns transfer, results and
-# unknown-job reconciliation; unknown jobs prevent new remote work until settled.
+# open-record reconciliation, including concurrent-client ownership.
 # Job copies live in state/heavy-remote/<job> in the root home, and open records
 # in state/heavy-remote/unknown-<host>.
 #

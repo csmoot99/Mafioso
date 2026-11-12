@@ -2,7 +2,12 @@
 """Remote half of bin/fm-heavy-remote.sh: run one transferred job and report it.
 
 Usage: fm-heavy-remote-runner.py busy [host-slots]
-       fm-heavy-remote-runner.py start|guard|supervise|container|execute|status|reconcile|wait|cancel|cleanup <jobdir> [seconds]
+       fm-heavy-remote-runner.py start|status|reconcile|cancel|cleanup <jobdir>
+       fm-heavy-remote-runner.py wait <jobdir> [seconds]
+Internal launches:
+       fm-heavy-remote-runner.py guard <jobdir> <slot-fd>
+       fm-heavy-remote-runner.py supervise <jobdir> <slot-fd> <ready-fd>
+       fm-heavy-remote-runner.py container|execute <jobdir> [<slot-fd> <ready-fd> <supervisor-pid> <supervisor-start>]
 
 The client ships this file with each job, so nothing is installed on the remote
 host. It needs python3 (stdlib), git and ps, and runs on macOS and Linux.
@@ -23,7 +28,11 @@ timeout, image, services and job env) and src.bundle (the candidate revision wit
 Host slots: host_slots in the manifest (default 1, range 1-64) includes the
 host's own jobs on FM_HEAVY_HOST_LOCK (default /tmp/fm-heavy.lock). Additional
 slots use <lock>.remote.<number>, preferred over the original lock so native
-jobs can still start unchanged. Each supervisor holds its slot to completion.
+jobs can still start unchanged. A detached guard retains the kernel lock until
+both the supervisor exits and the reported command group stops, including any
+surviving descendants. Supervisor loss therefore cannot free capacity for either
+native or remote admission. The command closes its inherited slot descriptor
+before preparing dependencies or launching the approved command.
 Live <lock>.waiting pid markers and childless `flock <lock> <command>` processes
 prevent admission, preserving priority for native jobs already waiting. Descriptor
 forms of flock are matched through /proc on Linux or the system lsof on macOS.
@@ -31,13 +40,15 @@ No running job is stopped for another.
 
 busy      Prints busy and exits 12 when capacity is full or native work awaits, else
           prints free. It needs no job directory.
-start     Exits 12, having created nothing, when the host slot is busy. Otherwise
-          it refuses a second start of the same job, verifies the bundle and command
+start     Exits 12, having created nothing, when capacity is full or native work
+          awaits. Otherwise it refuses a second start of the same job, verifies the bundle and command
           digests, clones the bundle, checks out and verifies the exact sha, then
-          launches a detached supervisor and prints "started". It exits 10 on any
-          refusal, having launched nothing, and 11 when the supervisor it launched
-          recorded no owner in time, so the job may still have started.
-supervise Holds the host slot passed by start and runs the command in its own process group with cwd the checkout, output
+          launches a detached guard and supervisor and prints "started". It exits
+          10 on any refusal, having launched nothing, and 11 when no owner was
+          recorded in time after launch, so the job may still have started.
+guard     Owns the slot lifetime described above; receives the command group's
+          identity over a pipe independently of the supervisor's survival.
+supervise Runs the command in its own process group with cwd the checkout, output
           to run.log, enforcing the timeout and killing the whole group on
           timeout, cancel or exit. It then publishes result.json atomically; that
           file is the durable completion record. Its fields: schema, id, sha and
@@ -258,9 +269,7 @@ def host_waiting():
 def take_host_slot(slots=1):
     """Take one kernel-owned slot without waiting; native jobs keep slot one.
 
-    Prefer extra slots so a new native job can still take the legacy lock.
-    Every extra slot has a separate flock, retained by the supervisor just as
-    the original lock was. No counters can leak when a client or runner dies.
+    The module header owns slot ordering, native priority and lock lifetime.
     """
     if host_waiting():
         return None
@@ -411,7 +420,6 @@ def cmd_start(jdir):
         die(10, "refused: could not check out %s: %s" % (sha, cloned.stderr.strip()))
     if git("-C", work, "rev-parse", "HEAD").stdout.strip() != sha:
         die(10, "refused: checkout is not %s" % sha)
-    # The supervisor holds the host slot until the job ends; the command does not inherit it.
     try:
         subprocess.Popen([sys.executable, os.path.abspath(__file__), "guard", jdir, str(slot)], start_new_session=True,
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True,

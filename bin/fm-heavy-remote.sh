@@ -56,12 +56,21 @@
 #
 # Open records: <state-dir>/unknown-<host>/<job>.json is written before anything
 # reaches the host and removed only once the host's scratch is gone or nothing was
-# launched, so an open record means the host may still hold that job. Before a new
-# job is admitted, records without a live client owner are reconciled over SSH from the
-# job's result.json, started marker and owned process group:
-#   running     no second job starts; fallback=unknown-job-running. A job whose
-#               supervisor is gone is stopped first, since nothing else would stop
-#               it, and its record closes on the next request.
+# launched, so an open record means the host may still hold that job. Each record
+# includes client_pid and client_start; matching both identifies its live local
+# collection owner without mistaking a reused PID for that client.
+# Before admission, every record is checked under <state-dir>/<job>/reconcile.lock;
+# a competing collector causes fallback=unknown-job-running. After taking the lock,
+# the request rechecks record existence and ownership, then queries the remote
+# result.json, started marker and owned process group:
+#   live owner collection and cleanup stay with that client. Running, preparing,
+#               finished, lost or absent jobs do not block another request's
+#               capacity check; an orphaned group blocks with unknown-job-running,
+#               and an unreachable job blocks with unreachable.
+# Without a live owner:
+#   running     no new job starts; fallback=unknown-job-running. A job whose
+#               supervisor is gone but whose group survives is stopped first,
+#               and its record closes on the next request.
 #   finished    its result is collected for its own record only, never as a pass
 #               for the new candidate; its scratch is removed and the record closes
 #               into <state-dir>/<job>/reconciled.json (job, candidate, outcome and
