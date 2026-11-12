@@ -471,6 +471,56 @@ test_live_client_with_orphaned_group_blocks_admission() {
   pass "fm-heavy: a live collection owner cannot hide orphaned work from admission"
 }
 
+test_supervisor_loss_after_reconciliation_blocks_admission() {
+  local first job open child probe
+  setup admissionrace 'echo $$ > "$HOME/job.pid"; echo $PPID > "$HOME/supervisor.pid"; sleep 300'
+  printf 'host fake-mac\nproject p\nhost-slots 2\n' > "$HOME_FM/config/heavy-remote"
+  rule waiting pre 'runner.py wait' -1 'touch "$FAKE_SSH_CTL/waiting"; n=0; until [ -e "$FAKE_SSH_CTL/release" ]; do n=$((n + 1)); [ "$n" -le 200 ] || exit 1; sleep 0.1; done'
+  hold_host
+  heavy --remote >"$CASE/first.out" 2>&1 5>&- & first=$!
+  wait_for "$REMOTE_HOME/supervisor.pid"
+  wait_for "$CTL/waiting"
+  open=$(echo "$HOME_FM/state/heavy-remote/unknown-fake-mac/"*.json)
+  job=$(basename "$open" .json)
+  child=$(cat "$REMOTE_HOME/job.pid")
+  new_candidate "echo next >> '$CASE/next-runs'"
+  rule reconciled pre 'runner.py reconcile' 1 'touch "$FAKE_SSH_CTL/reconciled"'
+  rule dies pre 'python3 - busy 2' 1 \
+    '[ -e "$FAKE_SSH_CTL/reconciled" ] || exit 1; state=$(python3 "$RUNNER_SRC" reconcile .fm-heavy-remote/*); [ "$state" = running ] || exit 1; printf "%s\n" "$state" > "$FAKE_SSH_CTL/snapshot"; pid=$(cat "$HOME/supervisor.pid"); kill -9 "$pid"; n=0; while kill -0 "$pid" 2>/dev/null; do n=$((n + 1)); [ "$n" -le 100 ] || exit 1; sleep 0.1; done'
+  heavy --remote >"$CASE/second.out" 2>&1 5>&- || fail "a request whose snapshot preceded supervisor death runs locally"
+  [ "$(cat "$CTL/snapshot")" = running ] || fail "reconciliation must see the live supervisor before admission"
+  expect_record '.host == "local" and .fallback == "destination-busy"' "slot ownership survives the supervisor"
+  [ "$(remote_starts)" -eq 1 ] || fail "a released kernel lock cannot admit a third heavy job"
+  pid_alive "$(jq -r .client_pid "$open")" || fail "the original client retains collection ownership"
+  pid_alive "$child" || fail "the orphan must still be running when admission is refused"
+  assert_absent "$HOME_FM/state/heavy-remote/$job/reconciled.json" "admission cannot collect the live client's result"
+  HOME="$REMOTE_HOME" python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 12 "$?" "busy counts orphaned work under its slot lock"
+  probe=$REMOTE_HOME/.fm-heavy-remote/admission-probe
+  mkdir -p "$probe"
+  git -C "$REPO" bundle create "$probe/src.bundle" HEAD >/dev/null 2>&1
+  jq -n --arg sha "$(git -C "$REPO" rev-parse HEAD)" \
+    --arg bs "$(sha256sum "$probe/src.bundle" | cut -d' ' -f1)" \
+    --arg cs "$(printf 'bash\0t/job.sh\0' | sha256sum | cut -d' ' -f1)" \
+    '{id: "admission-probe", host_slots: 2, sha: $sha, command_sha256: $cs, bundle_sha256: $bs, timeout_s: 20, argv: ["bash", "t/job.sh"]}' > "$probe/manifest.json"
+  HOME="$REMOTE_HOME" python3 "$RUNNER" start "$probe" >/dev/null 2>&1
+  expect_code 12 "$?" "start independently counts orphaned work under its slot lock"
+  assert_absent "$probe/started" "refused admission launches nothing"
+  rm -rf "$probe"
+  touch "$CTL/release"
+  wait "$first"; expect_code 70 "$?" "the original client reports its lost supervisor"
+  wait_gone "$child" || fail "the original client cleans its orphaned group"
+  assert_absent "$open" "the original client closes its record"
+  ! flock -n "$FM_HEAVY_HOST_LOCK" true || fail "the native job keeps its slot"
+  heavy --remote >"$CASE/third.out" 2>&1 5>&- || fail "the orphan's slot becomes reusable after collection"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "collected slot ownership is reusable"
+  ! flock -n "$FM_HEAVY_HOST_LOCK" true || fail "reusing the remote slot leaves the native job running"
+  release_host
+  [ "$(wc -l < "$CASE/next-runs")" -eq 2 ] || fail "both new requests run exactly once"
+  expect_host_clean "collection leaves no orphan scratch"
+  pass "fm-heavy: supervisor loss after reconciliation cannot free an occupied slot for remote admission"
+}
+
 test_abandoned_result_has_one_collector() {
   local first second collections
   unknown_job collectors 'echo original-output' 'runner.py (wait|status)'
@@ -1513,6 +1563,7 @@ test_duplicate_delivery
 test_unknown_job_blocks_until_reconciled
 test_unknown_job_other_endings
 test_live_client_with_orphaned_group_blocks_admission
+test_supervisor_loss_after_reconciliation_blocks_admission
 test_abandoned_result_has_one_collector
 test_runner_reconcile_ages_out_a_dead_start
 test_signalled_wrapper_stops_only_its_job

@@ -255,7 +255,18 @@ def host_waiting():
     return False
 
 
-def take_host_slot(slots=1):
+def slot_job_active(path):
+    record = read_json(path)
+    if record is None:
+        return os.path.exists(path)
+    jdir = record["job_dir"]
+    if not os.path.isdir(jdir):
+        return False
+    owner = read_json(os.path.join(jdir, "owner.json"))
+    return owner is None or alive(owner["supervisor_pid"], owner["supervisor_start"]) or group_alive(owner)
+
+
+def take_host_slot(slots=1, jdir=None):
     """Take one kernel-owned slot without waiting; native jobs keep slot one.
 
     Prefer extra slots so a new native job can still take the legacy lock.
@@ -278,6 +289,12 @@ def take_host_slot(slots=1):
         if host_waiting():
             os.close(fd)
             return None
+        record = path + ".job.json"
+        if slot_job_active(record):
+            os.close(fd)
+            continue
+        if jdir is not None:
+            write_json(record, {"job_dir": jdir})
         return fd
     return None
 
@@ -378,7 +395,7 @@ def git(*args):
 def cmd_start(jdir):
     manifest = read_json(os.path.join(jdir, "manifest.json")) or {}
     slots = host_slots(manifest.get("host_slots", 1))
-    slot = take_host_slot(slots)
+    slot = take_host_slot(slots, jdir)
     if slot is None:
         die(BUSY, "busy: the host's heavy slot is taken or awaited")
     try:
