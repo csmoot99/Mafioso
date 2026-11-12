@@ -96,7 +96,8 @@
 # collect_s (fetching and checking the result; both null for a local run),
 # outcome (pass, failed, timeout, rejected, lost, unknown or cancelled; null for
 # a local run), job (the remote job id), candidate (the commit run),
-# snapshot (true when an uncommitted-work snapshot was created, otherwise false),
+# snapshot (true when this remote attempt created an uncommitted-work snapshot,
+# otherwise false; reset to false on local fallback),
 # fallback (why an approved remote job ran locally), preparation_step (the failed
 # preparation stage) and preparation_log (its retained, verified host log path).
 # The preparation fields are null unless collected for a preparation fallback.
