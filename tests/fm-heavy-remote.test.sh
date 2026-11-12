@@ -438,6 +438,65 @@ test_unknown_job_other_endings() {
   pass "fm-heavy --remote: dropped collections, bad results, jobs that never arrived and orphaned groups all reconcile safely"
 }
 
+test_live_client_with_orphaned_group_blocks_admission() {
+  local first job open supervisor child
+  setup liveorphan 'echo $$ > "$HOME/job.pid"; echo $PPID > "$HOME/supervisor.pid"; sleep 300'
+  printf 'host fake-mac\nproject p\nhost-slots 2\n' > "$HOME_FM/config/heavy-remote"
+  rule waiting pre 'runner.py wait' -1 'touch "$FAKE_SSH_CTL/waiting"; n=0; until [ -e "$FAKE_SSH_CTL/release" ]; do n=$((n + 1)); [ "$n" -le 200 ] || exit 1; sleep 0.1; done'
+  hold_host
+  heavy --remote >"$CASE/first.out" 2>&1 5>&- & first=$!
+  wait_for "$REMOTE_HOME/supervisor.pid"
+  wait_for "$CTL/waiting"
+  open=$(echo "$HOME_FM/state/heavy-remote/unknown-fake-mac/"*.json)
+  job=$(basename "$open" .json)
+  supervisor=$(cat "$REMOTE_HOME/supervisor.pid")
+  child=$(cat "$REMOTE_HOME/job.pid")
+  kill -9 "$supervisor"
+  wait_gone "$supervisor" || fail "the remote supervisor must be gone"
+  new_candidate "echo next >> '$CASE/next-runs'"
+  heavy --remote >"$CASE/second.out" 2>&1 5>&- || fail "a request behind a live client's orphan runs locally"
+  expect_record '.host == "local" and .fallback == "unknown-job-running"' "live client orphan fallback"
+  [ "$(remote_starts)" -eq 1 ] || fail "an orphan cannot release capacity for a third heavy job"
+  assert_present "$open" "the live client retains its open record"
+  assert_absent "$HOME_FM/state/heavy-remote/$job/reconciled.json" "another client cannot settle the owner's record"
+  pid_alive "$(jq -r .client_pid "$open")" || fail "the collection owner must still be alive"
+  pid_alive "$child" || fail "admission must leave the orphan for its collection owner"
+  touch "$CTL/release"
+  wait "$first"; expect_code 70 "$?" "the live owner reports its lost supervisor"
+  wait_gone "$child" || fail "the owner cleans its orphaned group"
+  assert_absent "$open" "the owner closes its own record"
+  ! flock -n "$FM_HEAVY_HOST_LOCK" true || fail "the native job still owns its slot"
+  release_host
+  [ "$(wc -l < "$CASE/next-runs")" -eq 1 ] || fail "the new candidate runs exactly once"
+  pass "fm-heavy: a live collection owner cannot hide orphaned work from admission"
+}
+
+test_abandoned_result_has_one_collector() {
+  local first second collections
+  unknown_job collectors 'echo original-output' 'runner.py (wait|status)'
+  HOME="$REMOTE_HOME" python3 "$RUNNER" wait "$REMOTE_HOME/.fm-heavy-remote/$JOB" 20 >/dev/null
+  new_candidate "echo next >> '$CASE/next-runs'"
+  printf 'host fake-mac\nproject p\nhost-slots 2\n' > "$HOME_FM/config/heavy-remote"
+  rule collecting pre "cd .fm-heavy-remote/$JOB && tar -cf - result.json" -1 \
+    'if mkdir "$FAKE_SSH_CTL/collector" 2>/dev/null; then touch "$FAKE_SSH_CTL/collecting"; n=0; until [ -e "$FAKE_SSH_CTL/release" ]; do n=$((n + 1)); [ "$n" -le 200 ] || exit 1; sleep 0.1; done; fi'
+  heavy --remote >"$CASE/first.out" 2>&1 & first=$!
+  wait_for "$CTL/collecting"
+  heavy --remote >"$CASE/second.out" 2>&1 & second=$!
+  wait "$second" || fail "a competing collector runs its new candidate locally: $(cat "$CASE/second.out")"
+  touch "$CTL/release"
+  wait "$first" || fail "the original collector completes: $(cat "$CASE/first.out")"
+  collections=$(grep -c "cd .fm-heavy-remote/$JOB && tar -cf - result.json" "$CTL/log")
+  [ "$collections" -eq 1 ] || fail "an abandoned result is fetched only once, got $collections"
+  jq -e '.outcome == "pass"' "$JOB_DIR/reconciled.json" >/dev/null || fail "the abandoned pass is preserved"
+  [ "$(cat "$JOB_DIR/run.log")" = original-output ] || fail "the collected log retains its verified bytes"
+  assert_absent "$OPEN" "the collected record closes once"
+  expect_host_clean "the sole collector removes the abandoned scratch"
+  [ "$(wc -l < "$CASE/next-runs")" -eq 2 ] || fail "both new candidates run exactly once"
+  heavy --remote >"$CASE/third.out" 2>&1 || fail "the next request passes after reconciliation"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "reconciliation releases its lock"
+  pass "fm-heavy: concurrent lanes serialize abandoned-result collection and preserve the outcome"
+}
+
 test_runner_reconcile_ages_out_a_dead_start() {
   local d
   setup deadstart 'true'
@@ -1453,6 +1512,8 @@ test_bad_results_are_rejected
 test_duplicate_delivery
 test_unknown_job_blocks_until_reconciled
 test_unknown_job_other_endings
+test_live_client_with_orphaned_group_blocks_admission
+test_abandoned_result_has_one_collector
 test_runner_reconcile_ages_out_a_dead_start
 test_signalled_wrapper_stops_only_its_job
 test_unterminated_config_last_line

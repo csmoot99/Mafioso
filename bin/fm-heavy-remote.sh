@@ -202,14 +202,28 @@ result_outcome() {
 # Settle one open record. The locals stand in for the new job's while the helpers
 # above work on the earlier one. Status 0: nothing remains, or a live driver owns it;
 # otherwise $blocked is why the new job may not start there.
-reconcile_job() {  # <open record>
+reconcile_job() {
+  local rc lock_dir
+  lock_dir=$state_dir/$(basename "$1" .json)
+  mkdir -p "$lock_dir" || { blocked=unreachable; return 1; }
+  exec 7>>"$lock_dir/reconcile.lock" || { blocked=unreachable; return 1; }
+  if flock -n 7; then
+    reconcile_locked_job "$1"
+    rc=$?
+  else
+    blocked=unknown-job-running
+    rc=1
+  fi
+  exec 7>&-
+  return "$rc"
+}
+reconcile_locked_job() {
   local record=$1 id rdir runner jdir sha cmd_sha bundle_sha state outcome rc owner owner_start
+  [ -e "$record" ] || return 0
   # Another live driver owns collection. Once it exits, ordinary reconciliation
   # applies, including to unknown jobs. Start time protects against PID reuse.
   owner=$(jq -r '.client_pid // empty' "$record")
   owner_start=$(jq -r '.client_start // empty' "$record")
-  if [[ $owner =~ ^[1-9][0-9]*$ ]] && [ -n "$owner_start" ] &&
-    [ "$(ps -o lstart= -p "$owner" 2>/dev/null)" = "$owner_start" ]; then return 0; fi
   id=$(basename "$record" .json)
   rdir=.fm-heavy-remote/$id
   runner="python3 $rdir/runner.py"
@@ -219,6 +233,15 @@ reconcile_job() {  # <open record>
   bundle_sha=$(jq -r .bundle_sha256 "$record" 2>/dev/null)
   mkdir -p "$jdir"
   state=$(job_state reconcile)
+  if [[ $owner =~ ^[1-9][0-9]*$ ]] && [ -n "$owner_start" ] &&
+    [ "$(ps -o lstart= -p "$owner" 2>/dev/null)" = "$owner_start" ]; then
+    case "$state" in
+      running|preparing|done|lost|absent) return 0 ;;
+      orphaned) blocked=unknown-job-running ;;
+      *) blocked=unreachable ;;
+    esac
+    return 1
+  fi
   case "$state" in
     running|preparing) blocked=unknown-job-running; return 1 ;;
     orphaned)
