@@ -79,8 +79,8 @@
 # unreachable or still running an unknown job waits for a local slot while it
 # keeps checking: the remote slot every two seconds, the host itself every
 # FM_HEAVY_REMOTE_RECHECK seconds, and it moves to whichever frees first. Any other
-# reason, such as an unclean repository root, joins the normal local queue. The
-# last reason is recorded in fallback when the job runs locally. Missing runtimes,
+# reason, such as running outside the repository root or a failed snapshot, joins
+# the normal local queue. The last reason is recorded in fallback when the job runs locally. Missing runtimes,
 # incompatible versions and dependency-install errors on the host fail the remote
 # job and never silently retry locally. A signal before starting prevents
 # execution anywhere. bin/fm-heavy-remote.sh owns transfer, results and
@@ -92,7 +92,8 @@
 # local run), prepare_s (bundle, transfer and checkout until the job started) and
 # collect_s (fetching and checking the result; both null for a local run),
 # outcome (pass, failed, timeout, rejected, lost, unknown or cancelled; null for
-# a local run), job (the remote job id), candidate (the commit run), and
+# a local run), job (the remote job id), candidate (the commit run),
+# snapshot (true for uncommitted work, otherwise false), and
 # fallback (why an approved remote job ran locally). wait_s is the time before
 # preparation began; started_at is when the job started on the host and ended_at
 # when its completion was seen, both read on this machine's clock; peak_memory_bytes
@@ -386,7 +387,7 @@ record() {  # <exit status, empty when the command never started>
     --arg run "$run_s" --arg rc "$1" --arg slot "${started:+$slot}" --arg peak "$peak" --arg cpu "$cpu" \
     --arg host "${host:-local}" --arg prep "$(sget prepare_s)" --arg coll "$(sget collect_s)" \
     --arg outcome "$(sget outcome)" --arg job "$(sget job)" --arg cand "$(sget candidate)" \
-    --arg fallback "$fallback" '
+    --arg snapshot "$(sget snapshot)" --arg fallback "$fallback" '
     def num: if test("^[0-9]+$") then tonumber else null end;
     def str: if . == "" then null else . end;
     {task: ($task | str), project: ($project | str), class: $class, cmd: $cmd,
@@ -394,7 +395,7 @@ record() {  # <exit status, empty when the command never started>
      wait_s: ($wait | num), run_s: ($run | num), exit: ($rc | num), slot: ($slot | num),
      peak_memory_bytes: ($peak | num), cpu_usec: ($cpu | num),
      host: $host, prepare_s: ($prep | num), collect_s: ($coll | num), outcome: ($outcome | str),
-     job: ($job | str), candidate: ($cand | str), fallback: ($fallback | str)}' >> "$log"
+     job: ($job | str), candidate: ($cand | str), snapshot: ($snapshot == "true"), fallback: ($fallback | str)}' >> "$log"
 }
 
 # A foreground command would hold a trap back until it returned, so the steps of

@@ -133,7 +133,7 @@ test_pass_and_record() {
   out=$(heavy --remote 2>&1) || fail "a passing remote job must exit 0: $out"
   assert_contains "$out" "$SHA" "the job ran on the exact candidate and its output reached stdout"
   expect_record ".host == \"fake-mac\" and .outcome == \"pass\" and .exit == 0 and .candidate == \"$SHA\"
-    and .fallback == null and .slot == null and (.job | type) == \"string\"
+    and .snapshot == false and .fallback == null and .slot == null and (.job | type) == \"string\"
     and (.prepare_s | type) == \"number\" and (.collect_s | type) == \"number\"
     and (.wait_s | type) == \"number\" and (.run_s | type) == \"number\"
     and .started_at >= .requested_at and .ended_at >= .started_at
@@ -142,6 +142,110 @@ test_pass_and_record() {
   [ -z "$(ls -A "$HOME_FM/state/heavy-remote/unknown-fake-mac")" ] || fail "a finished job must leave no open record"
   assert_present "$HOME_FM/state/heavy-remote/$(last_record | jq -r .job)/result.json" "the result copy is kept locally"
   pass "fm-heavy --remote: the exact candidate runs on the host and the record has every stage"
+}
+
+# Fingerprint working files and Git control files, including raw index, refs,
+# HEAD and stash reflogs. New objects are allowed; no existing control file is.
+source_fingerprint() {
+  python3 - "$REPO" <<'PYCODE'
+import hashlib, os, pathlib, subprocess, sys
+root = pathlib.Path(sys.argv[1])
+gitdir = pathlib.Path(subprocess.check_output(
+    ["git", "-C", str(root), "rev-parse", "--absolute-git-dir"], text=True).strip())
+for label, base in [("work", root), ("git", gitdir)]:
+    for directory, dirs, files in os.walk(base):
+        dirs[:] = sorted(d for d in dirs if d != (".git" if label == "work" else "objects"))
+        for name in sorted(files):
+            path = pathlib.Path(directory) / name
+            data = os.readlink(path).encode() if path.is_symlink() else path.read_bytes()
+            print(label, path.relative_to(base), path.lstat().st_mode, hashlib.sha256(data).hexdigest())
+PYCODE
+}
+
+test_dirty_snapshot() {
+  setup snapshot 'test "$(cat tracked)" = modified && test ! -e deleted && test "$(cat new)" = untracked && test ! -e .env && git rev-parse HEAD && git rev-parse HEAD^'
+  printf 'original\n' > "$REPO/tracked"
+  printf 'delete me\n' > "$REPO/deleted"
+  printf '.env\n' > "$REPO/.gitignore"
+  git -C "$REPO" add -A
+  git -C "$REPO" commit -qm 'snapshot fixtures'
+  SHA=$(git -C "$REPO" rev-parse HEAD)
+  echo stash > "$REPO/tracked"
+  git -C "$REPO" stash push -qm 'preserve stash'
+  echo staged > "$REPO/tracked"
+  git -C "$REPO" add tracked
+  echo modified > "$REPO/tracked"
+  rm "$REPO/deleted"
+  echo untracked > "$REPO/new"
+  echo secret > "$REPO/.env"
+  source_fingerprint > "$CASE/before"
+  local out candidate
+  out=$(heavy --remote 2>&1) || fail "snapshot run: $out"
+  expect_record '.host == "fake-mac" and .snapshot == true and .outcome == "pass"' "snapshot record"
+  candidate=$(last_record | jq -r .candidate)
+  [ "$candidate" != "$SHA" ] || fail "dirty candidate must differ from HEAD"
+  assert_contains "$out" "$candidate" "snapshot candidate ran"
+  assert_contains "$out" "$SHA" "snapshot parent is HEAD"
+  source_fingerprint > "$CASE/after"
+  cmp "$CASE/before" "$CASE/after" || fail "snapshot changed source files or Git control files"
+  expect_host_clean "snapshot scratch removed"
+  pass "fm-heavy --remote: snapshot contains current files, excludes ignored files and preserves source state"
+}
+
+test_snapshot_failure() {
+  local step
+  export REAL_GIT
+  REAL_GIT=$(command -v git)
+  for step in add write-tree commit-tree; do
+    setup "snapshot-fail-$step" 'echo local'
+    echo dirty > "$REPO/new"
+    cat > "$FAKEBIN/git" <<'SH'
+#!/usr/bin/env bash
+[ "$1" != "$SNAPSHOT_FAIL" ] || exit 1
+exec "$REAL_GIT" "$@"
+SH
+    chmod +x "$FAKEBIN/git"
+    source_fingerprint > "$CASE/before"
+    SNAPSHOT_FAIL=$step heavy --remote >"$CASE/out" 2>&1 || fail "$step fallback"
+    expect_record '.host == "local" and .fallback == "snapshot-failed" and .candidate == null' "$step fallback record"
+    [ ! -s "$CTL/log" ] || fail "$step failure must send nothing"
+    source_fingerprint > "$CASE/after"
+    cmp "$CASE/before" "$CASE/after" || fail "$step failure changed source state"
+  done
+  pass "fm-heavy --remote: snapshot failures stay local without sending content or changing source state"
+}
+
+test_snapshot_bundle_failure() {
+  local mode rc
+  export REAL_GIT
+  REAL_GIT=$(command -v git)
+  for mode in failure signal; do
+    setup "snapshot-bundle-$mode" 'echo ran'
+    echo dirty > "$REPO/new"
+    cat > "$FAKEBIN/git" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" = bundle ]; then
+  [ "$SNAPSHOT_BUNDLE" != signal ] || kill -TERM "$PPID"
+  exit 1
+fi
+exec "$REAL_GIT" "$@"
+SH
+    chmod +x "$FAKEBIN/git"
+    source_fingerprint > "$CASE/before"
+    SNAPSHOT_BUNDLE=$mode heavy --remote >"$CASE/out" 2>&1
+    rc=$?
+    if [ "$mode" = signal ]; then
+      expect_code 143 "$rc" "signal during snapshot bundle"
+      expect_record '.outcome == "cancelled"' "snapshot cancellation"
+    else
+      expect_code 0 "$rc" "bundle failure falls back locally"
+      expect_record '.fallback == "bundle-failed" and .host == "local"' "snapshot bundle fallback"
+    fi
+    if grep -q 'runner.py start' "$CTL/log"; then fail "failed snapshot bundle must send no job"; fi
+    source_fingerprint > "$CASE/after"
+    cmp "$CASE/before" "$CASE/after" || fail "$mode changed source files or Git control files"
+  done
+  pass "fm-heavy --remote: bundle failures and signals preserve source state"
 }
 
 test_off_by_default_and_refusals() {
@@ -182,11 +286,6 @@ test_fallbacks_run_locally() {
   expect_record '.host == "local" and .fallback == "unreachable" and .exit == 0 and .slot == 1 and .outcome == null' "unreachable fallback"
   [ "$(wc -l < "$CASE/ran")" -eq 1 ] || fail "the fallback must run the command once"
   rm "$CTL/rules/down"
-
-  echo dirty > "$REPO/untracked-change"
-  heavy --remote >/dev/null 2>&1 || fail "a dirty tree must fall back to a local run"
-  expect_record '.host == "local" and .fallback == "dirty-tree"' "dirty fallback"
-  rm "$REPO/untracked-change"
 
   # The destination takes one job at a time; a second request does not queue behind it.
   flock -o "$LOCK.remote.fake-mac" sleep 5 &
@@ -884,19 +983,17 @@ test_queued_job_moves_to_the_freed_host() {
   release_local
   expect_record '.host == "fake-mac" and .outcome == "pass" and .fallback == null' "recovered host"
 
-  # Nothing changes a dirty tree while it queues, so it stops asking.
-  setup stilldirty 'echo local'
-  observe_local_queue
+  # Dirty work can also leave the local queue through automatic offload.
+  setup stilldirty 'test -f untracked-change'
   printf 'host fake-mac\ncommand p -- bash t/job.sh\noffload\n' > "$HOME_FM/config/heavy-remote"
   echo dirty > "$REPO/untracked-change"
   hold_local
   heavy >"$CASE/out" 2>&1 3>&- 4>&- & pid=$!
-  wait_for "$CTL/local-waiting"
-  [ ! -s "$CTL/log" ] || fail "a dirty tree may not contact the host"
+  wait_for "$LOG"
+  wait "$pid" || fail "dirty tree offload: $(cat "$CASE/out")"
   release_local
-  wait "$pid" || fail "dirty tree local run"
-  expect_record '.host == "local" and .fallback == "dirty-tree"' "dirty tree queues locally"
-  pass "fm-heavy: a queued approved job moves to the host once it frees, and an ineligible one stays queued"
+  expect_record '.host == "fake-mac" and .snapshot == true and .outcome == "pass"' "dirty tree offloads"
+  pass "fm-heavy: queued approved jobs, including dirty work, move to the free host"
 }
 
 test_queued_job_signal_runs_nowhere() {
@@ -1364,6 +1461,9 @@ test_project_paths() {
 
 test_project_paths
 test_pass_and_record
+test_dirty_snapshot
+test_snapshot_failure
+test_snapshot_bundle_failure
 test_off_by_default_and_refusals
 test_fallbacks_run_locally
 test_failed_command
