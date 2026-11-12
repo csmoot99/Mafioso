@@ -1,0 +1,1 @@
+ok - fm-brief: config/heavy-commands points ship and scout workers at the wrapper

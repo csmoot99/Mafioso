@@ -1,0 +1,3 @@
+Darwin
+/Users/chris/.local/bin/docker
+29.5.2

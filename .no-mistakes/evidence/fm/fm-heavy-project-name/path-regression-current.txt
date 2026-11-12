@@ -1,0 +1,22 @@
+ok - fm-heavy: clone and repository paths use named approvals, options and records without approving other projects
+
+Supplemental simulation only: SSH and Docker are test substitutes.
+
+Approval configuration used by path-form calls:
+host fake-mac
+image fm-heavy-linux:1
+timeout 30
+service db postgres:16 36089 512m PORT=36089 POSTGRES_DB=t
+service cache redis:7 58743 256m PORT=58743
+project p image=project-linux:1 service=db service=cache env=DATABASE_URL=postgres://localhost:36089/t
+
+Persisted records from path-form calls:
+{"task":"t","project":"p","class":"test","cmd":"bash","requested_at":1794506034,"started_at":1794506034,"ended_at":1794506034,"wait_s":0,"run_s":0,"exit":0,"slot":null,"peak_memory_bytes":null,"cpu_usec":128713,"host":"fake-mac","prepare_s":0,"collect_s":0,"outcome":"pass","job":"1794506034-1105794-12620","candidate":"4d7a4e8a7e8b611f62dedceabad8275cf0f7cf0d","fallback":null}
+{"task":"t","project":"p","class":"test","cmd":"bash","requested_at":1794506035,"started_at":1794506035,"ended_at":1794506035,"wait_s":0,"run_s":0,"exit":0,"slot":null,"peak_memory_bytes":null,"cpu_usec":122483,"host":"fake-mac","prepare_s":0,"collect_s":0,"outcome":"pass","job":"1794506035-1106364-15682","candidate":"4d7a4e8a7e8b611f62dedceabad8275cf0f7cf0d","fallback":null}
+
+Environment observed by the simulated remote job:
+postgres://localhost:36089/t
+
+Unapproved paths and explicit wildcard records:
+{"task":"t","project":"session-kit","class":"test","cmd":"bash","requested_at":1794506036,"started_at":1794506036,"ended_at":1794506037,"wait_s":0,"run_s":1,"exit":0,"slot":1,"peak_memory_bytes":null,"cpu_usec":null,"host":"local","prepare_s":null,"collect_s":null,"outcome":null,"job":null,"candidate":null,"fallback":null}
+{"task":"t","project":"session-kit","class":"test","cmd":"bash","requested_at":1794506037,"started_at":1794506037,"ended_at":1794506037,"wait_s":0,"run_s":0,"exit":0,"slot":null,"peak_memory_bytes":null,"cpu_usec":64932,"host":"fake-mac","prepare_s":0,"collect_s":0,"outcome":"pass","job":"1794506037-1107119-28249","candidate":"4b9659fa5286a2a02d4e194ae984d869769a6b58","fallback":null}
