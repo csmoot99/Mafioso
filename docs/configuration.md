@@ -1250,7 +1250,11 @@ timeout 900
 offload
 ```
 
-The candidate on the destination is a bundle of HEAD alone, so an approved command cannot rely on `origin/main` or any other ref; `fm-test-run.sh --changed` needs one and always fails there.
+The destination receives private source at the committed HEAD and its reachable history as a Git bundle, plus the job manifest and runner; other refs such as `origin/main` are not exported, so `fm-test-run.sh --changed`, which needs a base ref, always fails there.
+When the root home's `config/heavy-remote` configures a host, Codex ship and scout launches carry operator consent for this approved payload in their launch-time developer instructions.
+Workers launched by local secondmates use that same root configuration for the consent's host and approvals, while the authorized command retains the invoking `FM_HOME`; a child-only configuration grants no consent.
+[`bin/fm-spawn.sh`](../bin/fm-spawn.sh)'s `codex_developer_flag` owns the exact command scope and exclusions: consent is limited to the unmodified `fm-heavy.sh` entry point enforcing the existing approvals, with no policy or configuration overrides, and does not authorize other source-transfer routes.
+It adds no exec-policy allow rule and leaves the sandbox and automatic reviewer enabled; [runtime verification](verification/runtime-backends.md#codex-remote-source-authorization) records the consent checks and their limits.
 Approved classes are test and e2e; build and image stay local, because only the result and log come back from the destination.
 `--remote` explicitly requests the destination first and refuses an unapproved command or class.
 With `offload`, an approved job tries the destination automatically when every local slot is busy and the destination is free, without changing worker commands or instructions.
