@@ -560,6 +560,67 @@ test_supervisor_loss_after_reconciliation_blocks_admission() {
   pass "fm-heavy: supervisor loss after reconciliation cannot free an occupied slot for remote admission"
 }
 
+test_native_admission_waits_for_an_orphaned_group() {
+  local first second native supervisor child n=0
+  setup nativeorphan 'echo $$ > "$HOME/first.pid"; until [ -e "$HOME/first-release" ]; do sleep 0.1; done'
+  printf 'host fake-mac\nproject p\nhost-slots 2\n' > "$HOME_FM/config/heavy-remote"
+  rule waiting pre 'runner.py wait' -1 \
+    'mkdir -p "$FAKE_SSH_CTL/waiting"; touch "$FAKE_SSH_CTL/waiting/$$"; n=0; until [ -e "$FAKE_SSH_CTL/release" ]; do n=$((n + 1)); [ "$n" -le 300 ] || exit 1; sleep 0.1; done'
+  heavy --remote >"$CASE/first.out" 2>&1 & first=$!
+  wait_for "$REMOTE_HOME/first.pid"
+  new_candidate "$(cat <<'SH'
+echo $$ > "$HOME/second.pid"
+echo $PPID > "$HOME/supervisor.pid"
+python3 - <<'PY'
+import os
+import subprocess
+import time
+
+child = subprocess.Popen(["sleep", "300"], close_fds=True)
+with open(os.path.join(os.environ["HOME"], "child.pid"), "w") as handle:
+    handle.write(str(child.pid))
+while not os.path.exists(os.path.join(os.environ["HOME"], "leader-release")):
+    time.sleep(0.1)
+PY
+SH
+)"
+  heavy --remote >"$CASE/second.out" 2>&1 & second=$!
+  wait_for "$REMOTE_HOME/child.pid"
+  wait_for "$CTL/waiting"
+  until [ "$(find "$CTL/waiting" -type f | wc -l)" -eq 2 ]; do
+    n=$((n + 1)); [ "$n" -le 100 ] || fail "both collection clients must remain waiting"; sleep 0.1
+  done
+  supervisor=$(cat "$REMOTE_HOME/supervisor.pid")
+  child=$(cat "$REMOTE_HOME/child.pid")
+  kill -9 "$supervisor"
+  wait_gone "$supervisor" || fail "the supervisor using the original lock must be gone"
+  ! flock -n "$FM_HEAVY_HOST_LOCK" true || fail "native admission must stay closed while the orphan runs"
+  HOME="$REMOTE_HOME" python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 12 "$?" "remote admission also counts the original slot's orphan"
+  flock "$FM_HEAVY_HOST_LOCK" sh -c 'touch "$0"; until [ -e "$1" ]; do sleep 0.1; done' \
+    "$CASE/native-started" "$CASE/native-release" >"$CASE/native.out" 2>&1 & native=$!
+  touch "$REMOTE_HOME/leader-release"
+  wait_gone "$(cat "$REMOTE_HOME/second.pid")" || fail "the orphaned group leader must exit"
+  pid_alive "$child" || fail "a descendant with closed descriptors must still survive"
+  ! flock -n "$FM_HEAVY_HOST_LOCK" true || fail "the original lock must outlive the command group's leader"
+  assert_absent "$CASE/native-started" "the native caller cannot start a third job beside the descendant"
+  touch "$CTL/release"
+  wait "$second"; expect_code 70 "$?" "the original client reports its lost supervisor"
+  wait_gone "$child" || fail "collection must stop the orphan's remaining descendant"
+  wait_for "$CASE/native-started"
+  pid_alive "$(cat "$REMOTE_HOME/first.pid")" || fail "the other remote job must keep running"
+  HOME="$REMOTE_HOME" python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 12 "$?" "the native job and remaining remote job fill capacity"
+  touch "$CASE/native-release"
+  wait "$native" || fail "the unchanged native caller finishes normally"
+  touch "$REMOTE_HOME/first-release"
+  wait "$first" || fail "the other remote job completes normally: $(cat "$CASE/first.out")"
+  [ "$(remote_starts)" -eq 2 ] || fail "only the two requested remote jobs may start"
+  expect_host_clean "both remote jobs release their scratch and kernel locks"
+  flock -n "$FM_HEAVY_HOST_LOCK" true || fail "the original kernel lock becomes reusable"
+  pass "fm-heavy: native and remote admission wait for orphaned command descendants after supervisor loss"
+}
+
 test_abandoned_result_has_one_collector() {
   local first second collections
   unknown_job collectors 'echo original-output' 'runner.py (wait|status)'
@@ -1604,6 +1665,7 @@ test_unknown_job_blocks_until_reconciled
 test_unknown_job_other_endings
 test_live_client_with_orphaned_group_blocks_admission
 test_supervisor_loss_after_reconciliation_blocks_admission
+test_native_admission_waits_for_an_orphaned_group
 test_abandoned_result_has_one_collector
 test_runner_reconcile_ages_out_a_dead_start
 test_signalled_wrapper_stops_only_its_job

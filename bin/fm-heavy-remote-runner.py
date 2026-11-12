@@ -2,7 +2,7 @@
 """Remote half of bin/fm-heavy-remote.sh: run one transferred job and report it.
 
 Usage: fm-heavy-remote-runner.py busy [host-slots]
-       fm-heavy-remote-runner.py start|supervise|container|execute|status|reconcile|wait|cancel|cleanup <jobdir> [seconds]
+       fm-heavy-remote-runner.py start|guard|supervise|container|execute|status|reconcile|wait|cancel|cleanup <jobdir> [seconds]
 
 The client ships this file with each job, so nothing is installed on the remote
 host. It needs python3 (stdlib), git and ps, and runs on macOS and Linux.
@@ -255,17 +255,6 @@ def host_waiting():
     return False
 
 
-def slot_job_active(path):
-    record = read_json(path)
-    if record is None:
-        return os.path.exists(path)
-    jdir = record["job_dir"]
-    if not os.path.isdir(jdir):
-        return False
-    owner = read_json(os.path.join(jdir, "owner.json"))
-    return owner is None or alive(owner["supervisor_pid"], owner["supervisor_start"]) or group_alive(owner)
-
-
 def take_host_slot(slots=1):
     """Take one kernel-owned slot without waiting; native jobs keep slot one.
 
@@ -289,11 +278,7 @@ def take_host_slot(slots=1):
         if host_waiting():
             os.close(fd)
             return None
-        record = path + ".job.json"
-        if slot_job_active(record):
-            os.close(fd)
-            continue
-        return fd, record
+        return fd
     return None
 
 
@@ -308,7 +293,7 @@ def cmd_busy(slots=1):
     if slot is None:
         print("busy")
         sys.exit(BUSY)
-    os.close(slot[0])
+    os.close(slot)
     print("free")
 
 
@@ -393,10 +378,9 @@ def git(*args):
 def cmd_start(jdir):
     manifest = read_json(os.path.join(jdir, "manifest.json")) or {}
     slots = host_slots(manifest.get("host_slots", 1))
-    lease = take_host_slot(slots)
-    if lease is None:
+    slot = take_host_slot(slots)
+    if slot is None:
         die(BUSY, "busy: the host's heavy slot is taken or awaited")
-    slot, record = lease
     try:
         os.close(os.open(os.path.join(jdir, "started"), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600))
     except FileExistsError:
@@ -427,14 +411,12 @@ def cmd_start(jdir):
         die(10, "refused: could not check out %s: %s" % (sha, cloned.stderr.strip()))
     if git("-C", work, "rev-parse", "HEAD").stdout.strip() != sha:
         die(10, "refused: checkout is not %s" % sha)
-    write_json(record, {"job_dir": jdir})
     # The supervisor holds the host slot until the job ends; the command does not inherit it.
     try:
-        subprocess.Popen([sys.executable, os.path.abspath(__file__), "supervise", jdir, str(slot)], start_new_session=True,
+        subprocess.Popen([sys.executable, os.path.abspath(__file__), "guard", jdir, str(slot)], start_new_session=True,
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True,
                          pass_fds=(slot,))
     except OSError as error:
-        os.unlink(record)
         die(10, "refused: could not launch supervisor: %s" % error)
     end = time.monotonic() + 15
     while not os.path.exists(os.path.join(jdir, "owner.json")):
@@ -644,9 +626,26 @@ def cmd_execute(jdir):
         die(127, "cannot run %s: %s" % (manifest["argv"][0], error))
 
 
-def cmd_supervise(jdir, slot=None):
-    if slot is not None:
-        os.set_inheritable(int(slot), False)
+def cmd_guard(jdir, slot):
+    ready, notify = os.pipe()
+    try:
+        proc = subprocess.Popen([sys.executable, os.path.abspath(__file__), "supervise", jdir, str(slot), str(notify)],
+                                start_new_session=True, pass_fds=(slot, notify))
+    finally:
+        os.close(notify)
+    try:
+        proc.wait()
+        announced = os.read(ready, 4096)
+        owner = json.loads(announced) if announced else None
+        while owner and group_alive(owner):
+            time.sleep(0.05)
+    finally:
+        os.close(ready)
+        os.close(slot)
+
+
+def cmd_supervise(jdir, slot, ready):
+    os.set_inheritable(slot, False)
     manifest = read_json(os.path.join(jdir, "manifest.json"))
     work = os.path.join(jdir, "work")
     stops = []
@@ -656,14 +655,17 @@ def cmd_supervise(jdir, slot=None):
     log = open(os.path.join(jdir, "run.log"), "wb")
     outcome, code = "exited", 127
     try:
-        proc = subprocess.Popen(group_command(jdir, manifest), cwd=work, stdin=subprocess.DEVNULL, stdout=log,
-                                stderr=subprocess.STDOUT, start_new_session=True)
+        proc = subprocess.Popen(group_command(jdir, manifest) + [str(slot), str(ready), str(os.getpid()), proc_start(os.getpid())],
+                                cwd=work, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+                                start_new_session=True, pass_fds=(slot, ready))
     except OSError as error:
         log.write(("cannot run %s: %s\n" % (manifest["argv"][0], error)).encode())
         proc = None
     owner = {"supervisor_pid": os.getpid(), "supervisor_start": proc_start(os.getpid()),
              "group": proc.pid if proc else None, "group_start": proc_start(proc.pid) if proc else ""}
-    write_json(os.path.join(jdir, "owner.json"), owner)
+    os.close(ready)
+    if proc is None:
+        write_json(os.path.join(jdir, "owner.json"), owner)
     if proc:
         while proc.poll() is None:
             if stops:
@@ -744,11 +746,22 @@ def main():
     if sys.argv[1:2] == ["busy"] and len(sys.argv) in (2, 3):
         cmd_busy(host_slots(sys.argv[2]) if len(sys.argv) == 3 else 1)
         return
-    if len(sys.argv) < 3 or sys.argv[1] not in ("start", "supervise", "container", "execute", "status", "reconcile", "wait", "cancel", "cleanup"):
-        die(2, "usage: fm-heavy-remote-runner.py busy [host-slots] | start|supervise|container|execute|status|reconcile|wait|cancel|cleanup <jobdir> [seconds]")
+    if len(sys.argv) < 3 or sys.argv[1] not in ("start", "guard", "supervise", "container", "execute", "status", "reconcile", "wait", "cancel", "cleanup"):
+        die(2, "usage: fm-heavy-remote-runner.py busy [host-slots] | start|guard|supervise|container|execute|status|reconcile|wait|cancel|cleanup <jobdir> [seconds]")
     action, jdir = sys.argv[1], job_dir(sys.argv[2])
-    if action == "supervise":
-        cmd_supervise(jdir, sys.argv[3] if len(sys.argv) > 3 else None)
+    if action in ("container", "execute") and len(sys.argv) == 7:
+        slot, ready = int(sys.argv[3]), int(sys.argv[4])
+        owner = {
+            "supervisor_pid": int(sys.argv[5]), "supervisor_start": sys.argv[6],
+            "group": os.getpid(), "group_start": proc_start(os.getpid())}
+        write_json(os.path.join(jdir, "owner.json"), owner)
+        os.write(ready, json.dumps(owner).encode())
+        os.close(ready)
+        os.close(slot)
+    if action == "guard":
+        cmd_guard(jdir, int(sys.argv[3]))
+    elif action == "supervise":
+        cmd_supervise(jdir, int(sys.argv[3]), int(sys.argv[4]))
     elif action == "status":
         print(status(jdir))
     elif action == "reconcile":
