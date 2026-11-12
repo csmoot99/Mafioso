@@ -1232,7 +1232,7 @@ The flag is machine-wide like the slot and the log: it is read from the root hom
 A drive call holds the slot only while it runs a local test step, build or e2e, and the pipeline agent never takes the slot again inside that hold.
 
 `config/heavy-remote` in the root home is the opt-in for the SSH destination, and without it `fm-heavy.sh --remote` refuses and every job runs locally as before.
-The schema is one `host <ssh-alias>`, one or more approvals, an optional `image <ref>`, optional `service` lines, optional `timeout <seconds>` (default 900), and an optional `offload` presence line.
+The schema is one `host <ssh-alias>`, one or more approvals, an optional `image <ref>`, optional `service` lines, optional `host-slots <n>` (default 1), optional `timeout <seconds>` (default 900), and an optional `offload` presence line.
 An approval is `command <project> -- <words...>` for one command, `project <project>` for every test and e2e command of one project, or `project *` for every project.
 A project approval never covers a `no-mistakes` drive call, which needs this machine's gate.
 Blank lines and lines starting with `#` are ignored; duplicate settings, duplicate approvals, unknown keys, invalid values or an unreadable file refuse a job that would offload (`--remote`, or an approved command with `offload`) with an error naming the file and problem, while every other heavy job prints one warning and runs locally under the local slot.
@@ -1259,16 +1259,18 @@ Approved classes are test and e2e; build and image stay local, because only the 
 `--remote` explicitly requests the destination first and refuses an unapproved command or class.
 With `offload`, an approved job tries the destination automatically when every local slot is busy and the destination is free, without changing worker commands or instructions.
 Without `offload`, remote execution still requires `--remote`.
-The destination takes one job at a time, independently of local capacity, and shares that slot with its own heavy jobs.
-A job is sent only while the destination's slot is free and none of its own jobs waits for it, so its own work goes first; no running job of either kind is ever stopped for another.
-The destination's own workers run their heavy jobs through `bin/fm-heavy.sh` in its home, enabled there by `config/heavy-commands`, and each queued job there leaves a waiter marker beside the slot lock for that check.
+The destination's capacity is independent of local capacity; `host-slots 2` permits two concurrent jobs including its own heavy jobs, while omission retains one job at a time.
+Native jobs keep using the original lock unchanged; the [runner's header](../bin/fm-heavy-remote-runner.py) owns additional slot admission and native-waiter priority.
+No running job is stopped for another.
+Set the count only after checking that concurrent job memory caps, including each job's services, fit the destination's existing memory and container VM allocation.
 An approved job it cannot take yet, because it is busy, unreachable or still running an unknown job, waits for a local slot while it keeps checking, and moves to whichever frees first, so queued work drains to the destination.
 A busy destination is checked every two seconds and the host itself every 30 seconds.
 When preparation cannot transfer or check out the candidate, or the working tree is not a clean repository root, the command joins the normal local queue instead.
 A job that ends up running locally records its last reason in `fallback`.
 A lost connection never leads to a second run of a job that may still be running: the job is reconciled against its record on the destination first, and a job that cannot be reached is recorded as unknown with its scratch kept.
 A finished job whose result cannot be fetched after the same reconnect attempts is recorded the same way, with the result left on the destination for the next request to collect.
-Every unknown job keeps a durable local record in `state/heavy-remote/unknown-<host>/`, and each new remote request reconciles those records over SSH before it is admitted, from the job's completion file, its started marker and whether its own process group is alive.
+Every unknown job keeps a durable local record in `state/heavy-remote/unknown-<host>/`, and each new remote request reconciles records without a live client owner over SSH before it is admitted, from the job's completion file, its started marker and whether its own process group is alive.
+Another live client retains responsibility for collecting its own running job, so concurrent requests do not interfere.
 While such a job still runs, no second job starts there and the request stays in the local queue with fallback `unknown-job-running`; a job whose supervisor has died is stopped first, because nothing else would stop it.
 When the destination cannot be reached the record stays and the request stays in the local queue with fallback `unreachable`.
 A finished job's result is collected into `state/heavy-remote/<job>/` for that job alone and never counts as a pass for the new candidate; its scratch is then removed and `reconciled.json` there closes the record with the job's outcome.

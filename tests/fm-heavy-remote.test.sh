@@ -1175,6 +1175,83 @@ test_host_jobs_go_first_and_none_is_stopped() {
   pass "fm-heavy: the host's own jobs go first, and no running job is stopped for another"
 }
 
+test_two_host_slots() {
+  local pid first second n bad
+  setup twoslots 'touch "$HOME/started"; while [ ! -e "$HOME/release" ]; do sleep 0.1; done'
+  printf 'host fake-mac\nproject p\nhost-slots 2\n' > "$HOME_FM/config/heavy-remote"
+  hold_host
+  heavy --remote >"$CASE/out" 2>&1 5>&- & first=$!
+  wait_for "$REMOTE_HOME/started"
+  python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 12 "$?" "an own job and a sent job fill two slots"
+  touch "$REMOTE_HOME/release"
+  wait "$first" || fail "a sent job runs beside the unchanged own lock: $(cat "$CASE/out")"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "two-slot admission"
+  # A queued raw flock user has no Firstmate marker, and must still go first.
+  rm "$REMOTE_HOME/started" "$REMOTE_HOME/release"
+  flock "$FM_HEAVY_HOST_LOCK" sh -c 'echo own > "$0"' "$CASE/own" 5>&- & pid=$!
+  n=0
+  until [ "$(ps -o comm= -p "$pid" | xargs basename)" = flock ]; do
+    n=$((n + 1)); [ "$n" -le 50 ] || fail "native waiter never reached flock"; sleep 0.1
+  done
+  python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 12 "$?" "a native flock waiter prevents admission into the extra slot"
+  [ ! -e "$CASE/own" ] || fail "the waiting own job has not acquired its lock"
+  release_host
+  wait "$pid" || fail "the native job completes after release"
+  [ "$(cat "$CASE/own")" = own ] || fail "the native job was never stopped"
+  hold_host
+  ( exec 6>>"$FM_HEAVY_HOST_LOCK"; exec flock 6 ) 5>&- & pid=$!
+  n=0
+  until [ "$(ps -o comm= -p "$pid" | xargs basename)" = flock ]; do
+    n=$((n + 1)); [ "$n" -le 50 ] || fail "descriptor waiter never reached flock"; sleep 0.1
+  done
+  python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 12 "$?" "descriptor-form native flock also reserves the extra slot"
+  release_host
+  wait "$pid" || fail "the descriptor waiter finishes after release"
+  # Firstmate's explicit waiter markers also reserve capacity with two slots.
+  mkdir -p "$FM_HEAVY_HOST_LOCK.waiting"
+  : > "$FM_HEAVY_HOST_LOCK.waiting/$$"
+  python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 12 "$?" "a marked own waiter prevents two-slot admission"
+  rm "$FM_HEAVY_HOST_LOCK.waiting/$$"
+  # Priority is checked again at start, after a successful busy probe.
+  setup twostart 'exit 0'
+  printf 'host fake-mac\nproject p\nhost-slots 2\n' > "$HOME_FM/config/heavy-remote"
+  rule ownwait pre 'runner.py start' 1 "mkdir -p \"\$FM_HEAVY_HOST_LOCK.waiting\"; touch \"\$FM_HEAVY_HOST_LOCK.waiting/$$\""
+  heavy --remote >"$CASE/out" 2>&1 || fail "a new own waiter leaves the sent job local: $(cat "$CASE/out")"
+  expect_record '.host == "local" and .fallback == "destination-busy"' "priority rechecked at start"
+  # Two drivers from the same client can run remotely, with no mistaken
+  # reconciliation of the other live driver's completion record.
+  setup twosent 'mkdir -p "$HOME/started"; touch "$HOME/started/$$"; while [ ! -e "$HOME/release" ]; do sleep 0.1; done'
+  printf 'host fake-mac\nproject p\nhost-slots 2\n' > "$HOME_FM/config/heavy-remote"
+  heavy --remote >"$CASE/first.out" 2>&1 & first=$!
+  wait_for "$REMOTE_HOME/started"
+  heavy --remote >"$CASE/second.out" 2>&1 & second=$!
+  n=0
+  until [ "$(find "$REMOTE_HOME/started" -type f | wc -l)" -eq 2 ]; do
+    n=$((n + 1)); [ "$n" -le 200 ] || fail "two sent jobs never overlapped: $(cat "$CASE/first.out" "$CASE/second.out")"; sleep 0.1
+  done
+  python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 12 "$?" "two sent jobs refuse a third"
+  touch "$REMOTE_HOME/release"
+  wait "$first" || fail "first remote driver: $(cat "$CASE/first.out")"
+  wait "$second" || fail "second remote driver: $(cat "$CASE/second.out")"
+  [ "$(jq -s '[.[] | select(.host == "fake-mac" and .outcome == "pass")] | length' "$LOG")" -eq 2 ] || fail "both sent jobs completed remotely"
+  # Explicit one-slot settings retain the default's held-lock refusal.
+  hold_host
+  python3 "$RUNNER" busy 1 >/dev/null
+  expect_code 12 "$?" "explicit one slot retains legacy admission"
+  release_host
+  for bad in '0' '-1' '02' '65' '2 extra' '2\nhost-slots 2'; do
+    printf 'host fake-mac\nproject p\nhost-slots %b\n' "$bad" > "$HOME_FM/config/heavy-remote"
+    heavy --remote >/dev/null 2>&1
+    expect_code 2 "$?" "invalid host-slots: $bad"
+  done
+  pass "fm-heavy: two host slots include native jobs, preserve native priority and admit two sent jobs"
+}
+
 make_fake_docker() {  # <fakebin>: runs the container's command on the host, logging its argv
   cat > "$1/docker" <<'SH'
 #!/usr/bin/env bash
@@ -1402,6 +1479,7 @@ test_e2e_browser_preparation
 test_npm_dependency_cache
 test_project_approvals
 test_host_jobs_go_first_and_none_is_stopped
+test_two_host_slots
 test_image_runs_in_a_container
 test_services_start_with_the_job_and_are_removed
 
