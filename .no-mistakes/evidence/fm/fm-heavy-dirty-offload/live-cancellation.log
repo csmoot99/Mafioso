@@ -1,0 +1,3 @@
+fm-heavy-remote: not running on 127.0.0.1 (unreachable); staying in the local queue
+
+Signal result: {"wrapper_exit": 143, "record": {"task": null, "project": "lab", "class": "test", "cmd": "bash", "requested_at": 1794517805, "started_at": null, "ended_at": null, "wait_s": 0, "run_s": null, "exit": null, "slot": null, "peak_memory_bytes": null, "cpu_usec": null, "host": "local", "prepare_s": null, "collect_s": null, "outcome": null, "job": null, "candidate": null, "snapshot": false, "fallback": "unreachable"}, "command_never_executed": true, "source_preserved": true}

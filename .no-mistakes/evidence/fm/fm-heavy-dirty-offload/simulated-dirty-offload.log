@@ -1,0 +1,4 @@
+SIMULATED SSH TRANSPORT; real wrapper, runner, and test command
+60421adb8b35d230c2d9f6dc2c752feaac3dcc10
+DIRTY_AUTOMATIC_OFFLOAD_EXECUTED
+{"task":"t","project":"p","class":"test","cmd":"bash","requested_at":1794517740,"started_at":1794517740,"ended_at":1794517740,"wait_s":0,"run_s":0,"exit":0,"slot":null,"peak_memory_bytes":null,"cpu_usec":93432,"host":"fake-mac","prepare_s":0,"collect_s":0,"outcome":"pass","job":"1794517740-1551472-452","candidate":"60421adb8b35d230c2d9f6dc2c752feaac3dcc10","snapshot":true,"fallback":null}

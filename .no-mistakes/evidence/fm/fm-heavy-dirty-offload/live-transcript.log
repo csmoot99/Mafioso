@@ -1,85 +1,26 @@
-$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/openssh/usr/sbin/sshd -t -f /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/sshd_config
-[exit 0]
-
-$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/bin/ssh fm-loopback 'printf "real-ssh-ready\n"; pwd; python3 --version'
-real-ssh-ready
-/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/ssh-home
-Python 3.14.4
-[exit 0]
-
-$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/clean/repo init -q
-[exit 0]
-
-$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/clean/repo add -A
-[exit 0]
-
-$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/clean/repo commit -qm candidate
-[exit 0]
-
-$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/clean/repo rev-parse HEAD
-314264155e05b2202c5e050a0545883658e75f0c
-[exit 0]
-
-$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/bin/fm-heavy.sh --class test --task live-validation --project p --remote -- bash t/job.sh
-314264155e05b2202c5e050a0545883658e75f0c
-Linux
-[exit 0]
-
-$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/dirty/repo init -q
-[exit 0]
-
-$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/dirty/repo add -A
-[exit 0]
-
-$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/dirty/repo commit -qm candidate
-[exit 0]
-
-$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/dirty/repo add -A
-[exit 0]
-
-$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/dirty/repo commit -qm fixtures
-[exit 0]
-
-$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/dirty/repo rev-parse HEAD
-1687545788d9ecb54b747c464965f4b95beb689d
-[exit 0]
-
-$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/dirty/repo stash push -qm preserve
-[exit 0]
-
-$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/dirty/repo add tracked
-[exit 0]
-
-$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/dirty/repo add -f ignored-force
-[exit 0]
-
-$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/bin/fm-heavy.sh --class test --task live-validation --project p --remote -- bash t/job.sh
-{"deleted": false, "executable": true, "head": "96f154d844c7124435361dbc4ce07a1b3734d30b", "ignored_secret": false, "new": "untracked", "parent": "1687545788d9ecb54b747c464965f4b95beb689d", "symlink": "tracked", "tracked": "modified", "tracked_ignored": "force-added"}
-[exit 0]
-
-$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/bin/fm-heavy.sh --class test --task live-validation --project p -- bash t/job.sh
-{"deleted": false, "executable": true, "head": "fbfc248a10297f099fdee5c3c80f306d0ecaf7e6", "ignored_secret": false, "new": "untracked", "parent": "1687545788d9ecb54b747c464965f4b95beb689d", "symlink": "tracked", "tracked": "modified", "tracked_ignored": "force-added"}
-[exit 0]
-
-$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/snapshot-failure/repo init -q
-[exit 0]
-
-$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/snapshot-failure/repo add -A
-[exit 0]
-
-$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/.test-heavy-validation/snapshot-failure/repo commit -qm candidate
-[exit 0]
-
-$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/bin/fm-heavy.sh --class test --task live-validation --project p --remote -- bash t/job.sh
-error: open("unreadable"): Permission denied
+Base dirty-tree attempt: fm-heavy-remote: not running on 127.0.0.1 (dirty-tree); staying in the local queue
+Base sample: fallback=dirty-tree
+Target dirty-tree attempt: fm-heavy-remote: not running on 127.0.0.1 (unreachable); staying in the local queue
+Target sample: snapshot=true
+fallback=unreachable
+Generated snapshot candidate: {"parent": "fbfa407e7cc88edc8f5a3009e132ed42beb09727", "sha": "366734d72517cf921ff74f36c7e1f0485a830a68", "tree": "937da91705610225899b125e6aef1420b8c5ff59"}
+Source preservation: {"files_and_git_controls_equal": true, "index_sha256": "adb1427ed0669c69b80f5c664452b12d6470e7cc44ebf0b9ebcaf4f62331eee4", "stash": "stash@{0}: On master: Preserved stash"}
+live-dirty-snapshot start: started
+live-dirty-snapshot output: {"files": {"tracked": "working", "new": "untracked", "deleted": null, ".env": null, ".forced": "tracked ignored", "staged-new": "staged addition"}, "head": "366734d72517cf921ff74f36c7e1f0485a830a68", "cwd": "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78S47EKGR7CFY9G3C4HKCMM/.phase-validation/live/runner-host/.fm-heavy-remote/live-dirty-snapshot/work"}
+live-dirty-snapshot result: {"artifacts": {"run.log": {"bytes": 361, "sha256": "0e7aedda783e4333a65b2c46f486606028fce12334ef8d19f7eb425d82c5372c"}}, "bundle_sha256": "877e7fd08ede6660d82abbb64291f95ec6981b787ad57968785250946f9dbc03", "command_sha256": "acab36e9f7c4718aff4fbe7611333b06c590af1514e96173c589b5dded5ac57f", "cpu_usec": 100132, "ended_at": 1794517694, "exit_code": 0, "host": "DESKTOP-NKCLCNH", "id": "live-dirty-snapshot", "outcome": "exited", "run_s": 0.263, "schema": "fm-heavy-remote.v1", "sha": "366734d72517cf921ff74f36c7e1f0485a830a68", "started_at": 1794517694, "tree": "937da91705610225899b125e6aef1420b8c5ff59"}
+Dirty snapshot execution assertions: {"deletion_included": true, "force_added_ignored_included": true, "ignored_excluded": true, "source_preserved": true, "untracked_with_status_hidden_included": true, "working_beats_staged": true}
+Busy local slot before release: {"no_job_completed": true, "output": "fm-heavy-remote: not running on 127.0.0.1 (unreachable); staying in the local queue", "wrapper_pid": 1537777}
+Automatic offload fallback output: fm-heavy-remote: not running on 127.0.0.1 (unreachable); staying in the local queue
+{"files": {"tracked": "working", "new": "untracked", "deleted": null, ".env": "do not export", ".forced": "tracked ignored", "staged-new": "staged addition"}, "head": "fbfa407e7cc88edc8f5a3009e132ed42beb09727", "cwd": "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78S47EKGR7CFY9G3C4HKCMM/.phase-validation/live/repo"}
+Automatic offload fallback record: {"candidate": null, "class": "test", "cmd": "python3", "collect_s": null, "cpu_usec": 44432, "ended_at": 1794517695, "exit": 0, "fallback": "unreachable", "host": "local", "job": null, "outcome": null, "peak_memory_bytes": 8388608, "prepare_s": null, "project": "lab", "requested_at": 1794517694, "run_s": 1, "slot": 1, "snapshot": false, "started_at": 1794517694, "task": null, "wait_s": 0}
+Snapshot failure fallback output: error: open("unreadable"): Permission denied
 error: unable to index file 'unreadable'
 fatal: adding files failed
-fm-heavy-remote: not running on fm-loopback (snapshot-failed); staying in the local queue
-local-fallback-ran
-[exit 0]
-
-$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PKTATJJVSPR18T9AWQ6VC/bin/fm-heavy.sh --class test --task live-validation --project p --project unapproved --remote -- bash t/job.sh
-fm-heavy.sh: --remote command/class is not approved for this project
-[exit 2]
-
-All real-SSH scenarios passed; remote scratch is empty.
+fm-heavy-remote: not running on 127.0.0.1 (snapshot-failed); staying in the local queue
+{"files": {"tracked": "working", "new": "untracked", "deleted": null, ".env": "do not export", ".forced": "tracked ignored", "staged-new": "staged addition"}, "head": "fbfa407e7cc88edc8f5a3009e132ed42beb09727", "cwd": "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78S47EKGR7CFY9G3C4HKCMM/.phase-validation/live/repo"}
+Snapshot failure fallback record: {"candidate": null, "class": "test", "cmd": "python3", "collect_s": null, "cpu_usec": 40823, "ended_at": 1794517695, "exit": 0, "fallback": "snapshot-failed", "host": "local", "job": null, "outcome": null, "peak_memory_bytes": 8421376, "prepare_s": null, "project": "lab", "requested_at": 1794517695, "run_s": 0, "slot": 1, "snapshot": false, "started_at": 1794517695, "task": null, "wait_s": 0}
+live-dirty-failure start: started
+live-dirty-failure output: {"files": {"tracked": "working", "new": "untracked", "deleted": null, ".env": null, ".forced": "tracked ignored", "staged-new": "staged addition"}, "head": "9fbc399bb9747a6ae642e600b91e36756ab77402", "cwd": "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78S47EKGR7CFY9G3C4HKCMM/.phase-validation/live/runner-host/.fm-heavy-remote/live-dirty-failure/work"}
+UNCOMMITTED_FAILURE_REACHED
+live-dirty-failure result: {"artifacts": {"run.log": {"bytes": 388, "sha256": "133e5e2d223abba262fa8acdf81368b63850eb462d151135a073f0a3d109522f"}}, "bundle_sha256": "b73ead4ec38de928e257c4749598a8fea7549d5d4c6d2273db81c04df7b367c8", "command_sha256": "acab36e9f7c4718aff4fbe7611333b06c590af1514e96173c589b5dded5ac57f", "cpu_usec": 103330, "ended_at": 1794517695, "exit_code": 7, "host": "DESKTOP-NKCLCNH", "id": "live-dirty-failure", "outcome": "exited", "run_s": 0.266, "schema": "fm-heavy-remote.v1", "sha": "9fbc399bb9747a6ae642e600b91e36756ab77402", "started_at": 1794517695, "tree": "2a24c36f58dc622b837e5d2f631fc8fc6440ad3d"}
+Final isolation check: {"production_host_contacted": false, "runner_jobs_removed": true, "source_preserved": true}

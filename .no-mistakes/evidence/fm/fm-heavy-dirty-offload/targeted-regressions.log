@@ -1,0 +1,10 @@
+ok - fm-heavy --remote: the exact candidate runs on the host and the record has every stage
+ok - fm-heavy --remote: snapshot contains current files, excludes ignored files and preserves source state
+ok - fm-heavy --remote: untracked-only trees are snapshotted when Git status hides untracked files
+ok - fm-heavy --remote: snapshot failures stay local without sending content or changing source state
+ok - fm-heavy --remote: bundle failures and signals preserve source state
+ok - fm-heavy --remote: off unless asked, and only the one approved command from a valid config
+ok - fm-heavy --remote: an unreachable, busy or ineligible destination runs the command locally and says why
+ok - fm-heavy --remote: a failing command is a failure with its own status, log kept
+ok - fm-heavy --remote: a signal while the destination is probed or the bundle made cancels the job instead of running it locally
+ok - fm-heavy: scoped approvals, automatic offload, classes and malformed refusal
