@@ -57,6 +57,8 @@
 # matching approval supplies them: a command line, then project <name>, then
 # project *. An approval with services needs an image and distinct service ports;
 # its jobs reach every service on localhost:<port>.
+#   nofile <count>                      container soft/hard open-file limit, default
+#                                       65536, positive integer up to 1048576
 #   timeout <seconds>                   optional positive integer, default 900
 #   offload                             optional presence line
 # Command words must match argv exactly (whitespace separates words; no shell
@@ -81,8 +83,10 @@
 # FM_HEAVY_REMOTE_RECHECK seconds, and it moves to whichever frees first. Any other
 # reason, such as an unclean repository root, joins the normal local queue. The
 # last reason is recorded in fallback when the job runs locally. Missing runtimes,
-# incompatible versions and dependency-install errors on the host fail the remote
-# job and never silently retry locally. A signal before starting prevents
+# incompatible versions and dependency-install errors before the project command
+# starts return to the local queue with fallback=prepare-failed, preparation_step
+# and preparation_log (the retained host log). Project command failures stay failed.
+# A signal before starting prevents
 # execution anywhere. bin/fm-heavy-remote.sh owns transfer, results and
 # unknown-job reconciliation; unknown jobs prevent new remote work until settled.
 # Job copies live in state/heavy-remote/<job> in the root home, and open records
@@ -217,7 +221,7 @@ if [ -e "$root/config/host-test-slots" ]; then
     echo "fm-heavy.sh: config/host-test-slots must hold one positive integer" >&2; exit 2 ;; esac
 fi
 
-rhost=; rtimeout=; rimage=; offload=; approved=; rconf=$root/config/heavy-remote; rproblem=
+rhost=; rtimeout=; rimage=; rnofile=; offload=; approved=; rconf=$root/config/heavy-remote; rproblem=
 remote_opts=()
 # The most specific matching approval (level 3 command, 2 project, 1 project *) supplies options.
 select_approval() {
@@ -304,6 +308,7 @@ elif [ -e "$rconf" ]; then
         svc_names+=("${words[0]:-}"); svc_specs+=("${words[*]-}")
         ;;
       image) [ -z "$rimage" ] && [[ $rest =~ ^[A-Za-z0-9._/:@-]+$ ]] && rimage=$rest || bad=${bad:-$n} ;;
+      nofile) [ -z "$rnofile" ] && [[ $rest =~ ^[1-9][0-9]{0,6}$ ]] && [ "$rest" -le 1048576 ] && rnofile=$rest || bad=${bad:-$n} ;;
       timeout) [ -z "$rtimeout" ] && [[ $rest =~ ^[1-9][0-9]{0,5}$ ]] && rtimeout=$rest || bad=${bad:-$n} ;;
       offload) [ -z "$offload" ] && [ -z "$rest" ] && offload=1 || bad=${bad:-$n} ;;
       *) bad=${bad:-$n} ;;
@@ -353,7 +358,7 @@ unit="fm-heavy-$$-$requested"
 sample=$(mktemp)
 trap 'rm -f "$sample" "$lock.waiting/$$"' EXIT
 mkdir -p "$root/state"
-slot=; started=; signal=; waiter=; host=; fallback=
+preparation_step=; preparation_log=; slot=; started=; signal=; waiter=; host=; fallback=
 sget() { sed -n "s/^$1=//p" "$sample" 2>/dev/null | tail -1; }
 command_line=$*
 logs="$root/state/heavy-logs"
@@ -386,7 +391,7 @@ record() {  # <exit status, empty when the command never started>
     --arg run "$run_s" --arg rc "$1" --arg slot "${started:+$slot}" --arg peak "$peak" --arg cpu "$cpu" \
     --arg host "${host:-local}" --arg prep "$(sget prepare_s)" --arg coll "$(sget collect_s)" \
     --arg outcome "$(sget outcome)" --arg job "$(sget job)" --arg cand "$(sget candidate)" \
-    --arg fallback "$fallback" '
+    --arg preparation_step "$preparation_step" --arg preparation_log "$preparation_log" --arg fallback "$fallback" '
     def num: if test("^[0-9]+$") then tonumber else null end;
     def str: if . == "" then null else . end;
     {task: ($task | str), project: ($project | str), class: $class, cmd: $cmd,
@@ -394,7 +399,8 @@ record() {  # <exit status, empty when the command never started>
      wait_s: ($wait | num), run_s: ($run | num), exit: ($rc | num), slot: ($slot | num),
      peak_memory_bytes: ($peak | num), cpu_usec: ($cpu | num),
      host: $host, prepare_s: ($prep | num), collect_s: ($coll | num), outcome: ($outcome | str),
-     job: ($job | str), candidate: ($cand | str), fallback: ($fallback | str)}' >> "$log"
+     job: ($job | str), candidate: ($cand | str), preparation_step: ($preparation_step | str),
+     preparation_log: ($preparation_log | str), fallback: ($fallback | str)}' >> "$log"
 }
 
 # A foreground command would hold a trap back until it returned, so the steps of
@@ -486,9 +492,11 @@ try_remote() {
   if flock -n 8; then
     started=$(date +%s)  # signals now belong to the driver
     run_captured "$REMOTE" --host "$rhost" --timeout "$rtimeout" --sample "$sample" \
-      --project "$project" --class "$class" ${rimage:+--image "$rimage"} ${remote_opts[@]+"${remote_opts[@]}"} \
+      --project "$project" --class "$class" ${rnofile:+--nofile "$rnofile"} ${rimage:+--image "$rimage"} ${remote_opts[@]+"${remote_opts[@]}"} \
       --state-dir "$root/state/heavy-remote" -- "$@"
     rc=$?
+    preparation_step=$(sget preparation_step)
+    preparation_log=$(sget preparation_log)
     fallback=$(sget fallback)
     if [ -z "$fallback" ]; then
       host=$rhost

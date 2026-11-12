@@ -12,13 +12,13 @@ on the host: on the SSH PATH, under ~/.nvm/versions/node, or under
 version a project pins for itself, and then reports that version. execute puts
 the versions this job's project pins first on its PATH, prepares locked
 dependencies and then execs the approved command in the supervised process group;
-preparation failures exit 78 and a command that cannot run exits 127, never a
-local fallback.
+preparation failures exit 78 and report prepare-failed for local fallback; a
+command that cannot run exits 127 and remains a command failure.
 Dependency copies persist per project under ~/.fm-heavy-remote/cache, keyed by
 lockfile/package settings and runtime versions. Each job has private modules.
 A job directory lives under ~/.fm-heavy-remote and holds manifest.json (project,
 class, job id, candidate sha, command argv and its digest, bundle digest,
-timeout, image, services and job env) and src.bundle (the candidate revision with its history).
+timeout, image, nofile, services and job env) and src.bundle (the candidate revision with its history).
 
 Host slot: the host's own bin/fm-heavy.sh jobs and transferred jobs share one slot
 lock (FM_HEAVY_HOST_LOCK, default /tmp/fm-heavy.lock). A transferred job takes it
@@ -40,7 +40,7 @@ supervise Holds the host slot passed by start and runs the command in its own pr
           timeout, cancel or exit. It then publishes result.json atomically; that
           file is the durable completion record. Its fields: schema, id, sha and
           tree read back from the checkout, command_sha256, bundle_sha256,
-          outcome (exited, timeout or cancelled), exit_code (128+n for a signal),
+          outcome (exited, prepare-failed, timeout or cancelled), preparation_step, exit_code (128+n for a signal),
           started_at, ended_at, run_s, cpu_usec, host, and artifacts (bytes and
           sha256 of run.log).
 status    Prints absent, preparing, running, done, or lost (the supervisor died
@@ -60,7 +60,8 @@ path and ~/.fm-heavy-remote/linux/runtimes and linux/cache standing in for
 runtimes and cache, so Linux runtimes and dependency copies never mix with the
 host's own. The container's Playwright browsers, pnpm store and npm cache live
 under that cache's tools directory, so they persist across jobs. Stopping the job also removes that container. A missing docker fails
-the job with exit 127, never a local retry.
+preparation with exit 127, allowing a local retry. The manifest nofile sets
+the container soft/hard open-file limits (default 65536).
 
 Services: each manifest service runs as its own container, fm-heavy-<job>-<name>,
 capped at its declared memory with no swap and given its declared env. The first
@@ -307,6 +308,7 @@ def job_container_argv(jdir, manifest, docker, network):
         os.makedirs(os.path.join(linux, sub), exist_ok=True)
     tools = os.path.join(ROOT, "cache", "tools")
     return [docker, "run", "--rm", "--init", "--name", container(manifest), "--memory", "6g", "--memory-swap", "6g", *network,
+            "--ulimit", "nofile={0}:{0}".format(manifest.get("nofile", 65536)),
             "-e", "HOME=" + os.path.expanduser("~"), "-e", "GIT_CONFIG_COUNT=1",
             "-e", "PLAYWRIGHT_BROWSERS_PATH=" + os.path.join(tools, "ms-playwright"),
             "-e", "pnpm_config_store_dir=" + os.path.join(tools, "pnpm-store"),  # pnpm 11+
@@ -458,7 +460,13 @@ def module_dirs(work):
             yield os.path.relpath(os.path.join(base, "node_modules"), work)
 
 
+def preparation_step(jdir, step):
+    write_json(os.path.join(jdir, "preparation.json"), {"step": step})
+
+
 def prepare_dependencies(work, manifest):
+    jdir = os.path.dirname(work)
+    preparation_step(jdir, "runtime")
     package_path = os.path.join(work, "package.json")
     package = read_json(package_path)
     if package is None:
@@ -500,6 +508,7 @@ def prepare_dependencies(work, manifest):
         if os.path.isfile(path):
             digest.update((name + "\0" + sha256_file(path)).encode())
     fingerprint = digest.hexdigest()
+    preparation_step(jdir, "dependencies")
     # Lock only preparation/copying, never a test run.
     with open(os.path.join(cache, "lock"), "w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
@@ -526,6 +535,7 @@ def prepare_dependencies(work, manifest):
         # persistent cache; its installer only downloads revisions missing for this
         # checkout's installed version.
         command = ["pnpm", "exec", "playwright", "install"] if manager == "pnpm" else ["npm", "exec", "--no", "--", "playwright", "install"]
+        preparation_step(jdir, "browsers")
         subprocess.run(command, cwd=work, check=True)
 
 
@@ -548,6 +558,7 @@ def needs_playwright(argv, package):
 def cmd_execute(jdir):
     manifest = read_json(os.path.join(jdir, "manifest.json"))
     os.environ.update(manifest.get("env") or {})
+    preparation_step(jdir, "services")
     for service in manifest.get("services") or []:
         end = time.monotonic() + 180
         while True:
@@ -562,6 +573,7 @@ def cmd_execute(jdir):
         prepare_dependencies(os.path.join(jdir, "work"), manifest)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         die(78, "remote dependency/runtime preparation failed: %s" % error)
+    preparation_step(jdir, "command")
     try:
         os.execvp(manifest["argv"][0], manifest["argv"])
     except OSError as error:
@@ -606,6 +618,9 @@ def cmd_supervise(jdir, slot=None):
         if stops and outcome == "exited":
             outcome = "cancelled"
     log.close()
+    step = (read_json(os.path.join(jdir, "preparation.json")) or {}).get("step", "container-start")
+    if outcome in ("exited", "timeout") and code != 0 and step != "command":
+        outcome = "prepare-failed"
     usage = resource.getrusage(resource.RUSAGE_CHILDREN)
     artifact = os.path.join(jdir, "run.log")
     write_json(os.path.join(jdir, "result.json"), {
@@ -613,7 +628,7 @@ def cmd_supervise(jdir, slot=None):
         "sha": git("-C", work, "rev-parse", "HEAD").stdout.strip(),
         "tree": git("-C", work, "rev-parse", "HEAD^{tree}").stdout.strip(),
         "command_sha256": manifest["command_sha256"], "bundle_sha256": manifest["bundle_sha256"],
-        "outcome": outcome, "exit_code": code, "started_at": started_at, "ended_at": int(time.time()),
+        "outcome": outcome, "preparation_step": step, "exit_code": code, "started_at": started_at, "ended_at": int(time.time()),
         "run_s": round(time.monotonic() - began, 3), "cpu_usec": int((usage.ru_utime + usage.ru_stime) * 1e6),
         "host": socket.gethostname(),
         "artifacts": {"run.log": {"bytes": os.path.getsize(artifact), "sha256": sha256_file(artifact)}}})
