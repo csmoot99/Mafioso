@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 """Remote half of bin/fm-heavy-remote.sh: run one transferred job and report it.
 
-Usage: fm-heavy-remote-runner.py busy
-       fm-heavy-remote-runner.py start|supervise|container|execute|status|reconcile|wait|cancel|cleanup <jobdir> [seconds]
+Usage: fm-heavy-remote-runner.py busy [host-slots]
+       fm-heavy-remote-runner.py start|status|reconcile|cancel|cleanup <jobdir>
+       fm-heavy-remote-runner.py wait <jobdir> [seconds]
+Internal launches:
+       fm-heavy-remote-runner.py guard <jobdir> <slot-fd>
+       fm-heavy-remote-runner.py supervise <jobdir> <slot-fd> <ready-fd>
+       fm-heavy-remote-runner.py container|execute <jobdir> [<slot-fd> <ready-fd> <supervisor-pid> <supervisor-start>]
 
 The client ships this file with each job, so nothing is installed on the remote
 host. It needs python3 (stdlib), git and ps, and runs on macOS and Linux.
@@ -21,22 +26,30 @@ A job directory lives under ~/.fm-heavy-remote and holds manifest.json (project,
 class, job id, candidate sha, command argv and its digest, bundle digest,
 timeout, image, nofile, services and job env) and src.bundle (the candidate revision with its history).
 
-Host slot: the host's own bin/fm-heavy.sh jobs and transferred jobs share one slot
-lock (FM_HEAVY_HOST_LOCK, default /tmp/fm-heavy.lock). A transferred job takes it
-only when it is free and no live local job waits for it (a pid file in
-<lock>.waiting), so the host's own work goes first; once taken, the supervisor
-holds it until the job ends, and nothing ever stops a running job of either kind
-for the other.
+Host slots: host_slots in the manifest (default 1, range 1-64) includes the
+host's own jobs on FM_HEAVY_HOST_LOCK (default /tmp/fm-heavy.lock). Additional
+slots use <lock>.remote.<number>, preferred over the original lock so native
+jobs can still start unchanged. A detached guard retains the kernel lock until
+both the supervisor exits and the reported command group stops, including any
+surviving descendants. Supervisor loss therefore cannot free capacity for either
+native or remote admission. The command closes its inherited slot descriptor
+before preparing dependencies or launching the approved command.
+Live <lock>.waiting pid markers and childless `flock <lock> <command>` processes
+prevent admission, preserving priority for native jobs already waiting. Descriptor
+forms of flock are matched through /proc on Linux or the system lsof on macOS.
+No running job is stopped for another.
 
-busy      Prints busy and exits 12 when the host slot is taken or awaited, else
+busy      Prints busy and exits 12 when capacity is full or native work awaits, else
           prints free. It needs no job directory.
-start     Exits 12, having created nothing, when the host slot is busy. Otherwise
-          it refuses a second start of the same job, verifies the bundle and command
+start     Exits 12, having created nothing, when capacity is full or native work
+          awaits. Otherwise it refuses a second start of the same job, verifies the bundle and command
           digests, clones the bundle, checks out and verifies the exact sha, then
-          launches a detached supervisor and prints "started". It exits 10 on any
-          refusal, having launched nothing, and 11 when the supervisor it launched
-          recorded no owner in time, so the job may still have started.
-supervise Holds the host slot passed by start and runs the command in its own process group with cwd the checkout, output
+          launches a detached guard and supervisor and prints "started". It exits
+          10 on any refusal, having launched nothing, and 11 when no owner was
+          recorded in time after launch, so the job may still have started.
+guard     Owns the slot lifetime described above; receives the command group's
+          identity over a pipe independently of the supervisor's survival.
+supervise Runs the command in its own process group with cwd the checkout, output
           to run.log, enforcing the timeout and killing the whole group on
           timeout, cancel or exit. It then publishes result.json atomically; that
           file is the durable completion record. Its fields: schema, id, sha and
@@ -213,21 +226,13 @@ def reconcile_state(jdir):
     return state
 
 
-def take_host_slot():
-    """The host's own slot lock, held without waiting, or None when it is taken or awaited.
+def host_waiting():
+    """Firstmate waiter markers and unchanged `flock <path> <command>` jobs.
 
-    A pid file in <lock>.waiting is a local bin/fm-heavy.sh job queued for the slot;
-    while one is alive the host's own work goes first.
+    A flock command waiting in the kernel has no command child yet. A holder
+    has already forked its command (or execed it with --no-fork). Treat the
+    brief interval before that fork conservatively as waiting too.
     """
-    try:
-        fd = os.open(HOST_LOCK, os.O_CREAT | os.O_WRONLY | os.O_APPEND, 0o666)
-    except OSError as error:
-        die(BUSY, "busy: cannot open %s: %s" % (HOST_LOCK, error))
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
-        os.close(fd)
-        return None
     for marker in glob.glob(glob.escape(HOST_LOCK) + ".waiting/*"):
         try:
             os.kill(int(os.path.basename(marker)), 0)
@@ -235,17 +240,74 @@ def take_host_slot():
             continue
         except PermissionError:
             pass
-        os.close(fd)
+        return True
+    processes = subprocess.run(["ps", "-axo", "pid=,ppid=,comm=,args="], capture_output=True, text=True)
+    if processes.returncode:
+        return True  # Cannot prove native priority, so do not admit a job.
+    rows = [line.split(None, 3) for line in processes.stdout.splitlines()]
+    children = {row[1] for row in rows if len(row) == 4}
+    for row in rows:
+        if len(row) != 4 or os.path.basename(row[2]) != "flock" or row[0] in children:
+            continue
+        try:
+            words = shlex.split(row[3])
+        except ValueError:
+            return True
+        if any(word.startswith("/") and os.path.realpath(word) == os.path.realpath(HOST_LOCK) for word in words[1:]):
+            return True
+        # Descriptor-form flock has no path in argv. Inspect only this waiting
+        # flock's descriptors, never other homes' files or processes' contents.
+        if sys.platform == "linux":
+            paths = glob.glob("/proc/%s/fd/*" % row[0])
+            if any(os.path.realpath(path) == os.path.realpath(HOST_LOCK) for path in paths):
+                return True
+        else:
+            lsof = shutil.which("lsof") or ("/usr/sbin/lsof" if os.path.isfile("/usr/sbin/lsof") else None)
+            if not lsof:
+                return True
+            result = subprocess.run([lsof, "-a", "-p", row[0], "-Fn", HOST_LOCK], capture_output=True, text=True)
+            if result.returncode not in (0, 1) or any(line.startswith("n") for line in result.stdout.splitlines()):
+                return True
+    return False
+
+
+def take_host_slot(slots=1):
+    """Take one kernel-owned slot without waiting; native jobs keep slot one.
+
+    The module header owns slot ordering, native priority and lock lifetime.
+    """
+    if host_waiting():
         return None
-    return fd
+    for number in [*range(2, slots + 1), 1]:
+        path = HOST_LOCK if number == 1 else HOST_LOCK + ".remote.%d" % number
+        try:
+            fd = os.open(path, os.O_CREAT | os.O_WRONLY | os.O_APPEND, 0o666)
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                os.close(fd)
+                continue
+        except OSError as error:
+            die(BUSY, "busy: cannot open %s: %s" % (path, error))
+        if host_waiting():
+            os.close(fd)
+            return None
+        return fd
+    return None
 
 
-def cmd_busy():
-    fd = take_host_slot()
-    if fd is None:
+def host_slots(value):
+    if not re.fullmatch(r"[1-9][0-9]?", str(value)) or int(value) > 64:
+        die(10, "refused: host-slots must be 1-64")
+    return int(value)
+
+
+def cmd_busy(slots=1):
+    slot = take_host_slot(slots)
+    if slot is None:
         print("busy")
         sys.exit(BUSY)
-    os.close(fd)
+    os.close(slot)
     print("free")
 
 
@@ -329,7 +391,9 @@ def git(*args):
 
 
 def cmd_start(jdir):
-    slot = take_host_slot()
+    manifest = read_json(os.path.join(jdir, "manifest.json")) or {}
+    slots = host_slots(manifest.get("host_slots", 1))
+    slot = take_host_slot(slots)
     if slot is None:
         die(BUSY, "busy: the host's heavy slot is taken or awaited")
     try:
@@ -362,10 +426,12 @@ def cmd_start(jdir):
         die(10, "refused: could not check out %s: %s" % (sha, cloned.stderr.strip()))
     if git("-C", work, "rev-parse", "HEAD").stdout.strip() != sha:
         die(10, "refused: checkout is not %s" % sha)
-    # The supervisor holds the host slot until the job ends; the command does not inherit it.
-    subprocess.Popen([sys.executable, os.path.abspath(__file__), "supervise", jdir, str(slot)], start_new_session=True,
-                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True,
-                     pass_fds=(slot,))
+    try:
+        subprocess.Popen([sys.executable, os.path.abspath(__file__), "guard", jdir, str(slot)], start_new_session=True,
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True,
+                         pass_fds=(slot,))
+    except OSError as error:
+        die(10, "refused: could not launch supervisor: %s" % error)
     end = time.monotonic() + 15
     while not os.path.exists(os.path.join(jdir, "owner.json")):
         if time.monotonic() > end:
@@ -584,9 +650,26 @@ def cmd_execute(jdir):
         die(127, "cannot run %s: %s" % (manifest["argv"][0], error))
 
 
-def cmd_supervise(jdir, slot=None):
-    if slot is not None:
-        os.set_inheritable(int(slot), False)
+def cmd_guard(jdir, slot):
+    ready, notify = os.pipe()
+    try:
+        proc = subprocess.Popen([sys.executable, os.path.abspath(__file__), "supervise", jdir, str(slot), str(notify)],
+                                start_new_session=True, pass_fds=(slot, notify))
+    finally:
+        os.close(notify)
+    try:
+        proc.wait()
+        announced = os.read(ready, 4096)
+        owner = json.loads(announced) if announced else None
+        while owner and group_alive(owner):
+            time.sleep(0.05)
+    finally:
+        os.close(ready)
+        os.close(slot)
+
+
+def cmd_supervise(jdir, slot, ready):
+    os.set_inheritable(slot, False)
     manifest = read_json(os.path.join(jdir, "manifest.json"))
     work = os.path.join(jdir, "work")
     stops = []
@@ -596,14 +679,17 @@ def cmd_supervise(jdir, slot=None):
     log = open(os.path.join(jdir, "run.log"), "wb")
     outcome, code = "exited", 127
     try:
-        proc = subprocess.Popen(group_command(jdir, manifest), cwd=work, stdin=subprocess.DEVNULL, stdout=log,
-                                stderr=subprocess.STDOUT, start_new_session=True)
+        proc = subprocess.Popen(group_command(jdir, manifest) + [str(slot), str(ready), str(os.getpid()), proc_start(os.getpid())],
+                                cwd=work, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+                                start_new_session=True, pass_fds=(slot, ready))
     except OSError as error:
         log.write(("cannot run %s: %s\n" % (manifest["argv"][0], error)).encode())
         proc = None
     owner = {"supervisor_pid": os.getpid(), "supervisor_start": proc_start(os.getpid()),
              "group": proc.pid if proc else None, "group_start": proc_start(proc.pid) if proc else ""}
-    write_json(os.path.join(jdir, "owner.json"), owner)
+    os.close(ready)
+    if proc is None:
+        write_json(os.path.join(jdir, "owner.json"), owner)
     if proc:
         while proc.poll() is None:
             if stops:
@@ -684,14 +770,25 @@ def cmd_cleanup(jdir):
 
 
 def main():
-    if sys.argv[1:] == ["busy"]:
-        cmd_busy()
+    if sys.argv[1:2] == ["busy"] and len(sys.argv) in (2, 3):
+        cmd_busy(host_slots(sys.argv[2]) if len(sys.argv) == 3 else 1)
         return
-    if len(sys.argv) < 3 or sys.argv[1] not in ("start", "supervise", "container", "execute", "status", "reconcile", "wait", "cancel", "cleanup"):
-        die(2, "usage: fm-heavy-remote-runner.py busy | start|supervise|container|execute|status|reconcile|wait|cancel|cleanup <jobdir> [seconds]")
+    if len(sys.argv) < 3 or sys.argv[1] not in ("start", "guard", "supervise", "container", "execute", "status", "reconcile", "wait", "cancel", "cleanup"):
+        die(2, "usage: fm-heavy-remote-runner.py busy [host-slots] | start|guard|supervise|container|execute|status|reconcile|wait|cancel|cleanup <jobdir> [seconds]")
     action, jdir = sys.argv[1], job_dir(sys.argv[2])
-    if action == "supervise":
-        cmd_supervise(jdir, sys.argv[3] if len(sys.argv) > 3 else None)
+    if action in ("container", "execute") and len(sys.argv) == 7:
+        slot, ready = int(sys.argv[3]), int(sys.argv[4])
+        owner = {
+            "supervisor_pid": int(sys.argv[5]), "supervisor_start": sys.argv[6],
+            "group": os.getpid(), "group_start": proc_start(os.getpid())}
+        write_json(os.path.join(jdir, "owner.json"), owner)
+        os.write(ready, json.dumps(owner).encode())
+        os.close(ready)
+        os.close(slot)
+    if action == "guard":
+        cmd_guard(jdir, int(sys.argv[3]))
+    elif action == "supervise":
+        cmd_supervise(jdir, int(sys.argv[3]), int(sys.argv[4]))
     elif action == "status":
         print(status(jdir))
     elif action == "reconcile":

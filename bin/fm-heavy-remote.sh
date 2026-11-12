@@ -4,7 +4,7 @@
 # it; it is not a user command.
 #
 # usage: fm-heavy-remote.sh --host <ssh alias> --timeout <seconds> --sample <file>
-#          --state-dir <dir> --project <name> [--class test|e2e] [--image <ref>] [--nofile <count>]
+#          --state-dir <dir> --project <name> [--class test|e2e] [--image <ref>] [--nofile <count>] [--host-slots <1-64>]
 #          [--service "<name> <image> <port> <memory> [KEY=VALUE...]"]... [--env KEY=VALUE]...
 #          -- <command> [args...]
 #
@@ -29,7 +29,7 @@
 # job's stages are written to the --sample file for bin/fm-heavy.sh's record.
 #
 # The host's own heavy jobs (bin/fm-heavy.sh there) and the jobs sent here share its
-# slot lock: a job is sent only while that slot is free and no local job there is
+# capacity: a job is sent only while a host slot is free and no local job there is
 # waiting for it, and neither kind is ever stopped for the other. With --image the
 # command runs inside that Linux container image on the host (see the runner).
 #
@@ -64,12 +64,21 @@
 #
 # Open records: <state-dir>/unknown-<host>/<job>.json is written before anything
 # reaches the host and removed only once the host's scratch is gone or nothing was
-# launched, so an open record means the host may still hold that job. Before a new
-# job is admitted, every open record for the host is reconciled over SSH from the
-# job's result.json, started marker and owned process group:
-#   running     no second job starts; fallback=unknown-job-running. A job whose
-#               supervisor is gone is stopped first, since nothing else would stop
-#               it, and its record closes on the next request.
+# launched, so an open record means the host may still hold that job. Each record
+# includes client_pid and client_start; matching both identifies its live local
+# collection owner without mistaking a reused PID for that client.
+# Before admission, every record is checked under <state-dir>/<job>/reconcile.lock;
+# a competing collector causes fallback=unknown-job-running. After taking the lock,
+# the request rechecks record existence and ownership, then queries the remote
+# result.json, started marker and owned process group:
+#   live owner collection and cleanup stay with that client. Running, preparing,
+#               finished, lost or absent jobs do not block another request's
+#               capacity check; an orphaned group blocks with unknown-job-running,
+#               and an unreachable job blocks with unreachable.
+# Without a live owner:
+#   running     no new job starts; fallback=unknown-job-running. A job whose
+#               supervisor is gone but whose group survives is stopped first,
+#               and its record closes on the next request.
 #   finished    its result is collected for its own record only, never as a pass
 #               for the new candidate; its scratch is removed and the record closes
 #               into <state-dir>/<job>/reconciled.json (job, candidate, outcome and
@@ -84,7 +93,7 @@ set -u
 set -o pipefail
 
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-host=; timeout_s=; sample=; state_dir=; project=; class="test"; image=; nofile=65536; services=(); envs=()
+host=; host_slots=1; timeout_s=; sample=; state_dir=; project=; class="test"; image=; nofile=65536; services=(); envs=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --project) project=${2:-}; shift 2 || break ;;
@@ -93,6 +102,7 @@ while [ "$#" -gt 0 ]; do
     --nofile) nofile=${2:-}; shift 2 || break ;;
     --service) services+=("${2:-}"); shift 2 || break ;;
     --env) envs+=("${2:-}"); shift 2 || break ;;
+    --host-slots) host_slots=${2:-}; shift 2 || break ;;
     --host) host=${2:-}; shift 2 || break ;;
     --timeout) timeout_s=${2:-}; shift 2 || break ;;
     --sample) sample=${2:-}; shift 2 || break ;;
@@ -105,7 +115,9 @@ done
   echo "fm-heavy-remote.sh: usage error (see the header)" >&2; exit 2; }
 case "$timeout_s" in ''|*[!0-9]*|0*) echo "fm-heavy-remote.sh: --timeout must be a positive integer" >&2; exit 2 ;; esac
 [[ $nofile =~ ^[1-9][0-9]{0,6}$ ]] && [ "$nofile" -le 1048576 ] || { echo "fm-heavy-remote.sh: invalid --nofile (1..1048576)" >&2; exit 2; }
+[[ $host_slots =~ ^[1-9][0-9]?$ ]] && [ "$host_slots" -le 64 ] || { echo "fm-heavy-remote.sh: --host-slots must be 1-64" >&2; exit 2; }
 id="$(date +%s)-$$-$RANDOM"
+client_start=$(ps -o lstart= -p $$)
 
 tries=${FM_HEAVY_REMOTE_RECONNECT_TRIES:-5}
 pause=${FM_HEAVY_REMOTE_RECONNECT_SLEEP:-3}
@@ -208,10 +220,30 @@ result_outcome() {
   jq -r 'if .outcome == "exited" then (if .exit_code == 0 then "pass" else "failed" end) else .outcome end' "$jdir/result.json"
 }
 # Settle one open record. The locals stand in for the new job's while the helpers
-# above work on the earlier one. Status 0: nothing of it remains on the host;
+# above work on the earlier one. Status 0: nothing remains, or a live driver owns it;
 # otherwise $blocked is why the new job may not start there.
-reconcile_job() {  # <open record>
-  local record=$1 id rdir runner jdir sha cmd_sha bundle_sha state outcome rc
+reconcile_job() {
+  local rc lock_dir
+  lock_dir=$state_dir/$(basename "$1" .json)
+  mkdir -p "$lock_dir" || { blocked=unreachable; return 1; }
+  exec 7>>"$lock_dir/reconcile.lock" || { blocked=unreachable; return 1; }
+  if flock -n 7; then
+    reconcile_locked_job "$1"
+    rc=$?
+  else
+    blocked=unknown-job-running
+    rc=1
+  fi
+  exec 7>&-
+  return "$rc"
+}
+reconcile_locked_job() {
+  local record=$1 id rdir runner jdir sha cmd_sha bundle_sha state outcome rc owner owner_start
+  [ -e "$record" ] || return 0
+  # Another live driver owns collection. Once it exits, ordinary reconciliation
+  # applies, including to unknown jobs. Start time protects against PID reuse.
+  owner=$(jq -r '.client_pid // empty' "$record")
+  owner_start=$(jq -r '.client_start // empty' "$record")
   id=$(basename "$record" .json)
   rdir=.fm-heavy-remote/$id
   runner="python3 $rdir/runner.py"
@@ -221,6 +253,15 @@ reconcile_job() {  # <open record>
   bundle_sha=$(jq -r .bundle_sha256 "$record" 2>/dev/null)
   mkdir -p "$jdir"
   state=$(job_state reconcile)
+  if [[ $owner =~ ^[1-9][0-9]*$ ]] && [ -n "$owner_start" ] &&
+    [ "$(ps -o lstart= -p "$owner" 2>/dev/null)" = "$owner_start" ]; then
+    case "$state" in
+      running|preparing|done|lost|absent) return 0 ;;
+      orphaned) blocked=unknown-job-running ;;
+      *) blocked=unreachable ;;
+    esac
+    return 1
+  fi
   case "$state" in
     running|preparing) blocked=unknown-job-running; return 1 ;;
     orphaned)
@@ -275,8 +316,8 @@ for open in "$open_records"/*.json; do
   [ -z "$sig" ] || finish cancelled $((128 + sig))
   fallback "$blocked"
 done
-# The host's own heavy jobs come first: a held or awaited host slot keeps this job here.
-"${SSH[@]}" "$host" "python3 - busy" < "$SELF_DIR/fm-heavy-remote-runner.py" >/dev/null 2>>"$stage/ssh.err"
+# The host's own heavy jobs come first; the runner checks capacity and native waiters.
+"${SSH[@]}" "$host" "python3 - busy $host_slots" < "$SELF_DIR/fm-heavy-remote-runner.py" >/dev/null 2>>"$stage/ssh.err"
 case $? in 0) ;; 12) fallback destination-busy ;; *) fallback unreachable ;; esac
 
 emit candidate "$sha"
@@ -293,11 +334,12 @@ svcs=$(printf '%s\0' ${services[@]+"${services[@]}"} | jq -Rsc "split(\"\\u0000\
   | {name: .[0], image: .[1], port: (.[2] | tonumber), memory: .[3], env: (.[4:] | $pairs)})") || fallback manifest-failed
 jenv=$(printf '%s\0' ${envs[@]+"${envs[@]}"} | jq -Rsc "split(\"\\u0000\")[:-1] | $pairs") || fallback manifest-failed
 jq -n --arg id "$id" --arg sha "$sha" --arg cs "$cmd_sha" --arg bs "$bundle_sha" --argjson t "$timeout_s" \
-  --argjson nofile "$nofile" --arg project "$project" --arg class "$class" --arg image "$image" --argjson services "$svcs" --argjson env "$jenv" \
-  --argjson argv "$argv" '{nofile: $nofile, project: $project, class: $class, image: $image, services: $services, env: $env, id: $id, sha: $sha, command_sha256: $cs, bundle_sha256: $bs, timeout_s: $t, argv: $argv}' \
+  --argjson nofile "$nofile" --argjson slots "$host_slots" --argjson client_pid "$$" --arg client_start "$client_start" \
+  --arg project "$project" --arg class "$class" --arg image "$image" --argjson services "$svcs" --argjson env "$jenv" \
+  --argjson argv "$argv" '{nofile: $nofile, host_slots: $slots, client_pid: $client_pid, client_start: $client_start, project: $project, class: $class, image: $image, services: $services, env: $env, id: $id, sha: $sha, command_sha256: $cs, bundle_sha256: $bs, timeout_s: $t, argv: $argv}' \
   > "$stage/manifest.json" || fallback manifest-failed
 cp "$SELF_DIR/fm-heavy-remote-runner.py" "$stage/runner.py"
-cp "$stage/manifest.json" "$record" || fallback state-unwritable
+if ! cp "$stage/manifest.json" "$record.tmp" || ! mv "$record.tmp" "$record"; then fallback state-unwritable; fi
 [ -z "$sig" ] || finish cancelled $((128 + sig))
 
 tar -cf - -C "$stage" runner.py manifest.json src.bundle \

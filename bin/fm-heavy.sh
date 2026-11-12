@@ -38,7 +38,7 @@
 # and slot are null.
 #
 # Remote destination (opt-in): config/heavy-remote approves test and e2e commands
-# on one SSH host, which takes one job at a time; build and image always stay
+# on one SSH host; build and image always stay
 # local, since only the result and log come back. Lines (comments start #):
 #   host <ssh alias>                    required, one host
 #   command <project> [opt...] -- <words...>
@@ -59,6 +59,7 @@
 # its jobs reach every service on localhost:<port>.
 #   nofile <count>                      container soft/hard open-file limit, default
 #                                       65536, positive integer up to 1048576
+#   host-slots <n>                      optional host job count (1-64), default 1
 #   timeout <seconds>                   optional positive integer, default 900
 #   offload                             optional presence line
 # Command words must match argv exactly (whitespace separates words; no shell
@@ -73,8 +74,8 @@
 # --remote requires an approval and requests remote first. With offload, an
 # approved command automatically tries the host when all local slots are busy;
 # otherwise it runs locally. Without offload or --remote the local behavior is
-# unchanged. The host's own heavy jobs share its slot with the jobs sent there and
-# go first: a job is sent only while that slot is free and none of the host's jobs
+# unchanged. The host's own heavy jobs count toward host-slots and
+# go first: a job is sent only while capacity is free and none of the host's jobs
 # waits for it, and no running job of either kind is stopped for another. Each job
 # waiting for a local slot leaves a <lock>.waiting/<pid> marker for that check.
 # An approved job the host cannot take yet because it is busy,
@@ -88,7 +89,7 @@
 # and preparation_log (the retained host log). Project command failures stay failed.
 # A signal before starting prevents
 # execution anywhere. bin/fm-heavy-remote.sh owns transfer, results and
-# unknown-job reconciliation; unknown jobs prevent new remote work until settled.
+# open-record reconciliation, including concurrent-client ownership.
 # Job copies live in state/heavy-remote/<job> in the root home, and open records
 # in state/heavy-remote/unknown-<host>.
 #
@@ -225,7 +226,7 @@ if [ -e "$root/config/host-test-slots" ]; then
     echo "fm-heavy.sh: config/host-test-slots must hold one positive integer" >&2; exit 2 ;; esac
 fi
 
-rhost=; rtimeout=; rimage=; rnofile=; offload=; approved=; rconf=$root/config/heavy-remote; rproblem=
+rhost=; rslots=; rtimeout=; rimage=; rnofile=; offload=; approved=; rconf=$root/config/heavy-remote; rproblem=
 remote_opts=()
 # The most specific matching approval (level 3 command, 2 project, 1 project *) supplies options.
 select_approval() {
@@ -313,6 +314,7 @@ elif [ -e "$rconf" ]; then
         ;;
       image) [ -z "$rimage" ] && [[ $rest =~ ^[A-Za-z0-9._/:@-]+$ ]] && rimage=$rest || bad=${bad:-$n} ;;
       nofile) [ -z "$rnofile" ] && [[ $rest =~ ^[1-9][0-9]{0,6}$ ]] && [ "$rest" -le 1048576 ] && rnofile=$rest || bad=${bad:-$n} ;;
+      host-slots) [ -z "$rslots" ] && [[ $rest =~ ^[1-9][0-9]?$ ]] && [ "$rest" -le 64 ] && rslots=$rest || bad=${bad:-$n} ;;
       timeout) [ -z "$rtimeout" ] && [[ $rest =~ ^[1-9][0-9]{0,5}$ ]] && rtimeout=$rest || bad=${bad:-$n} ;;
       offload) [ -z "$offload" ] && [ -z "$rest" ] && offload=1 || bad=${bad:-$n} ;;
       *) bad=${bad:-$n} ;;
@@ -352,6 +354,7 @@ elif [ -e "$rconf" ]; then
     echo "fm-heavy.sh: --remote command/class is not approved for this project" >&2; exit 2
   fi
   rtimeout=${rtimeout:-900}
+  rslots=${rslots:-1}
 fi
 
 lock=${FM_HEAVY_LOCK:-/tmp/fm-heavy.lock}
@@ -489,32 +492,40 @@ try_local() {
   return 1
 }
 
-# The host takes one job at a time, under its own descriptor lock. Returns only
-# when the job did not run there, with the reason in $fallback.
+# Each client lane keeps its legacy lock through collection; the host runner
+# enforces the global count across clients and native host jobs.
 remote_recheck=0
 try_remote() {
-  exec 8>>"$lock.remote.$rhost" || { echo "fm-heavy.sh: cannot open $lock.remote.$rhost" >&2; exit 2; }
-  if flock -n 8; then
-    started=$(date +%s)  # signals now belong to the driver
-    run_captured "$REMOTE" --host "$rhost" --timeout "$rtimeout" --sample "$sample" \
-      --project "$project" --class "$class" ${rnofile:+--nofile "$rnofile"} ${rimage:+--image "$rimage"} ${remote_opts[@]+"${remote_opts[@]}"} \
-      --state-dir "$root/state/heavy-remote" -- "$@"
-    rc=$?
-    preparation_step=$(sget preparation_step)
-    preparation_log=$(sget preparation_log)
-    fallback=$(sget fallback)
-    if [ -z "$fallback" ]; then
-      host=$rhost
-      [ -z "$signal" ] || rc=$((128 + signal))
-      finish "$rc"
+  local lane lane_lock
+  lane=1
+  while [ "$lane" -le "$rslots" ]; do
+    lane_lock=$lock.remote.$rhost
+    [ "$lane" -eq 1 ] || lane_lock=$lane_lock.$lane
+    exec 8>>"$lane_lock" || { echo "fm-heavy.sh: cannot open $lane_lock" >&2; exit 2; }
+    if flock -n 8; then
+      started=$(date +%s)  # signals now belong to the driver
+      run_captured "$REMOTE" --host "$rhost" --host-slots "$rslots" --timeout "$rtimeout" --sample "$sample" \
+        --project "$project" --class "$class" ${rnofile:+--nofile "$rnofile"} ${rimage:+--image "$rimage"} ${remote_opts[@]+"${remote_opts[@]}"} \
+        --state-dir "$root/state/heavy-remote" -- "$@"
+      rc=$?
+      preparation_step=$(sget preparation_step)
+      preparation_log=$(sget preparation_log)
+      fallback=$(sget fallback)
+      if [ -z "$fallback" ]; then
+        host=$rhost
+        [ -z "$signal" ] || rc=$((128 + signal))
+        finish "$rc"
+      fi
+      started=; : > "$sample"
+      [ -z "$signal" ] || on_signal "$signal"
+      remote_recheck=$((SECONDS + ${FM_HEAVY_REMOTE_RECHECK:-30}))
+      exec 8>&-
+      return
     fi
-    started=; : > "$sample"
-    [ -z "$signal" ] || on_signal "$signal"
-    remote_recheck=$((SECONDS + ${FM_HEAVY_REMOTE_RECHECK:-30}))
-  else
-    fallback=destination-busy
-  fi
-  exec 8>&-
+    exec 8>&-
+    lane=$((lane + 1))
+  done
+  fallback=destination-busy
 }
 
 if [ -z "$remote" ] && [ -n "$offload" ] && [ -n "$approved" ]; then

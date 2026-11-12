@@ -320,6 +320,45 @@ test_fallbacks_run_locally() {
   pass "fm-heavy --remote: an unreachable, busy or ineligible destination runs the command locally and says why"
 }
 
+test_prelaunch_refusal_does_not_reserve_a_slot() {
+  local real_git failed_dir
+  setup prelaunch-refusal "echo run >> '$TMP_ROOT/prelaunch-refusal/runs'"
+  printf 'host fake-mac\nproject p\nhost-slots 2\n' > "$HOME_FM/config/heavy-remote"
+  real_git=$(command -v git)
+  cat > "$FAKEBIN/git" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = -C ] && [ "${3:-}" = checkout ]; then
+  printf '%s\n' "$2" > "$FAKE_SSH_CTL/failed-checkout"
+  exit 1
+fi
+exec "$FM_TEST_REAL_GIT" "$@"
+SH
+  chmod +x "$FAKEBIN/git"
+  rule cleanup drop 'runner.py cleanup' -1
+  hold_host
+  FM_TEST_REAL_GIT="$real_git" heavy --remote >"$CASE/first.out" 2>&1 5>&- || fail "a refused checkout falls back locally"
+  expect_record '.host == "local" and .fallback == "prepare-failed" and .exit == 0' "checkout refusal fallback"
+  assert_present "$CTL/failed-checkout" "the remote checkout actually failed"
+  failed_dir=$(cat "$CTL/failed-checkout")
+  failed_dir=${failed_dir%/work}
+  assert_present "$failed_dir/started" "the refused transfer remains when follow-up cleanup is unavailable"
+  assert_absent "$failed_dir/owner.json" "a failed checkout launches no supervisor"
+  assert_grep 'runner.py cleanup' "$CTL/log" "the client attempted the unavailable follow-up cleanup"
+  [ -z "$(ls -A "$HOME_FM/state/heavy-remote/unknown-fake-mac")" ] || fail "the definite refusal leaves no client recovery record"
+  HOME="$REMOTE_HOME" python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 0 "$?" "failed preparation leaves the extra slot available without follow-up cleanup"
+  ! flock -n "$FM_HEAVY_HOST_LOCK" true || fail "the native job still occupies the original slot"
+  rm "$FAKEBIN/git" "$CTL/rules/cleanup"
+  heavy --remote >"$CASE/second.out" 2>&1 5>&- || fail "the next job uses the freed remote capacity"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "remote admission after checkout refusal"
+  [ "$(wc -l < "$CASE/runs")" -eq 2 ] || fail "the fallback and next remote job each run once"
+  ! flock -n "$FM_HEAVY_HOST_LOCK" true || fail "the native job survives the remote recovery"
+  release_host
+  HOME="$REMOTE_HOME" python3 "$RUNNER" cleanup "$failed_dir" >/dev/null
+  expect_host_clean "the refused scratch can be removed independently"
+  pass "fm-heavy: checkout refusal preserves capacity when follow-up cleanup is unavailable"
+}
+
 test_failed_command() {
   setup failed 'echo broke >&2; exit 7'
   heavy --remote >"$CASE/out" 2>&1; expect_code 7 "$?" "the command's own status passes through"
@@ -553,6 +592,176 @@ test_unknown_job_other_endings() {
   jq -e '.outcome == "lost"' "$JOB_DIR/reconciled.json" >/dev/null || fail "an orphaned job closes as lost: $(cat "$JOB_DIR/reconciled.json")"
   expect_host_clean "scratch after an orphaned job"
   pass "fm-heavy --remote: dropped collections, bad results, jobs that never arrived and orphaned groups all reconcile safely"
+}
+
+test_live_client_with_orphaned_group_blocks_admission() {
+  local first job open supervisor child
+  setup liveorphan 'echo $$ > "$HOME/job.pid"; echo $PPID > "$HOME/supervisor.pid"; sleep 300'
+  printf 'host fake-mac\nproject p\nhost-slots 2\n' > "$HOME_FM/config/heavy-remote"
+  rule waiting pre 'runner.py wait' -1 'touch "$FAKE_SSH_CTL/waiting"; n=0; until [ -e "$FAKE_SSH_CTL/release" ]; do n=$((n + 1)); [ "$n" -le 200 ] || exit 1; sleep 0.1; done'
+  hold_host
+  heavy --remote >"$CASE/first.out" 2>&1 5>&- & first=$!
+  wait_for "$REMOTE_HOME/supervisor.pid"
+  wait_for "$CTL/waiting"
+  open=$(echo "$HOME_FM/state/heavy-remote/unknown-fake-mac/"*.json)
+  job=$(basename "$open" .json)
+  supervisor=$(cat "$REMOTE_HOME/supervisor.pid")
+  child=$(cat "$REMOTE_HOME/job.pid")
+  kill -9 "$supervisor"
+  wait_gone "$supervisor" || fail "the remote supervisor must be gone"
+  new_candidate "echo next >> '$CASE/next-runs'"
+  heavy --remote >"$CASE/second.out" 2>&1 5>&- || fail "a request behind a live client's orphan runs locally"
+  expect_record '.host == "local" and .fallback == "unknown-job-running"' "live client orphan fallback"
+  [ "$(remote_starts)" -eq 1 ] || fail "an orphan cannot release capacity for a third heavy job"
+  assert_present "$open" "the live client retains its open record"
+  assert_absent "$HOME_FM/state/heavy-remote/$job/reconciled.json" "another client cannot settle the owner's record"
+  pid_alive "$(jq -r .client_pid "$open")" || fail "the collection owner must still be alive"
+  pid_alive "$child" || fail "admission must leave the orphan for its collection owner"
+  touch "$CTL/release"
+  wait "$first"; expect_code 70 "$?" "the live owner reports its lost supervisor"
+  wait_gone "$child" || fail "the owner cleans its orphaned group"
+  assert_absent "$open" "the owner closes its own record"
+  ! flock -n "$FM_HEAVY_HOST_LOCK" true || fail "the native job still owns its slot"
+  release_host
+  [ "$(wc -l < "$CASE/next-runs")" -eq 1 ] || fail "the new candidate runs exactly once"
+  pass "fm-heavy: a live collection owner cannot hide orphaned work from admission"
+}
+
+test_supervisor_loss_after_reconciliation_blocks_admission() {
+  local first job open child probe
+  setup admissionrace 'echo $$ > "$HOME/job.pid"; echo $PPID > "$HOME/supervisor.pid"; sleep 300'
+  printf 'host fake-mac\nproject p\nhost-slots 2\n' > "$HOME_FM/config/heavy-remote"
+  rule waiting pre 'runner.py wait' -1 'touch "$FAKE_SSH_CTL/waiting"; n=0; until [ -e "$FAKE_SSH_CTL/release" ]; do n=$((n + 1)); [ "$n" -le 200 ] || exit 1; sleep 0.1; done'
+  hold_host
+  heavy --remote >"$CASE/first.out" 2>&1 5>&- & first=$!
+  wait_for "$REMOTE_HOME/supervisor.pid"
+  wait_for "$CTL/waiting"
+  open=$(echo "$HOME_FM/state/heavy-remote/unknown-fake-mac/"*.json)
+  job=$(basename "$open" .json)
+  child=$(cat "$REMOTE_HOME/job.pid")
+  new_candidate "echo next >> '$CASE/next-runs'"
+  rule reconciled pre 'runner.py reconcile' 1 'touch "$FAKE_SSH_CTL/reconciled"'
+  rule dies pre 'python3 - busy 2' 1 \
+    '[ -e "$FAKE_SSH_CTL/reconciled" ] || exit 1; state=$(python3 "$RUNNER_SRC" reconcile .fm-heavy-remote/*); [ "$state" = running ] || exit 1; printf "%s\n" "$state" > "$FAKE_SSH_CTL/snapshot"; pid=$(cat "$HOME/supervisor.pid"); kill -9 "$pid"; n=0; while kill -0 "$pid" 2>/dev/null; do n=$((n + 1)); [ "$n" -le 100 ] || exit 1; sleep 0.1; done'
+  heavy --remote >"$CASE/second.out" 2>&1 5>&- || fail "a request whose snapshot preceded supervisor death runs locally"
+  [ "$(cat "$CTL/snapshot")" = running ] || fail "reconciliation must see the live supervisor before admission"
+  expect_record '.host == "local" and .fallback == "destination-busy"' "slot ownership survives the supervisor"
+  [ "$(remote_starts)" -eq 1 ] || fail "a released kernel lock cannot admit a third heavy job"
+  pid_alive "$(jq -r .client_pid "$open")" || fail "the original client retains collection ownership"
+  pid_alive "$child" || fail "the orphan must still be running when admission is refused"
+  assert_absent "$HOME_FM/state/heavy-remote/$job/reconciled.json" "admission cannot collect the live client's result"
+  HOME="$REMOTE_HOME" python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 12 "$?" "busy counts orphaned work under its slot lock"
+  probe=$REMOTE_HOME/.fm-heavy-remote/admission-probe
+  mkdir -p "$probe"
+  git -C "$REPO" bundle create "$probe/src.bundle" HEAD >/dev/null 2>&1
+  jq -n --arg sha "$(git -C "$REPO" rev-parse HEAD)" \
+    --arg bs "$(sha256sum "$probe/src.bundle" | cut -d' ' -f1)" \
+    --arg cs "$(printf 'bash\0t/job.sh\0' | sha256sum | cut -d' ' -f1)" \
+    '{id: "admission-probe", host_slots: 2, sha: $sha, command_sha256: $cs, bundle_sha256: $bs, timeout_s: 20, argv: ["bash", "t/job.sh"]}' > "$probe/manifest.json"
+  HOME="$REMOTE_HOME" python3 "$RUNNER" start "$probe" >/dev/null 2>&1
+  expect_code 12 "$?" "start independently counts orphaned work under its slot lock"
+  assert_absent "$probe/started" "refused admission launches nothing"
+  rm -rf "$probe"
+  touch "$CTL/release"
+  wait "$first"; expect_code 70 "$?" "the original client reports its lost supervisor"
+  wait_gone "$child" || fail "the original client cleans its orphaned group"
+  assert_absent "$open" "the original client closes its record"
+  ! flock -n "$FM_HEAVY_HOST_LOCK" true || fail "the native job keeps its slot"
+  heavy --remote >"$CASE/third.out" 2>&1 5>&- || fail "the orphan's slot becomes reusable after collection"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "collected slot ownership is reusable"
+  ! flock -n "$FM_HEAVY_HOST_LOCK" true || fail "reusing the remote slot leaves the native job running"
+  release_host
+  [ "$(wc -l < "$CASE/next-runs")" -eq 2 ] || fail "both new requests run exactly once"
+  expect_host_clean "collection leaves no orphan scratch"
+  pass "fm-heavy: supervisor loss after reconciliation cannot free an occupied slot for remote admission"
+}
+
+test_native_admission_waits_for_an_orphaned_group() {
+  local first second native supervisor child n=0
+  setup nativeorphan 'echo $$ > "$HOME/first.pid"; until [ -e "$HOME/first-release" ]; do sleep 0.1; done'
+  printf 'host fake-mac\nproject p\nhost-slots 2\n' > "$HOME_FM/config/heavy-remote"
+  rule waiting pre 'runner.py wait' -1 \
+    'mkdir -p "$FAKE_SSH_CTL/waiting"; touch "$FAKE_SSH_CTL/waiting/$$"; n=0; until [ -e "$FAKE_SSH_CTL/release" ]; do n=$((n + 1)); [ "$n" -le 300 ] || exit 1; sleep 0.1; done'
+  heavy --remote >"$CASE/first.out" 2>&1 & first=$!
+  wait_for "$REMOTE_HOME/first.pid"
+  new_candidate "$(cat <<'SH'
+echo $$ > "$HOME/second.pid"
+echo $PPID > "$HOME/supervisor.pid"
+python3 - <<'PY'
+import os
+import subprocess
+import time
+
+child = subprocess.Popen(["sleep", "300"], close_fds=True)
+with open(os.path.join(os.environ["HOME"], "child.pid"), "w") as handle:
+    handle.write(str(child.pid))
+while not os.path.exists(os.path.join(os.environ["HOME"], "leader-release")):
+    time.sleep(0.1)
+PY
+SH
+)"
+  heavy --remote >"$CASE/second.out" 2>&1 & second=$!
+  wait_for "$REMOTE_HOME/child.pid"
+  wait_for "$CTL/waiting"
+  until [ "$(find "$CTL/waiting" -type f | wc -l)" -eq 2 ]; do
+    n=$((n + 1)); [ "$n" -le 100 ] || fail "both collection clients must remain waiting"; sleep 0.1
+  done
+  supervisor=$(cat "$REMOTE_HOME/supervisor.pid")
+  child=$(cat "$REMOTE_HOME/child.pid")
+  kill -9 "$supervisor"
+  wait_gone "$supervisor" || fail "the supervisor using the original lock must be gone"
+  ! flock -n "$FM_HEAVY_HOST_LOCK" true || fail "native admission must stay closed while the orphan runs"
+  HOME="$REMOTE_HOME" python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 12 "$?" "remote admission also counts the original slot's orphan"
+  flock "$FM_HEAVY_HOST_LOCK" sh -c 'touch "$0"; until [ -e "$1" ]; do sleep 0.1; done' \
+    "$CASE/native-started" "$CASE/native-release" >"$CASE/native.out" 2>&1 & native=$!
+  touch "$REMOTE_HOME/leader-release"
+  wait_gone "$(cat "$REMOTE_HOME/second.pid")" || fail "the orphaned group leader must exit"
+  pid_alive "$child" || fail "a descendant with closed descriptors must still survive"
+  ! flock -n "$FM_HEAVY_HOST_LOCK" true || fail "the original lock must outlive the command group's leader"
+  assert_absent "$CASE/native-started" "the native caller cannot start a third job beside the descendant"
+  touch "$CTL/release"
+  wait "$second"; expect_code 70 "$?" "the original client reports its lost supervisor"
+  wait_gone "$child" || fail "collection must stop the orphan's remaining descendant"
+  wait_for "$CASE/native-started"
+  pid_alive "$(cat "$REMOTE_HOME/first.pid")" || fail "the other remote job must keep running"
+  HOME="$REMOTE_HOME" python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 12 "$?" "the native job and remaining remote job fill capacity"
+  touch "$CASE/native-release"
+  wait "$native" || fail "the unchanged native caller finishes normally"
+  touch "$REMOTE_HOME/first-release"
+  wait "$first" || fail "the other remote job completes normally: $(cat "$CASE/first.out")"
+  [ "$(remote_starts)" -eq 2 ] || fail "only the two requested remote jobs may start"
+  expect_host_clean "both remote jobs release their scratch and kernel locks"
+  flock -n "$FM_HEAVY_HOST_LOCK" true || fail "the original kernel lock becomes reusable"
+  pass "fm-heavy: native and remote admission wait for orphaned command descendants after supervisor loss"
+}
+
+test_abandoned_result_has_one_collector() {
+  local first second collections
+  unknown_job collectors 'echo original-output' 'runner.py (wait|status)'
+  HOME="$REMOTE_HOME" python3 "$RUNNER" wait "$REMOTE_HOME/.fm-heavy-remote/$JOB" 20 >/dev/null
+  new_candidate "echo next >> '$CASE/next-runs'"
+  printf 'host fake-mac\nproject p\nhost-slots 2\n' > "$HOME_FM/config/heavy-remote"
+  rule collecting pre "cd .fm-heavy-remote/$JOB && tar -cf - result.json" -1 \
+    'if mkdir "$FAKE_SSH_CTL/collector" 2>/dev/null; then touch "$FAKE_SSH_CTL/collecting"; n=0; until [ -e "$FAKE_SSH_CTL/release" ]; do n=$((n + 1)); [ "$n" -le 200 ] || exit 1; sleep 0.1; done; fi'
+  heavy --remote >"$CASE/first.out" 2>&1 & first=$!
+  wait_for "$CTL/collecting"
+  heavy --remote >"$CASE/second.out" 2>&1 & second=$!
+  wait "$second" || fail "a competing collector runs its new candidate locally: $(cat "$CASE/second.out")"
+  touch "$CTL/release"
+  wait "$first" || fail "the original collector completes: $(cat "$CASE/first.out")"
+  collections=$(grep -c "cd .fm-heavy-remote/$JOB && tar -cf - result.json" "$CTL/log")
+  [ "$collections" -eq 1 ] || fail "an abandoned result is fetched only once, got $collections"
+  jq -e '.outcome == "pass"' "$JOB_DIR/reconciled.json" >/dev/null || fail "the abandoned pass is preserved"
+  [ "$(cat "$JOB_DIR/run.log")" = original-output ] || fail "the collected log retains its verified bytes"
+  assert_absent "$OPEN" "the collected record closes once"
+  expect_host_clean "the sole collector removes the abandoned scratch"
+  [ "$(wc -l < "$CASE/next-runs")" -eq 2 ] || fail "both new candidates run exactly once"
+  heavy --remote >"$CASE/third.out" 2>&1 || fail "the next request passes after reconciliation"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "reconciliation releases its lock"
+  pass "fm-heavy: concurrent lanes serialize abandoned-result collection and preserve the outcome"
 }
 
 test_runner_reconcile_ages_out_a_dead_start() {
@@ -1302,6 +1511,83 @@ test_host_jobs_go_first_and_none_is_stopped() {
   pass "fm-heavy: the host's own jobs go first, and no running job is stopped for another"
 }
 
+test_two_host_slots() {
+  local pid first second n bad
+  setup twoslots 'touch "$HOME/started"; while [ ! -e "$HOME/release" ]; do sleep 0.1; done'
+  printf 'host fake-mac\nproject p\nhost-slots 2\n' > "$HOME_FM/config/heavy-remote"
+  hold_host
+  heavy --remote >"$CASE/out" 2>&1 5>&- & first=$!
+  wait_for "$REMOTE_HOME/started"
+  python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 12 "$?" "an own job and a sent job fill two slots"
+  touch "$REMOTE_HOME/release"
+  wait "$first" || fail "a sent job runs beside the unchanged own lock: $(cat "$CASE/out")"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "two-slot admission"
+  # A queued raw flock user has no Firstmate marker, and must still go first.
+  rm "$REMOTE_HOME/started" "$REMOTE_HOME/release"
+  flock "$FM_HEAVY_HOST_LOCK" sh -c 'echo own > "$0"' "$CASE/own" 5>&- & pid=$!
+  n=0
+  until [ "$(ps -o comm= -p "$pid" | xargs basename)" = flock ]; do
+    n=$((n + 1)); [ "$n" -le 50 ] || fail "native waiter never reached flock"; sleep 0.1
+  done
+  python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 12 "$?" "a native flock waiter prevents admission into the extra slot"
+  [ ! -e "$CASE/own" ] || fail "the waiting own job has not acquired its lock"
+  release_host
+  wait "$pid" || fail "the native job completes after release"
+  [ "$(cat "$CASE/own")" = own ] || fail "the native job was never stopped"
+  hold_host
+  ( exec 6>>"$FM_HEAVY_HOST_LOCK"; exec flock 6 ) 5>&- & pid=$!
+  n=0
+  until [ "$(ps -o comm= -p "$pid" | xargs basename)" = flock ]; do
+    n=$((n + 1)); [ "$n" -le 50 ] || fail "descriptor waiter never reached flock"; sleep 0.1
+  done
+  python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 12 "$?" "descriptor-form native flock also reserves the extra slot"
+  release_host
+  wait "$pid" || fail "the descriptor waiter finishes after release"
+  # Firstmate's explicit waiter markers also reserve capacity with two slots.
+  mkdir -p "$FM_HEAVY_HOST_LOCK.waiting"
+  : > "$FM_HEAVY_HOST_LOCK.waiting/$$"
+  python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 12 "$?" "a marked own waiter prevents two-slot admission"
+  rm "$FM_HEAVY_HOST_LOCK.waiting/$$"
+  # Priority is checked again at start, after a successful busy probe.
+  setup twostart 'exit 0'
+  printf 'host fake-mac\nproject p\nhost-slots 2\n' > "$HOME_FM/config/heavy-remote"
+  rule ownwait pre 'runner.py start' 1 "mkdir -p \"\$FM_HEAVY_HOST_LOCK.waiting\"; touch \"\$FM_HEAVY_HOST_LOCK.waiting/$$\""
+  heavy --remote >"$CASE/out" 2>&1 || fail "a new own waiter leaves the sent job local: $(cat "$CASE/out")"
+  expect_record '.host == "local" and .fallback == "destination-busy"' "priority rechecked at start"
+  # Two drivers from the same client can run remotely, with no mistaken
+  # reconciliation of the other live driver's completion record.
+  setup twosent 'mkdir -p "$HOME/started"; touch "$HOME/started/$$"; while [ ! -e "$HOME/release" ]; do sleep 0.1; done'
+  printf 'host fake-mac\nproject p\nhost-slots 2\n' > "$HOME_FM/config/heavy-remote"
+  heavy --remote >"$CASE/first.out" 2>&1 & first=$!
+  wait_for "$REMOTE_HOME/started"
+  heavy --remote >"$CASE/second.out" 2>&1 & second=$!
+  n=0
+  until [ "$(find "$REMOTE_HOME/started" -type f | wc -l)" -eq 2 ]; do
+    n=$((n + 1)); [ "$n" -le 200 ] || fail "two sent jobs never overlapped: $(cat "$CASE/first.out" "$CASE/second.out")"; sleep 0.1
+  done
+  python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 12 "$?" "two sent jobs refuse a third"
+  touch "$REMOTE_HOME/release"
+  wait "$first" || fail "first remote driver: $(cat "$CASE/first.out")"
+  wait "$second" || fail "second remote driver: $(cat "$CASE/second.out")"
+  [ "$(jq -s '[.[] | select(.host == "fake-mac" and .outcome == "pass")] | length' "$LOG")" -eq 2 ] || fail "both sent jobs completed remotely"
+  # Explicit one-slot settings retain the default's held-lock refusal.
+  hold_host
+  python3 "$RUNNER" busy 1 >/dev/null
+  expect_code 12 "$?" "explicit one slot retains legacy admission"
+  release_host
+  for bad in '0' '-1' '02' '65' '2 extra' '2\nhost-slots 2'; do
+    printf 'host fake-mac\nproject p\nhost-slots %b\n' "$bad" > "$HOME_FM/config/heavy-remote"
+    heavy --remote >/dev/null 2>&1
+    expect_code 2 "$?" "invalid host-slots: $bad"
+  done
+  pass "fm-heavy: two host slots include native jobs, preserve native priority and admit two sent jobs"
+}
+
 make_fake_docker() {  # <fakebin>: runs the container's command on the host, logging its argv
   cat > "$1/docker" <<'SH'
 #!/usr/bin/env bash
@@ -1533,6 +1819,7 @@ test_snapshot_failure
 test_snapshot_bundle_failure
 test_off_by_default_and_refusals
 test_fallbacks_run_locally
+test_prelaunch_refusal_does_not_reserve_a_slot
 test_failed_command
 test_timeout_cancels_only_the_jobs_processes
 test_owned_processes_are_cleaned
@@ -1543,6 +1830,10 @@ test_bad_results_are_rejected
 test_duplicate_delivery
 test_unknown_job_blocks_until_reconciled
 test_unknown_job_other_endings
+test_live_client_with_orphaned_group_blocks_admission
+test_supervisor_loss_after_reconciliation_blocks_admission
+test_native_admission_waits_for_an_orphaned_group
+test_abandoned_result_has_one_collector
 test_runner_reconcile_ages_out_a_dead_start
 test_signalled_wrapper_stops_only_its_job
 test_unterminated_config_last_line
@@ -1569,6 +1860,7 @@ test_e2e_browser_preparation
 test_npm_dependency_cache
 test_project_approvals
 test_host_jobs_go_first_and_none_is_stopped
+test_two_host_slots
 test_image_runs_in_a_container
 test_container_many_file_install
 test_services_start_with_the_job_and_are_removed
