@@ -81,8 +81,8 @@
 # unreachable or still running an unknown job waits for a local slot while it
 # keeps checking: the remote slot every two seconds, the host itself every
 # FM_HEAVY_REMOTE_RECHECK seconds, and it moves to whichever frees first. Any other
-# reason, such as an unclean repository root, joins the normal local queue. The
-# last reason is recorded in fallback when the job runs locally. Missing runtimes,
+# reason, such as running outside the repository root or a failed snapshot, joins
+# the normal local queue. The last reason is recorded in fallback when the job runs locally. Missing runtimes,
 # incompatible versions and dependency-install errors before the project command
 # starts return to the local queue with fallback=prepare-failed, preparation_step
 # and preparation_log (the retained host log). Project command failures stay failed.
@@ -97,6 +97,7 @@
 # collect_s (fetching and checking the result; both null for a local run),
 # outcome (pass, failed, timeout, rejected, lost, unknown or cancelled; null for
 # a local run), job (the remote job id), candidate (the commit run),
+# snapshot (true when an uncommitted-work snapshot was created, otherwise false),
 # fallback (why an approved remote job ran locally), preparation_step (the failed
 # preparation stage) and preparation_log (its retained, verified host log path).
 # The preparation fields are null unless collected for a preparation fallback.
@@ -394,7 +395,7 @@ record() {  # <exit status, empty when the command never started>
     --arg run "$run_s" --arg rc "$1" --arg slot "${started:+$slot}" --arg peak "$peak" --arg cpu "$cpu" \
     --arg host "${host:-local}" --arg prep "$(sget prepare_s)" --arg coll "$(sget collect_s)" \
     --arg outcome "$(sget outcome)" --arg job "$(sget job)" --arg cand "$(sget candidate)" \
-    --arg preparation_step "$preparation_step" --arg preparation_log "$preparation_log" --arg fallback "$fallback" '
+    --arg snapshot "$(sget snapshot)" --arg preparation_step "$preparation_step" --arg preparation_log "$preparation_log" --arg fallback "$fallback" '
     def num: if test("^[0-9]+$") then tonumber else null end;
     def str: if . == "" then null else . end;
     {task: ($task | str), project: ($project | str), class: $class, cmd: $cmd,
@@ -402,8 +403,9 @@ record() {  # <exit status, empty when the command never started>
      wait_s: ($wait | num), run_s: ($run | num), exit: ($rc | num), slot: ($slot | num),
      peak_memory_bytes: ($peak | num), cpu_usec: ($cpu | num),
      host: $host, prepare_s: ($prep | num), collect_s: ($coll | num), outcome: ($outcome | str),
-     job: ($job | str), candidate: ($cand | str), preparation_step: ($preparation_step | str),
-     preparation_log: ($preparation_log | str), fallback: ($fallback | str)}' >> "$log"
+     job: ($job | str), candidate: ($cand | str), snapshot: ($snapshot == "true"),
+     preparation_step: ($preparation_step | str), preparation_log: ($preparation_log | str),
+     fallback: ($fallback | str)}' >> "$log"
 }
 
 # A foreground command would hold a trap back until it returned, so the steps of

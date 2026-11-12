@@ -806,8 +806,8 @@ The [heavy-command configuration](configuration.md#heavy-commands-and-concurrenc
 Resolve aliases such as `lts/*` to a numeric project version before approval; the runner does not resolve moving aliases or install runtimes, and pnpm's fetch of its own pin is the only install of a runtime a job can trigger.
 These are operator actions; the doctor never performs them automatically.
 
-After the runtimes are installed, add only project-approved portable commands to the root home's private `config/heavy-remote`, and run each approved command once with `bin/fm-heavy.sh --remote --class <class> --project <project> -- <command>` from a clean repository root.
-The first job transfers the committed candidate and installs dependencies from its lockfile; later candidates reuse the project cache unless the dependency fingerprint changes.
+After the runtimes are installed, add only project-approved portable commands to the root home's private `config/heavy-remote`, and run each approved command once with `bin/fm-heavy.sh --remote --class <class> --project <project> -- <command>` from the repository root.
+Candidate selection and dependency caching follow the [heavy-command configuration](configuration.md#heavy-commands-and-concurrency-confighost-test-slots-configheavy-commands-configheavy-remote).
 Before adding `offload`, confirm the job's `state/heavy-jobs.jsonl` record names the configured remote host, has outcome `pass` and no fallback, and inspect its collected result and log.
 A successful local fallback does not verify remote readiness; use the [preparation fallback guidance](configuration.md#heavy-commands-and-concurrency-confighost-test-slots-configheavy-commands-configheavy-remote) to diagnose it, then repeat the approved remote command after correcting the host.
 Use `bin/fm-heavy-summary.sh` to compare per-project local and remote wait/run times, including remote transfer and result collection.

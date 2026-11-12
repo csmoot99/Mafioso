@@ -9,9 +9,11 @@
 #          -- <command> [args...]
 #
 # The command must be a repository-relative portable command run from the
-# repository root, and the working tree must be clean: the candidate is exactly
-# the committed HEAD. The job:
-#   1. exports HEAD as a git bundle (history included, because the suites clone
+# repository root. A clean tree uses HEAD; uncommitted work uses a snapshot
+# commit with HEAD as parent, including tracked changes and non-ignored untracked
+# files as git add -A would, without changing the real index or working tree.
+# snapshot=true in the sample identifies that candidate. The job:
+#   1. exports the candidate as a git bundle (history included, because the suites clone
 #      the repository) and ships it, a manifest and bin/fm-heavy-remote-runner.py
 #      in one ssh stream; the runner verifies both digests, checks out and
 #      verifies the exact sha, and launches the command detached in its own
@@ -31,8 +33,9 @@
 # waiting for it, and neither kind is ever stopped for the other. With --image the
 # command runs inside that Linux container image on the host (see the runner).
 #
-# No project command started: when the host is unreachable or busy, the tree is dirty, an earlier
-# job is still running there or the host cannot prepare the job, the sample gets
+# No project command started: when the host is unreachable or busy, a snapshot cannot be
+# created (snapshot-failed), an earlier job is still running there or the host
+# cannot prepare the job, the sample gets
 # fallback=<reason> and the exit status is 0, so the caller keeps the command in
 # its local queue. A verified prepare-failed result adds preparation_step and
 # preparation_log (the retained, verified run.log) only after remote cleanup
@@ -244,11 +247,25 @@ reconcile_job() {  # <open record>
   [ ! -e "$record" ] || { blocked=unreachable; return 1; }
 }
 
-# Eligibility: the candidate is the committed HEAD of a clean repository root.
+# Eligibility: only repository roots; dirty roots use a private snapshot index.
 top=$(git rev-parse --show-toplevel 2>/dev/null) || fallback not-a-git-repository
 [ "$(pwd -P)" = "$(cd "$top" && pwd -P)" ] || fallback not-repository-root
-[ -z "$(git status --porcelain 2>/dev/null)" ] || fallback dirty-tree
 sha=$(git rev-parse HEAD) || fallback not-a-git-repository
+bundle_revs=(HEAD)
+status=$(GIT_OPTIONAL_LOCKS=0 git status --porcelain --untracked-files=all 2>/dev/null) || fallback snapshot-failed
+if [ -n "$status" ]; then
+  # Copy the real index so staged additions (including tracked ignored files)
+  # have exactly the same meaning as git add -A, but never refresh that index.
+  index=$(git rev-parse --git-path index) || fallback snapshot-failed
+  cp "$index" "$stage/index" || fallback snapshot-failed
+  GIT_INDEX_FILE="$stage/index" git add -A || fallback snapshot-failed
+  tree=$(GIT_INDEX_FILE="$stage/index" git write-tree) || fallback snapshot-failed
+  sha=$(printf '%s\n' 'Snapshot of uncommitted work for remote tests' |
+    git -c user.name=Firstmate -c user.email=firstmate@localhost commit-tree "$tree" -p "$sha") || fallback snapshot-failed
+  bundle_revs+=("$sha")
+  emit snapshot true
+fi
+[ -z "$sig" ] || finish cancelled $((128 + sig))
 rssh true >/dev/null 2>"$stage/ssh.err" || fallback unreachable
 mkdir -p "$jdir" "$open_records" || fallback state-unwritable
 
@@ -266,7 +283,9 @@ emit candidate "$sha"
 prepare_began=$(date +%s)
 emit wait_until "$prepare_began"
 cmd_sha=$(printf '%s\0' "$@" | sha256sum | cut -d' ' -f1)
-git bundle create "$stage/src.bundle" HEAD >/dev/null 2>&1 || fallback bundle-failed
+# HEAD gives clone an advertised ref; the extra revision includes the snapshot
+# objects in its pack without creating any ref for that unreferenced commit.
+git bundle create "$stage/src.bundle" "${bundle_revs[@]}" >/dev/null 2>&1 || fallback bundle-failed
 bundle_sha=$(sha256sum "$stage/src.bundle" | cut -d' ' -f1)
 argv=$(printf '%s\0' "$@" | jq -Rsc 'split("\u0000")[:-1]') || fallback manifest-failed
 pairs='map(capture("^(?<key>[^=]+)=(?<value>.*)$")) | from_entries'
@@ -279,6 +298,7 @@ jq -n --arg id "$id" --arg sha "$sha" --arg cs "$cmd_sha" --arg bs "$bundle_sha"
   > "$stage/manifest.json" || fallback manifest-failed
 cp "$SELF_DIR/fm-heavy-remote-runner.py" "$stage/runner.py"
 cp "$stage/manifest.json" "$record" || fallback state-unwritable
+[ -z "$sig" ] || finish cancelled $((128 + sig))
 
 tar -cf - -C "$stage" runner.py manifest.json src.bundle \
   | "${SSH[@]}" "$host" "mkdir -p $rdir && tar -xf - -C $rdir && $runner start $rdir" \
