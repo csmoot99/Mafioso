@@ -201,7 +201,7 @@ test_snapshot_failure() {
     echo dirty > "$REPO/new"
     cat > "$FAKEBIN/git" <<'SH'
 #!/usr/bin/env bash
-[ "$1" != "$SNAPSHOT_FAIL" ] || exit 1
+for arg in "$@"; do [ "$arg" != "$SNAPSHOT_FAIL" ] || exit 1; done
 exec "$REAL_GIT" "$@"
 SH
     chmod +x "$FAKEBIN/git"
