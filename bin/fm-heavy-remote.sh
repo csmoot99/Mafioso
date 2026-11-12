@@ -4,7 +4,7 @@
 # it; it is not a user command.
 #
 # usage: fm-heavy-remote.sh --host <ssh alias> --timeout <seconds> --sample <file>
-#          --state-dir <dir> --project <name> [--class test|e2e] [--image <ref>] [--nofile <count>] [--host-slots <1-64>]
+#          --state-dir <dir> --project <name> [--class test|e2e] [--image <ref>] [--host-slots <1-64>]
 #          [--service "<name> <image> <port> <memory> [KEY=VALUE...]"]... [--env KEY=VALUE]...
 #          -- <command> [args...]
 #
@@ -93,13 +93,12 @@ set -u
 set -o pipefail
 
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-host=; host_slots=1; timeout_s=; sample=; state_dir=; project=; class="test"; image=; nofile=65536; services=(); envs=()
+host=; host_slots=1; timeout_s=; sample=; state_dir=; project=; class="test"; image=; services=(); envs=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --project) project=${2:-}; shift 2 || break ;;
     --class) class=${2:-}; shift 2 || break ;;
     --image) image=${2:-}; shift 2 || break ;;
-    --nofile) nofile=${2:-}; shift 2 || break ;;
     --service) services+=("${2:-}"); shift 2 || break ;;
     --env) envs+=("${2:-}"); shift 2 || break ;;
     --host-slots) host_slots=${2:-}; shift 2 || break ;;
@@ -114,7 +113,6 @@ done
 [ -n "$host" ] && [ -n "$sample" ] && [ -n "$state_dir" ] && [ "$#" -gt 0 ] || {
   echo "fm-heavy-remote.sh: usage error (see the header)" >&2; exit 2; }
 case "$timeout_s" in ''|*[!0-9]*|0*) echo "fm-heavy-remote.sh: --timeout must be a positive integer" >&2; exit 2 ;; esac
-[[ $nofile =~ ^[1-9][0-9]{0,6}$ ]] && [ "$nofile" -le 1048576 ] || { echo "fm-heavy-remote.sh: invalid --nofile (1..1048576)" >&2; exit 2; }
 [[ $host_slots =~ ^[1-9][0-9]?$ ]] && [ "$host_slots" -le 64 ] || { echo "fm-heavy-remote.sh: --host-slots must be 1-64" >&2; exit 2; }
 id="$(date +%s)-$$-$RANDOM"
 client_start=$(ps -o lstart= -p $$)
@@ -334,9 +332,9 @@ svcs=$(printf '%s\0' ${services[@]+"${services[@]}"} | jq -Rsc "split(\"\\u0000\
   | {name: .[0], image: .[1], port: (.[2] | tonumber), memory: .[3], env: (.[4:] | $pairs)})") || fallback manifest-failed
 jenv=$(printf '%s\0' ${envs[@]+"${envs[@]}"} | jq -Rsc "split(\"\\u0000\")[:-1] | $pairs") || fallback manifest-failed
 jq -n --arg id "$id" --arg sha "$sha" --arg cs "$cmd_sha" --arg bs "$bundle_sha" --argjson t "$timeout_s" \
-  --argjson nofile "$nofile" --argjson slots "$host_slots" --argjson client_pid "$$" --arg client_start "$client_start" \
+  --argjson slots "$host_slots" --argjson client_pid "$$" --arg client_start "$client_start" \
   --arg project "$project" --arg class "$class" --arg image "$image" --argjson services "$svcs" --argjson env "$jenv" \
-  --argjson argv "$argv" '{nofile: $nofile, host_slots: $slots, client_pid: $client_pid, client_start: $client_start, project: $project, class: $class, image: $image, services: $services, env: $env, id: $id, sha: $sha, command_sha256: $cs, bundle_sha256: $bs, timeout_s: $t, argv: $argv}' \
+  --argjson argv "$argv" '{host_slots: $slots, client_pid: $client_pid, client_start: $client_start, project: $project, class: $class, image: $image, services: $services, env: $env, id: $id, sha: $sha, command_sha256: $cs, bundle_sha256: $bs, timeout_s: $t, argv: $argv}' \
   > "$stage/manifest.json" || fallback manifest-failed
 cp "$SELF_DIR/fm-heavy-remote-runner.py" "$stage/runner.py"
 if ! cp "$stage/manifest.json" "$record.tmp" || ! mv "$record.tmp" "$record"; then fallback state-unwritable; fi

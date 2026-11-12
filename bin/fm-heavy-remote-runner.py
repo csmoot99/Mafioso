@@ -24,7 +24,7 @@ Dependency copies persist per project under ~/.fm-heavy-remote/cache, keyed by
 lockfile/package settings and runtime versions. Each job has private modules.
 A job directory lives under ~/.fm-heavy-remote and holds manifest.json (project,
 class, job id, candidate sha, command argv and its digest, bundle digest,
-timeout, image, nofile, services and job env) and src.bundle (the candidate revision with its history).
+timeout, image, services and job env) and src.bundle (the candidate revision with its history).
 
 Host slots: host_slots in the manifest (default 1, range 1-64) includes the
 host's own jobs on FM_HEAVY_HOST_LOCK (default /tmp/fm-heavy.lock). Additional
@@ -77,8 +77,8 @@ path and ~/.fm-heavy-remote/linux/runtimes and linux/cache standing in for
 runtimes and cache, so Linux runtimes and dependency copies never mix with the
 host's own. The container's Playwright browsers, pnpm store and npm cache live
 under that cache's tools directory, so they persist across jobs. Stopping the job also removes that container. A missing docker fails
-preparation with exit 127, allowing a local retry. The manifest nofile sets
-the container soft/hard open-file limits (default 65536).
+preparation with exit 127, allowing a local retry. The container soft/hard
+open-file limits are fixed at 65536.
 
 Services: each manifest service runs as its own container, fm-heavy-<job>-<name>,
 capped at its declared memory with no swap and given its declared env. The first
@@ -374,7 +374,7 @@ def job_container_argv(jdir, manifest, docker, network):
         os.makedirs(os.path.join(linux, sub), exist_ok=True)
     tools = os.path.join(ROOT, "cache", "tools")
     return [docker, "run", "--rm", "--init", "--name", container(manifest), "--memory", "6g", "--memory-swap", "6g", *network,
-            "--ulimit", "nofile={0}:{0}".format(manifest.get("nofile", 65536)),
+            "--ulimit", "nofile=65536:65536",
             "-e", "HOME=" + os.path.expanduser("~"), "-e", "GIT_CONFIG_COUNT=1",
             "-e", "PLAYWRIGHT_BROWSERS_PATH=" + os.path.join(tools, "ms-playwright"),
             "-e", "pnpm_config_store_dir=" + os.path.join(tools, "pnpm-store"),  # pnpm 11+

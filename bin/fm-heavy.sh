@@ -57,8 +57,6 @@
 # matching approval supplies them: a command line, then project <name>, then
 # project *. An approval with services needs an image and distinct service ports;
 # its jobs reach every service on localhost:<port>.
-#   nofile <count>                      container soft/hard open-file limit, default
-#                                       65536, positive integer up to 1048576
 #   host-slots <n>                      optional host job count (1-64), default 1
 #   timeout <seconds>                   optional positive integer, default 900
 #   offload                             optional presence line
@@ -226,7 +224,7 @@ if [ -e "$root/config/host-test-slots" ]; then
     echo "fm-heavy.sh: config/host-test-slots must hold one positive integer" >&2; exit 2 ;; esac
 fi
 
-rhost=; rslots=; rtimeout=; rimage=; rnofile=; offload=; approved=; rconf=$root/config/heavy-remote; rproblem=
+rhost=; rslots=; rtimeout=; rimage=; offload=; approved=; rconf=$root/config/heavy-remote; rproblem=
 remote_opts=()
 # The most specific matching approval (level 3 command, 2 project, 1 project *) supplies options.
 select_approval() {
@@ -313,7 +311,6 @@ elif [ -e "$rconf" ]; then
         svc_names+=("${words[0]:-}"); svc_specs+=("${words[*]-}")
         ;;
       image) [ -z "$rimage" ] && [[ $rest =~ ^[A-Za-z0-9._/:@-]+$ ]] && rimage=$rest || bad=${bad:-$n} ;;
-      nofile) [ -z "$rnofile" ] && [[ $rest =~ ^[1-9][0-9]{0,6}$ ]] && [ "$rest" -le 1048576 ] && rnofile=$rest || bad=${bad:-$n} ;;
       host-slots) [ -z "$rslots" ] && [[ $rest =~ ^[1-9][0-9]?$ ]] && [ "$rest" -le 64 ] && rslots=$rest || bad=${bad:-$n} ;;
       timeout) [ -z "$rtimeout" ] && [[ $rest =~ ^[1-9][0-9]{0,5}$ ]] && rtimeout=$rest || bad=${bad:-$n} ;;
       offload) [ -z "$offload" ] && [ -z "$rest" ] && offload=1 || bad=${bad:-$n} ;;
@@ -505,7 +502,7 @@ try_remote() {
     if flock -n 8; then
       started=$(date +%s)  # signals now belong to the driver
       run_captured "$REMOTE" --host "$rhost" --host-slots "$rslots" --timeout "$rtimeout" --sample "$sample" \
-        --project "$project" --class "$class" ${rnofile:+--nofile "$rnofile"} ${rimage:+--image "$rimage"} ${remote_opts[@]+"${remote_opts[@]}"} \
+        --project "$project" --class "$class" ${rimage:+--image "$rimage"} ${remote_opts[@]+"${remote_opts[@]}"} \
         --state-dir "$root/state/heavy-remote" -- "$@"
       rc=$?
       preparation_step=$(sget preparation_step)

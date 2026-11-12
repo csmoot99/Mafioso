@@ -1426,7 +1426,7 @@ test_project_approvals() {
   printf 'host fake-mac\nproject *\n' > "$HOME_FM/config/heavy-remote"
   heavy --project '' --remote >/dev/null 2>&1; expect_code 2 "$?" "a job with no project never leaves"
   [ "$(wc -l < "$REMOTE_HOME/runs")" -eq 2 ] || fail "only the approved jobs ran on the host"
-  for bad in 'project p\nproject p' 'project a b' 'project' 'nofile 0' 'nofile nope' 'nofile 1048577' 'nofile 123\nnofile 456' 'image bad image!' 'image a\nimage b' \
+  for bad in 'project p\nproject p' 'project a b' 'project' 'nofile 65536' 'nofile 8192' 'image bad image!' 'image a\nimage b' \
     'image i\nproject q service=nope' 'service db pg 5432 1g\nproject q service=db' 'project q bogus=1' 'project q env=nokey' \
     'image i\nservice a x 5432 1g\nservice b y 5432 1g\nproject q service=a service=b' 'service DB pg 5432 1g' \
     'service db pg port 1g' 'service db pg 5432 1t' 'service db pg 5432 1g\nservice db pg 5433 1g' 'service db pg 5432 1g bad'; do
@@ -1609,7 +1609,7 @@ shift
 dir=.
 ulimit -Sn 256
 while [ "$#" -gt 0 ]; do
-  case "$1" in --rm|--init) shift ;; --ulimit) limits=${2#nofile=}; ulimit -Sn "${limits%%:*}"; shift 2 ;; -w) dir=$2; shift 2 ;; -e) export "${2?}"; shift 2 ;; -*) shift 2 ;; *) break ;; esac
+  case "$1" in --rm|--init) shift ;; --ulimit) limits=${2#nofile=}; ulimit -Sn "${limits%%:*}"; ulimit -Hn "${limits##*:}"; shift 2 ;; -w) dir=$2; shift 2 ;; -e) export "${2?}"; shift 2 ;; -*) shift 2 ;; *) break ;; esac
 done
 shift
 cd "$dir" && exec "$@"
@@ -1646,13 +1646,11 @@ SH
 }
 
 test_container_many_file_install() {
-  local limit
-  for limit in 256 default 8192; do
-    setup "manyfiles-$limit" 'test -f node_modules/proof'
-    make_node_project
-    make_fake_docker "$FAKEBIN"
-    # Exercise real simultaneous descriptors, as a parallel pnpm install does.
-    python3 - "$FAKEBIN/pnpm" <<'PYTHON'
+  setup manyfiles 'test -f node_modules/proof && test "$(ulimit -Sn)" = 65536 && test "$(ulimit -Hn)" = 65536'
+  make_node_project
+  make_fake_docker "$FAKEBIN"
+  # Exercise real simultaneous descriptors, as a parallel pnpm install does.
+  python3 - "$FAKEBIN/pnpm" <<'PYTHON'
 import sys
 from pathlib import Path
 p = Path(sys.argv[1])
@@ -1662,22 +1660,14 @@ OPENFILES
 [ "$?" = 0 ] || exit 42
 if [ "$1" = install ]"""))
 PYTHON
-    printf 'image fm-heavy-linux:2\n' >> "$HOME_FM/config/heavy-remote"
-    [ "$limit" = default ] || printf 'nofile %s\n' "$limit" >> "$HOME_FM/config/heavy-remote"
-    heavy --remote >"$CASE/out" 2>&1 || fail "many-file install: $(cat "$CASE/out")"
-    if [ "$limit" = 256 ]; then
-      expect_record '.host == "local" and .fallback == "prepare-failed" and .preparation_step == "dependencies"' "low limit returns locally"
-      assert_grep 'Too many open files' "$(last_record | jq -r .preparation_log)" "low-limit reproduction"
-      continue
-    fi
-    expect_record '.host == "fake-mac" and .outcome == "pass" and .fallback == null' "many-file install passes on host"
-    grep -F -- "--ulimit nofile=${limit/default/65536}:${limit/default/65536}" "$CTL/docker.log" >/dev/null || fail "container nofile setting"
-    [ ! -e "$CTL/local-runs" ] || fail "no fallback for many-file install"
-  done
+  printf 'image fm-heavy-linux:2\n' >> "$HOME_FM/config/heavy-remote"
+  heavy --remote >"$CASE/out" 2>&1 || fail "many-file install: $(cat "$CASE/out")"
+  expect_record '.host == "fake-mac" and .outcome == "pass" and .fallback == null' "many-file install passes on host"
+  [ ! -e "$CTL/local-runs" ] || fail "no fallback for many-file install"
   setup command78 'exit 78'
   heavy --remote >/dev/null 2>&1; expect_code 78 "$?" "project command exiting 78"
   expect_record '.host == "fake-mac" and .outcome == "failed" and .fallback == null' "exit 78 after command starts remains failed"
-  pass "fm-heavy: default and configured container limits permit many-file installs; command exit 78 stays failed"
+  pass "fm-heavy: fixed container limits permit many-file installs; command exit 78 stays failed"
 }
 
 free_port() { python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])'; }
