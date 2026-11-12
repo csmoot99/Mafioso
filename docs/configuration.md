@@ -1232,7 +1232,7 @@ The flag is machine-wide like the slot and the log: it is read from the root hom
 A drive call holds the slot only while it runs a local test step, build or e2e, and the pipeline agent never takes the slot again inside that hold.
 
 `config/heavy-remote` in the root home is the opt-in for the SSH destination, and without it `fm-heavy.sh --remote` refuses and every job runs locally as before.
-The schema is one `host <ssh-alias>`, one or more approvals, an optional `image <ref>`, optional `service` lines, optional `timeout <seconds>` (default 900), and an optional `offload` presence line.
+The schema is one `host <ssh-alias>`, one or more approvals, an optional `image <ref>`, optional `service` lines, optional `host-slots <n>` (1-64, default 1), optional `timeout <seconds>` (default 900), and an optional `offload` presence line.
 An approval is `command <project> -- <words...>` for one command, `project <project>` for every test and e2e command of one project, or `project *` for every project.
 A project approval never covers a `no-mistakes` drive call, which needs this machine's gate.
 Blank lines and lines starting with `#` are ignored; duplicate settings, duplicate approvals, unknown keys, invalid values or an unreadable file refuse a job that would offload (`--remote`, or an approved command with `offload`) with an error naming the file and problem, while every other heavy job prints one warning and runs locally under the local slot.
@@ -1250,7 +1250,8 @@ timeout 900
 offload
 ```
 
-The destination receives private source at the committed HEAD and its reachable history as a Git bundle, plus the job manifest and runner; other refs such as `origin/main` are not exported, so `fm-test-run.sh --changed`, which needs a base ref, always fails there.
+The destination receives private source for the selected candidate and its reachable history as a Git bundle, plus the job manifest and runner; other refs such as `origin/main` are not exported, so `fm-test-run.sh --changed`, which needs a base ref, always fails there.
+Uncommitted work is eligible through the snapshot mechanism; [`bin/fm-heavy-remote.sh`](../bin/fm-heavy-remote.sh)'s header owns candidate selection, file inclusion and source-state preservation.
 When the root home's `config/heavy-remote` configures a host, Codex ship and scout launches carry operator consent for this approved payload in their launch-time developer instructions.
 Workers launched by local secondmates use that same root configuration for the consent's host and approvals, while the authorized command retains the invoking `FM_HOME`; a child-only configuration grants no consent.
 [`bin/fm-spawn.sh`](../bin/fm-spawn.sh)'s `codex_developer_flag` owns the exact command scope and exclusions: consent is limited to the unmodified `fm-heavy.sh` entry point enforcing the existing approvals, with no policy or configuration overrides, and does not authorize other source-transfer routes.
@@ -1259,24 +1260,24 @@ Approved classes are test and e2e; build and image stay local, because only the 
 `--remote` explicitly requests the destination first and refuses an unapproved command or class.
 With `offload`, an approved job tries the destination automatically when every local slot is busy and the destination is free, without changing worker commands or instructions.
 Without `offload`, remote execution still requires `--remote`.
-The destination takes one job at a time, independently of local capacity, and shares that slot with its own heavy jobs.
-A job is sent only while the destination's slot is free and none of its own jobs waits for it, so its own work goes first; no running job of either kind is ever stopped for another.
-The destination's own workers run their heavy jobs through `bin/fm-heavy.sh` in its home, enabled there by `config/heavy-commands`, and each queued job there leaves a waiter marker beside the slot lock for that check.
+The destination's capacity is independent of local capacity; `host-slots 2` permits two concurrent jobs including its own heavy jobs, while omission retains one job at a time.
+Native jobs keep using the original lock unchanged; the [runner's header](../bin/fm-heavy-remote-runner.py) owns additional slot admission and native-waiter priority.
+No running job is stopped for another.
+Set the count only after checking that concurrent job memory caps, including each job's services, fit the destination's existing memory and container VM allocation.
 An approved job it cannot take yet, because it is busy, unreachable or still running an unknown job, waits for a local slot while it keeps checking, and moves to whichever frees first, so queued work drains to the destination.
 A busy destination is checked every two seconds and the host itself every 30 seconds.
-When preparation cannot transfer or check out the candidate, or the working tree is not a clean repository root, the command joins the normal local queue instead.
+When snapshot creation fails, preparation cannot transfer or check out the candidate, or the command is not run from a repository root, the command joins the normal local queue instead.
 A job that ends up running locally records its last reason in `fallback`.
 A lost connection never leads to a second run of a job that may still be running: the job is reconciled against its record on the destination first, and a job that cannot be reached is recorded as unknown with its scratch kept.
 A finished job whose result cannot be fetched after the same reconnect attempts is recorded the same way, with the result left on the destination for the next request to collect.
-Every unknown job keeps a durable local record in `state/heavy-remote/unknown-<host>/`, and each new remote request reconciles those records over SSH before it is admitted, from the job's completion file, its started marker and whether its own process group is alive.
-While such a job still runs, no second job starts there and the request stays in the local queue with fallback `unknown-job-running`; a job whose supervisor has died is stopped first, because nothing else would stop it.
-When the destination cannot be reached the record stays and the request stays in the local queue with fallback `unreachable`.
-A finished job's result is collected into `state/heavy-remote/<job>/` for that job alone and never counts as a pass for the new candidate; its scratch is then removed and `reconciled.json` there closes the record with the job's outcome.
+The [driver's open-record contract](../bin/fm-heavy-remote.sh) owns recovery records, concurrent-client collection ownership, reconciliation and the reasons an unsettled job blocks new remote work.
 A result with the wrong commit, command or bundle digest, or a missing or partial log, is rejected and is never a pass, and the destination refuses a second start of one job, so a duplicate delivery never runs twice.
 [`bin/fm-heavy.sh`](../bin/fm-heavy.sh) owns the wrapper mechanics and extra record fields, and [`bin/fm-heavy-remote.sh`](../bin/fm-heavy-remote.sh) owns the transfer, the outcomes and their exit statuses.
 [`bin/fm-heavy-summary.sh`](../bin/fm-heavy-summary.sh) gives local and remote jobs separate rows, so the queue wait a remote run saves can be read against its preparation and collection time.
 The destination needs `python3`, `git`, `tar` and `ps`; the runner is shipped with each job.
 With `image <ref>`, each job runs inside that Linux container image through the destination's `docker`, under a 6 GB memory cap, so its tools and results match a Linux machine; the image needs `python3` and `git` plus the projects' own system tools, and the container is removed when the job ends or is stopped.
+The repository supplies [`bin/fm-heavy-linux.Dockerfile`](../bin/fm-heavy-linux.Dockerfile) for `fm-heavy-linux:2`, including native build tools; its header owns the owner-approved, slot-locked build command.
+The container soft/hard open-file limits are fixed at `nofile=65536:65536`; the [`bin/fm-heavy-remote-runner.py`](../bin/fm-heavy-remote-runner.py) header owns the container mechanics.
 An approval may carry `image=<ref>` for its own image, such as a browser image for e2e, `service=<name>` for each throwaway service its jobs need, and `env=KEY=VALUE` for the job environment; the most specific matching approval supplies them.
 A `service <name> <image> <port> <memory> [KEY=VALUE...]` line declares a service container that starts beside each such job in a private network of its own, reachable only by that job on `localhost:<port>`, and is removed with the job; services are never shared or kept between jobs.
 A job whose 6 GB cap plus its services' memory exceeds the destination docker's memory is not started there and runs locally; `bin/fm-heavy.sh` and `bin/fm-heavy-remote-runner.py` headers own the exact syntax and container mechanics.
@@ -1284,7 +1285,8 @@ Inside the image, Node runtimes come from `~/.fm-heavy-remote/linux/runtimes` on
 For Node projects, each job runs on the versions of node and the lockfile's pnpm/npm that its own project pins in `package.json` engines, `packageManager` and `.nvmrc`, chosen from those installed on the destination, except that a reachable pnpm may fetch its own pinned version; the runner then installs locked dependencies from the transferred candidate.
 Stable numeric versions, comparison ranges, wildcards, caret, tilde, hyphen ranges and `||` alternatives are supported; unsupported requirements such as `.nvmrc` aliases refuse the job with a clear reason rather than guessing.
 A root `package.json` that declares no dependencies of any kind needs no lockfile: the job still runs on its pinned Node and skips installation.
-A pinned Node or npm version that is not installed, no reachable pnpm, declared dependencies with no lockfile, ambiguous lockfiles, and installation failures are failed remote jobs with a clear reason, never local fallbacks.
+A verified preparation failure, including container startup, service readiness, runtime, dependency or browser preparation and a timeout before the project command starts, returns the job to the local queue once remote cleanup succeeds, with the failing preparation step and retained host log in its record.
+Failures of the project command remain remote job failures, including exit 78; cancellation never retries locally.
 Dependency copies are cached per project under `~/.fm-heavy-remote/cache/`, refreshed when lockfiles, package settings or runtime versions change, and copied into each isolated candidate before execution.
 An e2e command that invokes Playwright directly or through a package script also installs its required browser revisions, using Playwright's account cache; test jobs never install browsers.
 Dependency preparation shares the job's process group and timeout, and is included in `run_s`; `prepare_s` measures transfer and checkout.

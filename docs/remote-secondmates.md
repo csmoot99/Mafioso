@@ -801,14 +801,15 @@ For each approved Node project, inspect its `package.json` engines and `packageM
 - **npm:** the selected Node's own npm is used. A project pinning a different npm takes the same per-version install under `~/.fm-heavy-remote/runtimes/npm/<version>`.
 
 For each tool the runner tries the SSH PATH first, then those directories, newest first, and uses the first version satisfying every pin for both dependency installation and the approved command.
-A pinned Node or npm version that is not installed refuses the job with the versions it found, so add it and run the job again.
-With no pnpm reachable the job refuses too, and a pnpm that cannot fetch its pin is reported the same way, as `missing runtime pnpm`.
+Use the collected preparation log to identify missing or incompatible runtimes, including `missing runtime pnpm` when no usable pnpm is available, and provision them before expecting remote execution.
+The [heavy-command configuration](configuration.md#heavy-commands-and-concurrency-confighost-test-slots-configheavy-commands-configheavy-remote) owns preparation fallback behavior.
 Resolve aliases such as `lts/*` to a numeric project version before approval; the runner does not resolve moving aliases or install runtimes, and pnpm's fetch of its own pin is the only install of a runtime a job can trigger.
 These are operator actions; the doctor never performs them automatically.
 
-After the runtimes are installed, add only project-approved portable commands to the root home's private `config/heavy-remote`, and run each approved command once with `bin/fm-heavy.sh --remote --class <class> --project <project> -- <command>` from a clean repository root.
-The first job transfers the committed candidate and installs dependencies from its lockfile; later candidates reuse the project cache unless the dependency fingerprint changes.
-Inspect the collected result and log, then add `offload` to enable automatic use when the local slot is busy.
+After the runtimes are installed, add only project-approved portable commands to the root home's private `config/heavy-remote`, and run each approved command once with `bin/fm-heavy.sh --remote --class <class> --project <project> -- <command>` from the repository root.
+Candidate selection and dependency caching follow the [heavy-command configuration](configuration.md#heavy-commands-and-concurrency-confighost-test-slots-configheavy-commands-configheavy-remote).
+Before adding `offload`, confirm the job's `state/heavy-jobs.jsonl` record names the configured remote host, has outcome `pass` and no fallback, and inspect its collected result and log.
+A successful local fallback does not verify remote readiness; use the [preparation fallback guidance](configuration.md#heavy-commands-and-concurrency-confighost-test-slots-configheavy-commands-configheavy-remote) to diagnose it, then repeat the approved remote command after correcting the host.
 Use `bin/fm-heavy-summary.sh` to compare per-project local and remote wait/run times, including remote transfer and result collection.
 No project repository, coding-agent placement, local slot limit or memory cap changes as part of this setup.
 
@@ -818,6 +819,6 @@ Jobs run directly on macOS can fail for macOS reasons alone, such as missing Lin
 Add `image <ref>` to `config/heavy-remote` and build that image on the Mac's existing container engine without stopping, restarting or reconfiguring it; it needs `python3`, `git`, `ca-certificates` and the system tools the projects' tests use.
 Tests that need a database, Redis or a search engine declare `service` lines at the versions the project's CI pins and name them on the project's approval, so each sent job gets its own throwaway copies; browser tests name an image with the project's pinned browsers through `image=` (see `config/heavy-remote` in [configuration](configuration.md)).
 For Node projects, install Linux runtimes for the image's architecture under `~/.fm-heavy-remote/linux/runtimes/<tool>/<version>`, with the same layout and selection as the macOS runtimes above.
-The Mac home's own workers keep running their jobs on macOS, but through its `bin/fm-heavy.sh` and slot lock, so they share one queue with sent jobs and always go first.
+The Mac home's own workers keep running their jobs on macOS through its `bin/fm-heavy.sh`; the [heavy-command configuration](configuration.md#heavy-commands-and-concurrency-confighost-test-slots-configheavy-commands-configheavy-remote) owns shared capacity and native-job priority.
 To enable that, update the Mac home to a Firstmate version with this support, install `bash`, `flock` and `jq` on its workers' PATH, and create `config/heavy-commands` in the Mac's root home so its worker instructions point at the wrapper.
-Check that `docker version` works over plain non-interactive SSH, then run one approved job with `--remote` while no job holds the Mac's slot, and confirm that `~/.fm-heavy-remote` keeps only `linux/`, `runtimes/` and `cache/` afterwards.
+Check that `docker version` works over plain non-interactive SSH, then repeat the remote-readiness checks above for one approved container job while the destination is idle, and confirm that `~/.fm-heavy-remote` keeps only `linux/`, `runtimes/` and `cache/` afterwards.

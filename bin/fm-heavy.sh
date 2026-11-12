@@ -38,7 +38,7 @@
 # and slot are null.
 #
 # Remote destination (opt-in): config/heavy-remote approves test and e2e commands
-# on one SSH host, which takes one job at a time; build and image always stay
+# on one SSH host; build and image always stay
 # local, since only the result and log come back. Lines (comments start #):
 #   host <ssh alias>                    required, one host
 #   command <project> [opt...] -- <words...>
@@ -57,6 +57,7 @@
 # matching approval supplies them: a command line, then project <name>, then
 # project *. An approval with services needs an image and distinct service ports;
 # its jobs reach every service on localhost:<port>.
+#   host-slots <n>                      optional host job count (1-64), default 1
 #   timeout <seconds>                   optional positive integer, default 900
 #   offload                             optional presence line
 # Command words must match argv exactly (whitespace separates words; no shell
@@ -71,20 +72,22 @@
 # --remote requires an approval and requests remote first. With offload, an
 # approved command automatically tries the host when all local slots are busy;
 # otherwise it runs locally. Without offload or --remote the local behavior is
-# unchanged. The host's own heavy jobs share its slot with the jobs sent there and
-# go first: a job is sent only while that slot is free and none of the host's jobs
+# unchanged. The host's own heavy jobs count toward host-slots and
+# go first: a job is sent only while capacity is free and none of the host's jobs
 # waits for it, and no running job of either kind is stopped for another. Each job
 # waiting for a local slot leaves a <lock>.waiting/<pid> marker for that check.
 # An approved job the host cannot take yet because it is busy,
 # unreachable or still running an unknown job waits for a local slot while it
 # keeps checking: the remote slot every two seconds, the host itself every
 # FM_HEAVY_REMOTE_RECHECK seconds, and it moves to whichever frees first. Any other
-# reason, such as an unclean repository root, joins the normal local queue. The
-# last reason is recorded in fallback when the job runs locally. Missing runtimes,
-# incompatible versions and dependency-install errors on the host fail the remote
-# job and never silently retry locally. A signal before starting prevents
+# reason, such as running outside the repository root or a failed snapshot, joins
+# the normal local queue. The last reason is recorded in fallback when the job runs locally. Missing runtimes,
+# incompatible versions and dependency-install errors before the project command
+# starts return to the local queue with fallback=prepare-failed, preparation_step
+# and preparation_log (the retained host log). Project command failures stay failed.
+# A signal before starting prevents
 # execution anywhere. bin/fm-heavy-remote.sh owns transfer, results and
-# unknown-job reconciliation; unknown jobs prevent new remote work until settled.
+# open-record reconciliation, including concurrent-client ownership.
 # Job copies live in state/heavy-remote/<job> in the root home, and open records
 # in state/heavy-remote/unknown-<host>.
 #
@@ -92,8 +95,13 @@
 # local run), prepare_s (bundle, transfer and checkout until the job started) and
 # collect_s (fetching and checking the result; both null for a local run),
 # outcome (pass, failed, timeout, rejected, lost, unknown or cancelled; null for
-# a local run), job (the remote job id), candidate (the commit run), and
-# fallback (why an approved remote job ran locally). wait_s is the time before
+# a local run), job (the remote job id), candidate (the commit run),
+# snapshot (true when this remote attempt created an uncommitted-work snapshot,
+# otherwise false; reset to false on local fallback),
+# fallback (why an approved remote job ran locally), preparation_step (the failed
+# preparation stage) and preparation_log (its retained, verified host log path).
+# The preparation fields are null unless collected for a preparation fallback.
+# wait_s is the time before
 # preparation began; started_at is when the job started on the host and ended_at
 # when its completion was seen, both read on this machine's clock; peak_memory_bytes
 # is null because no whole-job peak is read remotely, cpu_usec comes from the
@@ -217,7 +225,7 @@ if [ -e "$root/config/host-test-slots" ]; then
     echo "fm-heavy.sh: config/host-test-slots must hold one positive integer" >&2; exit 2 ;; esac
 fi
 
-rhost=; rtimeout=; rimage=; offload=; approved=; rconf=$root/config/heavy-remote; rproblem=
+rhost=; rslots=; rtimeout=; rimage=; offload=; approved=; rconf=$root/config/heavy-remote; rproblem=
 remote_opts=()
 # The most specific matching approval (level 3 command, 2 project, 1 project *) supplies options.
 select_approval() {
@@ -304,6 +312,7 @@ elif [ -e "$rconf" ]; then
         svc_names+=("${words[0]:-}"); svc_specs+=("${words[*]-}")
         ;;
       image) [ -z "$rimage" ] && [[ $rest =~ ^[A-Za-z0-9._/:@-]+$ ]] && rimage=$rest || bad=${bad:-$n} ;;
+      host-slots) [ -z "$rslots" ] && [[ $rest =~ ^[1-9][0-9]?$ ]] && [ "$rest" -le 64 ] && rslots=$rest || bad=${bad:-$n} ;;
       timeout) [ -z "$rtimeout" ] && [[ $rest =~ ^[1-9][0-9]{0,5}$ ]] && rtimeout=$rest || bad=${bad:-$n} ;;
       offload) [ -z "$offload" ] && [ -z "$rest" ] && offload=1 || bad=${bad:-$n} ;;
       *) bad=${bad:-$n} ;;
@@ -343,6 +352,7 @@ elif [ -e "$rconf" ]; then
     echo "fm-heavy.sh: --remote command/class is not approved for this project" >&2; exit 2
   fi
   rtimeout=${rtimeout:-900}
+  rslots=${rslots:-1}
 fi
 
 lock=${FM_HEAVY_LOCK:-/tmp/fm-heavy.lock}
@@ -353,7 +363,7 @@ unit="fm-heavy-$$-$requested"
 sample=$(mktemp)
 trap 'rm -f "$sample" "$lock.waiting/$$"' EXIT
 mkdir -p "$root/state"
-slot=; started=; signal=; waiter=; host=; fallback=
+preparation_step=; preparation_log=; slot=; started=; signal=; waiter=; host=; fallback=
 sget() { sed -n "s/^$1=//p" "$sample" 2>/dev/null | tail -1; }
 command_line=$*
 logs="$root/state/heavy-logs"
@@ -386,7 +396,7 @@ record() {  # <exit status, empty when the command never started>
     --arg run "$run_s" --arg rc "$1" --arg slot "${started:+$slot}" --arg peak "$peak" --arg cpu "$cpu" \
     --arg host "${host:-local}" --arg prep "$(sget prepare_s)" --arg coll "$(sget collect_s)" \
     --arg outcome "$(sget outcome)" --arg job "$(sget job)" --arg cand "$(sget candidate)" \
-    --arg fallback "$fallback" '
+    --arg snapshot "$(sget snapshot)" --arg preparation_step "$preparation_step" --arg preparation_log "$preparation_log" --arg fallback "$fallback" '
     def num: if test("^[0-9]+$") then tonumber else null end;
     def str: if . == "" then null else . end;
     {task: ($task | str), project: ($project | str), class: $class, cmd: $cmd,
@@ -394,7 +404,9 @@ record() {  # <exit status, empty when the command never started>
      wait_s: ($wait | num), run_s: ($run | num), exit: ($rc | num), slot: ($slot | num),
      peak_memory_bytes: ($peak | num), cpu_usec: ($cpu | num),
      host: $host, prepare_s: ($prep | num), collect_s: ($coll | num), outcome: ($outcome | str),
-     job: ($job | str), candidate: ($cand | str), fallback: ($fallback | str)}' >> "$log"
+     job: ($job | str), candidate: ($cand | str), snapshot: ($snapshot == "true"),
+     preparation_step: ($preparation_step | str), preparation_log: ($preparation_log | str),
+     fallback: ($fallback | str)}' >> "$log"
 }
 
 # A foreground command would hold a trap back until it returned, so the steps of
@@ -478,30 +490,40 @@ try_local() {
   return 1
 }
 
-# The host takes one job at a time, under its own descriptor lock. Returns only
-# when the job did not run there, with the reason in $fallback.
+# Each client lane keeps its legacy lock through collection; the host runner
+# enforces the global count across clients and native host jobs.
 remote_recheck=0
 try_remote() {
-  exec 8>>"$lock.remote.$rhost" || { echo "fm-heavy.sh: cannot open $lock.remote.$rhost" >&2; exit 2; }
-  if flock -n 8; then
-    started=$(date +%s)  # signals now belong to the driver
-    run_captured "$REMOTE" --host "$rhost" --timeout "$rtimeout" --sample "$sample" \
-      --project "$project" --class "$class" ${rimage:+--image "$rimage"} ${remote_opts[@]+"${remote_opts[@]}"} \
-      --state-dir "$root/state/heavy-remote" -- "$@"
-    rc=$?
-    fallback=$(sget fallback)
-    if [ -z "$fallback" ]; then
-      host=$rhost
-      [ -z "$signal" ] || rc=$((128 + signal))
-      finish "$rc"
+  local lane lane_lock
+  lane=1
+  while [ "$lane" -le "$rslots" ]; do
+    lane_lock=$lock.remote.$rhost
+    [ "$lane" -eq 1 ] || lane_lock=$lane_lock.$lane
+    exec 8>>"$lane_lock" || { echo "fm-heavy.sh: cannot open $lane_lock" >&2; exit 2; }
+    if flock -n 8; then
+      started=$(date +%s)  # signals now belong to the driver
+      run_captured "$REMOTE" --host "$rhost" --host-slots "$rslots" --timeout "$rtimeout" --sample "$sample" \
+        --project "$project" --class "$class" ${rimage:+--image "$rimage"} ${remote_opts[@]+"${remote_opts[@]}"} \
+        --state-dir "$root/state/heavy-remote" -- "$@"
+      rc=$?
+      preparation_step=$(sget preparation_step)
+      preparation_log=$(sget preparation_log)
+      fallback=$(sget fallback)
+      if [ -z "$fallback" ]; then
+        host=$rhost
+        [ -z "$signal" ] || rc=$((128 + signal))
+        finish "$rc"
+      fi
+      started=; : > "$sample"
+      [ -z "$signal" ] || on_signal "$signal"
+      remote_recheck=$((SECONDS + ${FM_HEAVY_REMOTE_RECHECK:-30}))
+      exec 8>&-
+      return
     fi
-    started=; : > "$sample"
-    [ -z "$signal" ] || on_signal "$signal"
-    remote_recheck=$((SECONDS + ${FM_HEAVY_REMOTE_RECHECK:-30}))
-  else
-    fallback=destination-busy
-  fi
-  exec 8>&-
+    exec 8>&-
+    lane=$((lane + 1))
+  done
+  fallback=destination-busy
 }
 
 if [ -z "$remote" ] && [ -n "$offload" ] && [ -n "$approved" ]; then

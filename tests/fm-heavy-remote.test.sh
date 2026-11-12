@@ -133,7 +133,7 @@ test_pass_and_record() {
   out=$(heavy --remote 2>&1) || fail "a passing remote job must exit 0: $out"
   assert_contains "$out" "$SHA" "the job ran on the exact candidate and its output reached stdout"
   expect_record ".host == \"fake-mac\" and .outcome == \"pass\" and .exit == 0 and .candidate == \"$SHA\"
-    and .fallback == null and .slot == null and (.job | type) == \"string\"
+    and .snapshot == false and .fallback == null and .slot == null and (.job | type) == \"string\"
     and (.prepare_s | type) == \"number\" and (.collect_s | type) == \"number\"
     and (.wait_s | type) == \"number\" and (.run_s | type) == \"number\"
     and .started_at >= .requested_at and .ended_at >= .started_at
@@ -142,6 +142,128 @@ test_pass_and_record() {
   [ -z "$(ls -A "$HOME_FM/state/heavy-remote/unknown-fake-mac")" ] || fail "a finished job must leave no open record"
   assert_present "$HOME_FM/state/heavy-remote/$(last_record | jq -r .job)/result.json" "the result copy is kept locally"
   pass "fm-heavy --remote: the exact candidate runs on the host and the record has every stage"
+}
+
+# Fingerprint working files and Git control files, including raw index, refs,
+# HEAD and stash reflogs. New objects are allowed; no existing control file is.
+source_fingerprint() {
+  python3 - "$REPO" <<'PYCODE'
+import hashlib, os, pathlib, subprocess, sys
+root = pathlib.Path(sys.argv[1])
+gitdir = pathlib.Path(subprocess.check_output(
+    ["git", "-C", str(root), "rev-parse", "--absolute-git-dir"], text=True).strip())
+for label, base in [("work", root), ("git", gitdir)]:
+    for directory, dirs, files in os.walk(base):
+        dirs[:] = sorted(d for d in dirs if d != (".git" if label == "work" else "objects"))
+        for name in sorted(files):
+            path = pathlib.Path(directory) / name
+            data = os.readlink(path).encode() if path.is_symlink() else path.read_bytes()
+            print(label, path.relative_to(base), path.lstat().st_mode, hashlib.sha256(data).hexdigest())
+PYCODE
+}
+
+test_dirty_snapshot() {
+  setup snapshot 'test "$(cat tracked)" = modified && test ! -e deleted && test "$(cat new)" = untracked && test ! -e .env && git rev-parse HEAD && git rev-parse HEAD^'
+  printf 'original\n' > "$REPO/tracked"
+  printf 'delete me\n' > "$REPO/deleted"
+  printf '.env\n' > "$REPO/.gitignore"
+  git -C "$REPO" add -A
+  git -C "$REPO" commit -qm 'snapshot fixtures'
+  SHA=$(git -C "$REPO" rev-parse HEAD)
+  echo stash > "$REPO/tracked"
+  git -C "$REPO" stash push -qm 'preserve stash'
+  echo staged > "$REPO/tracked"
+  git -C "$REPO" add tracked
+  echo modified > "$REPO/tracked"
+  rm "$REPO/deleted"
+  echo untracked > "$REPO/new"
+  echo secret > "$REPO/.env"
+  source_fingerprint > "$CASE/before"
+  local out candidate
+  out=$(heavy --remote 2>&1) || fail "snapshot run: $out"
+  expect_record '.host == "fake-mac" and .snapshot == true and .outcome == "pass"' "snapshot record"
+  candidate=$(last_record | jq -r .candidate)
+  [ "$candidate" != "$SHA" ] || fail "dirty candidate must differ from HEAD"
+  assert_contains "$out" "$candidate" "snapshot candidate ran"
+  assert_contains "$out" "$SHA" "snapshot parent is HEAD"
+  source_fingerprint > "$CASE/after"
+  cmp "$CASE/before" "$CASE/after" || fail "snapshot changed source files or Git control files"
+  expect_host_clean "snapshot scratch removed"
+  pass "fm-heavy --remote: snapshot contains current files, excludes ignored files and preserves source state"
+}
+
+test_hidden_untracked_snapshot() {
+  setup hidden-untracked 'test "$(cat new)" = untracked && git rev-parse HEAD'
+  git -C "$REPO" config status.showUntrackedFiles no
+  echo untracked > "$REPO/new"
+  [ -z "$(git -C "$REPO" status --porcelain)" ] || fail "fixture must hide untracked files from default status"
+  source_fingerprint > "$CASE/before"
+  local out candidate
+  out=$(heavy --remote 2>&1) || fail "hidden untracked snapshot run: $out"
+  expect_record '.host == "fake-mac" and .snapshot == true and .outcome == "pass"' "hidden untracked snapshot record"
+  candidate=$(last_record | jq -r .candidate)
+  [ "$candidate" != "$SHA" ] || fail "untracked candidate must differ from HEAD"
+  assert_contains "$out" "$candidate" "untracked snapshot candidate ran"
+  source_fingerprint > "$CASE/after"
+  cmp "$CASE/before" "$CASE/after" || fail "untracked snapshot changed source state"
+  expect_host_clean "untracked snapshot scratch removed"
+  pass "fm-heavy --remote: untracked-only trees are snapshotted when Git status hides untracked files"
+}
+
+test_snapshot_failure() {
+  local step
+  export REAL_GIT
+  REAL_GIT=$(command -v git)
+  for step in add write-tree commit-tree; do
+    setup "snapshot-fail-$step" 'echo local'
+    echo dirty > "$REPO/new"
+    cat > "$FAKEBIN/git" <<'SH'
+#!/usr/bin/env bash
+for arg in "$@"; do [ "$arg" != "$SNAPSHOT_FAIL" ] || exit 1; done
+exec "$REAL_GIT" "$@"
+SH
+    chmod +x "$FAKEBIN/git"
+    source_fingerprint > "$CASE/before"
+    SNAPSHOT_FAIL=$step heavy --remote >"$CASE/out" 2>&1 || fail "$step fallback"
+    expect_record '.host == "local" and .fallback == "snapshot-failed" and .candidate == null' "$step fallback record"
+    [ ! -s "$CTL/log" ] || fail "$step failure must send nothing"
+    source_fingerprint > "$CASE/after"
+    cmp "$CASE/before" "$CASE/after" || fail "$step failure changed source state"
+  done
+  pass "fm-heavy --remote: snapshot failures stay local without sending content or changing source state"
+}
+
+test_snapshot_bundle_failure() {
+  local mode rc
+  export REAL_GIT
+  REAL_GIT=$(command -v git)
+  for mode in failure signal; do
+    setup "snapshot-bundle-$mode" 'echo ran'
+    echo dirty > "$REPO/new"
+    cat > "$FAKEBIN/git" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" = bundle ]; then
+  [ "$SNAPSHOT_BUNDLE" != signal ] || kill -TERM "$PPID"
+  exit 1
+fi
+exec "$REAL_GIT" "$@"
+SH
+    chmod +x "$FAKEBIN/git"
+    source_fingerprint > "$CASE/before"
+    SNAPSHOT_BUNDLE=$mode heavy --remote >"$CASE/out" 2>&1
+    rc=$?
+    if [ "$mode" = signal ]; then
+      expect_code 143 "$rc" "signal during snapshot bundle"
+      expect_record '.outcome == "cancelled"' "snapshot cancellation"
+    else
+      expect_code 0 "$rc" "bundle failure falls back locally"
+      expect_record '.fallback == "bundle-failed" and .host == "local"' "snapshot bundle fallback"
+    fi
+    if grep -q 'runner.py start' "$CTL/log"; then fail "failed snapshot bundle must send no job"; fi
+    source_fingerprint > "$CASE/after"
+    cmp "$CASE/before" "$CASE/after" || fail "$mode changed source files or Git control files"
+  done
+  pass "fm-heavy --remote: bundle failures and signals preserve source state"
 }
 
 test_off_by_default_and_refusals() {
@@ -183,11 +305,6 @@ test_fallbacks_run_locally() {
   [ "$(wc -l < "$CASE/ran")" -eq 1 ] || fail "the fallback must run the command once"
   rm "$CTL/rules/down"
 
-  echo dirty > "$REPO/untracked-change"
-  heavy --remote >/dev/null 2>&1 || fail "a dirty tree must fall back to a local run"
-  expect_record '.host == "local" and .fallback == "dirty-tree"' "dirty fallback"
-  rm "$REPO/untracked-change"
-
   # The destination takes one job at a time; a second request does not queue behind it.
   flock -o "$LOCK.remote.fake-mac" sleep 5 &
   local holder=$! n=0
@@ -201,6 +318,45 @@ test_fallbacks_run_locally() {
   heavy --remote >/dev/null 2>&1 || fail "a host that cannot prepare the job must fall back to a local run"
   expect_record '.host == "local" and .fallback == "prepare-failed"' "prepare-failed fallback"
   pass "fm-heavy --remote: an unreachable, busy or ineligible destination runs the command locally and says why"
+}
+
+test_prelaunch_refusal_does_not_reserve_a_slot() {
+  local real_git failed_dir
+  setup prelaunch-refusal "echo run >> '$TMP_ROOT/prelaunch-refusal/runs'"
+  printf 'host fake-mac\nproject p\nhost-slots 2\n' > "$HOME_FM/config/heavy-remote"
+  real_git=$(command -v git)
+  cat > "$FAKEBIN/git" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = -C ] && [ "${3:-}" = checkout ]; then
+  printf '%s\n' "$2" > "$FAKE_SSH_CTL/failed-checkout"
+  exit 1
+fi
+exec "$FM_TEST_REAL_GIT" "$@"
+SH
+  chmod +x "$FAKEBIN/git"
+  rule cleanup drop 'runner.py cleanup' -1
+  hold_host
+  FM_TEST_REAL_GIT="$real_git" heavy --remote >"$CASE/first.out" 2>&1 5>&- || fail "a refused checkout falls back locally"
+  expect_record '.host == "local" and .fallback == "prepare-failed" and .exit == 0' "checkout refusal fallback"
+  assert_present "$CTL/failed-checkout" "the remote checkout actually failed"
+  failed_dir=$(cat "$CTL/failed-checkout")
+  failed_dir=${failed_dir%/work}
+  assert_present "$failed_dir/started" "the refused transfer remains when follow-up cleanup is unavailable"
+  assert_absent "$failed_dir/owner.json" "a failed checkout launches no supervisor"
+  assert_grep 'runner.py cleanup' "$CTL/log" "the client attempted the unavailable follow-up cleanup"
+  [ -z "$(ls -A "$HOME_FM/state/heavy-remote/unknown-fake-mac")" ] || fail "the definite refusal leaves no client recovery record"
+  HOME="$REMOTE_HOME" python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 0 "$?" "failed preparation leaves the extra slot available without follow-up cleanup"
+  ! flock -n "$FM_HEAVY_HOST_LOCK" true || fail "the native job still occupies the original slot"
+  rm "$FAKEBIN/git" "$CTL/rules/cleanup"
+  heavy --remote >"$CASE/second.out" 2>&1 5>&- || fail "the next job uses the freed remote capacity"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "remote admission after checkout refusal"
+  [ "$(wc -l < "$CASE/runs")" -eq 2 ] || fail "the fallback and next remote job each run once"
+  ! flock -n "$FM_HEAVY_HOST_LOCK" true || fail "the native job survives the remote recovery"
+  release_host
+  HOME="$REMOTE_HOME" python3 "$RUNNER" cleanup "$failed_dir" >/dev/null
+  expect_host_clean "the refused scratch can be removed independently"
+  pass "fm-heavy: checkout refusal preserves capacity when follow-up cleanup is unavailable"
 }
 
 test_failed_command() {
@@ -436,6 +592,176 @@ test_unknown_job_other_endings() {
   jq -e '.outcome == "lost"' "$JOB_DIR/reconciled.json" >/dev/null || fail "an orphaned job closes as lost: $(cat "$JOB_DIR/reconciled.json")"
   expect_host_clean "scratch after an orphaned job"
   pass "fm-heavy --remote: dropped collections, bad results, jobs that never arrived and orphaned groups all reconcile safely"
+}
+
+test_live_client_with_orphaned_group_blocks_admission() {
+  local first job open supervisor child
+  setup liveorphan 'echo $$ > "$HOME/job.pid"; echo $PPID > "$HOME/supervisor.pid"; sleep 300'
+  printf 'host fake-mac\nproject p\nhost-slots 2\n' > "$HOME_FM/config/heavy-remote"
+  rule waiting pre 'runner.py wait' -1 'touch "$FAKE_SSH_CTL/waiting"; n=0; until [ -e "$FAKE_SSH_CTL/release" ]; do n=$((n + 1)); [ "$n" -le 200 ] || exit 1; sleep 0.1; done'
+  hold_host
+  heavy --remote >"$CASE/first.out" 2>&1 5>&- & first=$!
+  wait_for "$REMOTE_HOME/supervisor.pid"
+  wait_for "$CTL/waiting"
+  open=$(echo "$HOME_FM/state/heavy-remote/unknown-fake-mac/"*.json)
+  job=$(basename "$open" .json)
+  supervisor=$(cat "$REMOTE_HOME/supervisor.pid")
+  child=$(cat "$REMOTE_HOME/job.pid")
+  kill -9 "$supervisor"
+  wait_gone "$supervisor" || fail "the remote supervisor must be gone"
+  new_candidate "echo next >> '$CASE/next-runs'"
+  heavy --remote >"$CASE/second.out" 2>&1 5>&- || fail "a request behind a live client's orphan runs locally"
+  expect_record '.host == "local" and .fallback == "unknown-job-running"' "live client orphan fallback"
+  [ "$(remote_starts)" -eq 1 ] || fail "an orphan cannot release capacity for a third heavy job"
+  assert_present "$open" "the live client retains its open record"
+  assert_absent "$HOME_FM/state/heavy-remote/$job/reconciled.json" "another client cannot settle the owner's record"
+  pid_alive "$(jq -r .client_pid "$open")" || fail "the collection owner must still be alive"
+  pid_alive "$child" || fail "admission must leave the orphan for its collection owner"
+  touch "$CTL/release"
+  wait "$first"; expect_code 70 "$?" "the live owner reports its lost supervisor"
+  wait_gone "$child" || fail "the owner cleans its orphaned group"
+  assert_absent "$open" "the owner closes its own record"
+  ! flock -n "$FM_HEAVY_HOST_LOCK" true || fail "the native job still owns its slot"
+  release_host
+  [ "$(wc -l < "$CASE/next-runs")" -eq 1 ] || fail "the new candidate runs exactly once"
+  pass "fm-heavy: a live collection owner cannot hide orphaned work from admission"
+}
+
+test_supervisor_loss_after_reconciliation_blocks_admission() {
+  local first job open child probe
+  setup admissionrace 'echo $$ > "$HOME/job.pid"; echo $PPID > "$HOME/supervisor.pid"; sleep 300'
+  printf 'host fake-mac\nproject p\nhost-slots 2\n' > "$HOME_FM/config/heavy-remote"
+  rule waiting pre 'runner.py wait' -1 'touch "$FAKE_SSH_CTL/waiting"; n=0; until [ -e "$FAKE_SSH_CTL/release" ]; do n=$((n + 1)); [ "$n" -le 200 ] || exit 1; sleep 0.1; done'
+  hold_host
+  heavy --remote >"$CASE/first.out" 2>&1 5>&- & first=$!
+  wait_for "$REMOTE_HOME/supervisor.pid"
+  wait_for "$CTL/waiting"
+  open=$(echo "$HOME_FM/state/heavy-remote/unknown-fake-mac/"*.json)
+  job=$(basename "$open" .json)
+  child=$(cat "$REMOTE_HOME/job.pid")
+  new_candidate "echo next >> '$CASE/next-runs'"
+  rule reconciled pre 'runner.py reconcile' 1 'touch "$FAKE_SSH_CTL/reconciled"'
+  rule dies pre 'python3 - busy 2' 1 \
+    '[ -e "$FAKE_SSH_CTL/reconciled" ] || exit 1; state=$(python3 "$RUNNER_SRC" reconcile .fm-heavy-remote/*); [ "$state" = running ] || exit 1; printf "%s\n" "$state" > "$FAKE_SSH_CTL/snapshot"; pid=$(cat "$HOME/supervisor.pid"); kill -9 "$pid"; n=0; while kill -0 "$pid" 2>/dev/null; do n=$((n + 1)); [ "$n" -le 100 ] || exit 1; sleep 0.1; done'
+  heavy --remote >"$CASE/second.out" 2>&1 5>&- || fail "a request whose snapshot preceded supervisor death runs locally"
+  [ "$(cat "$CTL/snapshot")" = running ] || fail "reconciliation must see the live supervisor before admission"
+  expect_record '.host == "local" and .fallback == "destination-busy"' "slot ownership survives the supervisor"
+  [ "$(remote_starts)" -eq 1 ] || fail "a released kernel lock cannot admit a third heavy job"
+  pid_alive "$(jq -r .client_pid "$open")" || fail "the original client retains collection ownership"
+  pid_alive "$child" || fail "the orphan must still be running when admission is refused"
+  assert_absent "$HOME_FM/state/heavy-remote/$job/reconciled.json" "admission cannot collect the live client's result"
+  HOME="$REMOTE_HOME" python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 12 "$?" "busy counts orphaned work under its slot lock"
+  probe=$REMOTE_HOME/.fm-heavy-remote/admission-probe
+  mkdir -p "$probe"
+  git -C "$REPO" bundle create "$probe/src.bundle" HEAD >/dev/null 2>&1
+  jq -n --arg sha "$(git -C "$REPO" rev-parse HEAD)" \
+    --arg bs "$(sha256sum "$probe/src.bundle" | cut -d' ' -f1)" \
+    --arg cs "$(printf 'bash\0t/job.sh\0' | sha256sum | cut -d' ' -f1)" \
+    '{id: "admission-probe", host_slots: 2, sha: $sha, command_sha256: $cs, bundle_sha256: $bs, timeout_s: 20, argv: ["bash", "t/job.sh"]}' > "$probe/manifest.json"
+  HOME="$REMOTE_HOME" python3 "$RUNNER" start "$probe" >/dev/null 2>&1
+  expect_code 12 "$?" "start independently counts orphaned work under its slot lock"
+  assert_absent "$probe/started" "refused admission launches nothing"
+  rm -rf "$probe"
+  touch "$CTL/release"
+  wait "$first"; expect_code 70 "$?" "the original client reports its lost supervisor"
+  wait_gone "$child" || fail "the original client cleans its orphaned group"
+  assert_absent "$open" "the original client closes its record"
+  ! flock -n "$FM_HEAVY_HOST_LOCK" true || fail "the native job keeps its slot"
+  heavy --remote >"$CASE/third.out" 2>&1 5>&- || fail "the orphan's slot becomes reusable after collection"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "collected slot ownership is reusable"
+  ! flock -n "$FM_HEAVY_HOST_LOCK" true || fail "reusing the remote slot leaves the native job running"
+  release_host
+  [ "$(wc -l < "$CASE/next-runs")" -eq 2 ] || fail "both new requests run exactly once"
+  expect_host_clean "collection leaves no orphan scratch"
+  pass "fm-heavy: supervisor loss after reconciliation cannot free an occupied slot for remote admission"
+}
+
+test_native_admission_waits_for_an_orphaned_group() {
+  local first second native supervisor child n=0
+  setup nativeorphan 'echo $$ > "$HOME/first.pid"; until [ -e "$HOME/first-release" ]; do sleep 0.1; done'
+  printf 'host fake-mac\nproject p\nhost-slots 2\n' > "$HOME_FM/config/heavy-remote"
+  rule waiting pre 'runner.py wait' -1 \
+    'mkdir -p "$FAKE_SSH_CTL/waiting"; touch "$FAKE_SSH_CTL/waiting/$$"; n=0; until [ -e "$FAKE_SSH_CTL/release" ]; do n=$((n + 1)); [ "$n" -le 300 ] || exit 1; sleep 0.1; done'
+  heavy --remote >"$CASE/first.out" 2>&1 & first=$!
+  wait_for "$REMOTE_HOME/first.pid"
+  new_candidate "$(cat <<'SH'
+echo $$ > "$HOME/second.pid"
+echo $PPID > "$HOME/supervisor.pid"
+python3 - <<'PY'
+import os
+import subprocess
+import time
+
+child = subprocess.Popen(["sleep", "300"], close_fds=True)
+with open(os.path.join(os.environ["HOME"], "child.pid"), "w") as handle:
+    handle.write(str(child.pid))
+while not os.path.exists(os.path.join(os.environ["HOME"], "leader-release")):
+    time.sleep(0.1)
+PY
+SH
+)"
+  heavy --remote >"$CASE/second.out" 2>&1 & second=$!
+  wait_for "$REMOTE_HOME/child.pid"
+  wait_for "$CTL/waiting"
+  until [ "$(find "$CTL/waiting" -type f | wc -l)" -eq 2 ]; do
+    n=$((n + 1)); [ "$n" -le 100 ] || fail "both collection clients must remain waiting"; sleep 0.1
+  done
+  supervisor=$(cat "$REMOTE_HOME/supervisor.pid")
+  child=$(cat "$REMOTE_HOME/child.pid")
+  kill -9 "$supervisor"
+  wait_gone "$supervisor" || fail "the supervisor using the original lock must be gone"
+  ! flock -n "$FM_HEAVY_HOST_LOCK" true || fail "native admission must stay closed while the orphan runs"
+  HOME="$REMOTE_HOME" python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 12 "$?" "remote admission also counts the original slot's orphan"
+  flock "$FM_HEAVY_HOST_LOCK" sh -c 'touch "$0"; until [ -e "$1" ]; do sleep 0.1; done' \
+    "$CASE/native-started" "$CASE/native-release" >"$CASE/native.out" 2>&1 & native=$!
+  touch "$REMOTE_HOME/leader-release"
+  wait_gone "$(cat "$REMOTE_HOME/second.pid")" || fail "the orphaned group leader must exit"
+  pid_alive "$child" || fail "a descendant with closed descriptors must still survive"
+  ! flock -n "$FM_HEAVY_HOST_LOCK" true || fail "the original lock must outlive the command group's leader"
+  assert_absent "$CASE/native-started" "the native caller cannot start a third job beside the descendant"
+  touch "$CTL/release"
+  wait "$second"; expect_code 70 "$?" "the original client reports its lost supervisor"
+  wait_gone "$child" || fail "collection must stop the orphan's remaining descendant"
+  wait_for "$CASE/native-started"
+  pid_alive "$(cat "$REMOTE_HOME/first.pid")" || fail "the other remote job must keep running"
+  HOME="$REMOTE_HOME" python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 12 "$?" "the native job and remaining remote job fill capacity"
+  touch "$CASE/native-release"
+  wait "$native" || fail "the unchanged native caller finishes normally"
+  touch "$REMOTE_HOME/first-release"
+  wait "$first" || fail "the other remote job completes normally: $(cat "$CASE/first.out")"
+  [ "$(remote_starts)" -eq 2 ] || fail "only the two requested remote jobs may start"
+  expect_host_clean "both remote jobs release their scratch and kernel locks"
+  flock -n "$FM_HEAVY_HOST_LOCK" true || fail "the original kernel lock becomes reusable"
+  pass "fm-heavy: native and remote admission wait for orphaned command descendants after supervisor loss"
+}
+
+test_abandoned_result_has_one_collector() {
+  local first second collections
+  unknown_job collectors 'echo original-output' 'runner.py (wait|status)'
+  HOME="$REMOTE_HOME" python3 "$RUNNER" wait "$REMOTE_HOME/.fm-heavy-remote/$JOB" 20 >/dev/null
+  new_candidate "echo next >> '$CASE/next-runs'"
+  printf 'host fake-mac\nproject p\nhost-slots 2\n' > "$HOME_FM/config/heavy-remote"
+  rule collecting pre "cd .fm-heavy-remote/$JOB && tar -cf - result.json" -1 \
+    'if mkdir "$FAKE_SSH_CTL/collector" 2>/dev/null; then touch "$FAKE_SSH_CTL/collecting"; n=0; until [ -e "$FAKE_SSH_CTL/release" ]; do n=$((n + 1)); [ "$n" -le 200 ] || exit 1; sleep 0.1; done; fi'
+  heavy --remote >"$CASE/first.out" 2>&1 & first=$!
+  wait_for "$CTL/collecting"
+  heavy --remote >"$CASE/second.out" 2>&1 & second=$!
+  wait "$second" || fail "a competing collector runs its new candidate locally: $(cat "$CASE/second.out")"
+  touch "$CTL/release"
+  wait "$first" || fail "the original collector completes: $(cat "$CASE/first.out")"
+  collections=$(grep -c "cd .fm-heavy-remote/$JOB && tar -cf - result.json" "$CTL/log")
+  [ "$collections" -eq 1 ] || fail "an abandoned result is fetched only once, got $collections"
+  jq -e '.outcome == "pass"' "$JOB_DIR/reconciled.json" >/dev/null || fail "the abandoned pass is preserved"
+  [ "$(cat "$JOB_DIR/run.log")" = original-output ] || fail "the collected log retains its verified bytes"
+  assert_absent "$OPEN" "the collected record closes once"
+  expect_host_clean "the sole collector removes the abandoned scratch"
+  [ "$(wc -l < "$CASE/next-runs")" -eq 2 ] || fail "both new candidates run exactly once"
+  heavy --remote >"$CASE/third.out" 2>&1 || fail "the next request passes after reconciliation"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "reconciliation releases its lock"
+  pass "fm-heavy: concurrent lanes serialize abandoned-result collection and preserve the outcome"
 }
 
 test_runner_reconcile_ages_out_a_dead_start() {
@@ -884,19 +1210,17 @@ test_queued_job_moves_to_the_freed_host() {
   release_local
   expect_record '.host == "fake-mac" and .outcome == "pass" and .fallback == null' "recovered host"
 
-  # Nothing changes a dirty tree while it queues, so it stops asking.
-  setup stilldirty 'echo local'
-  observe_local_queue
+  # Dirty work can also leave the local queue through automatic offload.
+  setup stilldirty 'test -f untracked-change'
   printf 'host fake-mac\ncommand p -- bash t/job.sh\noffload\n' > "$HOME_FM/config/heavy-remote"
   echo dirty > "$REPO/untracked-change"
   hold_local
   heavy >"$CASE/out" 2>&1 3>&- 4>&- & pid=$!
-  wait_for "$CTL/local-waiting"
-  [ ! -s "$CTL/log" ] || fail "a dirty tree may not contact the host"
+  wait_for "$LOG"
+  wait "$pid" || fail "dirty tree offload: $(cat "$CASE/out")"
   release_local
-  wait "$pid" || fail "dirty tree local run"
-  expect_record '.host == "local" and .fallback == "dirty-tree"' "dirty tree queues locally"
-  pass "fm-heavy: a queued approved job moves to the host once it frees, and an ineligible one stays queued"
+  expect_record '.host == "fake-mac" and .snapshot == true and .outcome == "pass"' "dirty tree offloads"
+  pass "fm-heavy: queued approved jobs, including dirty work, move to the free host"
 }
 
 test_queued_job_signal_runs_nowhere() {
@@ -915,6 +1239,9 @@ test_queued_job_signal_runs_nowhere() {
 }
 
 make_node_project() {
+  # Local fallback is observable and does not need this fixture's host-only modules.
+  { printf '%s\n' 'if [ "$HOME" != "$FAKE_SSH_HOME" ]; then echo local >> "$FAKE_SSH_CTL/local-runs"; exit 0; fi'; cat "$REPO/t/job.sh"; } > "$CASE/job"
+  mv "$CASE/job" "$REPO/t/job.sh"
   cat > "$REPO/package.json" <<'JSON'
 {"engines":{"node":">=20 <23","pnpm":"^9.0.0"},"packageManager":"pnpm@9.1.0","scripts":{"e2e":"playwright test"}}
 JSON
@@ -931,6 +1258,7 @@ SH
 if [ "$1" = --version ]; then echo "${FAKE_MANAGER_VERSION:-9.1.0}"; exit; fi
 printf '%s\n' "$*" >> "$HOME/install.log"
 [ "${FAKE_INSTALL_FAIL:-}" != 1 ] || exit 42
+[ "${FAKE_INSTALL_HANG:-}" != 1 ] || sleep 300
 if [ "$1" = install ] || [ "$1" = ci ]; then mkdir -p node_modules; echo ready > node_modules/proof; fi
 SH
   chmod +x "$FAKEBIN/node" "$FAKEBIN/pnpm"
@@ -949,18 +1277,26 @@ test_dependency_cache_and_failures() {
   git -C "$REPO" add -A; git -C "$REPO" commit -q -m lockchange
   heavy --remote >/dev/null 2>&1 || fail "changed lockfile install"
   [ "$(wc -l < "$REMOTE_HOME/install.log")" -eq 2 ] || fail "changed lockfile must reinstall"
-  FAKE_NODE_MISSING=1 heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "missing runtime"
+  FAKE_NODE_MISSING=1 heavy --remote >"$CASE/out" 2>&1; expect_code 0 "$?" "missing runtime"
   assert_grep 'missing runtime node' "$CASE/out" "missing runtime reason"
-  FAKE_MANAGER_VERSION=8.0.0 heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "incompatible pnpm"
-  FAKE_NODE_VERSION=v18.0.0 heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "incompatible runtime"
+  FAKE_MANAGER_VERSION=8.0.0 heavy --remote >"$CASE/out" 2>&1; expect_code 0 "$?" "incompatible pnpm"
+  FAKE_NODE_VERSION=v18.0.0 heavy --remote >"$CASE/out" 2>&1; expect_code 0 "$?" "incompatible runtime"
   assert_grep 'does not satisfy' "$CASE/out" "version failure reason"
-  expect_record '.host == "fake-mac" and .outcome == "failed" and .fallback == null' "runtime failure never retries locally"
+  expect_record '.host == "local" and .fallback == "prepare-failed" and .preparation_step == "runtime"' "runtime failure returns locally"
   echo '# changed again' >> "$REPO/pnpm-lock.yaml"
   git -C "$REPO" add -A; git -C "$REPO" commit -q -m failedinstall
-  FAKE_INSTALL_FAIL=1 heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "install error"
-  expect_record '.host == "fake-mac" and .outcome == "failed" and .fallback == null' "install failure never retries locally"
+  FAKE_INSTALL_FAIL=1 heavy --remote >"$CASE/out" 2>&1; expect_code 0 "$?" "install error"
+  expect_record '.host == "local" and .fallback == "prepare-failed" and .preparation_step == "dependencies"' "install failure returns locally"
+  assert_grep 'exit status 42' "$(last_record | jq -r .preparation_log)" "retained install failure log"
+  [ "$(wc -l < "$CTL/local-runs")" -eq 4 ] || fail "every preparation failure runs locally once"
   [ "$(wc -l < "$REMOTE_HOME/tested")" -eq 3 ] || fail "no candidate runs after runtime/install failure"
-  pass "fm-heavy: cached dependencies refresh on lockfile change; runtime/install failures cannot fall back"
+  setup preparetimeout 'echo tested >> "$HOME/tested"' 2
+  make_node_project
+  FAKE_INSTALL_HANG=1 heavy --remote >"$CASE/out" 2>&1 || fail "preparation timeout returns locally"
+  expect_record '.host == "local" and .fallback == "prepare-failed" and .preparation_step == "dependencies"' "preparation timeout fallback"
+  [ ! -e "$REMOTE_HOME/tested" ] || fail "remote test never starts after preparation timeout"
+  [ "$(wc -l < "$CTL/local-runs")" -eq 1 ] || fail "preparation timeout runs locally once"
+  pass "fm-heavy: cached dependencies refresh on lockfile change; runtime/install failures and preparation timeout return locally with evidence"
 }
 
 # host_tool <bin dir> <tool> <version>: one installed version of a tool on the host.
@@ -996,20 +1332,20 @@ test_each_project_runs_on_its_pinned_runtimes() {
   grep -F 'pnpm 9.2.0 install' "$REMOTE_HOME/install.log" >/dev/null || fail "the pinned pnpm installs dependencies"
   printf '{"engines":{"node":">=26.0.0"},"packageManager":"pnpm@9.2.0"}\n' > "$REPO/package.json"
   git -C "$REPO" add -A; git -C "$REPO" commit -q -m missingnode
-  heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "a pinned node that is not installed"
+  heavy --remote >"$CASE/out" 2>&1; expect_code 0 "$?" "a pinned node that is not installed"
   assert_grep 'does not satisfy >=26.0.0' "$CASE/out" "the refusal names the node pin"
   printf '{"packageManager":"pnpm@9.9.0"}\n' > "$REPO/package.json"
   rm "$REPO/.nvmrc"
   git -C "$REPO" add -A; git -C "$REPO" commit -q -m missingpnpm
-  heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "a pnpm that cannot provide the pin"
+  heavy --remote >"$CASE/out" 2>&1; expect_code 0 "$?" "a pnpm that cannot provide the pin"
   assert_grep 'does not satisfy 9.9.0' "$CASE/out" "the refusal names the pnpm pin"
   # A real pnpm reports the pin once it has fetched that version for itself.
   out=$(FAKE_MANAGER_VERSION=9.9.0 heavy --remote 2>&1) || fail "self-fetched pnpm: $out"
   assert_contains "$out" "9.9.0" "a pnpm providing its own pin runs the job"
   rm -rf "$REMOTE_HOME/.fm-heavy-remote/runtimes"
-  FAKE_PNPM_MISSING=1 heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "no pnpm reachable"
+  FAKE_PNPM_MISSING=1 heavy --remote >"$CASE/out" 2>&1; expect_code 0 "$?" "no pnpm reachable"
   assert_grep 'missing runtime pnpm' "$CASE/out" "the refusal says no pnpm was found"
-  expect_record '.host == "fake-mac" and .outcome == "failed" and .fallback == null' "a missing runtime never retries locally"
+  expect_record '.host == "local" and .fallback == "prepare-failed"' "a missing runtime returns locally"
   pass "fm-heavy: each project runs on the node and pnpm it pins; a missing node or no pnpm is a clear refusal"
 }
 
@@ -1026,11 +1362,11 @@ test_project_without_dependencies_needs_no_lockfile() {
   [ ! -e "$REMOTE_HOME/install.log" ] || fail "nothing may be installed: $(cat "$REMOTE_HOME/install.log")"
   printf '{"engines":{"node":">=26.0.0"}}\n' > "$REPO/package.json"
   git -C "$REPO" add -A; git -C "$REPO" commit -q -m missingnode
-  heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "a pinned node that is not installed"
+  heavy --remote >"$CASE/out" 2>&1; expect_code 0 "$?" "a pinned node that is not installed"
   assert_grep 'does not satisfy >=26.0.0' "$CASE/out" "the refusal names the node pin"
   printf '{"devDependencies":{"left-pad":"1.3.0"}}\n' > "$REPO/package.json"
   git -C "$REPO" add -A; git -C "$REPO" commit -q -m unlocked
-  heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "declared dependencies with no lockfile"
+  heavy --remote >"$CASE/out" 2>&1; expect_code 0 "$?" "declared dependencies with no lockfile"
   assert_grep 'no supported lockfile' "$CASE/out" "the refusal names the lockfile"
   pass "fm-heavy: a project with no dependencies needs no lockfile; a pinned node and declared dependencies still refuse"
 }
@@ -1060,7 +1396,7 @@ test_npm_dependency_cache() {
   [ "$(wc -l < "$REMOTE_HOME/install.log")" -eq 1 ] || fail "npm lock cache must avoid reinstall"
   printf '24\n' > "$REPO/.nvmrc"
   git -C "$REPO" add -A; git -C "$REPO" commit -q -m nvmrc
-  heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "nvmrc mismatch"
+  heavy --remote >"$CASE/out" 2>&1; expect_code 0 "$?" "nvmrc mismatch"
   assert_grep 'does not satisfy ^22.0.0 and 24' "$CASE/out" "nvmrc selects runtime"
   pass "fm-heavy: npm lock caching and nvmrc compatibility are enforced"
 }
@@ -1090,7 +1426,7 @@ test_project_approvals() {
   printf 'host fake-mac\nproject *\n' > "$HOME_FM/config/heavy-remote"
   heavy --project '' --remote >/dev/null 2>&1; expect_code 2 "$?" "a job with no project never leaves"
   [ "$(wc -l < "$REMOTE_HOME/runs")" -eq 2 ] || fail "only the approved jobs ran on the host"
-  for bad in 'project p\nproject p' 'project a b' 'project' 'image bad image!' 'image a\nimage b' \
+  for bad in 'project p\nproject p' 'project a b' 'project' 'nofile 65536' 'nofile 8192' 'image bad image!' 'image a\nimage b' \
     'image i\nproject q service=nope' 'service db pg 5432 1g\nproject q service=db' 'project q bogus=1' 'project q env=nokey' \
     'image i\nservice a x 5432 1g\nservice b y 5432 1g\nproject q service=a service=b' 'service DB pg 5432 1g' \
     'service db pg port 1g' 'service db pg 5432 1t' 'service db pg 5432 1g\nservice db pg 5433 1g' 'service db pg 5432 1g bad'; do
@@ -1175,6 +1511,83 @@ test_host_jobs_go_first_and_none_is_stopped() {
   pass "fm-heavy: the host's own jobs go first, and no running job is stopped for another"
 }
 
+test_two_host_slots() {
+  local pid first second n bad
+  setup twoslots 'touch "$HOME/started"; while [ ! -e "$HOME/release" ]; do sleep 0.1; done'
+  printf 'host fake-mac\nproject p\nhost-slots 2\n' > "$HOME_FM/config/heavy-remote"
+  hold_host
+  heavy --remote >"$CASE/out" 2>&1 5>&- & first=$!
+  wait_for "$REMOTE_HOME/started"
+  python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 12 "$?" "an own job and a sent job fill two slots"
+  touch "$REMOTE_HOME/release"
+  wait "$first" || fail "a sent job runs beside the unchanged own lock: $(cat "$CASE/out")"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "two-slot admission"
+  # A queued raw flock user has no Firstmate marker, and must still go first.
+  rm "$REMOTE_HOME/started" "$REMOTE_HOME/release"
+  flock "$FM_HEAVY_HOST_LOCK" sh -c 'echo own > "$0"' "$CASE/own" 5>&- & pid=$!
+  n=0
+  until [ "$(ps -o comm= -p "$pid" | xargs basename)" = flock ]; do
+    n=$((n + 1)); [ "$n" -le 50 ] || fail "native waiter never reached flock"; sleep 0.1
+  done
+  python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 12 "$?" "a native flock waiter prevents admission into the extra slot"
+  [ ! -e "$CASE/own" ] || fail "the waiting own job has not acquired its lock"
+  release_host
+  wait "$pid" || fail "the native job completes after release"
+  [ "$(cat "$CASE/own")" = own ] || fail "the native job was never stopped"
+  hold_host
+  ( exec 6>>"$FM_HEAVY_HOST_LOCK"; exec flock 6 ) 5>&- & pid=$!
+  n=0
+  until [ "$(ps -o comm= -p "$pid" | xargs basename)" = flock ]; do
+    n=$((n + 1)); [ "$n" -le 50 ] || fail "descriptor waiter never reached flock"; sleep 0.1
+  done
+  python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 12 "$?" "descriptor-form native flock also reserves the extra slot"
+  release_host
+  wait "$pid" || fail "the descriptor waiter finishes after release"
+  # Firstmate's explicit waiter markers also reserve capacity with two slots.
+  mkdir -p "$FM_HEAVY_HOST_LOCK.waiting"
+  : > "$FM_HEAVY_HOST_LOCK.waiting/$$"
+  python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 12 "$?" "a marked own waiter prevents two-slot admission"
+  rm "$FM_HEAVY_HOST_LOCK.waiting/$$"
+  # Priority is checked again at start, after a successful busy probe.
+  setup twostart 'exit 0'
+  printf 'host fake-mac\nproject p\nhost-slots 2\n' > "$HOME_FM/config/heavy-remote"
+  rule ownwait pre 'runner.py start' 1 "mkdir -p \"\$FM_HEAVY_HOST_LOCK.waiting\"; touch \"\$FM_HEAVY_HOST_LOCK.waiting/$$\""
+  heavy --remote >"$CASE/out" 2>&1 || fail "a new own waiter leaves the sent job local: $(cat "$CASE/out")"
+  expect_record '.host == "local" and .fallback == "destination-busy"' "priority rechecked at start"
+  # Two drivers from the same client can run remotely, with no mistaken
+  # reconciliation of the other live driver's completion record.
+  setup twosent 'mkdir -p "$HOME/started"; touch "$HOME/started/$$"; while [ ! -e "$HOME/release" ]; do sleep 0.1; done'
+  printf 'host fake-mac\nproject p\nhost-slots 2\n' > "$HOME_FM/config/heavy-remote"
+  heavy --remote >"$CASE/first.out" 2>&1 & first=$!
+  wait_for "$REMOTE_HOME/started"
+  heavy --remote >"$CASE/second.out" 2>&1 & second=$!
+  n=0
+  until [ "$(find "$REMOTE_HOME/started" -type f | wc -l)" -eq 2 ]; do
+    n=$((n + 1)); [ "$n" -le 200 ] || fail "two sent jobs never overlapped: $(cat "$CASE/first.out" "$CASE/second.out")"; sleep 0.1
+  done
+  python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 12 "$?" "two sent jobs refuse a third"
+  touch "$REMOTE_HOME/release"
+  wait "$first" || fail "first remote driver: $(cat "$CASE/first.out")"
+  wait "$second" || fail "second remote driver: $(cat "$CASE/second.out")"
+  [ "$(jq -s '[.[] | select(.host == "fake-mac" and .outcome == "pass")] | length' "$LOG")" -eq 2 ] || fail "both sent jobs completed remotely"
+  # Explicit one-slot settings retain the default's held-lock refusal.
+  hold_host
+  python3 "$RUNNER" busy 1 >/dev/null
+  expect_code 12 "$?" "explicit one slot retains legacy admission"
+  release_host
+  for bad in '0' '-1' '02' '65' '2 extra' '2\nhost-slots 2'; do
+    printf 'host fake-mac\nproject p\nhost-slots %b\n' "$bad" > "$HOME_FM/config/heavy-remote"
+    heavy --remote >/dev/null 2>&1
+    expect_code 2 "$?" "invalid host-slots: $bad"
+  done
+  pass "fm-heavy: two host slots include native jobs, preserve native priority and admit two sent jobs"
+}
+
 make_fake_docker() {  # <fakebin>: runs the container's command on the host, logging its argv
   cat > "$1/docker" <<'SH'
 #!/usr/bin/env bash
@@ -1194,8 +1607,9 @@ esac
 [ "$1" = run ] || exit 0
 shift
 dir=.
+ulimit -Sn 256
 while [ "$#" -gt 0 ]; do
-  case "$1" in --rm|--init) shift ;; -w) dir=$2; shift 2 ;; -e) export "${2?}"; shift 2 ;; -*) shift 2 ;; *) break ;; esac
+  case "$1" in --rm|--init) shift ;; --ulimit) limits=${2#nofile=}; ulimit -Sn "${limits%%:*}"; ulimit -Hn "${limits##*:}"; shift 2 ;; -w) dir=$2; shift 2 ;; -e) export "${2?}"; shift 2 ;; -*) shift 2 ;; *) break ;; esac
 done
 shift
 cd "$dir" && exec "$@"
@@ -1229,6 +1643,31 @@ SH
   grep -Fx "rm -f $id" "$CTL/docker.log" >/dev/null || fail "the container is removed: $(cat "$CTL/docker.log")"
   [ "$(ls "$REMOTE_HOME/.fm-heavy-remote")" = linux ] || fail "only the linux cache remains: $(ls "$REMOTE_HOME/.fm-heavy-remote")"
   pass "fm-heavy: an image line runs the job inside that container and removes it"
+}
+
+test_container_many_file_install() {
+  setup manyfiles 'test -f node_modules/proof && test "$(ulimit -Sn)" = 65536 && test "$(ulimit -Hn)" = 65536'
+  make_node_project
+  make_fake_docker "$FAKEBIN"
+  # Exercise real simultaneous descriptors, as a parallel pnpm install does.
+  python3 - "$FAKEBIN/pnpm" <<'PYTHON'
+import sys
+from pathlib import Path
+p = Path(sys.argv[1])
+p.write_text(p.read_text().replace('if [ "$1" = install ]', """python3 - <<'OPENFILES'
+files = [open('/dev/null') for _ in range(4096)]
+OPENFILES
+[ "$?" = 0 ] || exit 42
+if [ "$1" = install ]"""))
+PYTHON
+  printf 'image fm-heavy-linux:2\n' >> "$HOME_FM/config/heavy-remote"
+  heavy --remote >"$CASE/out" 2>&1 || fail "many-file install: $(cat "$CASE/out")"
+  expect_record '.host == "fake-mac" and .outcome == "pass" and .fallback == null' "many-file install passes on host"
+  [ ! -e "$CTL/local-runs" ] || fail "no fallback for many-file install"
+  setup command78 'exit 78'
+  heavy --remote >/dev/null 2>&1; expect_code 78 "$?" "project command exiting 78"
+  expect_record '.host == "fake-mac" and .outcome == "failed" and .fallback == null' "exit 78 after command starts remains failed"
+  pass "fm-heavy: fixed container limits permit many-file installs; command exit 78 stays failed"
 }
 
 free_port() { python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])'; }
@@ -1364,8 +1803,13 @@ test_project_paths() {
 
 test_project_paths
 test_pass_and_record
+test_dirty_snapshot
+test_hidden_untracked_snapshot
+test_snapshot_failure
+test_snapshot_bundle_failure
 test_off_by_default_and_refusals
 test_fallbacks_run_locally
+test_prelaunch_refusal_does_not_reserve_a_slot
 test_failed_command
 test_timeout_cancels_only_the_jobs_processes
 test_owned_processes_are_cleaned
@@ -1376,6 +1820,10 @@ test_bad_results_are_rejected
 test_duplicate_delivery
 test_unknown_job_blocks_until_reconciled
 test_unknown_job_other_endings
+test_live_client_with_orphaned_group_blocks_admission
+test_supervisor_loss_after_reconciliation_blocks_admission
+test_native_admission_waits_for_an_orphaned_group
+test_abandoned_result_has_one_collector
 test_runner_reconcile_ages_out_a_dead_start
 test_signalled_wrapper_stops_only_its_job
 test_unterminated_config_last_line
@@ -1402,7 +1850,9 @@ test_e2e_browser_preparation
 test_npm_dependency_cache
 test_project_approvals
 test_host_jobs_go_first_and_none_is_stopped
+test_two_host_slots
 test_image_runs_in_a_container
+test_container_many_file_install
 test_services_start_with_the_job_and_are_removed
 
 echo '# all fm-heavy-remote tests passed'
