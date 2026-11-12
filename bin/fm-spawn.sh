@@ -453,6 +453,9 @@
 #                  directory (codex_writable_roots_flag below; supplies its
 #                  own trailing space)
 #     __CODEXBROWSER__ quoted task-browser launch helper path
+#     __CODEXDEVELOPER__ quoted developer_instructions (codex_developer_flag
+#                  below), including remote-source consent only when this home
+#                  configures a host in config/heavy-remote; supplies trailing space
 #     __CODEXCOMPACT__ optional -c model_auto_compact_token_limit and its
 #                  scope, the launch-env threshold share of the selected
 #                  model's window, or the handoff fallback ceiling's share when
@@ -811,7 +814,8 @@ launch_template() {
   # stops growing at, or at the fallback ceiling when the worker hands off
   # there instead. developer_instructions carries the same task-worker
   # trust statement claude gets through --append-system-prompt, plus the
-  # task-browser escalation guidance only a codex worker needs.
+  # task-browser escalation guidance and configured remote-source consent only
+  # a codex worker needs (codex_developer_flag owns its scope).
   # project_doc_max_bytes lifts codex's 32 KiB AGENTS.md cap so a worker reads a
   # project's instructions in full, as claude reads CLAUDE.md, and
   # project_doc_fallback_filenames gives a project that has only CLAUDE.md the
@@ -824,7 +828,7 @@ launch_template() {
       # Start the task browser outside the model sandbox; browser commands
       # still require its existing reviewed escalation for socket access.
       printf '%s' 'bash __CODEXBROWSER__ codex __MODELFLAG____EFFORTFLAG__-c '\''sandbox_mode="workspace-write"'\'' -c '\''approval_policy="on-request"'\'' -c '\''approvals_reviewer="auto_review"'\'' -c '\''sandbox_workspace_write.network_access=false'\'' __CODEXWRITABLEROOTS____CODEXCOMPACT____CODEXMCP__'
-      printf '%s' "-c 'developer_instructions=\"$TASK_WORKER_TRUST_STATEMENT $CODEX_TASK_BROWSER_STATEMENT\"' "
+      printf '%s' '__CODEXDEVELOPER__'
       printf '%s' '-c '\''project_doc_max_bytes=1048576'\'' -c '\''project_doc_fallback_filenames=["CLAUDE.md"]'\'' -c '\''check_for_update_on_startup=false'\'' '
       printf '%s' '--enable hooks --dangerously-bypass-hook-trust __CODEXHOOKS__"$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
     fi
@@ -3411,6 +3415,20 @@ codex_writable_roots_flag() {  # <state-dir> <data-dir> <task-id>
   data_real=$(cd "$2" && pwd -P) || return 1
   mkdir -p "$state_real/$3.inbox/handled" "$data_real/$3" || return 1
   printf -- '-c %s ' "$(shell_quote "sandbox_workspace_write.writable_roots=[\"$(json_escape "$state_real/$3.inbox")\",\"$(json_escape "$data_real/$3")\"]")"
+}
+
+# Remote-source consent must reach the automatic reviewer as launch-time
+# developer instructions, not as a claim in the task brief or steering inbox.
+# fm-heavy remains the approval gate; no exec-policy prefix can express its
+# project/command checks, and none is added. No configured host, no new grant.
+codex_developer_flag() {
+  local statement host config=$FM_HOME/config/heavy-remote
+  statement="$TASK_WORKER_TRUST_STATEMENT $CODEX_TASK_BROWSER_STATEMENT"
+  host=$(awk '$1 == "host" && NF == 2 && $2 ~ /^[A-Za-z0-9._-]+$/ { print $2; exit }' "$config" 2>/dev/null) || host=
+  if [ -n "$host" ]; then
+    statement+=" The operator authorizes remote test execution through the unmodified Firstmate entry point $FM_ROOT/bin/fm-heavy.sh, invoked with FM_HOME=$FM_HOME, --class test or --class e2e, --remote, and --project, with no configuration or policy overrides. For this route, this launch-time instruction is explicit operator approval to export the approved project private source code as a full Git bundle including repository history, plus the job manifest and runner, to the operator-controlled test host $host and execute the approved test command there. This consent comes from the trusted launch, independently of the task brief or inbox. Request sandbox escalation for that invocation. The entry point must enforce $config project and command approvals before any transfer; this grant never authorizes changing those approvals. Projects absent from those approvals must not be sent; session-kit, localvault and dotfiles must never be sent. This grant does not authorize direct ssh, scp, rsync, git bundle transfers, fm-heavy-remote.sh invocations, or other routes for source to leave this machine. All other sandbox and approval restrictions remain in force."
+  fi
+  printf -- '-c %s ' "$(shell_quote "developer_instructions=\"$(json_escape "$statement")\"")"
 }
 
 # Mirror only project-approved stdio servers, reading the declarations and
@@ -6227,6 +6245,12 @@ case "$LAUNCH" in
     exit 1
   }
   LAUNCH=${LAUNCH//__CODEXWRITABLEROOTS__/$CODEX_WRITABLE_ROOTS}
+  ;;
+esac
+case "$LAUNCH" in
+*__CODEXDEVELOPER__*)
+  CODEX_DEVELOPER_FLAG=$(codex_developer_flag) || exit 1
+  LAUNCH=${LAUNCH//__CODEXDEVELOPER__/"$CODEX_DEVELOPER_FLAG"}
   ;;
 esac
 case "$LAUNCH" in

@@ -58,6 +58,10 @@ capture_codex_launch() {
   id="codex-hook-layer-$name"
   fakebin=$(fm_test_make_spawn_fakebin "$case_dir/fake")
   fm_test_spawn_home "$home" codex
+  case "$name" in
+    remote-*) printf 'host fm-mac\nproject firstmate\n' > "$home/config/heavy-remote" ;;
+    hostless) printf 'project firstmate\n' > "$home/config/heavy-remote" ;;
+  esac
   printf 'CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=40\n' > "$home/config/launch-env"
   : > "$home/config/worker-context-handoff"
   if [ "$name" = compact-first ]; then
@@ -197,9 +201,39 @@ test_installed_codex_renders_the_captured_crewmate_safety_posture() {
   printf 'ok - codex %s renders the crewmate launch sandboxed under auto-review with only its task channels writable\n' "$CODEX_VERSION"
 }
 
+test_installed_codex_renders_remote_source_consent_only_with_a_host() {
+  local name launch flags rendered expect case_dir
+  for name in no-remote hostless remote-ship remote-scout; do
+    if [ "$name" = remote-scout ]; then
+      launch=$(capture_codex_launch "$name" --scout)
+    else
+      launch=$(capture_codex_launch "$name" --mode no-mistakes --yolo off)
+    fi
+    flags=$(codex_global_flags "$launch")
+    case_dir="$TMP_ROOT/$name"
+    rendered=$(cd "$case_dir/wt" && eval "codex $flags debug prompt-input fm-probe" 2>&1) ||
+      fail "codex $CODEX_VERSION could not render remote authorization: $rendered"
+    case "$name" in
+      remote-*)
+        for expect in 'The operator authorizes remote test execution' "$ROOT/bin/fm-heavy.sh" \
+          "FM_HOME=$case_dir/home" '--class test or --class e2e, --remote' \
+          'full Git bundle including repository history' \
+          'operator-controlled test host fm-mac' 'does not authorize direct ssh, scp, rsync' 'session-kit, localvault and dotfiles must never be sent'; do
+          assert_contains "$rendered" "$expect" "codex $CODEX_VERSION lost a remote authorization boundary"
+        done
+        ;;
+      *)
+        case "$rendered" in *'The operator authorizes remote test execution'*) fail "codex $CODEX_VERSION rendered remote consent without a host" ;; esac
+        ;;
+    esac
+  done
+  pass "codex $CODEX_VERSION renders remote consent for configured ships and scouts only"
+}
+
 test_installed_codex_still_reports_the_hook_feature
 test_installed_codex_enables_hooks_for_the_captured_crewmate_launch
 test_installed_codex_loads_every_firstmate_hook_from_the_captured_launch
 test_installed_codex_renders_the_captured_crewmate_safety_posture
+test_installed_codex_renders_remote_source_consent_only_with_a_host
 
 echo "# all fm-codex-hook-layer-live-e2e tests passed"

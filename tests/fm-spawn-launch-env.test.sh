@@ -472,6 +472,40 @@ SH
   pass 'Codex gets isolated browser environment, unchanged safety flags, and owned cleanup on success/failure'
 }
 
+test_codex_remote_authorization() {
+  local setting rec out grant args
+  for setting in absent hostless configured; do
+    rec=$(make_case "remote-$setting" codex "remote-$setting")
+    read_case "$rec"
+    case "$setting" in
+      hostless) printf 'project firstmate\n' > "$HOME_DIR/config/heavy-remote" ;;
+      configured) printf 'host fm-mac\nproject firstmate\n' > "$HOME_DIR/config/heavy-remote" ;;
+    esac
+    out=$(run_case_spawn "remote-$setting" "$PROJ_DIR" --mode no-mistakes --yolo off)
+    expect_code 0 "$?" "remote authorization spawn should succeed: $out"
+    fm_test_codex_launch_argv "$LAUNCH_LOG" "$CASE_DIR/argv" >/dev/null 2>&1 || fail 'could not record Codex argv'
+    args=$(tr '\0' '\n' < "$CASE_DIR/argv/args")
+    grant=$(printf '%s\n' "$args" | grep '^developer_instructions=')
+    case "$setting" in
+      configured)
+        for out in "$ROOT/bin/fm-heavy.sh" "FM_HOME=$HOME_DIR" '--class test or --class e2e, --remote' \
+          "$HOME_DIR/config/heavy-remote" 'full Git bundle including repository history' \
+          'session-kit, localvault and dotfiles must never be sent' 'operator-controlled test host fm-mac' 'does not authorize direct ssh, scp, rsync'; do
+          assert_contains "$grant" "$out" 'Codex remote grant lost a boundary'
+        done
+        ;;
+      *)
+        case "$grant" in *'operator authorizes remote test execution'*) fail "$setting config granted remote-source consent" ;; esac
+        ;;
+    esac
+    for out in 'sandbox_mode="workspace-write"' 'approvals_reviewer="auto_review"' 'sandbox_workspace_write.network_access=false'; do
+      assert_contains "$args" "$out" 'remote grant changed the safety posture'
+    done
+  done
+  pass 'Codex remote-source consent is scoped to the configured gate and absent without a host'
+}
+
+test_codex_remote_authorization
 test_codex_task_browser
 test_ship_allowlist_absent
 test_ship_allowlist_enabled
