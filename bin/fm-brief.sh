@@ -708,10 +708,11 @@ HEAVY_BLOCK=
 if [ "$KIND" != review ] \
   && HEAVY_ROOT=$(. "$SCRIPT_DIR/fm-wake-lib.sh" && fm_firstmate_root_home "$FM_HOME") \
   && [ -e "$HEAVY_ROOT/config/heavy-commands" ]; then
+HEAVY_PROJECT=$(basename "${REPO%/}")
 IFS= read -r -d '' HEAVY_SECTION <<EOF || true
 # Heavy commands
 Run full or multi-file test suites, production builds, image builds, e2e runs, and every \`no-mistakes axi run\` or \`respond\` drive call that will execute a local test step, build or e2e through the machine's shared slot, one heavy command at a time under a 6 GB memory cap:
-\`FM_HOME=$(shell_quote "$FM_HOME") $(shell_quote "$FM_ROOT/bin/fm-heavy.sh") --class test|build|e2e|image --task ${ID:-<task-id>} --project ${REPO:-<project>} -- <command>\`
+\`FM_HOME=$(shell_quote "$FM_HOME") $(shell_quote "$FM_ROOT/bin/fm-heavy.sh") --class test|build|e2e|image --task ${ID:-<task-id>} --project $(shell_quote "$HEAVY_PROJECT") -- <command>\`
 Use class test for a drive call. The wrapper takes the lock and the memory scope for you and records the wait, run time and peak memory, so never wrap it in flock or systemd-run yourself.
 Hold the slot only while the command runs a local test step, build or e2e: drive without it while the pipeline is in intent, rebase or review, and once only document, lint, push, PR or ci remain.
 The pipeline agent never takes the slot again inside your hold, so when your \`respond\` asks for local builds or drivers, say that the caller already holds the slot and the commands run under the 6G cap only.

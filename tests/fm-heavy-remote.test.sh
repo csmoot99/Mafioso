@@ -1323,6 +1323,46 @@ run --rm --init --name" ] || fail "services start before the job: $(cat "$CTL/do
   pass "fm-heavy --remote: services start before the job with their settings and are removed on pass, failure, timeout, cancel and reconciliation, whatever the spacing of their lines"
 }
 
+# Path callers must select the same approval and remote options as name callers.
+test_project_paths() {
+  local input
+  setup_services pathservices 'echo "$DATABASE_URL" > "$HOME/url"'
+  mkdir -p "$HOME_FM/projects"
+  ln -s "$REPO" "$HOME_FM/projects/p"
+  # Select an approval-specific image, rather than the global default.
+  sed -i 's/project p service=/project p image=project-linux:1 service=/' "$HOME_FM/config/heavy-remote"
+  for input in "$HOME_FM/projects/p/" "$REPO"; do
+    heavy --project "$input" --remote >"$CASE/out" 2>&1 || fail "approved clone path: $(cat "$CASE/out")"
+    expect_record '.project == "p" and .host == "fake-mac" and .outcome == "pass"' "clone name record"
+    assert_grep ' project-linux:1 python3 ' "$CTL/docker.log" "approval image must reach the remote job"
+    [ "$(cat "$REMOTE_HOME/url")" = "postgres://localhost:$P1/t" ] || fail "approval environment must reach the job"
+    expect_services_removed "path services"
+    : > "$CTL/docker.log"
+  done
+
+  setup pathroot 'echo ran'
+  printf 'host fake-mac\nproject repo\n' > "$HOME_FM/config/heavy-remote"
+  heavy --project "$REPO" --remote >/dev/null 2>&1 || fail "current repository root path"
+  expect_record '.project == "repo" and .host == "fake-mac"' "repository basename record"
+  heavy --project . --remote >/dev/null 2>&1 || fail "relative repository root"
+
+  setup pathunapproved 'echo local'
+  mkdir -p "$HOME_FM/projects/session-kit" "$CASE/elsewhere/p"
+  printf 'host fake-mac\nproject p\noffload\n' > "$HOME_FM/config/heavy-remote"
+  heavy --project "$HOME_FM/projects/session-kit" --remote >/dev/null 2>&1
+  expect_code 2 "$?" "unapproved clone path refuses remote"
+  heavy --project "$HOME_FM/projects/session-kit" >/dev/null 2>&1 || fail "unapproved clone stays local"
+  expect_record '.project == "session-kit" and .host == "local"' "unapproved clone record"
+  heavy --project "$CASE/elsewhere/p" --remote >/dev/null 2>&1
+  expect_code 2 "$?" "an arbitrary path cannot borrow an approved basename"
+  [ ! -s "$CTL/log" ] || fail "unapproved paths must never contact the host"
+  printf 'host fake-mac\nproject *\n' > "$HOME_FM/config/heavy-remote"
+  heavy --project "$HOME_FM/projects/session-kit" --remote >/dev/null 2>&1 || fail "wildcard retains its meaning"
+  expect_record '.project == "session-kit" and .host == "fake-mac"' "wildcard path record"
+  pass "fm-heavy: clone and repository paths use named approvals, options and records without approving other projects"
+}
+
+test_project_paths
 test_pass_and_record
 test_off_by_default_and_refusals
 test_fallbacks_run_locally

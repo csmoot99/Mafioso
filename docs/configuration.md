@@ -1236,7 +1236,7 @@ The schema is one `host <ssh-alias>`, one or more approvals, an optional `image 
 An approval is `command <project> -- <words...>` for one command, `project <project>` for every test and e2e command of one project, or `project *` for every project.
 A project approval never covers a `no-mistakes` drive call, which needs this machine's gate.
 Blank lines and lines starting with `#` are ignored; duplicate settings, duplicate approvals, unknown keys, invalid values or an unreadable file refuse a job that would offload (`--remote`, or an approved command with `offload`) with an error naming the file and problem, while every other heavy job prints one warning and runs locally under the local slot.
-An approval covers the project named by the caller's `--project`, so a job with no project never leaves this machine.
+An approval covers the project named by the caller's `--project`, which also accepts clone or current-repository paths as described by [`fm-heavy.sh --help`](../bin/fm-heavy.sh); a job with no project never leaves this machine.
 Command approval words are separated by whitespace and must match the caller's argument vector exactly; shell quoting and expansion are not interpreted.
 For example:
 

@@ -328,10 +328,12 @@ test_brief_rule() {
       FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "heavy-on-$kind" some-proj --mode no-mistakes >/dev/null 2>&1
     fi
     brief="$home/data/heavy-on-$kind/brief.md"
-    assert_grep "bin/fm-heavy.sh' --class test|build|e2e|image --task heavy-on-$kind --project some-proj" "$brief" "$kind: wrapper command missing"
+    assert_grep "bin/fm-heavy.sh' --class test|build|e2e|image --task heavy-on-$kind --project 'some-proj'" "$brief" "$kind: wrapper command missing"
     assert_grep "never takes the slot again inside your hold" "$brief" "$kind: nested-hold rule missing"
     assert_grep "drive without it while the pipeline is in intent, rebase or review" "$brief" "$kind: drive-call slot rule missing"
   done
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" heavy-path "$home/projects/some-proj" --mode no-mistakes >/dev/null 2>&1
+  assert_grep "--project 'some-proj' --" "$home/data/heavy-path/brief.md" "path input must render the project name"
   FM_HOME="$home" "$ROOT/bin/fm-brief.sh" heavy-on-review some-proj --review >/dev/null 2>&1
   assert_no_grep "fm-heavy.sh" "$home/data/heavy-on-review/brief.md" "a read-only review must not get the rule"
   pass "fm-brief: config/heavy-commands points ship and scout workers at the wrapper"
