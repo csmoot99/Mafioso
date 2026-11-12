@@ -192,6 +192,24 @@ test_dirty_snapshot() {
   pass "fm-heavy --remote: snapshot contains current files, excludes ignored files and preserves source state"
 }
 
+test_hidden_untracked_snapshot() {
+  setup hidden-untracked 'test "$(cat new)" = untracked && git rev-parse HEAD'
+  git -C "$REPO" config status.showUntrackedFiles no
+  echo untracked > "$REPO/new"
+  [ -z "$(git -C "$REPO" status --porcelain)" ] || fail "fixture must hide untracked files from default status"
+  source_fingerprint > "$CASE/before"
+  local out candidate
+  out=$(heavy --remote 2>&1) || fail "hidden untracked snapshot run: $out"
+  expect_record '.host == "fake-mac" and .snapshot == true and .outcome == "pass"' "hidden untracked snapshot record"
+  candidate=$(last_record | jq -r .candidate)
+  [ "$candidate" != "$SHA" ] || fail "untracked candidate must differ from HEAD"
+  assert_contains "$out" "$candidate" "untracked snapshot candidate ran"
+  source_fingerprint > "$CASE/after"
+  cmp "$CASE/before" "$CASE/after" || fail "untracked snapshot changed source state"
+  expect_host_clean "untracked snapshot scratch removed"
+  pass "fm-heavy --remote: untracked-only trees are snapshotted when Git status hides untracked files"
+}
+
 test_snapshot_failure() {
   local step
   export REAL_GIT
@@ -1462,6 +1480,7 @@ test_project_paths() {
 test_project_paths
 test_pass_and_record
 test_dirty_snapshot
+test_hidden_untracked_snapshot
 test_snapshot_failure
 test_snapshot_bundle_failure
 test_off_by_default_and_refusals

@@ -244,7 +244,7 @@ top=$(git rev-parse --show-toplevel 2>/dev/null) || fallback not-a-git-repositor
 [ "$(pwd -P)" = "$(cd "$top" && pwd -P)" ] || fallback not-repository-root
 sha=$(git rev-parse HEAD) || fallback not-a-git-repository
 bundle_revs=(HEAD)
-status=$(GIT_OPTIONAL_LOCKS=0 git status --porcelain 2>/dev/null) || fallback snapshot-failed
+status=$(GIT_OPTIONAL_LOCKS=0 git status --porcelain --untracked-files=all 2>/dev/null) || fallback snapshot-failed
 if [ -n "$status" ]; then
   # Copy the real index so staged additions (including tracked ignored files)
   # have exactly the same meaning as git add -A, but never refresh that index.
