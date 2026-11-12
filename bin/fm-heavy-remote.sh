@@ -4,7 +4,7 @@
 # it; it is not a user command.
 #
 # usage: fm-heavy-remote.sh --host <ssh alias> --timeout <seconds> --sample <file>
-#          --state-dir <dir> --project <name> [--class test|e2e] [--image <ref>]
+#          --state-dir <dir> --project <name> [--class test|e2e] [--image <ref>] [--nofile <count>]
 #          [--service "<name> <image> <port> <memory> [KEY=VALUE...]"]... [--env KEY=VALUE]...
 #          -- <command> [args...]
 #
@@ -17,7 +17,7 @@
 #      verifies the exact sha, and launches the command detached in its own
 #      process group under ~/.fm-heavy-remote/<job> on the host;
 #      Dependency preparation runs inside the supervised group, using a
-#      per-project cache; runtime/install failures are collected job failures.
+#      per-project cache; runtime/install failures are collected for local fallback.
 #   2. waits for the runner's durable result.json (the completion record);
 #   3. collects result.json and run.log into <state-dir>/<job>/, checks the job id,
 #      candidate sha, command and bundle digests and the run.log checksum, and
@@ -31,10 +31,14 @@
 # waiting for it, and neither kind is ever stopped for the other. With --image the
 # command runs inside that Linux container image on the host (see the runner).
 #
-# Nothing started: when the host is unreachable or busy, the tree is dirty, an earlier
+# No project command started: when the host is unreachable or busy, the tree is dirty, an earlier
 # job is still running there or the host cannot prepare the job, the sample gets
 # fallback=<reason> and the exit status is 0, so the caller keeps the command in
-# its local queue. A signalled script ends cancelled instead.
+# its local queue. A verified prepare-failed result adds preparation_step and
+# preparation_log (the retained, verified run.log) only after remote cleanup
+# succeeds; a refusal before launch may have neither field.
+# A command failure, even exit 78, stays failed.
+# A signalled script ends cancelled instead.
 #
 # Outcomes (outcome= in the sample; exit status in parentheses):
 #   pass (0), failed (the command's own status), timeout (124: the host killed the
@@ -52,7 +56,8 @@
 #   command itself exited with).
 # After a lost connection the job is reconciled against its record on the host
 # before anything else happens: a job found running or done is waited for and
-# collected, never run again.
+# collected. Local fallback follows only a verified preparation failure and
+# successful cleanup; an uncertain result never authorizes another execution.
 #
 # Open records: <state-dir>/unknown-<host>/<job>.json is written before anything
 # reaches the host and removed only once the host's scratch is gone or nothing was
@@ -65,7 +70,7 @@
 #   finished    its result is collected for its own record only, never as a pass
 #               for the new candidate; its scratch is removed and the record closes
 #               into <state-dir>/<job>/reconciled.json (job, candidate, outcome and
-#               reconciled_at). outcome is pass, failed, timeout, cancelled,
+#               reconciled_at). outcome is pass, failed, prepare-failed, timeout, cancelled,
 #               rejected, lost, or absent when the job never arrived. A signal
 #               while its result is collected or checked leaves the record open.
 #   unreachable the record stays; fallback=unreachable.
@@ -76,12 +81,13 @@ set -u
 set -o pipefail
 
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-host=; timeout_s=; sample=; state_dir=; project=; class="test"; image=; services=(); envs=()
+host=; timeout_s=; sample=; state_dir=; project=; class="test"; image=; nofile=65536; services=(); envs=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --project) project=${2:-}; shift 2 || break ;;
     --class) class=${2:-}; shift 2 || break ;;
     --image) image=${2:-}; shift 2 || break ;;
+    --nofile) nofile=${2:-}; shift 2 || break ;;
     --service) services+=("${2:-}"); shift 2 || break ;;
     --env) envs+=("${2:-}"); shift 2 || break ;;
     --host) host=${2:-}; shift 2 || break ;;
@@ -95,6 +101,7 @@ done
 [ -n "$host" ] && [ -n "$sample" ] && [ -n "$state_dir" ] && [ "$#" -gt 0 ] || {
   echo "fm-heavy-remote.sh: usage error (see the header)" >&2; exit 2; }
 case "$timeout_s" in ''|*[!0-9]*|0*) echo "fm-heavy-remote.sh: --timeout must be a positive integer" >&2; exit 2 ;; esac
+[[ $nofile =~ ^[1-9][0-9]{0,6}$ ]] && [ "$nofile" -le 1048576 ] || { echo "fm-heavy-remote.sh: invalid --nofile (1..1048576)" >&2; exit 2; }
 id="$(date +%s)-$$-$RANDOM"
 
 tries=${FM_HEAVY_REMOTE_RECONNECT_TRIES:-5}
@@ -115,7 +122,7 @@ trap 'sig=15; [ -z "$bg" ] || kill "$bg" 2>/dev/null' TERM
 emit() { printf '%s=%s\n' "$1" "$2" >> "$sample"; }
 rssh() { "${SSH[@]}" "$host" "$@" </dev/null; }
 rrun() { rssh "$runner $1 $rdir ${2:-}"; }  # <runner action> [argument]
-fallback() {  # <reason>: nothing was started; the caller keeps the command in its local queue
+fallback() {  # <reason>: no project command started; the caller keeps the command in its local queue
   rmdir "$jdir" 2>/dev/null
   rm -f "$record"
   [ -z "$sig" ] || finish cancelled $((128 + sig))  # a signalled job never runs, here or locally
@@ -186,7 +193,8 @@ result_problem() {  # status 0 only when the collected result holds every check;
   local want
   jq -e --arg id "$id" --arg sha "$sha" --arg cs "$cmd_sha" --arg bs "$bundle_sha" '
     .schema == "fm-heavy-remote.v1" and .id == $id and .sha == $sha and .command_sha256 == $cs
-    and .bundle_sha256 == $bs and (.outcome | IN("exited", "timeout", "cancelled"))
+    and .bundle_sha256 == $bs and (.outcome | IN("exited", "timeout", "cancelled", "prepare-failed"))
+    and (if .outcome == "prepare-failed" then .exit_code != 0 and (.preparation_step | type) == "string" else true end)
     and (.exit_code | type) == "number" and (.artifacts["run.log"] | type) == "object"' \
     "$jdir/result.json" >/dev/null 2>&1 || { echo "wrong candidate, command, job or malformed envelope"; return 1; }
   want=$(jq -r '.artifacts["run.log"] | "\(.bytes) \(.sha256)"' "$jdir/result.json")
@@ -266,8 +274,8 @@ svcs=$(printf '%s\0' ${services[@]+"${services[@]}"} | jq -Rsc "split(\"\\u0000\
   | {name: .[0], image: .[1], port: (.[2] | tonumber), memory: .[3], env: (.[4:] | $pairs)})") || fallback manifest-failed
 jenv=$(printf '%s\0' ${envs[@]+"${envs[@]}"} | jq -Rsc "split(\"\\u0000\")[:-1] | $pairs") || fallback manifest-failed
 jq -n --arg id "$id" --arg sha "$sha" --arg cs "$cmd_sha" --arg bs "$bundle_sha" --argjson t "$timeout_s" \
-  --arg project "$project" --arg class "$class" --arg image "$image" --argjson services "$svcs" --argjson env "$jenv" \
-  --argjson argv "$argv" '{project: $project, class: $class, image: $image, services: $services, env: $env, id: $id, sha: $sha, command_sha256: $cs, bundle_sha256: $bs, timeout_s: $t, argv: $argv}' \
+  --argjson nofile "$nofile" --arg project "$project" --arg class "$class" --arg image "$image" --argjson services "$svcs" --argjson env "$jenv" \
+  --argjson argv "$argv" '{nofile: $nofile, project: $project, class: $class, image: $image, services: $services, env: $env, id: $id, sha: $sha, command_sha256: $cs, bundle_sha256: $bs, timeout_s: $t, argv: $argv}' \
   > "$stage/manifest.json" || fallback manifest-failed
 cp "$SELF_DIR/fm-heavy-remote-runner.py" "$stage/runner.py"
 cp "$stage/manifest.json" "$record" || fallback state-unwritable
@@ -371,6 +379,12 @@ cleanup_remote
 
 outcome=$(result_outcome)
 code=$(jq -r '.exit_code' "$jdir/result.json")
+if [ "$outcome" = prepare-failed ]; then
+  [ ! -e "$record" ] || finish unknown 75
+  emit preparation_step "$(jq -r .preparation_step "$jdir/result.json")"
+  emit preparation_log "$jdir/run.log"
+  fallback prepare-failed
+fi
 case "$outcome" in
   timeout) code=124 ;;
   cancelled) code=143 ;;

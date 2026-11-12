@@ -1232,7 +1232,7 @@ The flag is machine-wide like the slot and the log: it is read from the root hom
 A drive call holds the slot only while it runs a local test step, build or e2e, and the pipeline agent never takes the slot again inside that hold.
 
 `config/heavy-remote` in the root home is the opt-in for the SSH destination, and without it `fm-heavy.sh --remote` refuses and every job runs locally as before.
-The schema is one `host <ssh-alias>`, one or more approvals, an optional `image <ref>`, optional `service` lines, optional `timeout <seconds>` (default 900), and an optional `offload` presence line.
+The schema is one `host <ssh-alias>`, one or more approvals, an optional `image <ref>`, optional `service` lines, an optional container open-file limit (`nofile`), optional `timeout <seconds>` (default 900), and an optional `offload` presence line.
 An approval is `command <project> -- <words...>` for one command, `project <project>` for every test and e2e command of one project, or `project *` for every project.
 A project approval never covers a `no-mistakes` drive call, which needs this machine's gate.
 Blank lines and lines starting with `#` are ignored; duplicate settings, duplicate approvals, unknown keys, invalid values or an unreadable file refuse a job that would offload (`--remote`, or an approved command with `offload`) with an error naming the file and problem, while every other heavy job prints one warning and runs locally under the local slot.
@@ -1277,6 +1277,8 @@ A result with the wrong commit, command or bundle digest, or a missing or partia
 [`bin/fm-heavy-summary.sh`](../bin/fm-heavy-summary.sh) gives local and remote jobs separate rows, so the queue wait a remote run saves can be read against its preparation and collection time.
 The destination needs `python3`, `git`, `tar` and `ps`; the runner is shipped with each job.
 With `image <ref>`, each job runs inside that Linux container image through the destination's `docker`, under a 6 GB memory cap, so its tools and results match a Linux machine; the image needs `python3` and `git` plus the projects' own system tools, and the container is removed when the job ends or is stopped.
+The repository supplies [`bin/fm-heavy-linux.Dockerfile`](../bin/fm-heavy-linux.Dockerfile) for `fm-heavy-linux:2`, including native build tools; its header owns the owner-approved, slot-locked build command.
+The container open-file limit is configurable through `config/heavy-remote`; the [`bin/fm-heavy.sh`](../bin/fm-heavy.sh) header owns its syntax and default.
 An approval may carry `image=<ref>` for its own image, such as a browser image for e2e, `service=<name>` for each throwaway service its jobs need, and `env=KEY=VALUE` for the job environment; the most specific matching approval supplies them.
 A `service <name> <image> <port> <memory> [KEY=VALUE...]` line declares a service container that starts beside each such job in a private network of its own, reachable only by that job on `localhost:<port>`, and is removed with the job; services are never shared or kept between jobs.
 A job whose 6 GB cap plus its services' memory exceeds the destination docker's memory is not started there and runs locally; `bin/fm-heavy.sh` and `bin/fm-heavy-remote-runner.py` headers own the exact syntax and container mechanics.
@@ -1284,7 +1286,8 @@ Inside the image, Node runtimes come from `~/.fm-heavy-remote/linux/runtimes` on
 For Node projects, each job runs on the versions of node and the lockfile's pnpm/npm that its own project pins in `package.json` engines, `packageManager` and `.nvmrc`, chosen from those installed on the destination, except that a reachable pnpm may fetch its own pinned version; the runner then installs locked dependencies from the transferred candidate.
 Stable numeric versions, comparison ranges, wildcards, caret, tilde, hyphen ranges and `||` alternatives are supported; unsupported requirements such as `.nvmrc` aliases refuse the job with a clear reason rather than guessing.
 A root `package.json` that declares no dependencies of any kind needs no lockfile: the job still runs on its pinned Node and skips installation.
-A pinned Node or npm version that is not installed, no reachable pnpm, declared dependencies with no lockfile, ambiguous lockfiles, and installation failures are failed remote jobs with a clear reason, never local fallbacks.
+A verified preparation failure, including container startup, service readiness, runtime, dependency or browser preparation and a timeout before the project command starts, returns the job to the local queue once remote cleanup succeeds, with the failing preparation step and retained host log in its record.
+Failures of the project command remain remote job failures, including exit 78; cancellation never retries locally.
 Dependency copies are cached per project under `~/.fm-heavy-remote/cache/`, refreshed when lockfiles, package settings or runtime versions change, and copied into each isolated candidate before execution.
 An e2e command that invokes Playwright directly or through a package script also installs its required browser revisions, using Playwright's account cache; test jobs never install browsers.
 Dependency preparation shares the job's process group and timeout, and is included in `run_s`; `prepare_s` measures transfer and checkout.

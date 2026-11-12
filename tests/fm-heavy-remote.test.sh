@@ -915,6 +915,9 @@ test_queued_job_signal_runs_nowhere() {
 }
 
 make_node_project() {
+  # Local fallback is observable and does not need this fixture's host-only modules.
+  { printf '%s\n' 'if [ "$HOME" != "$FAKE_SSH_HOME" ]; then echo local >> "$FAKE_SSH_CTL/local-runs"; exit 0; fi'; cat "$REPO/t/job.sh"; } > "$CASE/job"
+  mv "$CASE/job" "$REPO/t/job.sh"
   cat > "$REPO/package.json" <<'JSON'
 {"engines":{"node":">=20 <23","pnpm":"^9.0.0"},"packageManager":"pnpm@9.1.0","scripts":{"e2e":"playwright test"}}
 JSON
@@ -931,6 +934,7 @@ SH
 if [ "$1" = --version ]; then echo "${FAKE_MANAGER_VERSION:-9.1.0}"; exit; fi
 printf '%s\n' "$*" >> "$HOME/install.log"
 [ "${FAKE_INSTALL_FAIL:-}" != 1 ] || exit 42
+[ "${FAKE_INSTALL_HANG:-}" != 1 ] || sleep 300
 if [ "$1" = install ] || [ "$1" = ci ]; then mkdir -p node_modules; echo ready > node_modules/proof; fi
 SH
   chmod +x "$FAKEBIN/node" "$FAKEBIN/pnpm"
@@ -949,18 +953,26 @@ test_dependency_cache_and_failures() {
   git -C "$REPO" add -A; git -C "$REPO" commit -q -m lockchange
   heavy --remote >/dev/null 2>&1 || fail "changed lockfile install"
   [ "$(wc -l < "$REMOTE_HOME/install.log")" -eq 2 ] || fail "changed lockfile must reinstall"
-  FAKE_NODE_MISSING=1 heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "missing runtime"
+  FAKE_NODE_MISSING=1 heavy --remote >"$CASE/out" 2>&1; expect_code 0 "$?" "missing runtime"
   assert_grep 'missing runtime node' "$CASE/out" "missing runtime reason"
-  FAKE_MANAGER_VERSION=8.0.0 heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "incompatible pnpm"
-  FAKE_NODE_VERSION=v18.0.0 heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "incompatible runtime"
+  FAKE_MANAGER_VERSION=8.0.0 heavy --remote >"$CASE/out" 2>&1; expect_code 0 "$?" "incompatible pnpm"
+  FAKE_NODE_VERSION=v18.0.0 heavy --remote >"$CASE/out" 2>&1; expect_code 0 "$?" "incompatible runtime"
   assert_grep 'does not satisfy' "$CASE/out" "version failure reason"
-  expect_record '.host == "fake-mac" and .outcome == "failed" and .fallback == null' "runtime failure never retries locally"
+  expect_record '.host == "local" and .fallback == "prepare-failed" and .preparation_step == "runtime"' "runtime failure returns locally"
   echo '# changed again' >> "$REPO/pnpm-lock.yaml"
   git -C "$REPO" add -A; git -C "$REPO" commit -q -m failedinstall
-  FAKE_INSTALL_FAIL=1 heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "install error"
-  expect_record '.host == "fake-mac" and .outcome == "failed" and .fallback == null' "install failure never retries locally"
+  FAKE_INSTALL_FAIL=1 heavy --remote >"$CASE/out" 2>&1; expect_code 0 "$?" "install error"
+  expect_record '.host == "local" and .fallback == "prepare-failed" and .preparation_step == "dependencies"' "install failure returns locally"
+  assert_grep 'exit status 42' "$(last_record | jq -r .preparation_log)" "retained install failure log"
+  [ "$(wc -l < "$CTL/local-runs")" -eq 4 ] || fail "every preparation failure runs locally once"
   [ "$(wc -l < "$REMOTE_HOME/tested")" -eq 3 ] || fail "no candidate runs after runtime/install failure"
-  pass "fm-heavy: cached dependencies refresh on lockfile change; runtime/install failures cannot fall back"
+  setup preparetimeout 'echo tested >> "$HOME/tested"' 2
+  make_node_project
+  FAKE_INSTALL_HANG=1 heavy --remote >"$CASE/out" 2>&1 || fail "preparation timeout returns locally"
+  expect_record '.host == "local" and .fallback == "prepare-failed" and .preparation_step == "dependencies"' "preparation timeout fallback"
+  [ ! -e "$REMOTE_HOME/tested" ] || fail "remote test never starts after preparation timeout"
+  [ "$(wc -l < "$CTL/local-runs")" -eq 1 ] || fail "preparation timeout runs locally once"
+  pass "fm-heavy: cached dependencies refresh on lockfile change; runtime/install failures and preparation timeout return locally with evidence"
 }
 
 # host_tool <bin dir> <tool> <version>: one installed version of a tool on the host.
@@ -996,20 +1008,20 @@ test_each_project_runs_on_its_pinned_runtimes() {
   grep -F 'pnpm 9.2.0 install' "$REMOTE_HOME/install.log" >/dev/null || fail "the pinned pnpm installs dependencies"
   printf '{"engines":{"node":">=26.0.0"},"packageManager":"pnpm@9.2.0"}\n' > "$REPO/package.json"
   git -C "$REPO" add -A; git -C "$REPO" commit -q -m missingnode
-  heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "a pinned node that is not installed"
+  heavy --remote >"$CASE/out" 2>&1; expect_code 0 "$?" "a pinned node that is not installed"
   assert_grep 'does not satisfy >=26.0.0' "$CASE/out" "the refusal names the node pin"
   printf '{"packageManager":"pnpm@9.9.0"}\n' > "$REPO/package.json"
   rm "$REPO/.nvmrc"
   git -C "$REPO" add -A; git -C "$REPO" commit -q -m missingpnpm
-  heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "a pnpm that cannot provide the pin"
+  heavy --remote >"$CASE/out" 2>&1; expect_code 0 "$?" "a pnpm that cannot provide the pin"
   assert_grep 'does not satisfy 9.9.0' "$CASE/out" "the refusal names the pnpm pin"
   # A real pnpm reports the pin once it has fetched that version for itself.
   out=$(FAKE_MANAGER_VERSION=9.9.0 heavy --remote 2>&1) || fail "self-fetched pnpm: $out"
   assert_contains "$out" "9.9.0" "a pnpm providing its own pin runs the job"
   rm -rf "$REMOTE_HOME/.fm-heavy-remote/runtimes"
-  FAKE_PNPM_MISSING=1 heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "no pnpm reachable"
+  FAKE_PNPM_MISSING=1 heavy --remote >"$CASE/out" 2>&1; expect_code 0 "$?" "no pnpm reachable"
   assert_grep 'missing runtime pnpm' "$CASE/out" "the refusal says no pnpm was found"
-  expect_record '.host == "fake-mac" and .outcome == "failed" and .fallback == null' "a missing runtime never retries locally"
+  expect_record '.host == "local" and .fallback == "prepare-failed"' "a missing runtime returns locally"
   pass "fm-heavy: each project runs on the node and pnpm it pins; a missing node or no pnpm is a clear refusal"
 }
 
@@ -1026,11 +1038,11 @@ test_project_without_dependencies_needs_no_lockfile() {
   [ ! -e "$REMOTE_HOME/install.log" ] || fail "nothing may be installed: $(cat "$REMOTE_HOME/install.log")"
   printf '{"engines":{"node":">=26.0.0"}}\n' > "$REPO/package.json"
   git -C "$REPO" add -A; git -C "$REPO" commit -q -m missingnode
-  heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "a pinned node that is not installed"
+  heavy --remote >"$CASE/out" 2>&1; expect_code 0 "$?" "a pinned node that is not installed"
   assert_grep 'does not satisfy >=26.0.0' "$CASE/out" "the refusal names the node pin"
   printf '{"devDependencies":{"left-pad":"1.3.0"}}\n' > "$REPO/package.json"
   git -C "$REPO" add -A; git -C "$REPO" commit -q -m unlocked
-  heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "declared dependencies with no lockfile"
+  heavy --remote >"$CASE/out" 2>&1; expect_code 0 "$?" "declared dependencies with no lockfile"
   assert_grep 'no supported lockfile' "$CASE/out" "the refusal names the lockfile"
   pass "fm-heavy: a project with no dependencies needs no lockfile; a pinned node and declared dependencies still refuse"
 }
@@ -1060,7 +1072,7 @@ test_npm_dependency_cache() {
   [ "$(wc -l < "$REMOTE_HOME/install.log")" -eq 1 ] || fail "npm lock cache must avoid reinstall"
   printf '24\n' > "$REPO/.nvmrc"
   git -C "$REPO" add -A; git -C "$REPO" commit -q -m nvmrc
-  heavy --remote >"$CASE/out" 2>&1; expect_code 78 "$?" "nvmrc mismatch"
+  heavy --remote >"$CASE/out" 2>&1; expect_code 0 "$?" "nvmrc mismatch"
   assert_grep 'does not satisfy ^22.0.0 and 24' "$CASE/out" "nvmrc selects runtime"
   pass "fm-heavy: npm lock caching and nvmrc compatibility are enforced"
 }
@@ -1090,7 +1102,7 @@ test_project_approvals() {
   printf 'host fake-mac\nproject *\n' > "$HOME_FM/config/heavy-remote"
   heavy --project '' --remote >/dev/null 2>&1; expect_code 2 "$?" "a job with no project never leaves"
   [ "$(wc -l < "$REMOTE_HOME/runs")" -eq 2 ] || fail "only the approved jobs ran on the host"
-  for bad in 'project p\nproject p' 'project a b' 'project' 'image bad image!' 'image a\nimage b' \
+  for bad in 'project p\nproject p' 'project a b' 'project' 'nofile 0' 'nofile nope' 'nofile 1048577' 'nofile 123\nnofile 456' 'image bad image!' 'image a\nimage b' \
     'image i\nproject q service=nope' 'service db pg 5432 1g\nproject q service=db' 'project q bogus=1' 'project q env=nokey' \
     'image i\nservice a x 5432 1g\nservice b y 5432 1g\nproject q service=a service=b' 'service DB pg 5432 1g' \
     'service db pg port 1g' 'service db pg 5432 1t' 'service db pg 5432 1g\nservice db pg 5433 1g' 'service db pg 5432 1g bad'; do
@@ -1194,8 +1206,9 @@ esac
 [ "$1" = run ] || exit 0
 shift
 dir=.
+ulimit -Sn 256
 while [ "$#" -gt 0 ]; do
-  case "$1" in --rm|--init) shift ;; -w) dir=$2; shift 2 ;; -e) export "${2?}"; shift 2 ;; -*) shift 2 ;; *) break ;; esac
+  case "$1" in --rm|--init) shift ;; --ulimit) limits=${2#nofile=}; ulimit -Sn "${limits%%:*}"; shift 2 ;; -w) dir=$2; shift 2 ;; -e) export "${2?}"; shift 2 ;; -*) shift 2 ;; *) break ;; esac
 done
 shift
 cd "$dir" && exec "$@"
@@ -1229,6 +1242,41 @@ SH
   grep -Fx "rm -f $id" "$CTL/docker.log" >/dev/null || fail "the container is removed: $(cat "$CTL/docker.log")"
   [ "$(ls "$REMOTE_HOME/.fm-heavy-remote")" = linux ] || fail "only the linux cache remains: $(ls "$REMOTE_HOME/.fm-heavy-remote")"
   pass "fm-heavy: an image line runs the job inside that container and removes it"
+}
+
+test_container_many_file_install() {
+  local limit
+  for limit in 256 default 8192; do
+    setup "manyfiles-$limit" 'test -f node_modules/proof'
+    make_node_project
+    make_fake_docker "$FAKEBIN"
+    # Exercise real simultaneous descriptors, as a parallel pnpm install does.
+    python3 - "$FAKEBIN/pnpm" <<'PYTHON'
+import sys
+from pathlib import Path
+p = Path(sys.argv[1])
+p.write_text(p.read_text().replace('if [ "$1" = install ]', """python3 - <<'OPENFILES'
+files = [open('/dev/null') for _ in range(4096)]
+OPENFILES
+[ "$?" = 0 ] || exit 42
+if [ "$1" = install ]"""))
+PYTHON
+    printf 'image fm-heavy-linux:2\n' >> "$HOME_FM/config/heavy-remote"
+    [ "$limit" = default ] || printf 'nofile %s\n' "$limit" >> "$HOME_FM/config/heavy-remote"
+    heavy --remote >"$CASE/out" 2>&1 || fail "many-file install: $(cat "$CASE/out")"
+    if [ "$limit" = 256 ]; then
+      expect_record '.host == "local" and .fallback == "prepare-failed" and .preparation_step == "dependencies"' "low limit returns locally"
+      assert_grep 'Too many open files' "$(last_record | jq -r .preparation_log)" "low-limit reproduction"
+      continue
+    fi
+    expect_record '.host == "fake-mac" and .outcome == "pass" and .fallback == null' "many-file install passes on host"
+    grep -F -- "--ulimit nofile=${limit/default/65536}:${limit/default/65536}" "$CTL/docker.log" >/dev/null || fail "container nofile setting"
+    [ ! -e "$CTL/local-runs" ] || fail "no fallback for many-file install"
+  done
+  setup command78 'exit 78'
+  heavy --remote >/dev/null 2>&1; expect_code 78 "$?" "project command exiting 78"
+  expect_record '.host == "fake-mac" and .outcome == "failed" and .fallback == null' "exit 78 after command starts remains failed"
+  pass "fm-heavy: default and configured container limits permit many-file installs; command exit 78 stays failed"
 }
 
 free_port() { python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])'; }
@@ -1403,6 +1451,7 @@ test_npm_dependency_cache
 test_project_approvals
 test_host_jobs_go_first_and_none_is_stopped
 test_image_runs_in_a_container
+test_container_many_file_install
 test_services_start_with_the_job_and_are_removed
 
 echo '# all fm-heavy-remote tests passed'
