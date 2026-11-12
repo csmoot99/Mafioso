@@ -1,0 +1,39 @@
+{"event": "environment", "platform": "linux", "transport": "direct runner CLI; no mocked executables", "candidate": "ba0c174f15404a16ff39d171bc42d6b3d0528fc0"}
+{"event": "runner", "action": "busy", "arguments": [], "exit": 12, "stdout": "busy", "stderr": ""}
+{"event": "runner", "action": "start", "arguments": ["<lab>/home/.fm-heavy-remote/default-refused"], "exit": 12, "stdout": "", "stderr": "busy: the host's heavy slot is taken or awaited"}
+{"event": "scenario-pass", "name": "Absent host-slots retains one total job"}
+{"event": "runner", "action": "start", "arguments": ["<lab>/home/.fm-heavy-remote/beside-native"], "exit": 0, "stdout": "started", "stderr": ""}
+{"event": "job-running", "job": "beside-native", "processes": {"pid": 1807745, "child": null}, "owner": {"supervisor_pid": 1807744, "supervisor_start": "Thu Nov 12 16:21:14 2026", "group": 1807745, "group_start": "Thu Nov 12 16:21:14 2026"}}
+{"event": "runner", "action": "busy", "arguments": ["2"], "exit": 12, "stdout": "busy", "stderr": ""}
+{"event": "runner", "action": "start", "arguments": ["<lab>/home/.fm-heavy-remote/third-refused"], "exit": 12, "stdout": "", "stderr": "busy: the host's heavy slot is taken or awaited"}
+{"event": "unchanged-native-probe", "exit": 1, "expected_occupied": true}
+{"event": "job-result", "job": "beside-native", "outcome": "exited", "exit": 0, "log": "running beside-native\ncompleted beside-native\n"}
+{"event": "runner", "action": "cleanup", "arguments": ["<lab>/home/.fm-heavy-remote/beside-native"], "exit": 0, "stdout": "", "stderr": ""}
+{"event": "scenario-pass", "name": "One native plus one sent job overlap; a third is refused"}
+{"event": "runner", "action": "busy", "arguments": ["2"], "exit": 12, "stdout": "busy", "stderr": ""}
+{"event": "runner", "action": "start", "arguments": ["<lab>/home/.fm-heavy-remote/third-refused"], "exit": 12, "stdout": "", "stderr": "busy: the host's heavy slot is taken or awaited"}
+{"event": "native-completed", "pid": 1807730, "started": true, "exit": 0}
+{"event": "native-completed", "pid": 1807760, "started": true, "exit": 0}
+{"event": "runner", "action": "busy", "arguments": ["2"], "exit": 12, "stdout": "busy", "stderr": ""}
+{"event": "native-completed", "pid": 1807767, "started": true, "exit": 0}
+{"event": "scenario-pass", "name": "Queued native path and descriptor flock callers retain priority"}
+{"event": "runner", "action": "start", "arguments": ["<lab>/home/.fm-heavy-remote/remote-first"], "exit": 0, "stdout": "started", "stderr": ""}
+{"event": "job-running", "job": "remote-first", "processes": {"pid": 1807836, "child": null}, "owner": {"supervisor_pid": 1807835, "supervisor_start": "Thu Nov 12 16:21:16 2026", "group": 1807836, "group_start": "Thu Nov 12 16:21:16 2026"}}
+{"event": "runner", "action": "start", "arguments": ["<lab>/home/.fm-heavy-remote/remote-second"], "exit": 0, "stdout": "started", "stderr": ""}
+{"event": "job-running", "job": "remote-second", "processes": {"pid": 1807910, "child": 1807950}, "owner": {"supervisor_pid": 1807880, "supervisor_start": "Thu Nov 12 16:21:16 2026", "group": 1807910, "group_start": "Thu Nov 12 16:21:16 2026"}}
+{"event": "runner", "action": "reconcile", "arguments": ["<lab>/home/.fm-heavy-remote/remote-second"], "exit": 0, "stdout": "running", "stderr": ""}
+{"event": "runner", "action": "busy", "arguments": ["2"], "exit": 12, "stdout": "busy", "stderr": ""}
+{"event": "runner", "action": "reconcile", "arguments": ["<lab>/home/.fm-heavy-remote/remote-second"], "exit": 0, "stdout": "running", "stderr": ""}
+{"event": "runner", "action": "reconcile", "arguments": ["<lab>/home/.fm-heavy-remote/remote-second"], "exit": 0, "stdout": "orphaned", "stderr": ""}
+{"event": "unchanged-native-probe", "exit": 0, "expected_occupied": true}
+{"event": "runner", "action": "cleanup", "arguments": ["<lab>/home/.fm-heavy-remote/remote-second"], "exit": 0, "stdout": "", "stderr": ""}
+{"event": "runner", "action": "cleanup", "arguments": ["<lab>/home/.fm-heavy-remote/remote-first"], "exit": 0, "stdout": "", "stderr": ""}
+{"event": "teardown", "lab": "all processes stopped; disposable home removed"}
+Traceback (most recent call last):
+  File "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PTHYBS4S52E0ECV1HMJ8A/.test-validation/live_slots.py", line 183, in <module>
+    probe_legacy(True)
+    ~~~~~~~~~~~~^^^^^^
+  File "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M78PTHYBS4S52E0ECV1HMJ8A/.test-validation/live_slots.py", line 133, in probe_legacy
+    assert (out.returncode != 0) == occupied
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

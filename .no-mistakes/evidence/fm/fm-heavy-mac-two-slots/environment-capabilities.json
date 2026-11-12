@@ -1,0 +1,8 @@
+{
+  "platform": "Linux",
+  "ssh": "/usr/bin/ssh",
+  "sshd": null,
+  "macos_permission": "Mac writes forbidden by run instructions; no Mac jobs launched",
+  "transport_limit": "Focused client tests use fake SSH and Docker; no live SSH server is installed locally",
+  "scope": "Direct live runner checks use native Python/git/flock on Linux, private HOME and lock under worktree"
+}

@@ -1,0 +1,71 @@
+{"event": "environment", "platform": "linux", "transport": "direct runner CLI; no mocked executables", "candidate": "dde1667ccc77f2dc0aab543ea61945748679a35a"}
+{"event": "runner", "action": "busy", "arguments": [], "exit": 12, "stdout": "busy", "stderr": ""}
+{"event": "runner", "action": "start", "arguments": ["<lab>/home/.fm-heavy-remote/default-refused"], "exit": 12, "stdout": "", "stderr": "busy: the host's heavy slot is taken or awaited"}
+{"event": "scenario-pass", "name": "Absent host-slots retains one total job"}
+{"event": "runner", "action": "start", "arguments": ["<lab>/home/.fm-heavy-remote/beside-native"], "exit": 0, "stdout": "started", "stderr": ""}
+{"event": "job-running", "job": "beside-native", "processes": {"pid": 1765556, "child": null}, "owner": {"supervisor_pid": 1765554, "supervisor_start": "Thu Nov 12 16:18:53 2026", "group": 1765556, "group_start": "Thu Nov 12 16:18:53 2026"}}
+{"event": "runner", "action": "busy", "arguments": ["2"], "exit": 12, "stdout": "busy", "stderr": ""}
+{"event": "runner", "action": "start", "arguments": ["<lab>/home/.fm-heavy-remote/third-refused"], "exit": 12, "stdout": "", "stderr": "busy: the host's heavy slot is taken or awaited"}
+{"event": "unchanged-native-probe", "exit": 1, "expected_occupied": true}
+{"event": "job-result", "job": "beside-native", "outcome": "exited", "exit": 0, "log": "running beside-native\ncompleted beside-native\n"}
+{"event": "runner", "action": "cleanup", "arguments": ["<lab>/home/.fm-heavy-remote/beside-native"], "exit": 0, "stdout": "", "stderr": ""}
+{"event": "scenario-pass", "name": "One native plus one sent job overlap; a third is refused"}
+{"event": "runner", "action": "busy", "arguments": ["2"], "exit": 12, "stdout": "busy", "stderr": ""}
+{"event": "runner", "action": "start", "arguments": ["<lab>/home/.fm-heavy-remote/third-refused"], "exit": 12, "stdout": "", "stderr": "busy: the host's heavy slot is taken or awaited"}
+{"event": "native-completed", "pid": 1765531, "started": true, "exit": 0}
+{"event": "native-completed", "pid": 1765582, "started": true, "exit": 0}
+{"event": "runner", "action": "busy", "arguments": ["2"], "exit": 12, "stdout": "busy", "stderr": ""}
+{"event": "native-completed", "pid": 1765606, "started": true, "exit": 0}
+{"event": "scenario-pass", "name": "Queued native path and descriptor flock callers retain priority"}
+{"event": "runner", "action": "start", "arguments": ["<lab>/home/.fm-heavy-remote/remote-first"], "exit": 0, "stdout": "started", "stderr": ""}
+{"event": "job-running", "job": "remote-first", "processes": {"pid": 1765749, "child": null}, "owner": {"supervisor_pid": 1765717, "supervisor_start": "Thu Nov 12 16:18:54 2026", "group": 1765749, "group_start": "Thu Nov 12 16:18:54 2026"}}
+{"event": "runner", "action": "start", "arguments": ["<lab>/home/.fm-heavy-remote/remote-second"], "exit": 0, "stdout": "started", "stderr": ""}
+{"event": "job-running", "job": "remote-second", "processes": {"pid": 1765896, "child": 1765938}, "owner": {"supervisor_pid": 1765862, "supervisor_start": "Thu Nov 12 16:18:55 2026", "group": 1765896, "group_start": "Thu Nov 12 16:18:55 2026"}}
+{"event": "runner", "action": "reconcile", "arguments": ["<lab>/home/.fm-heavy-remote/remote-second"], "exit": 0, "stdout": "running", "stderr": ""}
+{"event": "runner", "action": "busy", "arguments": ["2"], "exit": 12, "stdout": "busy", "stderr": ""}
+{"event": "runner", "action": "reconcile", "arguments": ["<lab>/home/.fm-heavy-remote/remote-second"], "exit": 0, "stdout": "orphaned", "stderr": ""}
+{"event": "unchanged-native-probe", "exit": 1, "expected_occupied": true}
+{"event": "runner", "action": "busy", "arguments": ["2"], "exit": 12, "stdout": "busy", "stderr": ""}
+{"event": "runner", "action": "start", "arguments": ["<lab>/home/.fm-heavy-remote/third-refused"], "exit": 12, "stdout": "", "stderr": "busy: the host's heavy slot is taken or awaited"}
+{"event": "unchanged-native-probe", "exit": 1, "expected_occupied": true}
+{"event": "runner", "action": "busy", "arguments": ["2"], "exit": 12, "stdout": "busy", "stderr": ""}
+{"event": "orphan-descendant-blocks-admission", "child": 1765938, "native_started": false}
+{"event": "runner", "action": "cancel", "arguments": ["<lab>/home/.fm-heavy-remote/remote-second"], "exit": 0, "stdout": "lost", "stderr": ""}
+{"event": "native-completed", "pid": 1766070, "started": true, "exit": 0}
+{"event": "runner", "action": "cleanup", "arguments": ["<lab>/home/.fm-heavy-remote/remote-second"], "exit": 0, "stdout": "", "stderr": ""}
+{"event": "job-result", "job": "remote-first", "outcome": "exited", "exit": 0, "log": "running remote-first\ncompleted remote-first\n"}
+{"event": "runner", "action": "cleanup", "arguments": ["<lab>/home/.fm-heavy-remote/remote-first"], "exit": 0, "stdout": "", "stderr": ""}
+{"event": "runner", "action": "busy", "arguments": ["2"], "exit": 0, "stdout": "free", "stderr": ""}
+{"event": "scenario-pass", "name": "Two sent jobs overlap; supervisor and leader loss cannot admit native or remote third job"}
+{"event": "runner", "action": "start", "arguments": ["<lab>/home/.fm-heavy-remote/orphan-extra"], "exit": 0, "stdout": "started", "stderr": ""}
+{"event": "job-running", "job": "orphan-extra", "processes": {"pid": 1767458, "child": null}, "owner": {"supervisor_pid": 1767454, "supervisor_start": "Thu Nov 12 16:18:59 2026", "group": 1767458, "group_start": "Thu Nov 12 16:18:59 2026"}}
+{"event": "runner", "action": "reconcile", "arguments": ["<lab>/home/.fm-heavy-remote/orphan-extra"], "exit": 0, "stdout": "running", "stderr": ""}
+{"event": "runner", "action": "reconcile", "arguments": ["<lab>/home/.fm-heavy-remote/orphan-extra"], "exit": 0, "stdout": "orphaned", "stderr": ""}
+{"event": "runner", "action": "busy", "arguments": ["2"], "exit": 12, "stdout": "busy", "stderr": ""}
+{"event": "runner", "action": "start", "arguments": ["<lab>/home/.fm-heavy-remote/third-refused"], "exit": 12, "stdout": "", "stderr": "busy: the host's heavy slot is taken or awaited"}
+{"event": "runner", "action": "cancel", "arguments": ["<lab>/home/.fm-heavy-remote/orphan-extra"], "exit": 0, "stdout": "lost", "stderr": ""}
+{"event": "runner", "action": "cleanup", "arguments": ["<lab>/home/.fm-heavy-remote/orphan-extra"], "exit": 0, "stdout": "", "stderr": ""}
+{"event": "runner", "action": "busy", "arguments": ["2"], "exit": 0, "stdout": "free", "stderr": ""}
+{"event": "unchanged-native-probe", "exit": 1, "expected_occupied": true}
+{"event": "native-completed", "pid": 1767398, "started": true, "exit": 0}
+{"event": "scenario-pass", "name": "Supervisor loss after running snapshot preserves the extra slot until cleanup"}
+{"event": "runner", "action": "start", "arguments": ["<lab>/home/.fm-heavy-remote/failed-checkout"], "exit": 10, "stdout": "", "stderr": "refused: could not check out ffffffffffffffffffffffffffffffffffffffff:"}
+{"event": "runner", "action": "busy", "arguments": ["2"], "exit": 0, "stdout": "free", "stderr": ""}
+{"event": "unchanged-native-probe", "exit": 1, "expected_occupied": true}
+{"event": "runner", "action": "start", "arguments": ["<lab>/home/.fm-heavy-remote/after-checkout-refusal"], "exit": 0, "stdout": "started", "stderr": ""}
+{"event": "job-running", "job": "after-checkout-refusal", "processes": {"pid": 1768911, "child": null}, "owner": {"supervisor_pid": 1768902, "supervisor_start": "Thu Nov 12 16:19:07 2026", "group": 1768911, "group_start": "Thu Nov 12 16:19:07 2026"}}
+{"event": "job-result", "job": "after-checkout-refusal", "outcome": "exited", "exit": 0, "log": "running after-checkout-refusal\ncompleted after-checkout-refusal\n"}
+{"event": "runner", "action": "cleanup", "arguments": ["<lab>/home/.fm-heavy-remote/after-checkout-refusal"], "exit": 0, "stdout": "", "stderr": ""}
+{"event": "native-completed", "pid": 1768842, "started": true, "exit": 0}
+{"event": "scenario-pass", "name": "Definite checkout refusal releases capacity without follow-up cleanup"}
+{"event": "runner", "action": "busy", "arguments": ["0"], "exit": 10, "stdout": "", "stderr": "refused: host-slots must be 1-64"}
+{"event": "runner", "action": "busy", "arguments": ["65"], "exit": 10, "stdout": "", "stderr": "refused: host-slots must be 1-64"}
+{"event": "runner", "action": "busy", "arguments": ["01"], "exit": 10, "stdout": "", "stderr": "refused: host-slots must be 1-64"}
+{"event": "runner", "action": "busy", "arguments": ["-1"], "exit": 10, "stdout": "", "stderr": "refused: host-slots must be 1-64"}
+{"event": "runner", "action": "busy", "arguments": ["two"], "exit": 10, "stdout": "", "stderr": "refused: host-slots must be 1-64"}
+{"event": "runner", "action": "busy", "arguments": ["1"], "exit": 0, "stdout": "free", "stderr": ""}
+{"event": "runner", "action": "busy", "arguments": ["2"], "exit": 0, "stdout": "free", "stderr": ""}
+{"event": "runner", "action": "busy", "arguments": ["3"], "exit": 0, "stdout": "free", "stderr": ""}
+{"event": "runner", "action": "busy", "arguments": ["64"], "exit": 0, "stdout": "free", "stderr": ""}
+{"event": "scenario-pass", "name": "Runner accepts 1 through 64 and refuses malformed capacities"}
+{"event": "teardown", "lab": "all processes stopped; disposable home removed"}
