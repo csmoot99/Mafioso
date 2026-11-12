@@ -805,7 +805,8 @@ The command would transfer an internal shell script to the unverified remote hos
 ```
 
 The positive session waited for its command to finish, and the probe preserved the heavy-job and remote-result records before temporary-home cleanup.
-`tests/fm-spawn-launch-env.test.sh` refreshes the conditional launch regression, and `tests/fm-codex-hook-layer-live-e2e.test.sh` refreshes real `codex debug prompt-input` rendering for absent, hostless, configured ship and configured scout launches without model tokens.
+`tests/fm-spawn-launch-env.test.sh` covers absent and hostless configuration, root-approved ships, local-child ships and scouts retaining their invoking home, and child-only configuration granting no consent.
+`tests/fm-codex-hook-layer-live-e2e.test.sh` refreshes real `codex debug prompt-input` rendering for absent, hostless, configured ship and configured scout launches without model tokens.
 A real reviewer acceptance check requires fresh model sessions and an explicitly approved remote source payload; prompt rendering alone does not establish transfer approval.
 
 ## Codex crewmate safety posture
