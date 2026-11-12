@@ -2,7 +2,7 @@
 # fm-heavy.sh - run one heavy command on this machine's shared test slot and
 # record where its time went.
 #
-# usage: fm-heavy.sh --class test|build|e2e|image [--task <id>] [--project <name>] [--remote] -- <command> [args...]
+# usage: fm-heavy.sh --class test|build|e2e|image [--task <id>] [--project <name-or-path>] [--remote] -- <command> [args...]
 #
 # The command runs exactly as workers ran it by hand before this wrapper:
 #   flock -o /tmp/fm-heavy.lock systemd-run --user --scope -q -p MemoryMax=6G -p MemorySwapMax=0 <command>
@@ -63,7 +63,11 @@
 # quoting or expansion). A malformed or unreadable config, including duplicate
 # approvals, refuses a job that would offload (--remote, or an approved command
 # with offload); every other job warns once and runs locally.
-# A job with an empty --project is never approved.
+# --project accepts a name or a path resolving to a clone under the root home's
+# projects/ (including symlinks), or to the current repository root. Such paths
+# use the clone directory name or repository basename for approvals, records and
+# remote jobs; other paths stay unmatched by named approvals. Plain names and
+# project * are unchanged. A job with an empty --project is never approved.
 # --remote requires an approval and requests remote first. With offload, an
 # approved command automatically tries the host when all local slots are busy;
 # otherwise it runs locally. Without offload or --remote the local behavior is
@@ -181,6 +185,30 @@ fi
 # shellcheck source=/dev/null # Isolated in this subshell; linted as its own root.
 root=$(. "$(dirname "$SELF")/fm-wake-lib.sh" && fm_firstmate_root_home) || {
   echo "fm-heavy.sh: cannot resolve the root Firstmate home" >&2; exit 2; }
+# Resolve only known clone roots or the repository this command runs from.
+# An arbitrary directory with an approved basename must not gain approval.
+case "$project" in
+  */*|.|..)
+    project_path=$(CDPATH='' cd -- "$project" 2>/dev/null && pwd -P) || project_path=
+    if [ -n "$project_path" ]; then
+      for clone in "$root"/projects/*; do
+        [ -d "$clone" ] || continue
+        clone_path=$(CDPATH='' cd -- "$clone" 2>/dev/null && pwd -P) || continue
+        if [ "$project_path" = "$clone_path" ]; then
+          project=${clone##*/}
+          break
+        fi
+      done
+      case "$project" in
+        */*|.|..)
+          repo_path=$(git rev-parse --show-toplevel 2>/dev/null) || repo_path=
+          repo_path=$(CDPATH='' cd -- "${repo_path:-/dev/null}" 2>/dev/null && pwd -P) || repo_path=
+          [ "$project_path" != "$repo_path" ] || project=${repo_path##*/}
+          ;;
+      esac
+    fi
+    ;;
+esac
 slots=1
 if [ -e "$root/config/host-test-slots" ]; then
   read -r -d '' -a tokens < "$root/config/host-test-slots"
