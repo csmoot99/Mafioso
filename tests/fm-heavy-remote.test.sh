@@ -203,6 +203,45 @@ test_fallbacks_run_locally() {
   pass "fm-heavy --remote: an unreachable, busy or ineligible destination runs the command locally and says why"
 }
 
+test_prelaunch_refusal_does_not_reserve_a_slot() {
+  local real_git failed_dir
+  setup prelaunch-refusal "echo run >> '$TMP_ROOT/prelaunch-refusal/runs'"
+  printf 'host fake-mac\nproject p\nhost-slots 2\n' > "$HOME_FM/config/heavy-remote"
+  real_git=$(command -v git)
+  cat > "$FAKEBIN/git" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = -C ] && [ "${3:-}" = checkout ]; then
+  printf '%s\n' "$2" > "$FAKE_SSH_CTL/failed-checkout"
+  exit 1
+fi
+exec "$FM_TEST_REAL_GIT" "$@"
+SH
+  chmod +x "$FAKEBIN/git"
+  rule cleanup drop 'runner.py cleanup' -1
+  hold_host
+  FM_TEST_REAL_GIT="$real_git" heavy --remote >"$CASE/first.out" 2>&1 5>&- || fail "a refused checkout falls back locally"
+  expect_record '.host == "local" and .fallback == "prepare-failed" and .exit == 0' "checkout refusal fallback"
+  assert_present "$CTL/failed-checkout" "the remote checkout actually failed"
+  failed_dir=$(cat "$CTL/failed-checkout")
+  failed_dir=${failed_dir%/work}
+  assert_present "$failed_dir/started" "the refused transfer remains when follow-up cleanup is unavailable"
+  assert_absent "$failed_dir/owner.json" "a failed checkout launches no supervisor"
+  assert_grep 'runner.py cleanup' "$CTL/log" "the client attempted the unavailable follow-up cleanup"
+  [ -z "$(ls -A "$HOME_FM/state/heavy-remote/unknown-fake-mac")" ] || fail "the definite refusal leaves no client recovery record"
+  HOME="$REMOTE_HOME" python3 "$RUNNER" busy 2 >/dev/null
+  expect_code 0 "$?" "failed preparation leaves the extra slot available without follow-up cleanup"
+  ! flock -n "$FM_HEAVY_HOST_LOCK" true || fail "the native job still occupies the original slot"
+  rm "$FAKEBIN/git" "$CTL/rules/cleanup"
+  heavy --remote >"$CASE/second.out" 2>&1 5>&- || fail "the next job uses the freed remote capacity"
+  expect_record '.host == "fake-mac" and .outcome == "pass"' "remote admission after checkout refusal"
+  [ "$(wc -l < "$CASE/runs")" -eq 2 ] || fail "the fallback and next remote job each run once"
+  ! flock -n "$FM_HEAVY_HOST_LOCK" true || fail "the native job survives the remote recovery"
+  release_host
+  HOME="$REMOTE_HOME" python3 "$RUNNER" cleanup "$failed_dir" >/dev/null
+  expect_host_clean "the refused scratch can be removed independently"
+  pass "fm-heavy: checkout refusal preserves capacity when follow-up cleanup is unavailable"
+}
+
 test_failed_command() {
   setup failed 'echo broke >&2; exit 7'
   heavy --remote >"$CASE/out" 2>&1; expect_code 7 "$?" "the command's own status passes through"
@@ -1552,6 +1591,7 @@ test_project_paths
 test_pass_and_record
 test_off_by_default_and_refusals
 test_fallbacks_run_locally
+test_prelaunch_refusal_does_not_reserve_a_slot
 test_failed_command
 test_timeout_cancels_only_the_jobs_processes
 test_owned_processes_are_cleaned

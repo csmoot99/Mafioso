@@ -266,7 +266,7 @@ def slot_job_active(path):
     return owner is None or alive(owner["supervisor_pid"], owner["supervisor_start"]) or group_alive(owner)
 
 
-def take_host_slot(slots=1, jdir=None):
+def take_host_slot(slots=1):
     """Take one kernel-owned slot without waiting; native jobs keep slot one.
 
     Prefer extra slots so a new native job can still take the legacy lock.
@@ -293,9 +293,7 @@ def take_host_slot(slots=1, jdir=None):
         if slot_job_active(record):
             os.close(fd)
             continue
-        if jdir is not None:
-            write_json(record, {"job_dir": jdir})
-        return fd
+        return fd, record
     return None
 
 
@@ -306,11 +304,11 @@ def host_slots(value):
 
 
 def cmd_busy(slots=1):
-    fd = take_host_slot(slots)
-    if fd is None:
+    slot = take_host_slot(slots)
+    if slot is None:
         print("busy")
         sys.exit(BUSY)
-    os.close(fd)
+    os.close(slot[0])
     print("free")
 
 
@@ -395,9 +393,10 @@ def git(*args):
 def cmd_start(jdir):
     manifest = read_json(os.path.join(jdir, "manifest.json")) or {}
     slots = host_slots(manifest.get("host_slots", 1))
-    slot = take_host_slot(slots, jdir)
-    if slot is None:
+    lease = take_host_slot(slots)
+    if lease is None:
         die(BUSY, "busy: the host's heavy slot is taken or awaited")
+    slot, record = lease
     try:
         os.close(os.open(os.path.join(jdir, "started"), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600))
     except FileExistsError:
@@ -428,10 +427,15 @@ def cmd_start(jdir):
         die(10, "refused: could not check out %s: %s" % (sha, cloned.stderr.strip()))
     if git("-C", work, "rev-parse", "HEAD").stdout.strip() != sha:
         die(10, "refused: checkout is not %s" % sha)
+    write_json(record, {"job_dir": jdir})
     # The supervisor holds the host slot until the job ends; the command does not inherit it.
-    subprocess.Popen([sys.executable, os.path.abspath(__file__), "supervise", jdir, str(slot)], start_new_session=True,
-                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True,
-                     pass_fds=(slot,))
+    try:
+        subprocess.Popen([sys.executable, os.path.abspath(__file__), "supervise", jdir, str(slot)], start_new_session=True,
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True,
+                         pass_fds=(slot,))
+    except OSError as error:
+        os.unlink(record)
+        die(10, "refused: could not launch supervisor: %s" % error)
     end = time.monotonic() + 15
     while not os.path.exists(os.path.join(jdir, "owner.json")):
         if time.monotonic() > end:
