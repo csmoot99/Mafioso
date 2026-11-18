@@ -126,7 +126,17 @@
 # merged, current or pending, in that order, with at most one current. The row
 # then shows one bar for the parts merged out of the total and one bar per part:
 # merged parts full, the current part filled to `pct`, later parts empty. A row
-# with no `parts` shows its own stage bar only. A marker keeps the reached fill
+# with no `parts` shows its own stage bar only. `progress` MAY also carry
+# `checks`, a finer line drawn under the stage bar while the task's checks run:
+# the bearings snapshot's checks row for that id without its `id`, each field
+# null or absent when unknown - `step` (a run step name), `n` of `of` (its place
+# among the steps), `elapsed_s`, `done` of `total` tests (a total needs a done
+# count no larger than it), `pct` (0-99, the fill; `estimate` true marks it as
+# time-based and the line says "about"), `queue` (place in line for the shared
+# test slot) and `label` (such as "fix round 2" or "waiting on a decision"). A
+# queue or label line has no `pct`, and a checks object names a step, a queue
+# or a label. A row without `checks` renders exactly as before.
+# A marker keeps the reached fill
 # and its bar says in words that it waits on the owner or is stuck; such a row,
 # like a row with no `progress`, also keeps its state pill. The values come from
 # the bearings snapshot's in_flight `stage`, `reached` and `pct` and its `parts`
@@ -252,6 +262,18 @@ validate_payload() {  # <data.json>
       and ([.[] | type == "object" and (.label | nonempty_string) and (.state | IN("merged", "current", "pending"))] | all)
       and ([.[] | part_rank] as $r | $r == ($r | sort))
       and ([.[] | select(.state == "current")] | length) <= 1;
+    def count($min): . == null or (type == "number" and floor == . and . >= $min);
+    def valid_checks:
+      type == "object"
+      and (.step == null or (.step | nonempty_string)) and (.label == null or (.label | nonempty_string))
+      and (.n | count(1)) and (.of | count(1)) and (.elapsed_s | count(0)) and (.queue | count(1))
+      and (.done | count(0)) and (.total | count(0)) and (.pct | count(0)) and ((.pct // 0) <= 99)
+      and (.estimate == null or (.estimate | type == "boolean"))
+      and ((.n == null) == (.of == null)) and ((.n // 0) <= (.of // 0))
+      and (.total == null or (.done != null and .done <= .total))
+      and (.estimate != true or .pct != null)
+      and ((.queue == null and .label == null) or .pct == null)
+      and (.step != null or .queue != null or .label != null);
     def optional_progress:
       (has("progress") | not)
       or (.progress
@@ -259,7 +281,8 @@ validate_payload() {  # <data.json>
           and (.reached | IN("planning", "building", "validating", "checks", "ready", "reported"))
           and (.stage == .reached or (.stage | IN("owner", "stuck")))
           and (.pct | type == "number" and . >= 0 and . <= 100 and floor == .)
-          and ((has("parts") | not) or (.parts | valid_parts)));
+          and ((has("parts") | not) or (.parts | valid_parts))
+          and ((has("checks") | not) or (.checks | valid_checks)));
     def underway_item:
       type == "object" and repo_marker and name_marker and (.id | nonempty_string)
       and (.state | nonempty_string) and (.doing | nonempty_string) and (.kind | nonempty_string)

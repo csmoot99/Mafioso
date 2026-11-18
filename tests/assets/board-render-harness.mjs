@@ -11,7 +11,8 @@
 //   { tabs:[{id,label,n,selected,tabindex,controls}], loaded:[visible panels at
 //     load], tabClicks/keys/answerKeepsTab (the tab bar driven like a captain),
 //     reports:{...} (the Reports tab: rows, project options, filters, reader),
-//     underway:[{title,sub,badges,bars:[{label,value,max,text,owner,stuck}],waiting}],
+//     underway:[{title,sub,badges,bars:[{label,value,max,text,owner,stuck}],waiting,
+//       lines:[[label,text]] (every bar line, with or without a bar)}],
 //     charted:[{title,sub,badges,pickable}], empty, more, error,
 //     cards:[{title,images:[{src,alt,lazy}],note:{tag,maxLength,count,limit}|null}],
 //     arrow:{moved,scrolled,count},
@@ -230,6 +231,8 @@ const rowsOf = (container) =>
           stuck: b.classList.contains("bb-bar--stuck"),
         })),
         waiting: row.querySelectorAll(".bb-wait").map((w) => w.textContent),
+        lines: row.querySelectorAll(".bb-barline").map((l) => [l.children[0]?.textContent ?? "",
+          l.children[l.children.length - 1]?.textContent ?? ""]),
       };
     });
 
