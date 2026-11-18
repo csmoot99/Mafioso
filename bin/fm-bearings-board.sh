@@ -117,7 +117,7 @@
 # Every Underway row likewise carries a non-empty `name`: the durable task name
 # when known, otherwise its durable identifier.
 # An Underway row MAY carry `progress`, which the Underway tab draws as progress
-# bars: `{ "stage", "reached", "pct", "parts"? }`, where `reached` is the run
+# bars: `{ "stage", "reached", "pct", "parts"?, "checks"? }`, where `reached` is the run
 # stage reached (planning, building, validating, checks, ready, or reported for a
 # finished scout), `stage` is that same value or one of the markers owner or
 # stuck, `pct` is the whole-number fill (0-100) of the reached stage, and
@@ -126,7 +126,7 @@
 # merged, current or pending, in that order, with at most one current. The row
 # then shows one bar for the parts merged out of the total and one bar per part:
 # merged parts full, the current part filled to `pct`, later parts empty. A row
-# with no `parts` shows its own stage bar only. `progress` MAY also carry
+# with no `parts` shows its own stage bar. `progress` MAY also carry
 # `checks`, a finer line drawn under the stage bar while the task's checks run:
 # the bearings snapshot's checks row for that id without its `id`, each field
 # null or absent when unknown - `step` (a run step name), `n` of `of` (its place

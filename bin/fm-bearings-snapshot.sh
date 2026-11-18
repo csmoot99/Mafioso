@@ -62,7 +62,8 @@
 # Godot PASS/FAIL lines, top-level TAP results or vitest per-file counts), pct
 # (whole-number fill: the test count, capped at 99; review/document estimates,
 # or test estimates only with no readable count, use the median of this project's
-# last five completed step durations, capped at 95 and flagged estimate=true).
+# last five completed step durations from no-mistakes' state database opened
+# read-only, capped at 95 and flagged estimate=true).
 # Review/document samples scale by current/historical changed lines from each
 # run's base_sha to head_sha, bounded to 0.25-4; missing sizes retain the sample's
 # duration and size_adjusted=false marks the estimate as unadjusted (true only
@@ -73,6 +74,8 @@
 # "fix round <n>" or "waiting on a decision", with no pct. The reader has FM_BEARINGS_CHECKS_TASK_TIMEOUT seconds per task
 # (default 2) within FM_BEARINGS_CHECKS_TIMEOUT overall (default 6); a task it
 # cannot read in time has no checks row, and its Underway row is unchanged.
+# Checks enrichment makes no network calls; if python3 is unavailable or the
+# overall reader fails, checks[] is empty and Underway rows remain available.
 # Captain-hold placement follows the canonical snapshot's hold_bucket and
 # nothing else; this wrapper never inspects hold reason or body prose. The
 # buckets are total and mutually exclusive, so every captain hold appears in
@@ -627,16 +630,8 @@ for parts_file in "$FM_DATA_DIR"/*/parts; do
 done
 
 # --- check progress (optional, structured) --------------------------------
-# For each main-home task, a finer reading of its running checks, from
-# machine-readable sources only: `no-mistakes axi status` in the task's worktree
-# (current step, its place among the run's steps, its elapsed time, a fix round
-# or a gate), the run's own test-step log for a configured test command's live
-# count, no-mistakes' state database read-only for the same project's recent
-# step durations, and the shared heavy slot's waiting markers (bin/fm-heavy.sh)
-# for wait duration and other-waiter counts. One python3 reader holds a per-task budget
-# (FM_BEARINGS_CHECKS_TASK_TIMEOUT) inside an overall one
-# (FM_BEARINGS_CHECKS_TIMEOUT); a task over its budget, or every task when the
-# reader is missing or killed, simply has no checks row. No network call.
+# The header owns the checks contract. The optional reader can fail or time out
+# without suppressing the canonical Underway rows.
 CHECKS='{}'
 case "${NM_HOME:-}" in ''|/*) CHECKS_DB=$(fm_nm_state_db /) ;; *) CHECKS_DB= ;; esac
 if command -v python3 >/dev/null 2>&1; then

@@ -76,8 +76,8 @@
 # go first: a job is sent only while capacity is free and none of the host's jobs
 # waits for it, and no running job of either kind is stopped for another. Each job
 # waiting for a local slot leaves a <lock>.waiting/<pid> marker for that check,
-# holding the job's --task (an empty line without one); bin/fm-bearings-snapshot.sh
-# reads the live markers in age order as the queue for its checks projection.
+# holding the job's --task (an empty line without one). Markers do not guarantee
+# admission order; bin/fm-bearings-snapshot.sh owns their checks projection.
 # An approved job the host cannot take yet because it is busy,
 # unreachable or still running an unknown job waits for a local slot while it
 # keeps checking: the remote slot every two seconds, the host itself every
