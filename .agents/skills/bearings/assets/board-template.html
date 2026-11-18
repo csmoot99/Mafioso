@@ -1391,27 +1391,24 @@ __FM_BEARINGS_BOARD_DATA__
     return progBar(label, p.pct, words + " · " + (marker || p.pct + "%"), marker ? p.stage : "", feature);
   }
   /* the finer checks line under the stage bar: a bar only when the payload has
-     a fill, and words for a queue place, a fix round or a decision */
+     a fill, and words for a slot wait, a fix round or a decision */
   var STEP_LABEL = { intent: "Intent", rebase: "Rebase", review: "Review", test: "Tests",
     document: "Docs", lint: "Lint", push: "Push", pr: "PR", ci: "GitHub checks" };
-  function ordinal(n) {
-    var t = n % 100, u = n % 10;
-    return n + (t >= 11 && t <= 13 ? "th" : u === 1 ? "st" : u === 2 ? "nd" : u === 3 ? "rd" : "th");
-  }
   function took(s) {
     return s < 60 ? s + "s" : s < 3600 ? Math.floor(s / 60) + "m" : Math.floor(s / 3600) + "h " + Math.floor(s % 3600 / 60) + "m";
   }
   function checksLine(c) {
     var label, bits = [];
-    if (c.queue != null) {
-      label = "Checks: waiting for the test slot";
-      bits.push(ordinal(c.queue) + " in line");
+    if (c.waiting_others != null) {
+      label = "Checks: waiting for the shared test slot";
+      bits.push(c.waiting_others + " other " + (c.waiting_others === 1 ? "task" : "tasks") + " waiting");
     } else {
       label = "Checks" + (c.step ? ": " + (STEP_LABEL[c.step] || c.step) : "")
         + (c.n != null ? ", step " + c.n + " of " + c.of : "");
       if (c.label) bits.push(c.label);
       if (c.done != null) bits.push(c.done + (c.total != null ? " of " + c.total : "") + " tests");
-      else if (c.pct != null) bits.push((c.estimate ? "about " : "") + c.pct + "%");
+      if (c.pct != null && (c.estimate || c.done == null)) bits.push((c.estimate ? "about " : "") + c.pct + "%");
+      if (c.estimate && c.size_adjusted === false) bits.push("unadjusted");
     }
     if (c.elapsed_s != null) bits.push(took(c.elapsed_s));
     var text = bits.join(" · ") || "running";

@@ -132,10 +132,11 @@
 # null or absent when unknown - `step` (a run step name), `n` of `of` (its place
 # among the steps), `elapsed_s`, `done` of `total` tests (a total needs a done
 # count no larger than it), `pct` (0-99, the fill; `estimate` true marks it as
-# time-based and the line says "about"), `queue` (place in line for the shared
+# time-based and the line says "about"), `size_adjusted` (false labels an
+# estimate "unadjusted"), `waiting_others` (other tasks waiting for the shared
 # test slot) and `label` (such as "fix round 2" or "waiting on a decision"). A
-# queue or label line has no `pct`, and a checks object names a step, a queue
-# or a label. A row without `checks` renders exactly as before.
+# queue or label line has no `pct`, and a checks object names a step,
+# a waiting_others count or a label. A row without `checks` renders exactly as before.
 # A marker keeps the reached fill
 # and its bar says in words that it waits on the owner or is stuck; such a row,
 # like a row with no `progress`, also keeps its state pill. The values come from
@@ -266,14 +267,15 @@ validate_payload() {  # <data.json>
     def valid_checks:
       type == "object"
       and (.step == null or (.step | nonempty_string)) and (.label == null or (.label | nonempty_string))
-      and (.n | count(1)) and (.of | count(1)) and (.elapsed_s | count(0)) and (.queue | count(1))
+      and (.n | count(1)) and (.of | count(1)) and (.elapsed_s | count(0)) and (.waiting_others | count(0))
       and (.done | count(0)) and (.total | count(0)) and (.pct | count(0)) and ((.pct // 0) <= 99)
       and (.estimate == null or (.estimate | type == "boolean"))
+      and (.size_adjusted == null or ((.size_adjusted | type == "boolean") and .estimate == true))
       and ((.n == null) == (.of == null)) and ((.n // 0) <= (.of // 0))
       and (.total == null or (.done != null and .done <= .total))
       and (.estimate != true or .pct != null)
-      and ((.queue == null and .label == null) or .pct == null)
-      and (.step != null or .queue != null or .label != null);
+      and ((.waiting_others == null and .label == null) or .pct == null)
+      and (.step != null or .waiting_others != null or .label != null);
     def optional_progress:
       (has("progress") | not)
       or (.progress

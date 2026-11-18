@@ -228,12 +228,12 @@ test_underway_checks_render_a_finer_line_under_the_stage_bar() {
     {"id":"tests","repo":"sample","name":"Counted","state":"working","kind":"ship","doing":"validating",
      "progress":{"stage":"validating","reached":"validating","pct":75,
        "checks":{"step":"test","n":4,"of":9,"elapsed_s":130,"pct":33,"estimate":false,"done":212,"total":643,
-                 "queue":null,"label":null}}},
+                 "waiting_others":null,"label":null}}},
     {"id":"review","repo":"sample","name":"Estimated","state":"working","kind":"ship","doing":"validating",
      "progress":{"stage":"validating","reached":"validating","pct":75,
        "checks":{"step":"review","n":3,"of":9,"elapsed_s":4000,"pct":40,"estimate":true}}},
     {"id":"queued","repo":"sample","name":"Queued","state":"working","kind":"ship","doing":"validating",
-     "progress":{"stage":"validating","reached":"validating","pct":75,"checks":{"queue":2,"elapsed_s":45}}},
+     "progress":{"stage":"validating","reached":"validating","pct":75,"checks":{"waiting_others":2,"elapsed_s":45}}},
     {"id":"fix","repo":"sample","name":"Fixing","state":"working","kind":"ship","doing":"validating",
      "progress":{"stage":"validating","reached":"validating","pct":75,
        "checks":{"step":"review","n":3,"of":9,"label":"fix round 2","elapsed_s":60}}},
@@ -241,7 +241,16 @@ test_underway_checks_render_a_finer_line_under_the_stage_bar() {
      "progress":{"stage":"owner","reached":"validating","pct":75,"parts":[{"label":"One","state":"current"}],
        "checks":{"step":"review","n":3,"of":9,"label":"waiting on a decision"}}},
     {"id":"plain","repo":"sample","name":"Plain","state":"working","kind":"ship","doing":"ci",
-     "progress":{"stage":"checks","reached":"checks","pct":90}}
+     "progress":{"stage":"checks","reached":"checks","pct":90}},
+    {"id":"fallback","repo":"sample","name":"Estimated tests","state":"working","kind":"ship","doing":"test",
+     "progress":{"stage":"validating","reached":"validating","pct":75,
+       "checks":{"step":"test","pct":20,"done":3,"estimate":true,"size_adjusted":false,"elapsed_s":120}}},
+    {"id":"lint","repo":"sample","name":"Lint","state":"working","kind":"ship","doing":"lint",
+     "progress":{"stage":"validating","reached":"validating","pct":75,"checks":{"step":"lint","elapsed_s":30}}},
+    {"id":"alone","repo":"sample","name":"Waiting alone","state":"working","kind":"ship","doing":"waiting",
+     "progress":{"stage":"validating","reached":"validating","pct":75,"checks":{"waiting_others":0,"elapsed_s":30}}},
+    {"id":"pair","repo":"sample","name":"Waiting pair","state":"working","kind":"ship","doing":"waiting",
+     "progress":{"stage":"validating","reached":"validating","pct":75,"checks":{"waiting_others":1,"elapsed_s":30}}}
   ]' '[]')
   printf '%s' "$out" | jq -e '
     .underway as $u
@@ -249,13 +258,19 @@ test_underway_checks_render_a_finer_line_under_the_stage_bar() {
         ["Checks: Tests, step 4 of 9","33","212 of 643 tests · 2m"]]
       and ($u[1].bars[1] | [.label, .value, .text]) == ["Checks: Review, step 3 of 9","40","about 40% · 1h 6m"]
       and ($u[2].bars | length) == 1
-      and ($u[2].lines[1] == ["Checks: waiting for the test slot","2nd in line · 45s"])
+      and ($u[2].lines[1] == ["Checks: waiting for the shared test slot","2 other tasks waiting · 45s"])
       and ($u[3].bars | length) == 1 and ($u[3].lines[1] == ["Checks: Review, step 3 of 9","fix round 2 · 1m"])
       and ($u[4].lines | last) == ["Checks: Review, step 3 of 9","waiting on a decision"]
       and ($u[5].bars | map([.label, .value, .text])) == [["This task","90","PR checks · 90%"]]
       and ($u[5].lines | length) == 1
+      and ($u[6].bars[1] | [.label, .value, .text]) == ["Checks: Tests","20","3 tests · about 20% · unadjusted · 2m"]
+      and ($u[7].bars | length) == 1 and $u[7].lines[1] == ["Checks: Lint","30s"]
+      and ($u[8].bars | length) == 1
+      and $u[8].lines[1] == ["Checks: waiting for the shared test slot","0 other tasks waiting · 30s"]
+      and ($u[9].bars | length) == 1
+      and $u[9].lines[1] == ["Checks: waiting for the shared test slot","1 other task waiting · 30s"]
   ' >/dev/null || fail "the Underway checks line did not render as specified: $out"
-  pass "Underway checks show the step, test count, an about-estimate, a queue place or a fix-round or decision label under the stage bar, and a row without checks is unchanged"
+  pass "Underway checks show the step, test count, an about-estimate, other-waiter counts or a fix-round or decision label under the stage bar, and a row without checks is unchanged"
 }
 
 test_underway_progress_renders_feature_part_and_stage_bars() {

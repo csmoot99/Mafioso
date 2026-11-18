@@ -989,9 +989,12 @@ test_build_validates_underway_progress() {
     | jq -e '.underway[0].progress | .stage == "owner" and .reached == "checks" and .pct == 90 and (.parts | length) == 3' >/dev/null \
     || fail "the progress row did not reach the built page"
   for checks in \
-    '{"step":"test","n":4,"of":9,"elapsed_s":120,"pct":20,"estimate":true,"done":3,"total":null,"queue":null,"label":null}' \
+    '{"step":"test","n":4,"of":9,"elapsed_s":120,"pct":20,"estimate":true,"done":3,"total":null,"waiting_others":null,"label":null}' \
     '{"step":"test","n":4,"of":9,"pct":75,"done":3,"total":4}' \
-    '{"queue":2,"elapsed_s":30}' \
+    '{"waiting_others":0,"elapsed_s":30}' \
+    '{"waiting_others":2,"elapsed_s":30}' \
+    '{"step":"review","pct":20,"estimate":true,"size_adjusted":false}' \
+    '{"step":"document","pct":40,"estimate":true,"size_adjusted":true}' \
     '{"step":"review","n":3,"of":9,"label":"waiting on a decision"}' \
     '{"step":"lint","n":6,"of":9,"elapsed_s":30,"pct":null,"estimate":false}'; do
     write_valid_payload "$data"
@@ -1028,8 +1031,10 @@ test_build_validates_underway_progress() {
     '.progress.checks = {"step":"test","estimate":true}' \
     '.progress.checks = {"step":"test","done":5,"total":4}' \
     '.progress.checks = {"step":"test","total":4}' \
-    '.progress.checks = {"queue":0}' \
-    '.progress.checks = {"queue":2,"pct":10}' \
+    '.progress.checks = {"waiting_others":-1}' \
+    '.progress.checks = {"waiting_others":2,"pct":10}' \
+    '.progress.checks = {"step":"review","size_adjusted":false}' \
+    '.progress.checks = {"step":"review","pct":10,"estimate":true,"size_adjusted":"yes"}' \
     '.progress.checks = {"step":"review","label":"fix round 2","pct":10}' \
     '.progress.checks = {"step":"test","elapsed_s":-1}' \
     '.progress.checks = "tests"'; do

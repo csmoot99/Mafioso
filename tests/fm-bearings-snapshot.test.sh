@@ -2750,12 +2750,26 @@ SH
 # One check-progress fixture task: a git worktree on fm/<id> and, unless <steps>
 # is "-", a running no-mistakes run whose `axi status` prints <steps> and
 # <active> as its steps and active_steps rows.
-checks_task() {  # <home> <id> <steps|-> [active]
-  local home=$1 id=$2 wt="$1/projects/$2" head
+checks_task() {  # <home> <id> <steps|-> [active] [changed-lines]
+  local home=$1 id=$2 wt="$1/projects/$2" head base historical
   mkdir -p "$wt"
   git -C "$wt" init -q
   git -C "$wt" -c user.email=t@example.test -c user.name=t commit -q --allow-empty -m init
   git -C "$wt" checkout -q -b "fm/$id"
+  if [ -n "${5:-}" ]; then
+    base=$(git -C "$wt" rev-parse HEAD)
+    git -C "$wt" checkout -q -b history
+    seq 100 > "$wt/change.txt"
+    git -C "$wt" add change.txt
+    git -C "$wt" -c user.email=t@example.test -c user.name=t commit -qm historical
+    historical=$(git -C "$wt" rev-parse HEAD)
+    git -C "$wt" checkout -q "fm/$id"
+    seq "$5" > "$wt/change.txt"
+    git -C "$wt" add change.txt
+    git -C "$wt" -c user.email=t@example.test -c user.name=t commit -qm current
+    printf '%s %s %s\n' "$base" "$historical" "$(git -C "$wt" rev-parse HEAD)" > "$home/nm-status/$id.size"
+    seq 5000 > "$wt/uncommitted.txt"
+  fi
   head=$(git -C "$wt" rev-parse HEAD)
   printf -- '- [ ] %s - Check progress %s (repo: firstmate) (kind: ship) (since 2026-07-09)\n' "$id" "$id" \
     >> "$home/data/backlog.md"
@@ -2781,7 +2795,7 @@ checks_steps() {  # <step-at-which-the-run-is> <its status>; the earlier steps c
 }
 
 test_underway_check_progress_reads_only_structured_sources() {
-  local home fakebin json toon q1 q2 lock
+  local home fakebin json toon q1 q2 lock step i
   home=$(make_home underway-checks)
   mkdir -p "$home/nm-status" "$home/nm/logs/R-t-tests" "$home/nm/logs/R-t-tap"
   printf '## In flight\n' > "$home/data/backlog.md"
@@ -2789,6 +2803,16 @@ test_underway_check_progress_reads_only_structured_sources() {
   checks_task "$home" t-long "$(checks_steps document running)" 'document,running,2h0m0s,2h0m0s,"",12,starting'
   checks_task "$home" t-tests "$(checks_steps test running)" 'test,running,2m0s,2m0s,"",13,starting'
   checks_task "$home" t-tap "$(checks_steps test running)" 'test,running,1m0s,1m0s,"",14,starting'
+  checks_task "$home" t-count "$(checks_steps test running)" 'test,running,2h0m0s,2h0m0s,"",14,starting'
+  checks_task "$home" t-test-estimate "$(checks_steps test running)" 'test,running,2m0s,2m0s,"",14,starting'
+  checks_task "$home" t-small "$(checks_steps review running)" 'review,running,1m40s,1m40s,"",14,starting' 10
+  checks_task "$home" t-large "$(checks_steps review running)" 'review,running,1m40s,1m40s,"",14,starting' 1000
+  checks_task "$home" t-mixed "$(checks_steps review running)" 'review,running,1m40s,1m40s,"",14,starting' 10
+  checks_task "$home" t-doc-small "$(checks_steps document running)" 'document,running,10s,10s,"",14,starting' 10
+  checks_task "$home" t-doc-large "$(checks_steps document running)" 'document,running,10s,10s,"",14,starting' 1000
+  for step in intent rebase lint push pr ci; do
+    checks_task "$home" "t-$step" "$(checks_steps "$step" running)" "$step,running,30s,30s,\"\",14,starting"
+  done
   checks_task "$home" t-fix "$(checks_steps test fixing)" 'test,fixing,9m0s,1m0s,"",15,round 3'
   checks_task "$home" t-gate "$(checks_steps review awaiting_approval)"
   checks_task "$home" t-nohist "$(checks_steps lint running)" 'lint,running,30s,30s,"",16,starting'
@@ -2801,30 +2825,52 @@ test_underway_check_progress_reads_only_structured_sources() {
     > "$home/nm/logs/R-t-tests/test.log"
   printf 'running tests: node --test\nTAP version 13\n# Subtest: a\n    ok 1 - inner\nok 1 - a\nnot ok 2 - b\nok 3 - c\n1..4\n' \
     > "$home/nm/logs/R-t-tap/test.log"
-  python3 - "$home/nm/state.sqlite" <<'PY'
+  mkdir -p "$home/nm/logs/R-t-count"
+  {
+    printf 'running tests: node --test\n1..643\n'
+    for ((i=1; i<=212; i++)); do printf 'ok %s - test\n' "$i"; done
+  } > "$home/nm/logs/R-t-count/test.log"
+  python3 - "$home/nm/state.sqlite" "$home/nm-status" <<'PYDB'
 import sqlite3, sys
+from pathlib import Path
 db = sqlite3.connect(sys.argv[1])
 db.executescript("""
-CREATE TABLE runs (id TEXT PRIMARY KEY, repo_id TEXT NOT NULL, branch TEXT NOT NULL);
+CREATE TABLE runs (id TEXT PRIMARY KEY, repo_id TEXT NOT NULL, branch TEXT NOT NULL,
+                  base_sha TEXT, head_sha TEXT);
 CREATE TABLE step_results (id TEXT PRIMARY KEY, run_id TEXT NOT NULL, step_name TEXT NOT NULL,
   status TEXT NOT NULL, duration_ms INTEGER, log_path TEXT, completed_at INTEGER);
 """)
-for task in ("t-review", "t-long", "t-tests", "t-tap", "t-fix", "t-gate", "t-nohist", "t-slow"):
-    db.execute("INSERT INTO runs VALUES (?, 'repo1', ?)", ("R-" + task, "fm/" + task))
-    # A finished step of the run itself never counts as its own history.
+for fixture in Path(sys.argv[2]).iterdir():
+    if "." in fixture.name:
+        continue
+    task = fixture.name
+    sizes = fixture.with_suffix(".size")
+    base, historical, head = sizes.read_text().split() if sizes.exists() else (None, None, None)
+    repo = task if sizes.exists() else "repo1"
+    db.execute("INSERT INTO runs VALUES (?, ?, ?, ?, ?)", ("R-" + task, repo, "fm/" + task, base, head))
     db.execute("INSERT INTO step_results VALUES (?, ?, 'intent', 'completed', 999999999, NULL, 1)",
                ("S-" + task, "R-" + task))
+    if not sizes.exists():
+        continue
+    for n, ms in enumerate((600000, 800000, 1000000), 1):
+        run = task + "-H" + str(n)
+        db.execute("INSERT INTO runs VALUES (?, ?, 'fm/old', ?, ?)",
+                   (run, repo, base, None if task == "t-mixed" and n == 1 else historical))
+        for step, duration in (("review", ms), ("document", 60000)):
+            db.execute("INSERT INTO step_results VALUES (?, ?, ?, 'completed', ?, NULL, ?)",
+                       (run + step, run, step, duration, n))
 n = 0
 for run, durations in (("H1", (600000, 600000, 60000)), ("H2", (800000, 500000, 60000)),
                        ("H3", (1000000, 700000, 60000))):
-    db.execute("INSERT INTO runs VALUES (?, 'repo1', 'fm/old')", (run,))
-    for step, ms in zip(("review", "test", "document"), durations):
+    db.execute("INSERT INTO runs VALUES (?, 'repo1', 'fm/old', NULL, NULL)", (run,))
+    for step, ms in zip(("review", "test", "document", "intent", "rebase", "lint", "push", "pr", "ci"),
+                        (*durations, 10000, 10000, 10000, 10000, 10000, 10000)):
         n += 1
         db.execute("INSERT INTO step_results VALUES (?, ?, ?, 'completed', ?, NULL, ?)", ("H%d" % n, run, step, ms, n))
-db.execute("INSERT INTO runs VALUES ('X1', 'other-repo', 'fm/x')")
+db.execute("INSERT INTO runs VALUES ('X1', 'other-repo', 'fm/x', NULL, NULL)")
 db.execute("INSERT INTO step_results VALUES ('X1s', 'X1', 'lint', 'completed', 5000, NULL, 1)")
 db.commit()
-PY
+PYDB
   lock="$home/heavy.lock"
   mkdir -p "$lock.waiting"
   sleep 60 & q1=$!
@@ -2845,28 +2891,37 @@ case "\$1 \${2:-}" in
 esac
 exit 0
 SH
-  json=$(FM_HEAVY_LOCK="$lock" NM_HOME="$home/nm" FM_BEARINGS_CHECKS_TASK_TIMEOUT=1 run "$home" "$fakebin" --json)
-  toon=$(FM_HEAVY_LOCK="$lock" NM_HOME="$home/nm" FM_BEARINGS_CHECKS_TASK_TIMEOUT=1 run "$home" "$fakebin")
+  json=$(FM_HEAVY_LOCK="$lock" NM_HOME="$home/nm" FM_BEARINGS_CHECKS_TASK_TIMEOUT=1 FM_BEARINGS_CHECKS_TIMEOUT=15 run "$home" "$fakebin" --json --all-in-flight)
+  toon=$(FM_HEAVY_LOCK="$lock" NM_HOME="$home/nm" FM_BEARINGS_CHECKS_TASK_TIMEOUT=1 FM_BEARINGS_CHECKS_TIMEOUT=15 run "$home" "$fakebin" --all-in-flight)
   kill "$q1" "$q2" 2>/dev/null
   wait "$q1" "$q2" 2>/dev/null
   printf '%s' "$json" | jq -e '
     (.checks | map({(.id): del(.id)}) | add) as $c
-    | def is($want): . == ({step:null,n:null,of:null,elapsed_s:null,pct:null,estimate:false,
-                              done:null,total:null,queue:null,label:null} + $want);
-    ($c["t-review"] | is({step:"review",n:3,of:9,elapsed_s:400,pct:50,estimate:true}))
-    and ($c["t-long"] | is({step:"document",n:5,of:9,elapsed_s:7200,pct:95,estimate:true}))
-    and ($c["t-tests"] | is({step:"test",n:4,of:9,elapsed_s:120,pct:20,estimate:true,done:3}))
+    | def is($want): . == ({step:null,n:null,of:null,elapsed_s:null,pct:null,estimate:false,size_adjusted:null,
+                              done:null,total:null,waiting_others:null,label:null} + $want);
+    ($c["t-review"] | is({step:"review",n:3,of:9,elapsed_s:400,pct:50,estimate:true,size_adjusted:false}))
+    and ($c["t-long"] | is({step:"document",n:5,of:9,elapsed_s:7200,pct:95,estimate:true,size_adjusted:false}))
+    and ($c["t-tests"] | is({step:"test",n:4,of:9,elapsed_s:120,done:3}))
     and ($c["t-tap"] | is({step:"test",n:4,of:9,elapsed_s:60,pct:75,done:3,total:4}))
+    and ($c["t-count"] | is({step:"test",n:4,of:9,elapsed_s:7200,pct:33,done:212,total:643}))
+    and ($c["t-test-estimate"] | is({step:"test",n:4,of:9,elapsed_s:120,pct:20,estimate:true,size_adjusted:false}))
+    and ($c["t-small"] | is({step:"review",n:3,of:9,elapsed_s:100,pct:50,estimate:true,size_adjusted:true}))
+    and ($c["t-large"] | is({step:"review",n:3,of:9,elapsed_s:100,pct:3,estimate:true,size_adjusted:true}))
+    and ($c["t-mixed"] | is({step:"review",n:3,of:9,elapsed_s:100,pct:40,estimate:true,size_adjusted:false}))
+    and ($c["t-doc-small"] | is({step:"document",n:5,of:9,elapsed_s:10,pct:66,estimate:true,size_adjusted:true}))
+    and ($c["t-doc-large"] | is({step:"document",n:5,of:9,elapsed_s:10,pct:4,estimate:true,size_adjusted:true}))
+    and (["intent", "rebase", "lint", "push", "pr", "ci"] | all(. as $s |
+         $c["t-" + $s] | .step == $s and .elapsed_s == 30 and .pct == null and .estimate == false))
     and ($c["t-fix"] | is({step:"test",n:4,of:9,elapsed_s:540,label:"fix round 2"}))
     and ($c["t-gate"] | is({step:"review",n:3,of:9,label:"waiting on a decision"}))
     and ($c["t-nohist"] | is({step:"lint",n:6,of:9,elapsed_s:30}))
-    and ($c["t-queue"] | .queue == 2 and .pct == null and .step == null and .elapsed_s >= 29 and .elapsed_s < 120)
+    and ($c["t-queue"] | .waiting_others == 1 and .pct == null and .step == null and .elapsed_s >= 29 and .elapsed_s < 120)
     and ($c | has("t-slow") | not) and ($c | has("t-plain") | not)
     and ([.in_flight[].id] | index("t-slow") != null and index("t-plain") != null)
   ' >/dev/null || fail "check progress rows are wrong: $json"
-  printf '%s\n' "$toon" | grep -q '^checks\[8\]{id,step,n,of,elapsed_s,pct,estimate,done,total,queue,label}:' \
+  printf '%s\n' "$toon" | grep -q '^checks\[21\]{id,step,n,of,elapsed_s,pct,estimate,size_adjusted,done,total,waiting_others,label}:' \
     || fail "the TOON output has no checks table: $toon"
-  pass "Underway check progress: step place, test counts, history estimates, queue place, fix rounds and gates, with no row past its budget"
+  pass "Underway check progress: step place, test counts, size-adjusted history estimates, other-waiter counts, fix rounds and gates, with no row past its budget"
 }
 
 test_mixed_secondmate_roles_partial_state_and_captain_readiness() {

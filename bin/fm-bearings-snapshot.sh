@@ -60,15 +60,17 @@
 # step, or in the queue), done and total (tests finished and, once the runner
 # prints it, the total, counted from a configured test command's live step log:
 # Godot PASS/FAIL lines, top-level TAP results or vitest per-file counts), pct
-# (whole-number fill: the test count, or for a step without one an estimate from
-# elapsed time against the median of the same project's last five completed runs
-# of that step in no-mistakes' state database, capped at 95 and flagged
-# estimate=true; the larger of the two when both exist, so it never falls within a
-# step; capped at 99 until the step completes; null with no history, and for ci),
-# queue (place in line for the shared heavy slot from bin/fm-heavy.sh's waiting
-# markers, with no pct and no step; it covers a direct-PR worker's own wrapped
-# check run while it waits) and label ("fix round <n>" or "waiting on a decision",
-# with no pct). The reader has FM_BEARINGS_CHECKS_TASK_TIMEOUT seconds per task
+# (whole-number fill: the test count, capped at 99; review/document estimates,
+# or test estimates only with no readable count, use the median of this project's
+# last five completed step durations, capped at 95 and flagged estimate=true).
+# Review/document samples scale by current/historical changed lines from each
+# run's base_sha to head_sha, bounded to 0.25-4; missing sizes retain the sample's
+# duration and size_adjusted=false marks the estimate as unadjusted (true only
+# when every sample was adjusted, null without an estimate). Other steps have
+# no fill. waiting_others counts other live tasks waiting for the shared heavy
+# slot from bin/fm-heavy.sh's waiting markers, with no pct and no step; it covers
+# a direct-PR worker's own wrapped check run while it waits. label is
+# "fix round <n>" or "waiting on a decision", with no pct. The reader has FM_BEARINGS_CHECKS_TASK_TIMEOUT seconds per task
 # (default 2) within FM_BEARINGS_CHECKS_TIMEOUT overall (default 6); a task it
 # cannot read in time has no checks row, and its Underway row is unchanged.
 # Captain-hold placement follows the canonical snapshot's hold_bucket and
@@ -188,7 +190,7 @@ from pathlib import Path
 task_budget, total_budget, waiting, database = int(sys.argv[1]), int(sys.argv[2]), sys.argv[3], sys.argv[4]
 tasks = json.loads(sys.argv[5])
 end_all = time.monotonic() + total_budget
-FIELDS = ("step", "n", "of", "elapsed_s", "pct", "estimate", "done", "total", "queue", "label")
+FIELDS = ("step", "n", "of", "elapsed_s", "pct", "estimate", "size_adjusted", "done", "total", "waiting_others", "label")
 GATES = ("awaiting_approval", "fix_review")
 
 
@@ -200,7 +202,6 @@ def row(**kw):
 
 
 def queue():
-    """Live markers in age order; the first marker naming a task is its place."""
     marks = []
     try:
         entries = list(os.scandir(waiting))
@@ -221,11 +222,14 @@ def queue():
             marks.append((e.stat().st_mtime, int(e.name), task))
         except OSError:
             continue
-    places = {}
-    for n, (mtime, _, task) in enumerate(sorted(marks), 1):
-        if task and task not in places:
-            places[task] = row(queue=n, elapsed_s=max(0, int(time.time() - mtime)))
-    return places
+    waits = {}
+    others = {task or pid for _, pid, task in marks}
+    for mtime, _, task in marks:
+        if task:
+            waits[task] = min(mtime, waits.get(task, mtime))
+    return {task: row(waiting_others=len(others) - 1,
+                      elapsed_s=max(0, int(time.time() - mtime)))
+            for task, mtime in waits.items()}
 
 
 def seconds(text):
@@ -270,28 +274,45 @@ def tests(path, limit):
     return None
 
 
-def history(run, step, deadline):
-    """The run's test-step log (its recorded path, which a running step does
-    not have yet, else logs/<run>/test.log beside the database) and the median
-    of this project's last five completed durations of <step>, from the state
-    database read-only."""
+def change_size(wt, base, head, deadline):
+    if not all(re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", ref or "") for ref in (base, head)):
+        return None
+    out = subprocess.run(["git", "diff", "--numstat", "--no-ext-diff", "--no-textconv", base, head, "--"],
+                         cwd=wt, capture_output=True, text=True, stdin=subprocess.DEVNULL,
+                         timeout=max(0.1, deadline - time.monotonic()))
+    if out.returncode:
+        return None
+    return sum(int(n) for line in out.stdout.splitlines() for n in line.split("\t")[:2] if n.isdigit())
+
+
+def history(run, step, wt, deadline):
     if not database or not os.path.isfile(database):
-        return None, None
+        return None, None, None
     with closing(sqlite3.connect(Path(database).as_uri() + "?mode=ro", uri=True,
                                  timeout=max(0.1, deadline - time.monotonic()))) as db:
         log = db.execute("SELECT log_path FROM step_results WHERE run_id = ? AND step_name = 'test'",
                          (run,)).fetchone()
-        rows = [r[0] for r in db.execute(
-            "SELECT s.duration_ms FROM step_results s JOIN runs r ON r.id = s.run_id "
+        current = db.execute("SELECT base_sha, head_sha FROM runs WHERE id = ?", (run,)).fetchone()
+        rows = list(db.execute(
+            "SELECT s.duration_ms, r.base_sha, r.head_sha FROM step_results s JOIN runs r ON r.id = s.run_id "
             "WHERE r.repo_id = (SELECT repo_id FROM runs WHERE id = ?) AND r.id != ? "
             "AND s.step_name = ? AND s.status = 'completed' AND s.duration_ms > 0 "
-            "ORDER BY s.completed_at DESC LIMIT 5", (run, run, step))]
-    rows.sort()
+            "ORDER BY s.completed_at DESC LIMIT 5", (run, run, step)))
+    durations, adjusted = [], step in ("review", "document")
+    current_size = change_size(wt, *current, deadline) if adjusted and current else None
+    for duration, base, head in rows:
+        size = change_size(wt, base, head, deadline) if current_size is not None else None
+        if size is not None:
+            duration *= min(4, max(0.25, max(1, current_size) / max(1, size)))
+        else:
+            adjusted = False
+        durations.append(duration)
+    durations.sort()
     median = None
-    if rows:
-        mid = len(rows) // 2
-        median = rows[mid] if len(rows) % 2 else (rows[mid - 1] + rows[mid]) / 2
-    return ((log and log[0]) or os.path.join(os.path.dirname(database), "logs", run, "test.log")), median
+    if durations:
+        mid = len(durations) // 2
+        median = durations[mid] if len(durations) % 2 else (durations[mid - 1] + durations[mid]) / 2
+    return ((log and log[0]) or os.path.join(os.path.dirname(database), "logs", run, "test.log")), median, adjusted
 
 
 def run_checks(wt, deadline):
@@ -320,18 +341,17 @@ def run_checks(wt, deadline):
         return c
     if status != "running" or step == "ci":
         return c
-    log, median = history(scalar("id"), step, deadline)
+    if step not in ("review", "document", "test"):
+        return c
+    log, median, adjusted = history(scalar("id"), step, wt, deadline)
     counts = tests(log, 8 << 20) if step == "test" else None
     if counts:
         c["done"], c["total"] = counts
-    # Each fill only grows within a step, so the larger of the two never moves
-    # back when a runner prints its total late.
-    counted = min(99, c["done"] * 100 // c["total"]) if c["total"] else None
-    timed = min(95, int(c["elapsed_s"] * 100000 // median)) if median and c["elapsed_s"] is not None else None
-    if timed is not None and (counted is None or timed > counted):
-        c["pct"], c["estimate"] = timed, True
-    else:
-        c["pct"] = counted
+        if c["total"]:
+            c["pct"] = min(99, int(c["done"] * 100 / c["total"] + 0.5))
+    elif median and c["elapsed_s"] is not None:
+        c["pct"] = min(95, int(c["elapsed_s"] * 100000 // median))
+        c["estimate"], c["size_adjusted"] = True, adjusted
     return c
 
 
@@ -371,7 +391,7 @@ remote homes under one shared snapshot budget and may refresh the parent-side ca
 
 Default fields: schema, home, generated, prs, in_flight{id,kind,state,repo,name,doing,stage,reached,pct},
   parts{id,n,label,state} (only in-flight tasks with a data/<id>/parts record),
-  checks{id,step,n,of,elapsed_s,pct,estimate,done,total,queue,label} (only
+  checks{id,step,n,of,elapsed_s,pct,estimate,size_adjusted,done,total,waiting_others,label} (only
   main in-flight tasks whose checks are running or queued),
   secondmates{id,state,doing,provenance,freshness,age_seconds,contradiction,reason},
   secondmate_reconcile{id,spawn_gen,host,kind,ids},
@@ -613,7 +633,7 @@ done
 # or a gate), the run's own test-step log for a configured test command's live
 # count, no-mistakes' state database read-only for the same project's recent
 # step durations, and the shared heavy slot's waiting markers (bin/fm-heavy.sh)
-# for a place in line. One python3 reader holds a per-task budget
+# for wait duration and other-waiter counts. One python3 reader holds a per-task budget
 # (FM_BEARINGS_CHECKS_TASK_TIMEOUT) inside an overall one
 # (FM_BEARINGS_CHECKS_TIMEOUT); a task over its budget, or every task when the
 # reader is missing or killed, simply has no checks row. No network call.
