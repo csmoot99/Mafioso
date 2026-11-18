@@ -1,0 +1,172 @@
+{
+  "source": "real board build; seeded canonical projection, not a running check job",
+  "rows": [
+    {
+      "title": "Measured test count",
+      "text": "Measured test count\nvalidating (running) · ship · progress-lab\nThis task\nValidating · 75%\nChecks: Tests, step 4 of 9\n212 of 643 tests · 2h 0m",
+      "bars": [
+        {
+          "label": "This task",
+          "value": 75,
+          "text": "Validating · 75%"
+        },
+        {
+          "label": "Checks: Tests, step 4 of 9",
+          "value": 33,
+          "text": "212 of 643 tests · 2h 0m"
+        }
+      ]
+    },
+    {
+      "title": "Small review change",
+      "text": "Small review change\nvalidating (running) · ship · progress-lab\nThis task\nValidating · 75%\nChecks: Review, step 3 of 9\nabout 50% · 1m",
+      "bars": [
+        {
+          "label": "This task",
+          "value": 75,
+          "text": "Validating · 75%"
+        },
+        {
+          "label": "Checks: Review, step 3 of 9",
+          "value": 50,
+          "text": "about 50% · 1m"
+        }
+      ]
+    },
+    {
+      "title": "Large review change",
+      "text": "Large review change\nvalidating (running) · ship · progress-lab\nThis task\nValidating · 75%\nChecks: Review, step 3 of 9\nabout 3% · 1m",
+      "bars": [
+        {
+          "label": "This task",
+          "value": 75,
+          "text": "Validating · 75%"
+        },
+        {
+          "label": "Checks: Review, step 3 of 9",
+          "value": 3,
+          "text": "about 3% · 1m"
+        }
+      ]
+    },
+    {
+      "title": "Missing historical size",
+      "text": "Missing historical size\nvalidating (running) · ship · progress-lab\nThis task\nValidating · 75%\nChecks: Review, step 3 of 9\nabout 40% · unadjusted · 1m",
+      "bars": [
+        {
+          "label": "This task",
+          "value": 75,
+          "text": "Validating · 75%"
+        },
+        {
+          "label": "Checks: Review, step 3 of 9",
+          "value": 40,
+          "text": "about 40% · unadjusted · 1m"
+        }
+      ]
+    },
+    {
+      "title": "Waiting for shared tests",
+      "text": "Waiting for shared tests\nharness busy (claude-hook) · ship · progress-lab\nThis task\nBuilding · 30%\nChecks: waiting for the shared test slot\n1 other task waiting · 32s",
+      "bars": [
+        {
+          "label": "This task",
+          "value": 30,
+          "text": "Building · 30%"
+        }
+      ]
+    },
+    {
+      "title": "Fixing findings",
+      "text": "Fixing findings\nvalidating (running) · ship · progress-lab\nThis task\nValidating · 75%\nChecks: Tests, step 4 of 9\nfix round 2 · 9m",
+      "bars": [
+        {
+          "label": "This task",
+          "value": 75,
+          "text": "Validating · 75%"
+        }
+      ]
+    },
+    {
+      "title": "Decision required",
+      "text": "PARKED\nDecision required\nparked at review: 0 finding(s) · ship · progress-lab\nWAITING ON YOU\nThis task\nValidating · waiting on owner\nChecks: Review, step 3 of 9\nwaiting on a decision",
+      "bars": [
+        {
+          "label": "This task",
+          "value": 75,
+          "text": "Validating · waiting on owner"
+        }
+      ]
+    },
+    {
+      "title": "Lint elapsed only",
+      "text": "Lint elapsed only\nvalidating (running) · ship · progress-lab\nThis task\nValidating · 75%\nChecks: Lint, step 6 of 9\n30s",
+      "bars": [
+        {
+          "label": "This task",
+          "value": 75,
+          "text": "Validating · 75%"
+        }
+      ]
+    },
+    {
+      "title": "Tests with no readable count",
+      "text": "Tests with no readable count\nvalidating (running) · ship · progress-lab\nThis task\nValidating · 75%\nChecks: Tests, step 4 of 9\nabout 20% · unadjusted · 2m",
+      "bars": [
+        {
+          "label": "This task",
+          "value": 75,
+          "text": "Validating · 75%"
+        },
+        {
+          "label": "Checks: Tests, step 4 of 9",
+          "value": 20,
+          "text": "about 20% · unadjusted · 2m"
+        }
+      ]
+    },
+    {
+      "title": "Small docs change",
+      "text": "Small docs change\nvalidating (running) · ship · progress-lab\nThis task\nValidating · 75%\nChecks: Docs, step 5 of 9\nabout 66% · 10s",
+      "bars": [
+        {
+          "label": "This task",
+          "value": 75,
+          "text": "Validating · 75%"
+        },
+        {
+          "label": "Checks: Docs, step 5 of 9",
+          "value": 66,
+          "text": "about 66% · 10s"
+        }
+      ]
+    },
+    {
+      "title": "Large docs change",
+      "text": "Large docs change\nvalidating (running) · ship · progress-lab\nThis task\nValidating · 75%\nChecks: Docs, step 5 of 9\nabout 4% · 10s",
+      "bars": [
+        {
+          "label": "This task",
+          "value": 75,
+          "text": "Validating · 75%"
+        },
+        {
+          "label": "Checks: Docs, step 5 of 9",
+          "value": 4,
+          "text": "about 4% · 10s"
+        }
+      ]
+    },
+    {
+      "title": "Tests before total is known",
+      "text": "Tests before total is known\nvalidating (running) · ship · progress-lab\nThis task\nValidating · 75%\nChecks: Tests, step 4 of 9\n3 tests · 2m",
+      "bars": [
+        {
+          "label": "This task",
+          "value": 75,
+          "text": "Validating · 75%"
+        }
+      ]
+    }
+  ]
+}

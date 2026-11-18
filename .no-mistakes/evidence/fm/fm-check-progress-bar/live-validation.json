@@ -1,0 +1,62 @@
+{
+  "result": "pass",
+  "tested_head_sha": "da5bdd72cd93227ec64cf69503d66453c2a17757",
+  "source_changes_required": false,
+  "initial_problem": "Direct axi status from the isolated gate worktree reports uninitialized; this does not establish whether the Bearings snapshot can read registered live task runs.",
+  "resolution": "Executed this branch snapshot against the real FM_HOME while this run remained in test/fixing; compared projections with read-only live run database state.",
+  "snapshot_total_elapsed_s": 13.362201966985594,
+  "checks_collection_elapsed_s": 0.25466394424438477,
+  "checks_collection_budget_s": 6,
+  "per_task_budget_s": 2,
+  "memory_max": "6G",
+  "memory_swap_max": 0,
+  "live_checks": [
+    {
+      "id": "combined-business-test-fixture",
+      "step": "review",
+      "n": 3,
+      "of": 9,
+      "elapsed_s": null,
+      "pct": null,
+      "estimate": false,
+      "size_adjusted": null,
+      "done": null,
+      "total": null,
+      "waiting_others": null,
+      "label": "waiting on a decision"
+    },
+    {
+      "id": "fm-check-progress-bar",
+      "step": "test",
+      "n": 4,
+      "of": 9,
+      "elapsed_s": 602,
+      "pct": null,
+      "estimate": false,
+      "size_adjusted": null,
+      "done": null,
+      "total": null,
+      "waiting_others": null,
+      "label": "fix round"
+    },
+    {
+      "id": "superhero-game-concurrent-copies",
+      "step": "review",
+      "n": 3,
+      "of": 9,
+      "elapsed_s": null,
+      "pct": null,
+      "estimate": false,
+      "size_adjusted": null,
+      "done": null,
+      "total": null,
+      "waiting_others": null,
+      "label": "waiting on a decision"
+    }
+  ],
+  "b2b_duress_cleanup_s4b2": "building; no check-progress row, consistent with no attributed run",
+  "live_waiting_markers": "Four live waiting markers had empty task IDs; no task queue progress was inferred from them.",
+  "limits": "Live observed states were a test fix round and review decision gates. No running counted-test or estimated-review/document state was present; those behaviors retain the focused fixture and browser evidence from round 1. The six-second budget applies to checks collection, not the full fleet snapshot.",
+  "production_writes": "Only the specifically requested live-snapshot.json evidence file; remote summary cache and incidental temporary files redirected to the worktree.",
+  "outer_executor_action": "Use pr-body-note.md in the PR phase; no PR operation executed in this test phase."
+}

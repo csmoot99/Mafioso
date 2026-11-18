@@ -1,0 +1,323 @@
+{
+  "schema": "fm-bearings-board.v1",
+  "home": "Progress validation",
+  "generated": "2026-07-11T18:00:00Z",
+  "prs_live": false,
+  "captains_call": [],
+  "underway": [
+    {
+      "id": "t-count",
+      "name": "Measured test count",
+      "repo": "progress-lab",
+      "state": "working",
+      "kind": "ship",
+      "doing": "validating (running)",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "test",
+          "n": 4,
+          "of": 9,
+          "elapsed_s": 7200,
+          "pct": 33,
+          "estimate": false,
+          "size_adjusted": null,
+          "done": 212,
+          "total": 643,
+          "waiting_others": null,
+          "label": null
+        }
+      }
+    },
+    {
+      "id": "t-small",
+      "name": "Small review change",
+      "repo": "progress-lab",
+      "state": "working",
+      "kind": "ship",
+      "doing": "validating (running)",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "review",
+          "n": 3,
+          "of": 9,
+          "elapsed_s": 100,
+          "pct": 50,
+          "estimate": true,
+          "size_adjusted": true,
+          "done": null,
+          "total": null,
+          "waiting_others": null,
+          "label": null
+        }
+      }
+    },
+    {
+      "id": "t-large",
+      "name": "Large review change",
+      "repo": "progress-lab",
+      "state": "working",
+      "kind": "ship",
+      "doing": "validating (running)",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "review",
+          "n": 3,
+          "of": 9,
+          "elapsed_s": 100,
+          "pct": 3,
+          "estimate": true,
+          "size_adjusted": true,
+          "done": null,
+          "total": null,
+          "waiting_others": null,
+          "label": null
+        }
+      }
+    },
+    {
+      "id": "t-mixed",
+      "name": "Missing historical size",
+      "repo": "progress-lab",
+      "state": "working",
+      "kind": "ship",
+      "doing": "validating (running)",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "review",
+          "n": 3,
+          "of": 9,
+          "elapsed_s": 100,
+          "pct": 40,
+          "estimate": true,
+          "size_adjusted": false,
+          "done": null,
+          "total": null,
+          "waiting_others": null,
+          "label": null
+        }
+      }
+    },
+    {
+      "id": "t-queue",
+      "name": "Waiting for shared tests",
+      "repo": "progress-lab",
+      "state": "working",
+      "kind": "ship",
+      "doing": "harness busy (claude-hook)",
+      "progress": {
+        "stage": "building",
+        "reached": "building",
+        "pct": 30,
+        "checks": {
+          "step": null,
+          "n": null,
+          "of": null,
+          "elapsed_s": 32,
+          "pct": null,
+          "estimate": false,
+          "size_adjusted": null,
+          "done": null,
+          "total": null,
+          "waiting_others": 1,
+          "label": null
+        }
+      }
+    },
+    {
+      "id": "t-fix",
+      "name": "Fixing findings",
+      "repo": "progress-lab",
+      "state": "working",
+      "kind": "ship",
+      "doing": "validating (running)",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "test",
+          "n": 4,
+          "of": 9,
+          "elapsed_s": 540,
+          "pct": null,
+          "estimate": false,
+          "size_adjusted": null,
+          "done": null,
+          "total": null,
+          "waiting_others": null,
+          "label": "fix round 2"
+        }
+      }
+    },
+    {
+      "id": "t-gate",
+      "name": "Decision required",
+      "repo": "progress-lab",
+      "state": "parked",
+      "kind": "ship",
+      "doing": "parked at review: 0 finding(s)",
+      "progress": {
+        "stage": "owner",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "review",
+          "n": 3,
+          "of": 9,
+          "elapsed_s": null,
+          "pct": null,
+          "estimate": false,
+          "size_adjusted": null,
+          "done": null,
+          "total": null,
+          "waiting_others": null,
+          "label": "waiting on a decision"
+        }
+      }
+    },
+    {
+      "id": "t-lint",
+      "name": "Lint elapsed only",
+      "repo": "progress-lab",
+      "state": "working",
+      "kind": "ship",
+      "doing": "validating (running)",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "lint",
+          "n": 6,
+          "of": 9,
+          "elapsed_s": 30,
+          "pct": null,
+          "estimate": false,
+          "size_adjusted": null,
+          "done": null,
+          "total": null,
+          "waiting_others": null,
+          "label": null
+        }
+      }
+    },
+    {
+      "id": "t-test-estimate",
+      "name": "Tests with no readable count",
+      "repo": "progress-lab",
+      "state": "working",
+      "kind": "ship",
+      "doing": "validating (running)",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "test",
+          "n": 4,
+          "of": 9,
+          "elapsed_s": 120,
+          "pct": 20,
+          "estimate": true,
+          "size_adjusted": false,
+          "done": null,
+          "total": null,
+          "waiting_others": null,
+          "label": null
+        }
+      }
+    },
+    {
+      "id": "t-doc-small",
+      "name": "Small docs change",
+      "repo": "progress-lab",
+      "state": "working",
+      "kind": "ship",
+      "doing": "validating (running)",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "document",
+          "n": 5,
+          "of": 9,
+          "elapsed_s": 10,
+          "pct": 66,
+          "estimate": true,
+          "size_adjusted": true,
+          "done": null,
+          "total": null,
+          "waiting_others": null,
+          "label": null
+        }
+      }
+    },
+    {
+      "id": "t-doc-large",
+      "name": "Large docs change",
+      "repo": "progress-lab",
+      "state": "working",
+      "kind": "ship",
+      "doing": "validating (running)",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "document",
+          "n": 5,
+          "of": 9,
+          "elapsed_s": 10,
+          "pct": 4,
+          "estimate": true,
+          "size_adjusted": true,
+          "done": null,
+          "total": null,
+          "waiting_others": null,
+          "label": null
+        }
+      }
+    },
+    {
+      "id": "t-tests",
+      "name": "Tests before total is known",
+      "repo": "progress-lab",
+      "state": "working",
+      "kind": "ship",
+      "doing": "validating (running)",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "test",
+          "n": 4,
+          "of": 9,
+          "elapsed_s": 120,
+          "pct": null,
+          "estimate": false,
+          "size_adjusted": null,
+          "done": 3,
+          "total": null,
+          "waiting_others": null,
+          "label": null
+        }
+      }
+    }
+  ],
+  "landed": [],
+  "charted": []
+}

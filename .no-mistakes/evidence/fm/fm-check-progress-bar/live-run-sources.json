@@ -1,0 +1,151 @@
+{
+  "own_run": {
+    "id": "01M7RF315GNV72PXTS8QBDNV5Q",
+    "repo_id": "5f69104d19ce",
+    "branch": "fm/fm-check-progress-bar",
+    "base_sha": "0000000000000000000000000000000000000000",
+    "head_sha": "da5bdd72cd93227ec64cf69503d66453c2a17757"
+  },
+  "own_steps": [
+    {
+      "step_name": "intent",
+      "status": "completed",
+      "duration_ms": 33,
+      "log_path": "/home/work/.no-mistakes/logs/01M7RF315GNV72PXTS8QBDNV5Q/intent.log"
+    },
+    {
+      "step_name": "rebase",
+      "status": "completed",
+      "duration_ms": 925,
+      "log_path": "/home/work/.no-mistakes/logs/01M7RF315GNV72PXTS8QBDNV5Q/rebase.log"
+    },
+    {
+      "step_name": "review",
+      "status": "completed",
+      "duration_ms": 1109988,
+      "log_path": "/home/work/.no-mistakes/logs/01M7RF315GNV72PXTS8QBDNV5Q/review.log"
+    },
+    {
+      "step_name": "test",
+      "status": "fixing",
+      "duration_ms": 349307,
+      "log_path": null
+    },
+    {
+      "step_name": "document",
+      "status": "pending",
+      "duration_ms": null,
+      "log_path": null
+    },
+    {
+      "step_name": "lint",
+      "status": "pending",
+      "duration_ms": null,
+      "log_path": null
+    },
+    {
+      "step_name": "push",
+      "status": "pending",
+      "duration_ms": null,
+      "log_path": null
+    },
+    {
+      "step_name": "pr",
+      "status": "pending",
+      "duration_ms": null,
+      "log_path": null
+    },
+    {
+      "step_name": "ci",
+      "status": "pending",
+      "duration_ms": null,
+      "log_path": null
+    }
+  ],
+  "own_project_history": [
+    {
+      "id": "01M78WSYX8YMJ7PXNCTRM65Z1M",
+      "base_sha": "0000000000000000000000000000000000000000",
+      "head_sha": "8d9d3dc05e02c88d9523f02642ddcf60d9f98f7c",
+      "step_name": "document",
+      "duration_ms": 104902
+    },
+    {
+      "id": "01M78WSYX8YMJ7PXNCTRM65Z1M",
+      "base_sha": "0000000000000000000000000000000000000000",
+      "head_sha": "8d9d3dc05e02c88d9523f02642ddcf60d9f98f7c",
+      "step_name": "test",
+      "duration_ms": 286211
+    },
+    {
+      "id": "01M78WSYX8YMJ7PXNCTRM65Z1M",
+      "base_sha": "0000000000000000000000000000000000000000",
+      "head_sha": "8d9d3dc05e02c88d9523f02642ddcf60d9f98f7c",
+      "step_name": "review",
+      "duration_ms": 795111
+    },
+    {
+      "id": "01M78PTHYBS4S52E0ECV1HMJ8A",
+      "base_sha": "0000000000000000000000000000000000000000",
+      "head_sha": "7baf6ad90eddb4a961c88a8f2e84758dd27fa215",
+      "step_name": "document",
+      "duration_ms": 133492
+    },
+    {
+      "id": "01M78PTHYBS4S52E0ECV1HMJ8A",
+      "base_sha": "0000000000000000000000000000000000000000",
+      "head_sha": "7baf6ad90eddb4a961c88a8f2e84758dd27fa215",
+      "step_name": "test",
+      "duration_ms": 368249
+    },
+    {
+      "id": "01M78PTHYBS4S52E0ECV1HMJ8A",
+      "base_sha": "0000000000000000000000000000000000000000",
+      "head_sha": "7baf6ad90eddb4a961c88a8f2e84758dd27fa215",
+      "step_name": "review",
+      "duration_ms": 3034922
+    },
+    {
+      "id": "01M78S47EKGR7CFY9G3C4HKCMM",
+      "base_sha": "f5e96bf4b8fc98da39990bf8b99de7513a325b72",
+      "head_sha": "94d50f70ef4e8ae9acafb1b15f712c8b8e55299c",
+      "step_name": "document",
+      "duration_ms": 52773
+    },
+    {
+      "id": "01M78S47EKGR7CFY9G3C4HKCMM",
+      "base_sha": "f5e96bf4b8fc98da39990bf8b99de7513a325b72",
+      "head_sha": "94d50f70ef4e8ae9acafb1b15f712c8b8e55299c",
+      "step_name": "test",
+      "duration_ms": 335813
+    },
+    {
+      "id": "01M78S47EKGR7CFY9G3C4HKCMM",
+      "base_sha": "f5e96bf4b8fc98da39990bf8b99de7513a325b72",
+      "head_sha": "94d50f70ef4e8ae9acafb1b15f712c8b8e55299c",
+      "step_name": "review",
+      "duration_ms": 131555
+    },
+    {
+      "id": "01M78QZ3R87TWXYC2Q39EHFTAP",
+      "base_sha": "d0e979460bb7d2c026c16f44e4168a5daf66d073",
+      "head_sha": "f6b6f7cd3b68a753b3b127916b7d486f28f67b6c",
+      "step_name": "document",
+      "duration_ms": 85702
+    },
+    {
+      "id": "01M78QZ3R87TWXYC2Q39EHFTAP",
+      "base_sha": "d0e979460bb7d2c026c16f44e4168a5daf66d073",
+      "head_sha": "f6b6f7cd3b68a753b3b127916b7d486f28f67b6c",
+      "step_name": "test",
+      "duration_ms": 539693
+    },
+    {
+      "id": "01M78QZ3R87TWXYC2Q39EHFTAP",
+      "base_sha": "d0e979460bb7d2c026c16f44e4168a5daf66d073",
+      "head_sha": "f6b6f7cd3b68a753b3b127916b7d486f28f67b6c",
+      "step_name": "review",
+      "duration_ms": 153197
+    }
+  ]
+}

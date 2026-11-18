@@ -1,0 +1,210 @@
+{
+  "schema": "fm-bearings-board.v1",
+  "home": "Progress display scenarios (explicit inputs)",
+  "generated": "2026-11-18T00:00:00Z",
+  "prs_live": false,
+  "captains_call": [],
+  "underway": [
+    {
+      "id": "counted",
+      "name": "Counted tests after two hours",
+      "repo": "progress-validation",
+      "doing": "Explicit board input for visual verification",
+      "state": "working",
+      "kind": "ship",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "test",
+          "n": 4,
+          "of": 9,
+          "elapsed_s": 7200,
+          "done": 212,
+          "total": 643,
+          "pct": 33,
+          "estimate": false
+        }
+      }
+    },
+    {
+      "id": "review-small",
+      "name": "Review: small change",
+      "repo": "progress-validation",
+      "doing": "Explicit board input for visual verification",
+      "state": "working",
+      "kind": "ship",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "review",
+          "n": 3,
+          "of": 9,
+          "elapsed_s": 100,
+          "pct": 50,
+          "estimate": true,
+          "size_adjusted": true
+        }
+      }
+    },
+    {
+      "id": "review-large",
+      "name": "Review: large change, same history",
+      "repo": "progress-validation",
+      "doing": "Explicit board input for visual verification",
+      "state": "working",
+      "kind": "ship",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "review",
+          "n": 3,
+          "of": 9,
+          "elapsed_s": 100,
+          "pct": 3,
+          "estimate": true,
+          "size_adjusted": true
+        }
+      }
+    },
+    {
+      "id": "missing-size",
+      "name": "Docs: history has no change size",
+      "repo": "progress-validation",
+      "doing": "Explicit board input for visual verification",
+      "state": "working",
+      "kind": "ship",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "document",
+          "n": 5,
+          "of": 9,
+          "elapsed_s": 7200,
+          "pct": 95,
+          "estimate": true,
+          "size_adjusted": false
+        }
+      }
+    },
+    {
+      "id": "test-fallback",
+      "name": "Tests: no count is readable",
+      "repo": "progress-validation",
+      "doing": "Explicit board input for visual verification",
+      "state": "working",
+      "kind": "ship",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "test",
+          "n": 4,
+          "of": 9,
+          "elapsed_s": 120,
+          "pct": 20,
+          "estimate": true,
+          "size_adjusted": false
+        }
+      }
+    },
+    {
+      "id": "lint",
+      "name": "Lint shows elapsed time",
+      "repo": "progress-validation",
+      "doing": "Explicit board input for visual verification",
+      "state": "working",
+      "kind": "ship",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "lint",
+          "n": 6,
+          "of": 9,
+          "elapsed_s": 30
+        }
+      }
+    },
+    {
+      "id": "queued",
+      "name": "Waiting for the shared test slot",
+      "repo": "progress-validation",
+      "doing": "Explicit board input for visual verification",
+      "state": "working",
+      "kind": "ship",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "elapsed_s": 45,
+          "waiting_others": 2
+        }
+      }
+    },
+    {
+      "id": "fix",
+      "name": "Unpredictable fix round",
+      "repo": "progress-validation",
+      "doing": "Explicit board input for visual verification",
+      "state": "working",
+      "kind": "ship",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "review",
+          "n": 3,
+          "of": 9,
+          "elapsed_s": 60,
+          "label": "fix round 2"
+        }
+      }
+    },
+    {
+      "id": "decision",
+      "name": "Waiting on a decision",
+      "repo": "progress-validation",
+      "doing": "Explicit board input for visual verification",
+      "state": "working",
+      "kind": "ship",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "review",
+          "n": 3,
+          "of": 9,
+          "label": "waiting on a decision"
+        }
+      }
+    },
+    {
+      "id": "legacy",
+      "name": "Existing row without checks",
+      "repo": "progress-validation",
+      "doing": "Explicit board input for visual verification",
+      "state": "working",
+      "kind": "ship",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75
+      }
+    }
+  ],
+  "landed": [],
+  "charted": []
+}

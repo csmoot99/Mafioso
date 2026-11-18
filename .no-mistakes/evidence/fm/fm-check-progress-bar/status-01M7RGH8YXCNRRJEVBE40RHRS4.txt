@@ -1,0 +1,19 @@
+run:
+  id: "01M7RGH8YXCNRRJEVBE40RHRS4"
+  branch: fm/combined-business-test-fixture
+  status: running
+  head: 1dc3f002
+  head_sha: 1dc3f002b77a51730a808359a378193f9f002642
+  findings: "2 awaiting, 2 auto-fix"
+  steps[9]{step,status,findings,duration_ms}:
+    intent,completed,0,30
+    rebase,completed,0,1409
+    review,fixing,4,213083
+    test,pending,0,0
+    document,pending,0,0
+    lint,pending,0,0
+    push,pending,0,0
+    pr,pending,0,0
+    ci,pending,0,0
+  active_steps[1]{step,status,active_for,round_active_for,last_activity,agent_pid,round}:
+    review,fixing,12m17s,2m44s,"8s ago: codex producing output","1395861",fix 1

@@ -1,0 +1,206 @@
+{
+  "schema": "fm-bearings-board.v1",
+  "home": "work/firstmate",
+  "generated": "2026-11-18T23:48:26Z",
+  "prs_live": false,
+  "captains_call": [],
+  "underway": [
+    {
+      "id": "b2b-duress-cleanup-s4b2",
+      "repo": "b2b-platform",
+      "name": "B2B dev dashboard: already-erased store cleanup, slice 4b-2 (action wi\u2026",
+      "doing": "harness busy (claude-hook)",
+      "state": "working",
+      "kind": "ship",
+      "progress": {
+        "stage": "building",
+        "reached": "building",
+        "pct": 30
+      }
+    },
+    {
+      "id": "combined-business-test-fixture",
+      "repo": "combined-business",
+      "name": "Business app: synthetic test fixture",
+      "doing": "parked at review: 4 finding(s) \u00b7 ask-user: authority decision \u00b7 run: 01M7RGH8YXCNRRJEVBE40\u2026",
+      "state": "parked",
+      "kind": "ship",
+      "progress": {
+        "stage": "owner",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "review",
+          "n": 3,
+          "of": 9,
+          "elapsed_s": null,
+          "pct": null,
+          "estimate": false,
+          "size_adjusted": null,
+          "done": null,
+          "total": null,
+          "waiting_others": null,
+          "label": "waiting on a decision"
+        }
+      }
+    },
+    {
+      "id": "combined-strict-s6-payments",
+      "repo": "combined-strict",
+      "name": "Strict app: payment options (S6, foundation) and sync 2 export",
+      "doing": "harness busy (claude-hook)",
+      "state": "working",
+      "kind": "ship",
+      "progress": {
+        "stage": "building",
+        "reached": "building",
+        "pct": 30
+      }
+    },
+    {
+      "id": "combined-strict-s9-postgres-trial",
+      "repo": "combined-strict",
+      "name": "Strict app: Postgres persistence trial (S9)",
+      "doing": "done [at=1795045662]: S9 Postgres trial finished: GO for persistence and cents, async conv\u2026",
+      "state": "unknown",
+      "kind": "scout",
+      "progress": {
+        "stage": "stuck",
+        "reached": "planning",
+        "pct": 10
+      }
+    },
+    {
+      "id": "fm-check-progress-bar",
+      "repo": "firstmate",
+      "name": "Firstmate: accurate check progress on the board",
+      "doing": "validating (running) \u00b7 run: 01M7RF315GNV72PXTS8QBDNV5Q",
+      "state": "working",
+      "kind": "ship",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "test",
+          "n": 4,
+          "of": 9,
+          "elapsed_s": 738,
+          "pct": null,
+          "estimate": false,
+          "size_adjusted": null,
+          "done": null,
+          "total": null,
+          "waiting_others": null,
+          "label": "fix round"
+        }
+      }
+    },
+    {
+      "id": "nomz-world-02",
+      "repo": "naughty-nomz",
+      "name": "Naughty Nomz World: playable, fun Liar's Dice game on a phone",
+      "doing": "harness state unavailable (unknown missing)",
+      "state": "unknown",
+      "kind": "ship",
+      "progress": {
+        "stage": "stuck",
+        "reached": "building",
+        "pct": 30
+      }
+    },
+    {
+      "id": "nomz-world-velvet-rope",
+      "repo": "naughty-nomz",
+      "name": "Naughty Nomz World: playable Velvet Rope sketch for the owner's phone",
+      "doing": "harness state unavailable (unknown missing)",
+      "state": "unknown",
+      "kind": "ship",
+      "progress": {
+        "stage": "stuck",
+        "reached": "building",
+        "pct": 30
+      }
+    },
+    {
+      "id": "superhero-game-concurrent-copies",
+      "repo": "superhero-game",
+      "name": "Superhero game: make concurrent game copies safe (sessions, tests, pla\u2026",
+      "doing": "parked at review: 4 finding(s) \u00b7 run: 01M7RG9B2TRJS3274X3BF67VGC",
+      "state": "parked",
+      "kind": "ship",
+      "progress": {
+        "stage": "owner",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "review",
+          "n": 3,
+          "of": 9,
+          "elapsed_s": null,
+          "pct": null,
+          "estimate": false,
+          "size_adjusted": null,
+          "done": null,
+          "total": null,
+          "waiting_others": null,
+          "label": "waiting on a decision"
+        }
+      }
+    },
+    {
+      "id": "superhero-game-flight-core",
+      "repo": "superhero-game",
+      "name": "Superhero game: flight and telemetry PR 2 of 3 - flight, power selecti\u2026",
+      "doing": "harness busy (claude-hook)",
+      "state": "working",
+      "kind": "ship",
+      "progress": {
+        "stage": "building",
+        "reached": "building",
+        "pct": 30
+      }
+    },
+    {
+      "id": "superhero-game-humanoid-rig",
+      "repo": "superhero-game",
+      "name": "Superhero game: shared humanoid physics and animation system",
+      "doing": "harness busy (claude-hook)",
+      "state": "working",
+      "kind": "ship",
+      "progress": {
+        "stage": "building",
+        "reached": "building",
+        "pct": 30
+      }
+    },
+    {
+      "id": "superhero-game-mac-capture",
+      "repo": "superhero-game",
+      "name": "Superhero game: make F9 video recording work on the owner's Mac",
+      "doing": "harness busy (claude-hook)",
+      "state": "working",
+      "kind": "ship",
+      "progress": {
+        "stage": "building",
+        "reached": "building",
+        "pct": 30
+      }
+    },
+    {
+      "id": "mac-420usa/420usa-pr194-localci",
+      "repo": "420usa",
+      "name": "420usa: reproduce CI locally on the Mac for PR 194 head 12dec4e9",
+      "doing": "harness busy (claude-hook)",
+      "state": "working",
+      "kind": "scout",
+      "progress": {
+        "stage": "planning",
+        "reached": "planning",
+        "pct": 10
+      }
+    }
+  ],
+  "landed": [],
+  "charted": []
+}

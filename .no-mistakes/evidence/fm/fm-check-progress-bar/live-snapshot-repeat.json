@@ -1,0 +1,506 @@
+{
+  "schema": "fm-bearings.v1",
+  "home": "work/firstmate",
+  "generated": "2026-11-18T23:50:28Z",
+  "prs": "not_requested (run: /bearings include PRs)",
+  "contributions": {
+    "scope": "owned contributions per home",
+    "known": 309,
+    "checked": 305,
+    "counts": {
+      "captain": 0,
+      "fleet": 5,
+      "maintainer": 0,
+      "nobody": 304
+    },
+    "complete": false,
+    "proven_clear": false,
+    "unmeasured_homes": 0,
+    "unreadable_records": 0,
+    "unmeasured": 0,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "captain_omitted": 0,
+    "captain": []
+  },
+  "in_flight": [
+    {
+      "id": "b2b-duress-cleanup-s4b2",
+      "kind": "ship",
+      "state": "working",
+      "repo": "b2b-platform",
+      "name": "B2B dev dashboard: already-erased store cleanup, slice 4b-2 (action wi…",
+      "doing": "harness busy (claude-hook)",
+      "stage": "building",
+      "reached": "building",
+      "pct": 30
+    },
+    {
+      "id": "combined-business-test-fixture",
+      "kind": "ship",
+      "state": "working",
+      "repo": "combined-business",
+      "name": "Business app: synthetic test fixture",
+      "doing": "validating (running) · run: 01M7RGH8YXCNRRJEVBE40RHRS4",
+      "stage": "validating",
+      "reached": "validating",
+      "pct": 75
+    },
+    {
+      "id": "combined-strict-s6-payments",
+      "kind": "ship",
+      "state": "working",
+      "repo": "combined-strict",
+      "name": "Strict app: payment options (S6, foundation) and sync 2 export",
+      "doing": "harness busy (claude-hook)",
+      "stage": "building",
+      "reached": "building",
+      "pct": 30
+    },
+    {
+      "id": "fm-check-progress-bar",
+      "kind": "ship",
+      "state": "working",
+      "repo": "firstmate",
+      "name": "Firstmate: accurate check progress on the board",
+      "doing": "validating (running) · run: 01M7RF315GNV72PXTS8QBDNV5Q",
+      "stage": "validating",
+      "reached": "validating",
+      "pct": 75
+    },
+    {
+      "id": "nomz-world-02",
+      "kind": "ship",
+      "state": "unknown",
+      "repo": "naughty-nomz",
+      "name": "Naughty Nomz World: playable, fun Liar's Dice game on a phone",
+      "doing": "harness state unavailable (unknown missing)",
+      "stage": "stuck",
+      "reached": "building",
+      "pct": 30
+    },
+    {
+      "id": "nomz-world-velvet-rope",
+      "kind": "ship",
+      "state": "unknown",
+      "repo": "naughty-nomz",
+      "name": "Naughty Nomz World: playable Velvet Rope sketch for the owner's phone",
+      "doing": "harness state unavailable (unknown missing)",
+      "stage": "stuck",
+      "reached": "building",
+      "pct": 30
+    },
+    {
+      "id": "superhero-game-concurrent-copies",
+      "kind": "ship",
+      "state": "parked",
+      "repo": "superhero-game",
+      "name": "Superhero game: make concurrent game copies safe (sessions, tests, pla…",
+      "doing": "parked at review: 4 finding(s) · run: 01M7RG9B2TRJS3274X3BF67VGC",
+      "stage": "owner",
+      "reached": "validating",
+      "pct": 75
+    },
+    {
+      "id": "superhero-game-flight-core",
+      "kind": "ship",
+      "state": "working",
+      "repo": "superhero-game",
+      "name": "Superhero game: flight and telemetry PR 2 of 3 - flight, power selecti…",
+      "doing": "harness busy (claude-hook)",
+      "stage": "building",
+      "reached": "building",
+      "pct": 30
+    },
+    {
+      "id": "superhero-game-humanoid-rig",
+      "kind": "ship",
+      "state": "working",
+      "repo": "superhero-game",
+      "name": "Superhero game: shared humanoid physics and animation system",
+      "doing": "harness busy (claude-hook)",
+      "stage": "building",
+      "reached": "building",
+      "pct": 30
+    },
+    {
+      "id": "superhero-game-mac-capture",
+      "kind": "ship",
+      "state": "working",
+      "repo": "superhero-game",
+      "name": "Superhero game: make F9 video recording work on the owner's Mac",
+      "doing": "harness busy (claude-hook)",
+      "stage": "building",
+      "reached": "building",
+      "pct": 30
+    },
+    {
+      "id": "mac-420usa/420usa-pr194-localci",
+      "kind": "scout",
+      "state": "working",
+      "repo": "420usa",
+      "name": "420usa: reproduce CI locally on the Mac for PR 194 head 12dec4e9",
+      "doing": "harness busy (claude-hook)",
+      "stage": "planning",
+      "reached": "planning",
+      "pct": 10
+    }
+  ],
+  "parts": [],
+  "checks": [
+    {
+      "id": "combined-business-test-fixture",
+      "step": "review",
+      "n": 3,
+      "of": 9,
+      "elapsed_s": 602,
+      "pct": null,
+      "estimate": false,
+      "size_adjusted": null,
+      "done": null,
+      "total": null,
+      "waiting_others": null,
+      "label": "fix round"
+    },
+    {
+      "id": "fm-check-progress-bar",
+      "step": "test",
+      "n": 4,
+      "of": 9,
+      "elapsed_s": 852,
+      "pct": null,
+      "estimate": false,
+      "size_adjusted": null,
+      "done": null,
+      "total": null,
+      "waiting_others": null,
+      "label": "fix round"
+    },
+    {
+      "id": "superhero-game-concurrent-copies",
+      "step": "review",
+      "n": 3,
+      "of": 9,
+      "elapsed_s": null,
+      "pct": null,
+      "estimate": false,
+      "size_adjusted": null,
+      "done": null,
+      "total": null,
+      "waiting_others": null,
+      "label": "waiting on a decision"
+    }
+  ],
+  "secondmates": [
+    {
+      "id": "mac-420usa",
+      "state": "active_child_work",
+      "doing": "420usa-pr194-localci: harness busy (claude-hook)",
+      "provenance": "structured-home-cache",
+      "freshness": "cached",
+      "age_seconds": 293,
+      "contradiction": true,
+      "reason": "structured home state invalid: in-flight backlog item has terminal child state: 420usa-f26-s8=done"
+    }
+  ],
+  "secondmate_reconcile": [
+    {
+      "id": "mac-420usa",
+      "spawn_gen": null,
+      "host": "fm-mac",
+      "kind": "terminal_in_flight",
+      "ids": [
+        "420usa-f26-s8"
+      ]
+    }
+  ],
+  "decisions_open": [
+    {
+      "id": "420mia-menu-gate-step",
+      "key": "420mia-menu-gate-step",
+      "verb": "captain-hold",
+      "summary": "420mia: server-side menu gate step in PoliteHttp (build when a gated menu has products): J…",
+      "owner": "(main)"
+    },
+    {
+      "id": "iphone-farm-direction-2",
+      "key": "iphone-farm-direction-2",
+      "verb": "captain-hold",
+      "summary": "iPhone farm: pick a direction (deferred): Jefe 2026-10-29 board: later; keep parked until …",
+      "owner": "(main)"
+    },
+    {
+      "id": "420usa-cash-mailbox",
+      "key": "420usa-cash-mailbox",
+      "verb": "captain-hold",
+      "summary": "420usa: choose the mailbox for cash payments: Before 420usa cash payments are switched on,…",
+      "owner": "(main)"
+    },
+    {
+      "id": "420usa-f7-live-bot-test-later",
+      "key": "420usa-f7-live-bot-test-later",
+      "verb": "captain-hold",
+      "summary": "420usa: live test of menu pulls with a real test bot (deferred): Owner said later: ask aga…",
+      "owner": "(main)"
+    },
+    {
+      "id": "420usa-potato-pairing-later",
+      "key": "420usa-potato-pairing-later",
+      "verb": "captain-hold",
+      "summary": "420usa: revisit order pairing on Potato: Owner chose later (board, 2026-11-03): whether 42…",
+      "owner": "(main)"
+    }
+  ],
+  "landed": [
+    {
+      "id": "superhero-game-test-results-playcopy",
+      "what": "Superhero game: record the play copy skill's tests in docs/TEST_RESULT…",
+      "artifact": "https://github.com/csmoot99/superhero-game/pull/10",
+      "owner": "(main)"
+    },
+    {
+      "id": "420usa-restore-drill-test-teardown-eacces",
+      "what": "420usa: fix restore-drill test teardown EACCES on Linux (test/restore-…",
+      "artifact": "https://github.com/csmoot99/420usa/pull/191",
+      "owner": "mac-420usa"
+    },
+    {
+      "id": "superhero-game-reel-revert",
+      "what": "Superhero game: fully revert reeling to the original swing build",
+      "artifact": "-",
+      "owner": "(main)"
+    },
+    {
+      "id": "420usa-nextjs-security-upgrade",
+      "what": "420usa: upgrade Next.js 16.4.3 to the patched security release",
+      "artifact": "https://github.com/csmoot99/420usa/pull/192",
+      "owner": "mac-420usa"
+    },
+    {
+      "id": "superhero-game-reel-15",
+      "what": "Superhero game: rope shortening 15 m/s",
+      "artifact": "https://github.com/csmoot99/superhero-game/pull/11",
+      "owner": "(main)"
+    },
+    {
+      "id": "420usa-f26-s7",
+      "what": "420usa F2.6 S7: channel list at /feed",
+      "artifact": "https://github.com/csmoot99/420usa/pull/190",
+      "owner": "mac-420usa"
+    }
+  ],
+  "gates": [
+    {
+      "id": "truck-pos-stripe-sandbox-account",
+      "title": "Truck POS sandbox: rerun the account and webhook tests once …",
+      "blocked_by": "-",
+      "reason": "until 2026-11-21: captain: finish Stripe…",
+      "owner": "(main)",
+      "filed": "2026-11-18"
+    },
+    {
+      "id": "superhero-game-flight-tuning",
+      "title": "Superhero game: flight and telemetry PR 3 of 3 - measured tu…",
+      "blocked_by": "superhero-game-flight-core",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2026-11-18"
+    },
+    {
+      "id": "b2b-duress-cleanup-s4c",
+      "title": "B2B dev dashboard: already-erased store cleanup, slice 4c (d…",
+      "blocked_by": "b2b-duress-cleanup-s4b3",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2026-11-18"
+    },
+    {
+      "id": "combined-business-b4-locations",
+      "title": "Business app: sync 2 and brand locations (B4)",
+      "blocked_by": "combined-strict-s6-payments",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2026-11-18"
+    },
+    {
+      "id": "b2b-duress-cleanup-s4b3",
+      "title": "B2B dev dashboard: already-erased store cleanup, slice 4b-3 …",
+      "blocked_by": "b2b-duress-cleanup-s4b2",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2026-11-18"
+    },
+    {
+      "id": "combined-strict-bootcheck-live-db",
+      "title": "Strict app: boot check must not copy a root kds.db",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2026-11-18"
+    },
+    {
+      "id": "420usa-restore-drill-remove-containers-deadline-flake",
+      "title": "420usa: restore-drill 'bounds a create that never settles' f…",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "mac-420usa",
+      "filed": "2026-11-18"
+    },
+    {
+      "id": "truck-pos-nui-v1-low-followups",
+      "title": "Truck POS iPad V1: minor screen follow-ups from re-tour 4",
+      "blocked_by": "truck-pos-nui-p21-mac",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2026-11-17"
+    },
+    {
+      "id": "b2b-e2e-rehearsal-flakes",
+      "title": "B2B: fix the two unreliable browser tests the staging rehear…",
+      "blocked_by": "truck-pos-launch-r01-ipad",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2026-11-15"
+    },
+    {
+      "id": "b2b-provider-ip-quote-3",
+      "title": "B2B: ask the providers about extra IP addresses (deferred)",
+      "blocked_by": "-",
+      "reason": "until 2026-11-28: Captain said later aga…",
+      "owner": "(main)",
+      "filed": "2026-11-14"
+    },
+    {
+      "id": "420usa-pr190-linux-2",
+      "title": "420usa: Linux check of PR 190 after rebase onto PR 188",
+      "blocked_by": "420usa-pr188-linux-2,420usa-pr188-linux-3,420usa-pr188-linux-4",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2026-11-13"
+    },
+    {
+      "id": "b2b-audit-anon-duress",
+      "title": "B2B go-live audit: anonymity and duress (read-only)",
+      "blocked_by": "b2b-duress-cleanup-s4,b2b-front-store-dns-cache",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2026-11-13"
+    },
+    {
+      "id": "420usa-pr188-linux-4",
+      "title": "420usa PR 188: PC Linux four-shard recheck AFTER mac-420usa …",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2026-11-13"
+    },
+    {
+      "id": "b2b-golive-ssd-pilot-build",
+      "title": "B2B go-live: build the drive-only pilot checks (pilot-end ga…",
+      "blocked_by": "restore-test-slots-after-truck-pos",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2026-11-13"
+    },
+    {
+      "id": "b2b-crypto-envelope-build",
+      "title": "B2B: build the v2 encrypted audit-record format (nine packet…",
+      "blocked_by": "restore-test-slots-after-truck-pos",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2026-11-13"
+    },
+    {
+      "id": "420usa-audit-witness-flake",
+      "title": "Investigate intermittent audit-witness test failure on Mac",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "mac-420usa",
+      "filed": "2026-11-13"
+    },
+    {
+      "id": "truck-pos-launch-g02",
+      "title": "Truck POS launch G02: Google hours and reviewed business-inf…",
+      "blocked_by": "truck-pos-launch-s01,truck-pos-launch-s02,truck-pos-launch-g01",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2026-11-12"
+    },
+    {
+      "id": "truck-pos-launch-g03",
+      "title": "Truck POS launch G03: Google food menus and own-ordering lin…",
+      "blocked_by": "truck-pos-launch-g01,truck-pos-launch-g02,truck-pos-launch-s02",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2026-11-12"
+    },
+    {
+      "id": "truck-pos-launch-g04",
+      "title": "Truck POS launch G04: Google posts and reviews with human ap…",
+      "blocked_by": "truck-pos-launch-g01,truck-pos-launch-s01,truck-pos-launch-g02",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2026-11-12"
+    },
+    {
+      "id": "fm-heavy-mac-image-v2",
+      "title": "Mac test image v2: build it on the Mac, re-enable Truck POS …",
+      "blocked_by": "fm-heavy-remote-prep",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2026-11-12"
+    }
+  ],
+  "reports": [],
+  "recorded_prs": [],
+  "omitted": [
+    {
+      "surface": "backlog item bodies",
+      "reveal": "--fields bodies"
+    },
+    {
+      "surface": "task paths",
+      "reveal": "--fields paths"
+    },
+    {
+      "surface": "watch/steer actions",
+      "reveal": "--fields actions"
+    },
+    {
+      "surface": "healthy endpoint detail",
+      "reveal": "--fields endpoints"
+    },
+    {
+      "surface": "full scout-report inventory",
+      "reveal": "--all-reports"
+    },
+    {
+      "surface": "landed showing 6 of 12 (incl. 1 secondmate home(s))",
+      "reveal": "--all-landed"
+    },
+    {
+      "surface": "landed per-home capped at 6 for 1 home(s)",
+      "reveal": "--all-landed"
+    },
+    {
+      "surface": "secondmate mac-420usa served from cached home ledger",
+      "reveal": "inspect the home ledger publication and remote route"
+    },
+    {
+      "surface": "secondmate parent activity evidence truncated for 1 record(s)",
+      "reveal": "raise FM_SNAPSHOT_PARENT_ACTIVITY_LINES, FM_SNAPSHOT_PARENT_ACTIVITY_BYTES, or FM_SNAPSHOT_PARENT_ACTIVITIES"
+    },
+    {
+      "surface": "captain holds bucketed blocked, dated, or aged: 23",
+      "reveal": "--all-decisions"
+    },
+    {
+      "surface": "gates showing 20 of 120",
+      "reveal": "--all-queued"
+    },
+    {
+      "surface": "live PR discovery + checks",
+      "reveal": "--include-prs"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+The real board build and Chromium rendered seeded projection output at 1440px and 390px. Real isolated Lavish and its listener were used. An initial test-directory permission refusal was corrected by making state and claims directories private. No product code changed.
+
+The projection behavior test uses stubbed no-mistakes status and seeded SQLite history. Browser artifacts prove rendering of supplied progress, not live pipeline ingestion. Projection, renderer and invalid-input checks passed.
+
+Installed no-mistakes axi status reports this repository is not initialized. This phase cannot initialize or start another pipeline. A prepared disposable initialized run with real readable status, logs and history is required for the full live ingestion proof. No default fleet session or pane was accessed.
+
+Tests used systemd scopes with MemoryMax=6G and MemorySwapMax=0. Isolated listener, Lavish and Chromium were stopped. Temporary files were removed.

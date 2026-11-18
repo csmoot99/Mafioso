@@ -1,0 +1,206 @@
+{
+  "schema": "fm-bearings-board.v1",
+  "home": "render-home",
+  "generated": "2026-08-26T00:00Z",
+  "prs_live": false,
+  "captains_call": [],
+  "underway": [
+    {
+      "id": "tests",
+      "repo": "sample",
+      "name": "Counted",
+      "state": "working",
+      "kind": "ship",
+      "doing": "validating",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "test",
+          "n": 4,
+          "of": 9,
+          "elapsed_s": 130,
+          "pct": 33,
+          "estimate": false,
+          "done": 212,
+          "total": 643,
+          "waiting_others": null,
+          "label": null
+        }
+      }
+    },
+    {
+      "id": "review",
+      "repo": "sample",
+      "name": "Estimated",
+      "state": "working",
+      "kind": "ship",
+      "doing": "validating",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "review",
+          "n": 3,
+          "of": 9,
+          "elapsed_s": 4000,
+          "pct": 40,
+          "estimate": true
+        }
+      }
+    },
+    {
+      "id": "queued",
+      "repo": "sample",
+      "name": "Queued",
+      "state": "working",
+      "kind": "ship",
+      "doing": "validating",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "waiting_others": 2,
+          "elapsed_s": 45
+        }
+      }
+    },
+    {
+      "id": "fix",
+      "repo": "sample",
+      "name": "Fixing",
+      "state": "working",
+      "kind": "ship",
+      "doing": "validating",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "review",
+          "n": 3,
+          "of": 9,
+          "label": "fix round 2",
+          "elapsed_s": 60
+        }
+      }
+    },
+    {
+      "id": "gate",
+      "repo": "sample",
+      "name": "Gate",
+      "state": "parked",
+      "kind": "ship",
+      "doing": "parked at review",
+      "progress": {
+        "stage": "owner",
+        "reached": "validating",
+        "pct": 75,
+        "parts": [
+          {
+            "label": "One",
+            "state": "current"
+          }
+        ],
+        "checks": {
+          "step": "review",
+          "n": 3,
+          "of": 9,
+          "label": "waiting on a decision"
+        }
+      }
+    },
+    {
+      "id": "plain",
+      "repo": "sample",
+      "name": "Plain",
+      "state": "working",
+      "kind": "ship",
+      "doing": "ci",
+      "progress": {
+        "stage": "checks",
+        "reached": "checks",
+        "pct": 90
+      }
+    },
+    {
+      "id": "fallback",
+      "repo": "sample",
+      "name": "Estimated tests",
+      "state": "working",
+      "kind": "ship",
+      "doing": "test",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "test",
+          "pct": 20,
+          "done": 3,
+          "estimate": true,
+          "size_adjusted": false,
+          "elapsed_s": 120
+        }
+      }
+    },
+    {
+      "id": "lint",
+      "repo": "sample",
+      "name": "Lint",
+      "state": "working",
+      "kind": "ship",
+      "doing": "lint",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "step": "lint",
+          "elapsed_s": 30
+        }
+      }
+    },
+    {
+      "id": "alone",
+      "repo": "sample",
+      "name": "Waiting alone",
+      "state": "working",
+      "kind": "ship",
+      "doing": "waiting",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "waiting_others": 0,
+          "elapsed_s": 30
+        }
+      }
+    },
+    {
+      "id": "pair",
+      "repo": "sample",
+      "name": "Waiting pair",
+      "state": "working",
+      "kind": "ship",
+      "doing": "waiting",
+      "progress": {
+        "stage": "validating",
+        "reached": "validating",
+        "pct": 75,
+        "checks": {
+          "waiting_others": 1,
+          "elapsed_s": 30
+        }
+      }
+    }
+  ],
+  "landed": [],
+  "charted": [],
+  "charted_more": 0,
+  "charted_warning_more": 0
+}

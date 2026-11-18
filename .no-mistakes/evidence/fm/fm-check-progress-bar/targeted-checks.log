@@ -1,0 +1,3 @@
+ok - Underway check progress: step place, test counts, size-adjusted history estimates, other-waiter counts, fix rounds and gates, with no row past its budget
+ok - Underway checks show the step, test count, an about-estimate, other-waiter counts or a fix-round or decision label under the stage bar, and a row without checks is unchanged
+ok - build validates the optional underway progress field, including its checks line, and keeps rows without it

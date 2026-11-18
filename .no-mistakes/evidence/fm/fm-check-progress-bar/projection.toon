@@ -1,0 +1,83 @@
+schema: fm-bearings.v1
+home: fm-bearings.1WL99L/underway-checks
+generated: "2026-07-11T18:00:00Z"
+prs: "not_requested (run: /bearings include PRs)"
+contributions: 
+  scope: owned contributions per home
+  known: 0
+  checked: 0
+  counts: 
+    captain: 0
+    fleet: 0
+    maintainer: 0
+    nobody: 0
+  complete: true
+  proven_clear: true
+  unmeasured_homes: 0
+  unreadable_records: 0
+  unmeasured: 0
+  stale_verdicts: 0
+  missing_verdicts: 0
+  captain_omitted: 0
+  captain: []
+in_flight[23]{id,kind,state,repo,name,doing,stage,reached,pct}:
+  t-ci,ship,working,firstmate,Check progress t-ci,validating (running),validating,validating,75
+  t-count,ship,working,firstmate,Check progress t-count,validating (running),validating,validating,75
+  t-doc-large,ship,working,firstmate,Check progress t-doc-large,validating (running),validating,validating,75
+  t-doc-small,ship,working,firstmate,Check progress t-doc-small,validating (running),validating,validating,75
+  t-fix,ship,working,firstmate,Check progress t-fix,validating (running),validating,validating,75
+  t-gate,ship,parked,firstmate,Check progress t-gate,"parked at review: 0 finding(s)",owner,validating,75
+  t-intent,ship,working,firstmate,Check progress t-intent,validating (running),validating,validating,75
+  t-large,ship,working,firstmate,Check progress t-large,validating (running),validating,validating,75
+  t-lint,ship,working,firstmate,Check progress t-lint,validating (running),validating,validating,75
+  t-long,ship,working,firstmate,Check progress t-long,validating (running),validating,validating,75
+  t-mixed,ship,working,firstmate,Check progress t-mixed,validating (running),validating,validating,75
+  t-nohist,ship,working,firstmate,Check progress t-nohist,validating (running),validating,validating,75
+  t-plain,ship,working,firstmate,Check progress t-plain,harness busy (claude-hook),building,building,30
+  t-pr,ship,working,firstmate,Check progress t-pr,validating (running),validating,validating,75
+  t-push,ship,working,firstmate,Check progress t-push,validating (running),validating,validating,75
+  t-queue,ship,working,firstmate,Check progress t-queue,harness busy (claude-hook),building,building,30
+  t-rebase,ship,working,firstmate,Check progress t-rebase,validating (running),validating,validating,75
+  t-review,ship,working,firstmate,Check progress t-review,validating (running),validating,validating,75
+  t-slow,ship,working,firstmate,Check progress t-slow,validating (running),validating,validating,75
+  t-small,ship,working,firstmate,Check progress t-small,validating (running),validating,validating,75
+  t-tap,ship,working,firstmate,Check progress t-tap,validating (running),validating,validating,75
+  t-test-estimate,ship,working,firstmate,Check progress t-test-estimate,validating (running),validating,validating,75
+  t-tests,ship,working,firstmate,Check progress t-tests,validating (running),validating,validating,75
+parts: []
+checks[21]{id,step,n,of,elapsed_s,pct,estimate,size_adjusted,done,total,waiting_others,label}:
+  t-ci,ci,9,9,30,null,false,null,null,null,null,null
+  t-count,test,4,9,7200,33,false,null,212,643,null,null
+  t-doc-large,document,5,9,10,4,true,true,null,null,null,null
+  t-doc-small,document,5,9,10,66,true,true,null,null,null,null
+  t-fix,test,4,9,540,null,false,null,null,null,null,fix round 2
+  t-gate,review,3,9,null,null,false,null,null,null,null,waiting on a decision
+  t-intent,intent,1,9,30,null,false,null,null,null,null,null
+  t-large,review,3,9,100,3,true,true,null,null,null,null
+  t-lint,lint,6,9,30,null,false,null,null,null,null,null
+  t-long,document,5,9,7200,95,true,false,null,null,null,null
+  t-mixed,review,3,9,100,40,true,false,null,null,null,null
+  t-nohist,lint,6,9,30,null,false,null,null,null,null,null
+  t-pr,pr,8,9,30,null,false,null,null,null,null,null
+  t-push,push,7,9,30,null,false,null,null,null,null,null
+  t-queue,null,null,null,36,null,false,null,null,null,1,null
+  t-rebase,rebase,2,9,30,null,false,null,null,null,null,null
+  t-review,review,3,9,400,50,true,false,null,null,null,null
+  t-small,review,3,9,100,50,true,true,null,null,null,null
+  t-tap,test,4,9,60,75,false,null,3,4,null,null
+  t-test-estimate,test,4,9,120,20,true,false,null,null,null,null
+  t-tests,test,4,9,120,null,false,null,3,null,null,null
+secondmates: []
+secondmate_reconcile: []
+decisions_open: []
+landed: []
+gates: []
+reports: []
+recorded_prs: []
+omitted[6]{surface,reveal}:
+  backlog item bodies,"--fields bodies"
+  task paths,"--fields paths"
+  watch/steer actions,"--fields actions"
+  healthy endpoint detail,"--fields endpoints"
+  full scout-report inventory,"--all-reports"
+  live PR discovery + checks,"--include-prs"

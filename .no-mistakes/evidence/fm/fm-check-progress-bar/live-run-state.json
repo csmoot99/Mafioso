@@ -1,0 +1,289 @@
+{
+  "observed_epoch": 1795045600.6959038,
+  "runs": [
+    {
+      "id": "01M7RF315GNV72PXTS8QBDNV5Q",
+      "branch": "fm/fm-check-progress-bar",
+      "status": "running",
+      "head_sha": "da5bdd72cd93227ec64cf69503d66453c2a17757",
+      "base_sha": "0000000000000000000000000000000000000000",
+      "created_at": 1795043722,
+      "steps": [
+        {
+          "step_name": "intent",
+          "status": "completed",
+          "duration_ms": 33,
+          "log_path": "/home/work/.no-mistakes/logs/01M7RF315GNV72PXTS8QBDNV5Q/intent.log"
+        },
+        {
+          "step_name": "rebase",
+          "status": "completed",
+          "duration_ms": 925,
+          "log_path": "/home/work/.no-mistakes/logs/01M7RF315GNV72PXTS8QBDNV5Q/rebase.log"
+        },
+        {
+          "step_name": "review",
+          "status": "completed",
+          "duration_ms": 1109988,
+          "log_path": "/home/work/.no-mistakes/logs/01M7RF315GNV72PXTS8QBDNV5Q/review.log"
+        },
+        {
+          "step_name": "test",
+          "status": "fixing",
+          "duration_ms": 349307,
+          "log_path": null
+        },
+        {
+          "step_name": "document",
+          "status": "pending",
+          "duration_ms": null,
+          "log_path": null
+        },
+        {
+          "step_name": "lint",
+          "status": "pending",
+          "duration_ms": null,
+          "log_path": null
+        },
+        {
+          "step_name": "push",
+          "status": "pending",
+          "duration_ms": null,
+          "log_path": null
+        },
+        {
+          "step_name": "pr",
+          "status": "pending",
+          "duration_ms": null,
+          "log_path": null
+        },
+        {
+          "step_name": "ci",
+          "status": "pending",
+          "duration_ms": null,
+          "log_path": null
+        }
+      ]
+    },
+    {
+      "id": "01M7RG9B2TRJS3274X3BF67VGC",
+      "branch": "fm/superhero-game-concurrent-copies",
+      "status": "running",
+      "head_sha": "b611b7804cd27b0510553361ec22bcaf71cfa827",
+      "base_sha": "0000000000000000000000000000000000000000",
+      "created_at": 1795044977,
+      "steps": [
+        {
+          "step_name": "intent",
+          "status": "completed",
+          "duration_ms": 77,
+          "log_path": "/home/work/.no-mistakes/logs/01M7RG9B2TRJS3274X3BF67VGC/intent.log"
+        },
+        {
+          "step_name": "rebase",
+          "status": "completed",
+          "duration_ms": 1576,
+          "log_path": "/home/work/.no-mistakes/logs/01M7RG9B2TRJS3274X3BF67VGC/rebase.log"
+        },
+        {
+          "step_name": "review",
+          "status": "awaiting_approval",
+          "duration_ms": 254819,
+          "log_path": null
+        },
+        {
+          "step_name": "test",
+          "status": "pending",
+          "duration_ms": null,
+          "log_path": null
+        },
+        {
+          "step_name": "document",
+          "status": "pending",
+          "duration_ms": null,
+          "log_path": null
+        },
+        {
+          "step_name": "lint",
+          "status": "pending",
+          "duration_ms": null,
+          "log_path": null
+        },
+        {
+          "step_name": "push",
+          "status": "pending",
+          "duration_ms": null,
+          "log_path": null
+        },
+        {
+          "step_name": "pr",
+          "status": "pending",
+          "duration_ms": null,
+          "log_path": null
+        },
+        {
+          "step_name": "ci",
+          "status": "pending",
+          "duration_ms": null,
+          "log_path": null
+        }
+      ]
+    },
+    {
+      "id": "01M7RGH8YXCNRRJEVBE40RHRS4",
+      "branch": "fm/combined-business-test-fixture",
+      "status": "running",
+      "head_sha": "dda52470daf9c6ec5d758349ec69b6ef1c455714",
+      "base_sha": "0000000000000000000000000000000000000000",
+      "created_at": 1795045237,
+      "steps": [
+        {
+          "step_name": "intent",
+          "status": "completed",
+          "duration_ms": 30,
+          "log_path": "/home/work/.no-mistakes/logs/01M7RGH8YXCNRRJEVBE40RHRS4/intent.log"
+        },
+        {
+          "step_name": "rebase",
+          "status": "completed",
+          "duration_ms": 1409,
+          "log_path": "/home/work/.no-mistakes/logs/01M7RGH8YXCNRRJEVBE40RHRS4/rebase.log"
+        },
+        {
+          "step_name": "review",
+          "status": "awaiting_approval",
+          "duration_ms": 213083,
+          "log_path": null
+        },
+        {
+          "step_name": "test",
+          "status": "pending",
+          "duration_ms": null,
+          "log_path": null
+        },
+        {
+          "step_name": "document",
+          "status": "pending",
+          "duration_ms": null,
+          "log_path": null
+        },
+        {
+          "step_name": "lint",
+          "status": "pending",
+          "duration_ms": null,
+          "log_path": null
+        },
+        {
+          "step_name": "push",
+          "status": "pending",
+          "duration_ms": null,
+          "log_path": null
+        },
+        {
+          "step_name": "pr",
+          "status": "pending",
+          "duration_ms": null,
+          "log_path": null
+        },
+        {
+          "step_name": "ci",
+          "status": "pending",
+          "duration_ms": null,
+          "log_path": null
+        }
+      ]
+    }
+  ],
+  "history_samples": [
+    {
+      "step_name": "document",
+      "duration_ms": 104902,
+      "base_sha": "0000000000000000000000000000000000000000",
+      "head_sha": "8d9d3dc05e02c88d9523f02642ddcf60d9f98f7c"
+    },
+    {
+      "step_name": "test",
+      "duration_ms": 286211,
+      "base_sha": "0000000000000000000000000000000000000000",
+      "head_sha": "8d9d3dc05e02c88d9523f02642ddcf60d9f98f7c"
+    },
+    {
+      "step_name": "review",
+      "duration_ms": 795111,
+      "base_sha": "0000000000000000000000000000000000000000",
+      "head_sha": "8d9d3dc05e02c88d9523f02642ddcf60d9f98f7c"
+    },
+    {
+      "step_name": "document",
+      "duration_ms": 133492,
+      "base_sha": "0000000000000000000000000000000000000000",
+      "head_sha": "7baf6ad90eddb4a961c88a8f2e84758dd27fa215"
+    },
+    {
+      "step_name": "test",
+      "duration_ms": 368249,
+      "base_sha": "0000000000000000000000000000000000000000",
+      "head_sha": "7baf6ad90eddb4a961c88a8f2e84758dd27fa215"
+    },
+    {
+      "step_name": "review",
+      "duration_ms": 3034922,
+      "base_sha": "0000000000000000000000000000000000000000",
+      "head_sha": "7baf6ad90eddb4a961c88a8f2e84758dd27fa215"
+    },
+    {
+      "step_name": "document",
+      "duration_ms": 52773,
+      "base_sha": "f5e96bf4b8fc98da39990bf8b99de7513a325b72",
+      "head_sha": "94d50f70ef4e8ae9acafb1b15f712c8b8e55299c"
+    },
+    {
+      "step_name": "test",
+      "duration_ms": 335813,
+      "base_sha": "f5e96bf4b8fc98da39990bf8b99de7513a325b72",
+      "head_sha": "94d50f70ef4e8ae9acafb1b15f712c8b8e55299c"
+    },
+    {
+      "step_name": "review",
+      "duration_ms": 131555,
+      "base_sha": "f5e96bf4b8fc98da39990bf8b99de7513a325b72",
+      "head_sha": "94d50f70ef4e8ae9acafb1b15f712c8b8e55299c"
+    },
+    {
+      "step_name": "document",
+      "duration_ms": 85702,
+      "base_sha": "d0e979460bb7d2c026c16f44e4168a5daf66d073",
+      "head_sha": "f6b6f7cd3b68a753b3b127916b7d486f28f67b6c"
+    },
+    {
+      "step_name": "test",
+      "duration_ms": 539693,
+      "base_sha": "d0e979460bb7d2c026c16f44e4168a5daf66d073",
+      "head_sha": "f6b6f7cd3b68a753b3b127916b7d486f28f67b6c"
+    },
+    {
+      "step_name": "review",
+      "duration_ms": 153197,
+      "base_sha": "d0e979460bb7d2c026c16f44e4168a5daf66d073",
+      "head_sha": "f6b6f7cd3b68a753b3b127916b7d486f28f67b6c"
+    },
+    {
+      "step_name": "document",
+      "duration_ms": 111057,
+      "base_sha": "0000000000000000000000000000000000000000",
+      "head_sha": "2521f82faa62dced6b92c208a2f259d618d4542c"
+    },
+    {
+      "step_name": "document",
+      "duration_ms": 72625,
+      "base_sha": "0000000000000000000000000000000000000000",
+      "head_sha": "f5e96bf4b8fc98da39990bf8b99de7513a325b72"
+    },
+    {
+      "step_name": "test",
+      "duration_ms": 434617,
+      "base_sha": "0000000000000000000000000000000000000000",
+      "head_sha": "f5e96bf4b8fc98da39990bf8b99de7513a325b72"
+    }
+  ]
+}

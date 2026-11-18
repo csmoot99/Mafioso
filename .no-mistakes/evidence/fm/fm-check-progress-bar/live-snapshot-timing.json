@@ -1,0 +1,8 @@
+{
+  "command": "FM_HOME=/home/work/firstmate FM_SNAPSHOT_CACHE_DIR=<evidence>/snapshot-cache bin/fm-bearings-snapshot.sh --json",
+  "exit_code": 0,
+  "elapsed_seconds": 21.7271227609599,
+  "checks_task_budget_seconds": 2,
+  "checks_total_budget_seconds": 6,
+  "cache_redirected_to_evidence": true
+}

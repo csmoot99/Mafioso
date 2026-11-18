@@ -1,0 +1,11 @@
+{
+  "exit_code": 0,
+  "full_snapshot_seconds": 13.994,
+  "checks_reader_observed_seconds": [
+    0.204
+  ],
+  "checks_reader_budget_seconds": 6,
+  "outer_reader_timeout_seconds": 8,
+  "observation_poll_seconds": 0.02,
+  "memory_limit_bytes": 6442450944
+}

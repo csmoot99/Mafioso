@@ -1,0 +1,19 @@
+run:
+  id: "01M7RF315GNV72PXTS8QBDNV5Q"
+  branch: fm/fm-check-progress-bar
+  status: running
+  head: da5bdd72
+  head_sha: da5bdd72cd93227ec64cf69503d66453c2a17757
+  findings: "1 awaiting, 1 info"
+  steps[9]{step,status,findings,duration_ms}:
+    intent,completed,0,33
+    rebase,completed,0,925
+    review,completed,0,1109988
+    test,fixing,2,349307
+    document,pending,0,0
+    lint,pending,0,0
+    push,pending,0,0
+    pr,pending,0,0
+    ci,pending,0,0
+  active_steps[1]{step,status,active_for,round_active_for,last_activity,agent_pid,round}:
+    test,fixing,13m39s,5m53s,"29s ago: codex producing output","1265093",fix 1

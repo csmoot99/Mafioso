@@ -1,0 +1,24 @@
+Read-only live validation on target da5bdd72cd93227ec64cf69503d66453c2a17757
+
+Ran this worktree's bin/fm-bearings-snapshot.sh --json twice with FM_HOME=/home/work/firstmate. Redirected the snapshot's observational remote-summary cache into the dedicated evidence directory so the real home was not modified. All evidence is saved in the evidence directory under the current workspace-boundary instruction; no output was written into /home/work/firstmate/data.
+
+First projection:
+- fm-check-progress-bar: Tests, step 4 of 9, fix round, 738 seconds, no percentage. The run's real status identifies test=fixing, round=fix 1.
+- combined-business-test-fixture: Review, step 3 of 9, waiting on a decision, no percentage. On the repeat snapshot it had advanced into a real review fix round, 602 seconds, still no percentage; subsequent real run status confirms review=fixing.
+- superhero-game-concurrent-copies: Review, step 3 of 9, waiting on a decision, no percentage; real run status confirms review=awaiting_approval.
+- b2b-duress-cleanup-s4b2: building, harness busy, no checks row. No matching run exists in the run database, and no live waiting marker identifies this task.
+- Four live heavy waiting markers had empty task IDs. They cannot be attributed to a board task, so the snapshot correctly invents no task-specific waiting row for them.
+
+Timing:
+- First full fleet snapshot: 21.727 seconds.
+- Repeat full fleet snapshot: 13.994 seconds.
+- Added checks-reader process: approximately 0.204 seconds, observed through its real /proc process lifecycle at 20ms polling resolution, within the 6-second reader budget (8-second outer kill bound). The 6-second limit is not a whole-fleet snapshot limit.
+
+Visual evidence:
+- live-board.png shows the shipped board template rendered in Chromium with the captured real snapshot, including our active test fix round and both review decision gates.
+- display-cases.png shows the unchanged shipped renderer with explicitly supplied board inputs for 212/643=33%, differently sized estimates, missing-size fallback with an unadjusted label, a capped 95% estimate, test estimate fallback, elapsed-only lint, shared-slot waiting with another-waiter count, fix round, decision, and a legacy row. These explicit display inputs demonstrate rendering; they are not evidence of live pipeline count/history ingestion.
+
+Targeted behavioral checks:
+Executed only test_underway_check_progress_reads_only_structured_sources, test_underway_checks_render_a_finer_line_under_the_stage_bar, and test_build_validates_underway_progress from their existing test files, under a systemd scope with MemoryMax=6G and MemorySwapMax=0. All passed. The snapshot test executes the actual snapshot against isolated status/history/log fixtures, covering measured-count precedence, small/large change scaling, missing-size history, estimate bounds, live marker filtering, per-task timeout degradation, JSON/TOON parity, and no invented fill for other steps. These fixture-backed checks are supplemental, not live pipeline evidence.
+
+No source changes were required. No pipeline-control, other validation phase, push, PR, CI, linter, formatter, or full-suite command was run.

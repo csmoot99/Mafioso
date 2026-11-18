@@ -1,0 +1,29 @@
+run:
+  id: "01M7RG9B2TRJS3274X3BF67VGC"
+  branch: fm/superhero-game-concurrent-copies
+  status: running
+  awaiting_agent: parked 9m34s
+  head: b611b780
+  head_sha: b611b7804cd27b0510553361ec22bcaf71cfa827
+  findings: 4 auto-fix
+  steps[9]{step,status,findings,duration_ms}:
+    intent,completed,0,77
+    rebase,completed,0,1576
+    review,awaiting_approval,4,254819
+    test,pending,0,0
+    document,pending,0,0
+    lint,pending,0,0
+    push,pending,0,0
+    pr,pending,0,0
+    ci,pending,0,0
+gate:
+  step: review
+  status: awaiting_approval
+  risk: high
+  note: "Review auto-fix is disabled by default (`auto_fix.review: 0`; a repo or global `auto_fix.review > 0` override re-enables it), so blocking and ask-user review findings park for your decision rather than being silently self-fixed."
+  findings[4]{id,severity,file,action,description}:
+    R1,error,game/tests/test_concurrent_copies.gd,auto-fix,"Reject failed launches before tracking or cleaning them up. If create_process returns -1, expect() records a failure but execution continues and appends -1 to _children. When A never produces a session, _finish() calls _stop(-1), which invokes OS.kill(-1). [Godot forwards this to Unix kill](https://raw.githubusercontent.com/godotengine/godot/master/drivers/unix/os_unix.cpp), potentially terminating unrelated processes owned by the user. Track only positive PIDs and guard _stop against invalid or untracked IDs."
+    R2,error,game/debug/instrumentation/session_store.gd,auto-fix,"Re-read the manifest after confirming owner death. B can snapshot A's open/finalizing manifest in list(root), then A can finalize successfully and exit before B probes its PID. B subsequently overwrites A's complete manifest with the stale snapshot marked incomplete, losing final counts, capture metadata and the real end reason. The maintenance claim does not cover owner finalization. Re-read and revalidate the current manifest under the claim before recovery writes it."
+    R3,warning,game/tests/run_tests.gd,auto-fix,"The suite rejects --session-root but accepts its generic override equivalent. Running with --telemetry --instrumentation=session_root:user://sessions,retention_delete:true bypasses the private environment root because apply_launch_options() applies generic overrides last. Live controls-menu fixtures then record into—and can prune—the owner's history. Reject session_root entries in the suite's generic overrides at startup too."
+    R4,warning,game/tools/playcopy.gd,auto-fix,"Validate flushed bytes before reporting successful staging. save() returns store_string()'s buffered result; a disk-full failure during close can therefore leave a truncated file while returning true. [Godot's Unix implementation uses buffered fwrite and ignores fclose's result](https://raw.githubusercontent.com/godotengine/godot/master/drivers/unix/file_access_unix.cpp). The updater can consequently publish a truncated README or scoring sheet. Flush and verify errors and the expected UTF-8 byte length before returning success, as write_json_atomic() already does."
+help[2]: The explicitly selected gate for run 01M7RG9B2TRJS3274X3BF67VGC is inspection-only; no run-scoped response command exists,Run `no-mistakes axi logs --run 01M7RG9B2TRJS3274X3BF67VGC --step review --full` to read the full step log
