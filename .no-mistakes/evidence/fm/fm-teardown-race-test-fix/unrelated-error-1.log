@@ -1,0 +1,15 @@
+Focused selector: test_teardown_cannot_race_authority_consumption
+Variant: unrelated-error-1
+Fixture GitHub responses are stubbed; this is not live product validation.
+Exit: 1
+Elapsed seconds: 5.39
+
+not ok - teardown race: cleanup did not refuse on the lifecycle lock: fixture: unrelated missing project
+
+fixture output: teardown.err
+fixture: unrelated missing project
+
+fixture output: watch.err
+
+Merged ledger: check: merge landed: task-a https://github.com/o/r/pull/1 away
+Poll released: yes

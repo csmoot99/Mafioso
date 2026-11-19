@@ -1,0 +1,15 @@
+Focused selector: test_teardown_cannot_race_authority_consumption
+Variant: fixed-2
+Fixture GitHub responses are stubbed; this is not live product validation.
+Exit: 0
+Elapsed seconds: 7.39
+
+ok - teardown cannot race merged-poll authority consumption
+
+fixture output: teardown.err
+error: another lifecycle action is already running for task task-a; nothing was changed
+
+fixture output: watch.err
+
+Merged ledger: check: merge landed: task-a https://github.com/o/r/pull/1 away
+Poll released: yes

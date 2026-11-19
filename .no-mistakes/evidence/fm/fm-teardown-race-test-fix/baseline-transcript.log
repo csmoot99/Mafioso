@@ -1,0 +1,72 @@
+Focused selector: test_teardown_cannot_race_authority_consumption
+Variant: baseline-1
+Fixture GitHub responses are stubbed; this is not live product validation.
+Exit: 1
+Elapsed seconds: 12.17
+
+not ok - teardown race: refused cleanup removed persisted authority
+
+fixture output: teardown.err
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 3s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+/home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TJY530VDRR0XW2CPPGZC9R/bin/fm-teardown.sh: line 1836: cd: /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TJY530VDRR0XW2CPPGZC9R/.phase-test-tmp/fm-pr-check-security.Hq7Hea/merge-authority-teardown-race/project: No such file or directory
+error: treehouse return failed for worktree /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TJY530VDRR0XW2CPPGZC9R/.phase-test-tmp/fm-pr-check-security.Hq7Hea/merge-authority-teardown-race/wt; teardown aborted
+
+fixture output: watch.err
+
+Merged ledger: check: merge landed: task-a https://github.com/o/r/pull/1 away
+Poll released: 
+Focused selector: test_teardown_cannot_race_authority_consumption
+Variant: baseline-2
+Fixture GitHub responses are stubbed; this is not live product validation.
+Exit: 1
+Elapsed seconds: 11.86
+
+not ok - teardown race: refused cleanup removed persisted authority
+
+fixture output: teardown.err
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 3s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+/home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TJY530VDRR0XW2CPPGZC9R/bin/fm-teardown.sh: line 1836: cd: /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TJY530VDRR0XW2CPPGZC9R/.phase-test-tmp/fm-pr-check-security.pYEYwJ/merge-authority-teardown-race/project: No such file or directory
+error: treehouse return failed for worktree /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TJY530VDRR0XW2CPPGZC9R/.phase-test-tmp/fm-pr-check-security.pYEYwJ/merge-authority-teardown-race/wt; teardown aborted
+
+fixture output: watch.err
+
+Merged ledger: check: merge landed: task-a https://github.com/o/r/pull/1 away
+Poll released: 
+Focused selector: test_teardown_cannot_race_authority_consumption
+Variant: baseline-3
+Fixture GitHub responses are stubbed; this is not live product validation.
+Exit: 1
+Elapsed seconds: 12.33
+
+not ok - teardown race: refused cleanup removed persisted authority
+
+fixture output: teardown.err
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 3s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+/home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TJY530VDRR0XW2CPPGZC9R/bin/fm-teardown.sh: line 1836: cd: /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TJY530VDRR0XW2CPPGZC9R/.phase-test-tmp/fm-pr-check-security.PC7yra/merge-authority-teardown-race/project: No such file or directory
+error: treehouse return failed for worktree /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TJY530VDRR0XW2CPPGZC9R/.phase-test-tmp/fm-pr-check-security.PC7yra/merge-authority-teardown-race/wt; teardown aborted
+
+fixture output: watch.err
+
+Merged ledger: check: merge landed: task-a https://github.com/o/r/pull/1 away
+Poll released: 
