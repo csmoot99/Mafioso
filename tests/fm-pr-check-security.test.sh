@@ -198,6 +198,17 @@ case " $* " in
     [ "${FM_TEST_GH_FAIL:-0}" = 0 ] || exit 1
     [ -z "${FM_TEST_GH_STATE_STARTED:-}" ] || : > "$FM_TEST_GH_STATE_STARTED"
     [ "${FM_TEST_GH_SLEEP:-0}" = 0 ] || sleep "$FM_TEST_GH_SLEEP"
+    if [ -n "${FM_TEST_GH_STATE_RELEASE:-}" ]; then
+      i=0
+      while [ ! -e "$FM_TEST_GH_STATE_RELEASE" ]; do
+        sleep 0.01
+        i=$((i + 1))
+        if [ "$i" -ge 2000 ]; then
+          printf '%s\n' 'timed out waiting for test poll release' >&2
+          exit 1
+        fi
+      done
+    fi
     printf '%s\n' "${FM_TEST_GH_STATE:-OPEN}"
     ;;
 esac
@@ -3093,7 +3104,7 @@ SH
 }
 
 test_teardown_cannot_race_authority_consumption() {
-  local dir state url watcher_pid rc i
+  local dir state url watcher_pid rc i failure
   url=https://github.com/o/r/pull/1
   dir=$(make_case merge-authority-teardown-race)
   state="$dir/home/state"
@@ -3111,7 +3122,7 @@ test_teardown_cannot_race_authority_consumption() {
   queue_merge "$dir" "$url"
   archive_away_record "$dir"
   FM_TEST_GH_STATE_STARTED="$dir/poll-started" FM_TEST_GH_STATE=MERGED \
-    FM_TEST_GH_SLEEP=0.5 FM_TEST_CHECK_TIMEOUT=3 \
+    FM_TEST_GH_STATE_RELEASE="$dir/poll-release" FM_TEST_CHECK_TIMEOUT=30 \
     run_watcher_bounded "$dir/home" "$dir/fakebin" \
       > "$dir/watch.out" 2> "$dir/watch.err" &
   watcher_pid=$!
@@ -3120,7 +3131,7 @@ test_teardown_cannot_race_authority_consumption() {
     sleep 0.01
     i=$((i + 1))
     if [ "$i" -ge 500 ]; then
-      kill "$watcher_pid" 2>/dev/null || true
+      : > "$dir/poll-release"
       wait "$watcher_pid" 2>/dev/null || true
       fail "teardown race: watcher did not begin its validated poll"
     fi
@@ -3130,11 +3141,18 @@ test_teardown_cannot_race_authority_consumption() {
     "$TEARDOWN" task-a --force > "$dir/teardown.out" 2> "$dir/teardown.err"
   rc=$?
   set -e
-  [ "$rc" -ne 0 ] || fail "teardown race: cleanup crossed the active poll transaction"
+  failure=
+  [ "$rc" -ne 0 ] || failure="teardown race: cleanup crossed the active poll transaction"
+  grep -qF 'another lifecycle action is already running for task task-a; nothing was changed' "$dir/teardown.err" \
+    || failure="teardown race: cleanup did not refuse on the lifecycle lock: $(cat "$dir/teardown.err")"
   [ -f "$state/task-a.merge-authority" ] \
-    || fail "teardown race: refused cleanup removed persisted authority"
+    || failure="teardown race: refused cleanup removed persisted authority"
+  # Keep the poll held through both assertions, then release and reap it even
+  # when an assertion failed so the fixture leaves no held watcher behind.
+  : > "$dir/poll-release"
   rc=0
   wait "$watcher_pid" || rc=$?
+  [ -z "$failure" ] || fail "$failure"
   [ "$rc" -eq 0 ] || fail "teardown race: watcher failed with $rc: $(cat "$dir/watch.err")"
   [ "$(merged_ledger_row "$state" task-a)" = "check: merge landed: task-a $url away" ] \
     || fail "teardown race: concurrent cleanup downgraded the merge authority"
