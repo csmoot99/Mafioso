@@ -3,8 +3,9 @@
 
 CLI owner: this module's --help. Storage: <state>/integration-queue/<key>/,
 where key hashes the canonical project path and base ref. Each SQLite database
-has ready components, immutable manifests, mutable batch outcomes and an event
-history. FULL-synchronous transactions publish each transition atomically.
+has ready components, immutable manifests, mutable batch outcomes, accounting
+progress and an event history. FULL-synchronous transactions publish each
+transition atomically.
 Candidate objects live beside the database, never in the project clone.
 
 `claim --workdir <isolated-copy> -- <command> ...` holds an exclusive flock on
@@ -49,6 +50,11 @@ PR-only protection or unreadable rules refuse, and server rejection is final.
 A durable publishing intent precedes that command. After interruption, claim
 proves the exact candidate is an ancestor of the remote base and every folded
 PR is merged at its recorded head before idempotent merge-outcome accounting.
+Accounting progress is keyed by batch, task, PR URL and exact head, with an
+accounted boolean and Unix timestamp for its last transition. Publication
+intent creates pending rows for all components and the integration PR. Each
+accounting step and its completion record run in one transaction; recovery
+skips completed records even after the task's successor PR has merged.
 If the base is still expected_base the same passed candidate may retry the
 existing guards; any ambiguous publication remains recoverable, never guessed
 landed or silently replaced. A changed component after publication leaves
@@ -153,6 +159,10 @@ class Queue:
                 BEGIN SELECT RAISE(ABORT, 'immutable manifest'); END;
             CREATE TABLE IF NOT EXISTS batches (
                 id TEXT PRIMARY KEY, status TEXT NOT NULL, result TEXT);
+            CREATE TABLE IF NOT EXISTS accounting (
+                batch TEXT NOT NULL, task TEXT NOT NULL, pr TEXT NOT NULL,
+                head TEXT NOT NULL, accounted INTEGER NOT NULL CHECK (accounted IN (0,1)),
+                at INTEGER NOT NULL, PRIMARY KEY (batch,task,pr,head));
             CREATE TABLE IF NOT EXISTS active (id TEXT PRIMARY KEY CHECK (id='active'), batch TEXT);
             INSERT OR IGNORE INTO active VALUES ('active', NULL);
             CREATE TABLE IF NOT EXISTS events (
@@ -570,7 +580,19 @@ class Queue:
                          '" then "fm-queue-merged" else "fm-queue-unproved" end'])
             if proof != 'fm-queue-merged':
                 raise Refused('published PR merge is not yet proved: ' + component['pr'])
-            run(['bash', self.shell, '--account', component['id'], component['pr'], result['authority'], component['head']])
+            identity = (manifest['id'], component['id'], component['pr'], component['head'])
+            with self.transaction():
+                progress = self.db.execute('SELECT accounted FROM accounting WHERE batch=? AND task=? AND pr=? AND head=?',
+                                           identity).fetchone()
+                if not progress:
+                    raise Refused('publication accounting record is missing: ' + component['pr'])
+                if progress['accounted']:
+                    continue
+                run(['bash', self.shell, '--account', component['id'], component['pr'], result['authority'], component['head']])
+                self.db.execute('UPDATE accounting SET accounted=1,at=? WHERE batch=? AND task=? AND pr=? AND head=?',
+                                (int(time.time()), *identity))
+                self.event('accounted', dict(batch=manifest['id'], task=component['id'],
+                                             pr=component['pr'], head=component['head']))
         with self.transaction():
             self.db.execute("UPDATE batches SET status='landed' WHERE id=?", (manifest['id'],))
             for component in manifest['components']:
@@ -625,6 +647,9 @@ class Queue:
             row = self.db.execute('SELECT result FROM batches WHERE id=?', (manifest['id'],)).fetchone()
             result = json.loads(row[0])
             result['authority'] = authority
+            for component in [*manifest['components'], binding]:
+                self.db.execute('INSERT OR IGNORE INTO accounting VALUES(?,?,?,?,0,?)',
+                                (manifest['id'], component['id'], component['pr'], component['head'], int(time.time())))
             self.db.execute("UPDATE batches SET status='publishing',result=? WHERE id=?",
                             (json.dumps(result), manifest['id']))
             self.event('publishing', dict(batch=manifest['id'], publication=binding))
@@ -653,6 +678,8 @@ class Queue:
                     self.db.execute('SELECT * FROM components ORDER BY position')],
                     batches=[dict(r, manifest=self.manifest(r['id'])) for r in
                              self.db.execute('SELECT * FROM batches ORDER BY rowid')],
+                    accounting=[dict(r, accounted=bool(r['accounted'])) for r in
+                                self.db.execute('SELECT * FROM accounting ORDER BY rowid')],
                     events=[dict(r, data=json.loads(r['data'])) for r in
                             self.db.execute('SELECT * FROM events ORDER BY seq')])
 
@@ -674,7 +701,7 @@ def main():
     submit.add_argument('--focused-head', required=True)
     submit.add_argument('--depends-on', action='append', default=[],
                         help='known prerequisite task ID; repeat for multiple dependencies; cycles refuse')
-    commands.add_parser('list', help='read components, immutable manifests, outcomes and recovery history')
+    commands.add_parser('list', help='read components, immutable manifests, outcomes, accounting progress and recovery history')
     claim = commands.add_parser('claim', help='immediately prepare/resume up to three components under one live lease')
     claim.add_argument('--workdir', required=True)
     claim.add_argument('command', nargs=argparse.REMAINDER)

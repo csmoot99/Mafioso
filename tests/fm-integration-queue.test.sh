@@ -43,7 +43,7 @@ class QueueTests(unittest.TestCase):
         self.forge = {}
         self.write_forge()
         self.tool('gh-axi', '''#!/usr/bin/env python3
-import json, os, sys, subprocess
+import json, os, sys, subprocess, signal
 from pathlib import Path
 if sys.argv[1] == 'api':
     endpoint = sys.argv[2]
@@ -59,6 +59,11 @@ if sys.argv[1] == 'api':
         markers = Path(os.environ['QUEUE_MARKERS'])
         blocked = markers / 'unproved-pr'
         if (markers / 'unproved').exists() or (blocked.exists() and blocked.read_text() == url): rc = 1
+        crash = markers / 'crash-before-pr'
+        if crash.exists() and crash.read_text() == url:
+            crash.unlink()
+            (markers / 'accounting-crashed').write_text(str(os.getppid()))
+            os.kill(os.getppid(), signal.SIGKILL)
         print('fm-queue-merged' if rc == 0 else 'fm-queue-unproved')
     elif '/rules/branches/' in endpoint:
         print('fm-queue-requires-pr' if (Path(os.environ['QUEUE_MARKERS']) / 'requires-pr').exists() else 'fm-queue-no-pr-rule')
@@ -438,6 +443,7 @@ else:
 
     def test_guarded_fast_forward_accounts_all_prs(self):
         manifest, command = self.ready_publication()
+        self.assertEqual(self.snapshot()['accounting'], [])
         hook = self.project / '.git/hooks/pre-push'
         hook.write_text('#!/bin/sh\necho chained > ' + str(self.root / 'hook-ran') + '\n')
         hook.chmod(0o700)
@@ -448,6 +454,7 @@ else:
         self.assertEqual(self.snapshot()['batches'][0]['status'], 'landed')
         for task in ('a', 'b', 'integration'):
             self.assertTrue((self.home / 'state' / (task + '.pr-poll-merge-notified')).exists())
+        self.assert_accounting(manifest, [True, True, True])
 
     def test_successor_registration_retires_landed_batch_binding(self):
         manifest, command = self.ready_publication()
@@ -573,43 +580,69 @@ else:
         self.assertIsNone(self.claim())
         self.assertEqual(self.snapshot()['batches'][0]['status'], 'landed')
 
-    def test_partial_accounting_resumes_after_component_registers_successor(self):
+    def assert_accounting(self, manifest, accounted):
+        progress = self.snapshot()['accounting']
+        components = [*manifest['components'], dict(id='integration', pr='https://github.com/example/game/pull/99',
+                                                   head=manifest['commit'])]
+        self.assertEqual(len(progress), len(components))
+        for row, component, done in zip(progress, components, accounted):
+            self.assertEqual((row['batch'], row['task'], row['pr'], row['head']),
+                             (manifest['id'], component['id'], component['pr'], component['head']))
+            self.assertIs(row['accounted'], done)
+            self.assertIsInstance(row['at'], int)
+            self.assertGreater(row['at'], 0)
+        return progress
+
+    def assert_merge_outcomes_once(self, components):
+        rows = [line.split('\t', 4) for line in (self.home / 'state/.wake-queue').read_text().splitlines()]
+        for component in components:
+            key = 'merged-' + component['id'] + '-' + component['pr']
+            self.assertEqual(sum(row[2] == 'check' and row[3] == key for row in rows), 1)
+
+    def crash_between_components(self):
         manifest, command = self.ready_publication()
         first, second = manifest['components']
-        blocked = self.root / 'unproved-pr'
-        blocked.write_text(second['pr'])
+        (self.root / 'crash-before-pr').write_text(second['pr'])
         result = self.publish_attempt(command)
         self.assertNotEqual(result.returncode, 0)
+        self.assertTrue((self.root / 'accounting-crashed').exists())
         self.assertEqual(self.git(self.project, 'ls-remote', 'origin', 'refs/heads/main').split()[0], manifest['commit'])
         self.assertEqual(self.snapshot()['batches'][0]['status'], 'publishing')
-        marker = self.home / 'state' / (first['id'] + '.pr-poll-merge-notified')
-        proof = marker.read_bytes()
-        self.assertEqual(proof.decode().splitlines()[4], first['pr'].rsplit('/', 1)[1])
+        self.assert_accounting(manifest, [True, False, False])
         self.assertFalse((self.home / 'state' / (second['id'] + '.pr-poll-merge-notified')).exists())
         self.assertFalse((self.home / 'state/integration.pr-poll-merge-notified').exists())
+        return manifest
+
+    def test_crash_between_components_resumes_without_double_accounting(self):
+        manifest = self.crash_between_components()
+        first = self.assert_accounting(manifest, [True, False, False])[0]
+        marker = self.home / 'state' / (first['task'] + '.pr-poll-merge-notified')
+        marker.unlink()
+        self.assertIsNone(self.claim())
+        self.assertIsNone(self.claim())
+        self.assertEqual(self.snapshot()['batches'][0]['status'], 'landed')
+        self.assertEqual(self.assert_accounting(manifest, [True, True, True])[0], first)
+        self.assertFalse(marker.exists())
+        self.assert_merge_outcomes_once([*manifest['components'],
+                                        dict(id='integration', pr='https://github.com/example/game/pull/99')])
+
+    def resume_after_successor(self, merge):
+        manifest = self.crash_between_components()
+        first = manifest['components'][0]
+        completed = self.assert_accounting(manifest, [True, False, False])[0]
         successor = self.component('successor')
         self.cmd(['bash', str(ROOT / 'bin/fm-pr-check.sh'), first['id'], successor[2]])
+        if merge:
+            env = dict(self.env, QUEUE_ORDINARY_PR=successor[2])
+            self.cmd(['bash', str(ROOT / 'bin/fm-pr-merge.sh'), first['id'], successor[2]], env=env)
         meta = self.home / 'state' / (first['id'] + '.meta')
         registered = meta.read_bytes()
         authority = self.home / 'state' / (first['id'] + '.merge-authority')
         prior_authority = authority.read_bytes()
-        other_pr = proof.decode().splitlines()
-        other_pr[-1] = successor[2].rsplit('/', 1)[1]
-        for invalid in (None, ('\n'.join(other_pr) + '\n').encode()):
-            with self.subTest(proof=invalid):
-                if invalid is None:
-                    marker.unlink()
-                else:
-                    marker.write_bytes(invalid)
-                    marker.chmod(0o600)
-                result = self.queue('claim', '--workdir', str(self.worker), '--', 'true', check=False)
-                self.assertNotEqual(result.returncode, 0)
-                self.assertEqual(self.snapshot()['batches'][0]['status'], 'publishing')
-                self.assertEqual(meta.read_bytes(), registered)
-                self.assertEqual(authority.read_bytes(), prior_authority)
-        marker.write_bytes(proof)
-        marker.chmod(0o600)
-        blocked.unlink()
+        marker = self.home / 'state' / (first['id'] + '.pr-poll-merge-notified')
+        notification = marker.read_bytes()
+        expected_pr = successor[2] if merge else first['pr']
+        self.assertEqual(notification.decode().splitlines()[4], expected_pr.rsplit('/', 1)[1])
         self.assertIsNone(self.claim())
         self.assertIsNone(self.claim())
         state = self.snapshot()
@@ -617,15 +650,18 @@ else:
         self.assertEqual(state['batches'][0]['status'], 'landed')
         self.assertEqual(meta.read_bytes(), registered)
         self.assertEqual(authority.read_bytes(), prior_authority)
-        rows = [line.split('\t', 4) for line in (self.home / 'state/.wake-queue').read_text().splitlines()]
+        self.assertEqual(marker.read_bytes(), notification)
+        self.assertEqual(self.assert_accounting(manifest, [True, True, True])[0], completed)
         components = [*manifest['components'], dict(id='integration', pr='https://github.com/example/game/pull/99')]
-        for component in components:
-            key = 'merged-' + component['id'] + '-' + component['pr']
-            self.assertEqual(sum(row[2] == 'check' and row[3] == key for row in rows), 1)
-            marker = self.home / 'state' / (component['id'] + '.pr-poll-merge-notified')
-            self.assertEqual(marker.read_text().splitlines(),
-                             ['fm-pr-poll-merge-notified-v1', 'github', 'github.com', 'example/game',
-                              component['pr'].rsplit('/', 1)[1]])
+        if merge:
+            components.append(dict(id=first['id'], pr=successor[2]))
+        self.assert_merge_outcomes_once(components)
+
+    def test_partial_accounting_resumes_after_component_registers_successor(self):
+        self.resume_after_successor(merge=False)
+
+    def test_partial_accounting_resumes_after_component_merges_successor(self):
+        self.resume_after_successor(merge=True)
 
     def test_protected_branch_rejection_has_no_fallback(self):
         manifest, command = self.ready_publication()
