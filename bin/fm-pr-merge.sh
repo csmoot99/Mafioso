@@ -168,6 +168,13 @@
 # explicit captain instruction and never skips the live green check, the
 # away-record read, or a captain hold.
 #
+# --integration-batch <id> is reserved for the leased integration queue.
+# It keeps every live gate for the integration PR and its component PRs,
+# holds their control locks through publication, and invokes only the exact
+# fast-forward primitive in fm-integration-queue.py. No overrides or forge
+# arguments apply to this path. A recorded integration_batch refuses an
+# ordinary PR merge, including retries after a publication refusal.
+#
 # Usage: fm-pr-merge.sh <task-id> <pr-url> [--attended-override] [--allow-red <check-name>]... [--allow-missing <check-name>] [--allow-in-flight] [-- <extra forge merge args>]
 #
 # On GitLab, this script confirms the MR is actually merged before reporting it;
@@ -236,8 +243,15 @@ ATTENDED_OVERRIDE=false
 ALLOW_RED=()
 ALLOW_MISSING=()
 ALLOW_IN_FLIGHT=false
+INTEGRATION_BATCH=
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    --integration-batch)
+      [ -n "${2:-}" ] || exit 2
+      INTEGRATION_BATCH=$2
+      [[ "$INTEGRATION_BATCH" =~ ^[a-f0-9]{32}$ ]] || exit 2
+      shift 2
+      ;;
     --attended-override)
       ATTENDED_OVERRIDE=true
       shift
@@ -277,6 +291,14 @@ while [ "$#" -gt 0 ]; do
     *) break ;;
   esac
 done
+if [ -n "$INTEGRATION_BATCH" ]; then
+  if [ "$PROVIDER" != github ] || [ "$ATTENDED_OVERRIDE" != false ] \
+    || [ "$ALLOW_IN_FLIGHT" != false ] || [ "${#ALLOW_RED[@]}" -ne 0 ] \
+    || [ "${#ALLOW_MISSING[@]}" -ne 0 ] || [ "$#" -ne 0 ]; then
+    echo 'error: integration publication accepts no waivers or forge merge arguments' >&2
+    exit 2
+  fi
+fi
 if [ "${#ALLOW_RED[@]}" -gt 0 ] && [ "$PROVIDER" = gitlab ]; then
   echo "error: --allow-red does not apply to GitLab, where a merge already requires the head pipeline to have succeeded" >&2
   exit 2
@@ -444,14 +466,23 @@ MERGE_EXPECTED_SPAWN_GEN=$FM_BACKLOG_META_SPAWN_GEN
 
 MERGE_CONTROL_LOCK=
 MERGE_META_LOCK=
+INTEGRATION_CONTROL_LOCKS=()
 merge_control_cleanup() {
   [ -z "$MERGE_META_LOCK" ] || fm_lock_release "$MERGE_META_LOCK" || true
   fm_afk_contract_lock_release || true
+  for lock in "${INTEGRATION_CONTROL_LOCKS[@]+"${INTEGRATION_CONTROL_LOCKS[@]}"}"; do
+    fm_lock_release "$lock" || true
+  done
   [ -z "$MERGE_CONTROL_LOCK" ] || fm_lock_release "$MERGE_CONTROL_LOCK" || true
 }
 trap merge_control_cleanup EXIT
 MERGE_CONTROL_LOCK="$STATE/.control-$ID.lock"
 fm_lock_acquire_wait "$MERGE_CONTROL_LOCK"
+RECORDED_BATCH=$(sed -n 's/^integration_batch=//p' "$META" | tail -1)
+if [ -n "$RECORDED_BATCH" ] && [ "$RECORDED_BATCH" != "$INTEGRATION_BATCH" ]; then
+  echo 'error: queued integration PR must land through its bound queue batch' >&2
+  exit 1
+fi
 if ! fm_backlog_meta_spawn_gen_optional "$META" "$STATE"; then
   echo "error: task $ID changed while waiting to merge; refusing: $FM_BACKLOG_TRANSITION_ERROR" >&2
   exit 1
@@ -1110,7 +1141,7 @@ METHODS
 }
 
 record_pr_metadata() {
-  if ! FM_PR_CHECK_MERGE=1 "$SCRIPT_DIR/fm-pr-check.sh" "$ID" "$URL"; then
+  if ! FM_PR_CHECK_MERGE=1 FM_INTEGRATION_REGISTER_BATCH="$INTEGRATION_BATCH" "$SCRIPT_DIR/fm-pr-check.sh" "$ID" "$URL"; then
     return 1
   fi
   grep -qxF "pr=$URL" "$META" || {
@@ -1505,6 +1536,47 @@ gitlab_confirm_merged() {
   [ "$state" = merged ]
 }
 
+# Components are checked with the same functions as an ordinary PR, but never
+# individually merged. Their locks remain held in the parent through publish.
+require_integration_component() {
+  # Dynamic locals let the ordinary guards validate this component without
+  # changing the integration task identity in the calling shell.
+  local ID=$1 URL=$2 head=$3 project=$4 base=$5
+  local META="$STATE/$ID.meta" INTEGRATION_BATCH='' PR_OWNER PR_REPO PR_NUMBER
+  [ -f "$META" ] && [ ! -L "$META" ] || return 1
+  [ "$(meta_value "$META" project)" = "$project" ] || return 1
+  fm_pr_url_parse "$URL" || return 1
+  PR_OWNER=$FM_PR_OWNER PR_REPO=$FM_PR_REPO PR_NUMBER=$FM_PR_NUMBER
+  require_current_away_authority && require_recorded_pr_identity \
+    && record_pr_metadata && require_released_captain_hold || return 1
+  github_verify_mergeable || return 1
+  [ "$FM_PR_MERGE_HEAD" = "$head" ] && [ "$FM_PR_GITHUB_BASE" = "$base" ] || return 1
+  fm_consigliere_require_review "$FM_HOME" "$ID" "$URL" "$head"
+}
+
+require_integration_components() {
+  local project base data component cid url head lock
+  project=$(meta_value "$META" project)
+  base=$FM_PR_GITHUB_BASE
+  data=$("$SCRIPT_DIR/fm-integration-queue.sh" --project "$project" --base "$base" \
+    landing-data --batch "$INTEGRATION_BATCH") || return 1
+  [ "$(printf '%s' "$data" | jq -r '.commit')" = "$FM_PR_MERGE_HEAD" ] || {
+    echo 'error: integration PR head differs from the tested manifest' >&2; return 1;
+  }
+  [ "$(printf '%s' "$data" | jq -r '.publication.id')" = "$ID" ] \
+    && [ "$(printf '%s' "$data" | jq -r '.publication.pr')" = "$URL" ] || return 1
+  for component in $(printf '%s' "$data" | jq -r '.components | sort_by(.id)[] | @base64'); do
+    cid=$(printf '%s' "$component" | jq -Rr '@base64d | fromjson | .id')
+    url=$(printf '%s' "$component" | jq -Rr '@base64d | fromjson | .pr')
+    head=$(printf '%s' "$component" | jq -Rr '@base64d | fromjson | .head')
+    fm_pr_task_id_valid "$cid" && [ "$cid" != "$ID" ] || return 1
+    lock="$STATE/.control-$cid.lock"
+    fm_lock_acquire_wait "$lock" || return 1
+    INTEGRATION_CONTROL_LOCKS+=("$lock")
+    ( require_integration_component "$cid" "$url" "$head" "$project" "$base" ) || return 1
+  done
+}
+
 # Record before either forge call. This arms the merge poll without claiming a
 # landed outcome, so even a provider read failure after a real merge cannot
 # leave teardown without the PR identity it needs to verify the result.
@@ -1558,6 +1630,7 @@ case "$PROVIDER" in
     fi
     fm_consigliere_require_review "$FM_HOME" "$ID" "$URL" "$FM_PR_MERGE_HEAD" || exit 1
     refuse_conflicting_siblings || exit 1
+    if [ -n "$INTEGRATION_BATCH" ]; then require_integration_components || exit 1; fi
     # The away record is locked first, so this last presence and authority read
     # and the forge command below share one live-owner critical section.
     hold_away_record_for_merge || exit 1
@@ -1565,6 +1638,26 @@ case "$PROVIDER" in
     require_current_away_authority || away_status=$?
     [ "$away_status" -eq 0 ] || exit "$away_status"
     refuse_github_queue_while_away || exit 2
+    if [ -n "$INTEGRATION_BATCH" ]; then
+      # The callback is a library function, never a standalone push subcommand.
+      # All authority, hold, review, head and green checks above still apply.
+      python3 - "$SCRIPT_DIR/fm-integration-queue.py" "$(meta_value "$META" project)" \
+        "$FM_PR_GITHUB_BASE" "$INTEGRATION_BATCH" "$ID" "$URL" "$FM_PR_MERGE_HEAD" \
+        "$FM_PR_MERGE_AUTHORITY" <<'QUEUE_PUBLISH'
+import argparse, runpy, sys
+module = runpy.run_path(sys.argv[1], run_name='fm_integration_library')
+queue = module['Queue'](argparse.Namespace(project=sys.argv[2], base=sys.argv[3], batch=sys.argv[4]))
+try:
+    queue.land_after_guards(*sys.argv[5:])
+except (module['Refused'], OSError, ValueError) as error:
+    sys.exit('error: ' + str(error))
+finally:
+    queue.db.close()
+QUEUE_PUBLISH
+      # Parent queue verifies publication and accounts every component and the
+      # integration PR, idempotently, including recovery after this shell dies.
+      exit 0
+    fi
     merge_status=0
     merge_output=$(gh pr merge "$PR_NUMBER" --repo "$PR_OWNER/$PR_REPO" \
       --match-head-commit "$FM_PR_MERGE_HEAD" \

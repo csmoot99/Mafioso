@@ -521,3 +521,16 @@ Use `/stow` before an intentional reset when the conversation may hold durable k
 
 The current watcher reliability work combines always-on bash triage with a durable queue for actionable wakes, generation-bound post-handling acknowledgement, deterministic re-arm recovery after watcher downtime, a race-proof singleton lock, duplicate self-eviction, drain-time liveness assertion, and a self-verifying tracked-child arm wrapper.
 The away posture is the record `bin/fm-afk-contract.sh` owns; see [supervision-host.md](supervision-host.md) for the non-Pi away session and the `/afk` skill for the remaining daemon-backed harnesses.
+
+### Integration queue
+
+[`bin/fm-integration-queue.sh`](../bin/fm-integration-queue.sh) is an opt-in integration tool, with its command and durable-record contract owned by the sibling [implementation header and help](../bin/fm-integration-queue.py).
+It is not wired into dispatch, readiness registration, validation or landing policy.
+Publication runs inside the existing merge guards and uses a normal fast-forward Git push with an expected-old-base pre-push check, followed by the server's atomic reference update.
+The original project pre-push hook is preserved, and branch protection requiring PR merges refuses publication.
+The private project opt-in is documented in [configuration.md](configuration.md#integration-queue-publication).
+Durable publication intent and ancestry plus forge proof recover interrupted publication and account for each folded PR through the existing merge-outcome reporter.
+The queue's assertions about focused tests and review do not replace any current pipeline requirement or grant merge authority.
+The queue conservatively refuses preparation alongside any active legacy validation on that base, while the ordinary single-PR path retains its existing conflict guard.
+The implementation uses Python's standard SQLite and `fcntl` modules, so queue behavior is independent of worker runtime and needs no `flock` executable on macOS.
+`tests/fm-integration-queue.test.sh` exercises the public entrypoint using local Git remotes and real OS leases, including external base movement, changed heads, legacy validation, crash recovery, conflict rejection and attributed batch failure.

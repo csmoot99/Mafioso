@@ -22,6 +22,8 @@
 # (bin/fm-consigliere-lib.sh owns the receipt).
 # The recorded pr= also frees the task's place in a declared project capacity
 # (bin/fm-project-capacity-lib.sh).
+# A queue merge caller may bind integration_batch while registering its final
+# PR; fm-pr-merge refuses an ordinary landing of that bound PR on retries.
 # Usage: fm-pr-check.sh <task-id> <pr-url>
 set -eu
 
@@ -173,6 +175,10 @@ if [ "$REVIEW_MODE" = on ]; then
   fm_consigliere_require_review "$FM_HOME" "$ID" "$URL" "$REVIEW_HEAD" || exit 1
 fi
 
+INTEGRATION_BATCH=${FM_INTEGRATION_REGISTER_BATCH:-}
+if [ -n "$INTEGRATION_BATCH" ]; then
+  [ "${FM_PR_CHECK_MERGE:-}" = 1 ] && [[ "$INTEGRATION_BATCH" =~ ^[a-f0-9]{32}$ ]] || exit 2
+fi
 META_TMP=
 META_LOCK=
 META_LOCK_HELD=0
@@ -206,10 +212,12 @@ STATE_DEVICE=$(fm_pr_file_device "$STATE") || exit 1
 META_TMP=$(mktemp "$STATE/.fm-pr-meta.XXXXXX") || exit 1
 while IFS= read -r line || [ -n "$line" ]; do
   case "$line" in
+    integration_batch=*) [ -n "$INTEGRATION_BATCH" ] || printf '%s\n' "$line" >> "$META_TMP" ;;
     pr=*|pr_head=*) ;;
     *) printf '%s\n' "$line" >> "$META_TMP" || exit 1 ;;
   esac
 done < "$META"
+[ -z "$INTEGRATION_BATCH" ] || printf 'integration_batch=%s\n' "$INTEGRATION_BATCH" >> "$META_TMP" || exit 1
 printf 'pr=%s\n' "$URL" >> "$META_TMP" || exit 1
 [ -z "$PR_HEAD" ] || printf 'pr_head=%s\n' "$PR_HEAD" >> "$META_TMP" || exit 1
 chmod 0600 "$META_TMP" || exit 1
