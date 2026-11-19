@@ -32,9 +32,9 @@
 # Additive identity fields: command_sha256 hashes the full NUL-terminated argv
 # (SHA-256, including argument boundaries); source_head is HEAD, source_tree is
 # the Git tree of tracked and non-ignored untracked working-copy contents, and
-# source_dirty includes staged, unstaged and untracked changes. A private index
+# source_dirty includes staged, unstaged and non-ignored untracked changes. A private index
 # captures the tree without changing the real index; Git objects may be written.
-# Ignored files, submodule working contents and external inputs are not covered.
+# Ignored untracked files, submodule working contents and external inputs are not covered.
 # source_sha256 hashes source_tree plus a newline; unavailable identities are null.
 # Identity is sampled at launch; concurrent edits during a job are not tracked.
 # phase is the optional caller label. entry_kind is execution, pipeline-drive

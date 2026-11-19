@@ -1218,7 +1218,8 @@ A record holds the task, project, command class (test, build, e2e or image), the
 A job stopped by TERM, INT or HUP is recorded too, whether it was running or still queued; the wrapper's header owns the exact fields.
 The command's exit status passes through, so 137 means the memory cap killed the command itself; when the cap kills one of its child processes, systemd stops the whole scope and the status is usually 143, with the peak still recorded.
 [`bin/fm-heavy-summary.sh`](../bin/fm-heavy-summary.sh) prints queue wait against run time and peak memory per project, class and host.
-Its `--executions --since <epoch> --until <epoch>` view counts distinct command executions by full-argument and source-content digests; the wrapper header owns the additive identity, driver/reattachment classification, timing fields and coverage limitations.
+Its execution-count view groups distinct executions by command and source content and reports unresolved jobs separately; the report's header owns filtering, deduplication and reconciliation semantics.
+The wrapper header owns the identity fields, driver/reattachment classification, timing fields and coverage limitations.
 These identities support measurement only and do not authorize test-result reuse.
 A failing test or e2e job also records each failing test in the project's ledger, and [`bin/fm-test-failure.sh`](../bin/fm-test-failure.sh) classifies those failures and reports on them.
 The weekly rollup is `bin/fm-test-failure.sh report --since 7d`, run on demand until a schedule is added.

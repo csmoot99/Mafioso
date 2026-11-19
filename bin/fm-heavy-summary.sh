@@ -22,8 +22,12 @@
 # source_sha256 over command_started_at in [since, until). Counts deduplicate
 # execution_id, exclude drivers, reattachments, not-started and legacy records.
 # Executions lacking command or source identity remain uncounted. Verified
-# reconciled results in heavy-remote/ beside the log resolve unknown executions without changing the
-# ledger. The unknown column counts unresolved jobs, using requested_at for the
+# reconciled results in heavy-remote/ beside the log resolve unknown executions
+# without changing the ledger. Reconciliation excludes jobs confirmed absent,
+# preparation failures before command start, and verified cancellations with a
+# null command_started_at at a pre-command preparation step; these never count
+# as executions or unknown jobs. Rejected or otherwise unresolved results remain
+# unknown. The unknown column counts unresolved jobs, using requested_at for the
 # period when command start is unknown. It counts invocations, not test cases or
 # equivalent environments; the wrapper header owns identity coverage limitations.
 # Without --executions, --until filters requested_at with an exclusive upper bound.
