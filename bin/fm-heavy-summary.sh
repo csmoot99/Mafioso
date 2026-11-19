@@ -82,6 +82,10 @@ if [ -n "$executions" ]; then
                 if ($result.command_started_at | type) == "number" and .source_sha256 != null then
                   .entry_kind = "execution" | .command_started_at = $result.command_started_at
                 elif $receipt.outcome == "prepare-failed" then .entry_kind = "not-started"
+                elif $receipt.outcome == "cancelled" and $result.outcome == "cancelled"
+                  and ($result | has("command_started_at")) and $result.command_started_at == null
+                  and ($result.preparation_step | IN("container-start", "services", "runtime", "dependencies", "browsers"))
+                then .entry_kind = "not-started"
                 else . end
               else . end
             else . end

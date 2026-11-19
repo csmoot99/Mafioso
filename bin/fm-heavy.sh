@@ -456,6 +456,7 @@ record() {  # <exit status, empty when the command never started>
     cstart=$(sget command_started_at); cend=$(sget command_ended_at); crc=$(sget command_exit)
     execution_id=$(sget job)
     kind=unknown
+    [ "$(sget command_not_started)" != true ] || kind=not-started
     [ -z "$cstart" ] || timing="remote-result"
   elif [ -n "$started" ]; then
     execution_id=$unit

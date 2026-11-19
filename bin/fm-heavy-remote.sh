@@ -444,6 +444,10 @@ if jq -e '(.command_started_at | type) == "number"' "$jdir/result.json" >/dev/nu
   emit command_started_at "$(jq -r '.command_started_at // empty' "$jdir/result.json")"
   emit command_ended_at "$(jq -r '.command_ended_at // empty' "$jdir/result.json")"
   emit command_exit "$(jq -r .exit_code "$jdir/result.json")"
+elif jq -e '.outcome == "cancelled" and has("command_started_at") and .command_started_at == null
+    and (.preparation_step | IN("container-start", "services", "runtime", "dependencies", "browsers"))' \
+    "$jdir/result.json" >/dev/null; then
+  emit command_not_started true
 fi
 emit cpu "$(jq -r '.cpu_usec' "$jdir/result.json")"
 cleanup_remote

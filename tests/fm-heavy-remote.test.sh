@@ -1310,6 +1310,62 @@ SH
   git -C "$REPO" add -A; git -C "$REPO" commit -q -m dependencies
 }
 
+test_precommand_cancellation_classification() {
+  local mode pid job jdir out duplicate first
+  for mode in direct reconciled; do
+    setup "precommand-cancel-$mode" 'echo ran >> "$HOME/ran"'
+    make_node_project
+    if [ "$mode" = reconciled ]; then rule gone drop 'runner.py (wait|status)' -1; fi
+    FAKE_INSTALL_HANG=1 heavy --remote >"$CASE/out" 2>&1 &
+    pid=$!
+    wait_for "$REMOTE_HOME/install.log"
+    job=$(basename "$HOME_FM/state/heavy-remote/unknown-fake-mac/"*.json .json)
+    jdir=$HOME_FM/state/heavy-remote/$job
+    if [ "$mode" = reconciled ]; then
+      wait "$pid"
+      expect_code 75 "$?" "unreachable preparation cancellation"
+      expect_record '.entry_kind == "unknown" and .outcome == "unknown"' "unverified preparation record"
+      first=$(last_record)
+      out=$("$SUMMARY" --executions --log "$LOG") || fail "unresolved preparation summary"
+      printf '%s\n' "$out" | awk 'NR == 2 {ok = ($4 == 0 && $5 == 1)} END {exit !ok}' \
+        || fail "unverified preparation must remain unknown: $out"
+      rm "$CTL/rules/gone"
+    fi
+    HOME="$REMOTE_HOME" python3 "$RUNNER" cancel "$REMOTE_HOME/.fm-heavy-remote/$job" >/dev/null \
+      || fail "cancel dependency preparation"
+    if [ "$mode" = direct ]; then
+      wait "$pid"
+      expect_code 143 "$?" "verified preparation cancellation"
+      expect_record '.outcome == "cancelled" and .entry_kind == "not-started"
+        and .command_started_at == null and .command_exit == null and .fallback == null' "verified pre-command cancellation record"
+    else
+      [ ! -e "$REMOTE_HOME/ran" ] || fail "cancelled preparation must never launch the command"
+      heavy --remote >"$CASE/next-out" 2>&1 || fail "reconcile cancellation and run next command"
+      jq -e '.outcome == "cancelled"' "$jdir/reconciled.json" >/dev/null || fail "cancelled result must be reconciled"
+      [ "$(head -1 "$LOG")" = "$first" ] || fail "reconciliation must preserve the original ledger row"
+      [ "$(wc -l < "$REMOTE_HOME/ran")" -eq 1 ] || fail "only the subsequent command may run"
+      duplicate=$(last_record)
+      printf '%s\n' "$duplicate" >> "$LOG"
+      printf '%s\n' "$duplicate" | jq -c '.entry_kind = "reattachment" | .execution_id = "attachment"' >> "$LOG"
+    fi
+    jq -e '.outcome == "cancelled" and .preparation_step == "dependencies" and .command_started_at == null' \
+      "$jdir/result.json" >/dev/null || fail "cancellation must occur during dependency preparation"
+    [ ! -e "$CTL/local-runs" ] || fail "pre-command cancellation must not fall back locally"
+    out=$("$SUMMARY" --executions --log "$LOG") || fail "verified preparation cancellation summary"
+    if [ "$mode" = direct ]; then
+      [ ! -e "$REMOTE_HOME/ran" ] || fail "cancelled preparation must not run the command"
+      [ "$(printf '%s\n' "$out" | wc -l)" -eq 1 ] || fail "not-started jobs must be excluded: $out"
+    else
+      printf '%s\n' "$out" | awk 'NR == 2 {ok = ($4 == 1 && $5 == 0)} END {exit !(ok && NR == 2)}' \
+        || fail "reconciled pre-command cancellation must not count as execution or unknown: $out"
+    fi
+    assert_absent "$REMOTE_HOME/.fm-heavy-remote/$job" "pre-command cancellation scratch"
+    assert_absent "$REMOTE_HOME/.fm-heavy-remote/$(last_record | jq -r .job)" "subsequent command scratch"
+    [ -z "$(ls -A "$HOME_FM/state/heavy-remote/unknown-fake-mac")" ] || fail "verified cancellation must close the open record"
+  done
+  pass "fm-heavy: verified pre-command cancellations are not-started directly and after reconciliation"
+}
+
 test_dependency_cache_and_failures() {
   local out
   setup dependencies 'test -f node_modules/proof && echo tested >> "$HOME/tested"'
@@ -1888,6 +1944,7 @@ test_scoped_offload
 test_bad_config_refuses_only_offload
 test_queued_job_moves_to_the_freed_host
 test_queued_job_signal_runs_nowhere
+test_precommand_cancellation_classification
 test_dependency_cache_and_failures
 test_each_project_runs_on_its_pinned_runtimes
 test_project_without_dependencies_needs_no_lockfile
