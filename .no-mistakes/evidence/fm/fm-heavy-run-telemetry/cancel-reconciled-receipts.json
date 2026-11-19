@@ -1,0 +1,56 @@
+{
+  "1795109870-702890-31215/result.json": {
+    "schema": "fm-heavy-remote.v1",
+    "id": "1795109870-702890-31215",
+    "sha": "38005d80596aafede364e296a572b638e8acceed",
+    "tree": "fefe771d795831e04f4ddbb7813604ae1dd4129a",
+    "command_sha256": "1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41",
+    "bundle_sha256": "8aff0f4afc839a939ea3ef58796b2b487dec0cfb955b9cc35ba526f904495d68",
+    "outcome": "exited",
+    "preparation_step": "command",
+    "exit_code": 0,
+    "started_at": 1795109872,
+    "ended_at": 1795109873,
+    "command_started_at": 1795109872,
+    "command_ended_at": 1795109873,
+    "run_s": 0.86,
+    "cpu_usec": 917791,
+    "host": "DESKTOP-NKCLCNH",
+    "artifacts": {
+      "run.log": {
+        "bytes": 228,
+        "sha256": "cc6047249fac45be760395f24f5033e5adcd497685671f25a0e9f4626fd937a9"
+      }
+    }
+  },
+  "1795109866-702041-20267/reconciled.json": {
+    "job": "1795109866-702041-20267",
+    "candidate": "38005d80596aafede364e296a572b638e8acceed",
+    "outcome": "cancelled",
+    "reconciled_at": 1795109870
+  },
+  "1795109866-702041-20267/result.json": {
+    "schema": "fm-heavy-remote.v1",
+    "id": "1795109866-702041-20267",
+    "sha": "38005d80596aafede364e296a572b638e8acceed",
+    "tree": "fefe771d795831e04f4ddbb7813604ae1dd4129a",
+    "command_sha256": "1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41",
+    "bundle_sha256": "8aff0f4afc839a939ea3ef58796b2b487dec0cfb955b9cc35ba526f904495d68",
+    "outcome": "cancelled",
+    "preparation_step": "dependencies",
+    "exit_code": 143,
+    "started_at": 1795109867,
+    "ended_at": 1795109869,
+    "command_started_at": null,
+    "command_ended_at": null,
+    "run_s": 1.979,
+    "cpu_usec": 944295,
+    "host": "DESKTOP-NKCLCNH",
+    "artifacts": {
+      "run.log": {
+        "bytes": 163,
+        "sha256": "67d33d209c57208725df50e66938b8c0d4a52b52c60693baa2363126d2c71260"
+      }
+    }
+  }
+}

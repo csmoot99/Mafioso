@@ -1,0 +1,1 @@
+Private SSH listener and TCP proxy stopped; no remote fixture jobs remain. Removed all downloaded tools, temporary keys, npm caches, fixture repositories and private homes from the worktree. Tracked worktree is unchanged.

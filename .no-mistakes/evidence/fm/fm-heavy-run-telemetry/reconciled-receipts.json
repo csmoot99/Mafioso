@@ -1,0 +1,80 @@
+{
+  "1795109859-699348-804/result.json": {
+    "schema": "fm-heavy-remote.v1",
+    "id": "1795109859-699348-804",
+    "sha": "b52dfc8eae612cc6424a63d5c451a572e03abd6e",
+    "tree": "fad42e7a7bcd318b7c8911100e3ae92f083ba4c7",
+    "command_sha256": "1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41",
+    "bundle_sha256": "b2e288965dec8d854188b191f72051a27cc86017a514239027bc57d2762071ae",
+    "outcome": "exited",
+    "preparation_step": "command",
+    "exit_code": 0,
+    "started_at": 1795109860,
+    "ended_at": 1795109860,
+    "command_started_at": 1795109860,
+    "command_ended_at": 1795109860,
+    "run_s": 0.448,
+    "cpu_usec": 583550,
+    "host": "DESKTOP-NKCLCNH",
+    "artifacts": {
+      "run.log": {
+        "bytes": 16,
+        "sha256": "7f320edf17049cebade5e7baf6546a0bdd4a03ae99bc54a081c7bca0ef52e0cc"
+      }
+    }
+  },
+  "1795109855-697686-20378/result.json": {
+    "schema": "fm-heavy-remote.v1",
+    "id": "1795109855-697686-20378",
+    "sha": "b52dfc8eae612cc6424a63d5c451a572e03abd6e",
+    "tree": "fad42e7a7bcd318b7c8911100e3ae92f083ba4c7",
+    "command_sha256": "1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41",
+    "bundle_sha256": "b2e288965dec8d854188b191f72051a27cc86017a514239027bc57d2762071ae",
+    "outcome": "exited",
+    "preparation_step": "command",
+    "exit_code": 0,
+    "started_at": 1795109857,
+    "ended_at": 1795109858,
+    "command_started_at": 1795109857,
+    "command_ended_at": 1795109857,
+    "run_s": 0.472,
+    "cpu_usec": 608765,
+    "host": "DESKTOP-NKCLCNH",
+    "artifacts": {
+      "run.log": {
+        "bytes": 16,
+        "sha256": "7f320edf17049cebade5e7baf6546a0bdd4a03ae99bc54a081c7bca0ef52e0cc"
+      }
+    }
+  },
+  "1795109852-696430-3649/reconciled.json": {
+    "job": "1795109852-696430-3649",
+    "candidate": "b52dfc8eae612cc6424a63d5c451a572e03abd6e",
+    "outcome": "pass",
+    "reconciled_at": 1795109856
+  },
+  "1795109852-696430-3649/result.json": {
+    "schema": "fm-heavy-remote.v1",
+    "id": "1795109852-696430-3649",
+    "sha": "b52dfc8eae612cc6424a63d5c451a572e03abd6e",
+    "tree": "fad42e7a7bcd318b7c8911100e3ae92f083ba4c7",
+    "command_sha256": "1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41",
+    "bundle_sha256": "b2e288965dec8d854188b191f72051a27cc86017a514239027bc57d2762071ae",
+    "outcome": "exited",
+    "preparation_step": "command",
+    "exit_code": 0,
+    "started_at": 1795109854,
+    "ended_at": 1795109855,
+    "command_started_at": 1795109854,
+    "command_ended_at": 1795109855,
+    "run_s": 0.851,
+    "cpu_usec": 587893,
+    "host": "DESKTOP-NKCLCNH",
+    "artifacts": {
+      "run.log": {
+        "bytes": 16,
+        "sha256": "7f320edf17049cebade5e7baf6546a0bdd4a03ae99bc54a081c7bca0ef52e0cc"
+      }
+    }
+  }
+}

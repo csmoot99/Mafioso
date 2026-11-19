@@ -1,0 +1,61 @@
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy.sh --class test --project p -- no-mistakes --help
+[33mA new version of no-mistakes is available: v1.75.2 -> v1.106.1
+Run "no-mistakes update" to update[0m
+Local Git proxy that validates code before pushing to the configured target
+
+Usage:
+  no-mistakes [flags]
+  no-mistakes [command]
+
+Available Commands:
+  attach      Attach to the active pipeline run
+  axi         Agent interface: drive no-mistakes from an autonomous agent
+  ci-workflow Generate .github/workflows/ci.yml from .no-mistakes.yaml commands
+  completion  Generate the autocompletion script for the specified shell
+  daemon      Manage the no-mistakes daemon
+  doctor      Check system health and dependencies
+  eject       Remove no-mistakes gate from the current repository
+  eval        Inspect and locally replay review evaluation cases
+  help        Help about any command
+  init        Initialize no-mistakes gate for the current repository
+  rerun       Rerun the pipeline for the current branch
+  runs        List pipeline runs for the current repository
+  stats       Show historical no-mistakes usage stats
+  status      Show status of the current repository
+  sync        Safely move the current branch to an exact pipeline-pushed head
+  update      Update no-mistakes and reset the daemon
+
+Flags:
+  -h, --help          help for no-mistakes
+      --skip string   comma-separated pipeline steps to skip for a new run
+  -v, --version       version for no-mistakes
+  -y, --yes           run setup wizard and accept defaults automatically
+
+Use "no-mistakes [command] --help" for more information about a command.
+[exit 0]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy-summary.sh --executions --log /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/local/home/state/heavy-jobs.jsonl
+project	command_sha256	source_sha256	executions	unknown
+p	1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41	6ae02da2508b8efa1c53466da6007c1c454257e4a50e98faad0ecfe534249fef	1	0
+p	1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41	7a95af67cfff431fb90173b5755def7f20873a5bc0ac7e32ae9a4d68a73e9816	3	0
+p	1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41	e637fb2861aa5fbc4daa782cef3b949b41354a283d599cab22b8ee2a688f28ea	2	0
+p	e61055133f702cfe36d41ec9734aa7f5e3c4e2525defeb81acad17e21177f670	e637fb2861aa5fbc4daa782cef3b949b41354a283d599cab22b8ee2a688f28ea	1	0
+p	f4b914884e1639e465a4a163eb74be28332702f853c767c8bb3f608313bac196	e637fb2861aa5fbc4daa782cef3b949b41354a283d599cab22b8ee2a688f28ea	1	0
+[exit 0]
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/summary-before-reconciliation.sh --executions --log /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/reconciled/home/state/heavy-jobs.jsonl
+project	command_sha256	source_sha256	executions
+p	1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41	bf935fbf78ed86e1eed8ededa22e54a32635ad733fd3dc830424b3014f21e4f9	1
+[exit 0]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy-summary.sh --executions --log /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/reconciled/home/state/heavy-jobs.jsonl
+project	command_sha256	source_sha256	executions	unknown
+p	1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41	bf935fbf78ed86e1eed8ededa22e54a32635ad733fd3dc830424b3014f21e4f9	2	0
+[exit 0]
+REPRODUCED R3: original summary undercounts real, verified commands as 1; fixed summary reports 2.
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/summary-before-cancellation-fix.sh --executions --log /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/cancel-reconciled/home/state/heavy-jobs.jsonl
+project	command_sha256	source_sha256	executions	unknown
+p	1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41	0c07b949dd6b728b7d5a9c9dc0daf8398d959b3720cc7b1f843e7b37787c7e60	1	1
+[exit 0]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy-summary.sh --executions --log /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/cancel-reconciled/home/state/heavy-jobs.jsonl
+project	command_sha256	source_sha256	executions	unknown
+p	1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41	0c07b949dd6b728b7d5a9c9dc0daf8398d959b3720cc7b1f843e7b37787c7e60	1	0
+[exit 0]
+REPRODUCED R4: previous summary leaves cancelled dependency preparation unknown=1; fixed summary reports unknown=0 and only the one started command.

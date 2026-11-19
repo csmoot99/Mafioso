@@ -1,0 +1,241 @@
+
+SCENARIO: Local command identity, failure timing, source snapshots, reattachments and bounded deduplicated report
+$ git init -q /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/local/repo
+[exit 0]
+$ git add -A
+[exit 0]
+$ git commit -qm initial
+[exit 0]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy.sh --class build --project p --phase focused -- bash t/job.sh
+workload output
+[exit 7]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy.sh --class build --project p --phase focused -- bash t/job.sh
+workload output
+[exit 7]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy-summary.sh --executions --log /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/local/home/state/heavy-jobs.jsonl
+project	command_sha256	source_sha256	executions	unknown
+p	1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41	e637fb2861aa5fbc4daa782cef3b949b41354a283d599cab22b8ee2a688f28ea	2	0
+[exit 0]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy.sh --class build --project p --reattach -- bash t/job.sh
+workload output
+[exit 7]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy-summary.sh --executions --log /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/local/home/state/heavy-jobs.jsonl
+project	command_sha256	source_sha256	executions	unknown
+p	1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41	e637fb2861aa5fbc4daa782cef3b949b41354a283d599cab22b8ee2a688f28ea	2	0
+[exit 0]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy.sh --class build --project p -- true 'a b' ''
+[exit 0]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy.sh --class build --project p -- true a b
+[exit 0]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy.sh --class build --project p -- bash t/job.sh
+workload output
+[exit 7]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy.sh --class build --project p -- bash t/job.sh
+workload output
+[exit 7]
+$ git add -A
+[exit 0]
+$ git commit -qm 'same content now committed'
+[exit 0]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy.sh --class build --project p -- bash t/job.sh
+workload output
+[exit 7]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy.sh --class build --project p -- bash t/job.sh
+workload output
+[exit 7]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy-summary.sh --executions --log /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/local/home/state/heavy-jobs.jsonl
+project	command_sha256	source_sha256	executions	unknown
+p	1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41	6ae02da2508b8efa1c53466da6007c1c454257e4a50e98faad0ecfe534249fef	1	0
+p	1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41	7a95af67cfff431fb90173b5755def7f20873a5bc0ac7e32ae9a4d68a73e9816	3	0
+p	1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41	e637fb2861aa5fbc4daa782cef3b949b41354a283d599cab22b8ee2a688f28ea	2	0
+p	e61055133f702cfe36d41ec9734aa7f5e3c4e2525defeb81acad17e21177f670	e637fb2861aa5fbc4daa782cef3b949b41354a283d599cab22b8ee2a688f28ea	1	0
+p	f4b914884e1639e465a4a163eb74be28332702f853c767c8bb3f608313bac196	e637fb2861aa5fbc4daa782cef3b949b41354a283d599cab22b8ee2a688f28ea	1	0
+[exit 0]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy-summary.sh --executions --log /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/local/home/state/heavy-jobs.jsonl
+project	command_sha256	source_sha256	executions	unknown
+p	1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41	6ae02da2508b8efa1c53466da6007c1c454257e4a50e98faad0ecfe534249fef	1	0
+p	1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41	7a95af67cfff431fb90173b5755def7f20873a5bc0ac7e32ae9a4d68a73e9816	3	0
+p	1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41	e637fb2861aa5fbc4daa782cef3b949b41354a283d599cab22b8ee2a688f28ea	2	0
+p	e61055133f702cfe36d41ec9734aa7f5e3c4e2525defeb81acad17e21177f670	e637fb2861aa5fbc4daa782cef3b949b41354a283d599cab22b8ee2a688f28ea	1	0
+p	f4b914884e1639e465a4a163eb74be28332702f853c767c8bb3f608313bac196	e637fb2861aa5fbc4daa782cef3b949b41354a283d599cab22b8ee2a688f28ea	1	0
+[exit 0]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy-summary.sh --executions --log /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/local/home/state/heavy-jobs.jsonl --until 1795109822
+project	command_sha256	source_sha256	executions	unknown
+[exit 0]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy-summary.sh --log /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/local/home/state/heavy-jobs.jsonl
+project  class  jobs  failed  wait_avg_s  wait_max_s  run_avg_s  run_max_s  wait_pct  peak_mib  unknown_peak  host   prepare_avg_s  collect_avg_s
+p        build  10    8       0           0           0          0          unknown   5         0             local  unknown        unknown
+unknown         1     0       unknown     unknown     unknown    unknown    unknown   unknown   1             local  unknown        unknown
+[exit 0]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy-summary.sh --until later --log /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/local/home/state/heavy-jobs.jsonl
+fm-heavy-summary.sh: --until needs epoch seconds
+[exit 2]
+PASS: Local command identity, failure timing, source snapshots, reattachments and bounded deduplicated report
+
+SCENARIO: Cancellation while queued starts no command and contributes no execution or unknown
+$ git init -q /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/queued/repo
+[exit 0]
+$ git add -A
+[exit 0]
+$ git commit -qm initial
+[exit 0]
+$ fm-heavy.sh --class test --project p --remote -- bash t/job.sh
+[exit 143]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy-summary.sh --executions --log /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/queued/home/state/heavy-jobs.jsonl
+project	command_sha256	source_sha256	executions	unknown
+[exit 0]
+PASS: Cancellation while queued starts no command and contributes no execution or unknown
+$ ssh fm-telemetry-lab 'printf "SSH live: "; pwd'
+[exit 255]
+Traceback (most recent call last):
+  File "/home/work/.no-mistakes/evidence/01M7TCTVHGPH3CVZZQN48YVMH0/live-telemetry.py", line 429, in <module>
+    host, ssh_env = setup_ssh()
+                    ~~~~~~~~~^^
+  File "/home/work/.no-mistakes/evidence/01M7TCTVHGPH3CVZZQN48YVMH0/live-telemetry.py", line 226, in setup_ssh
+    run(['ssh', 'fm-telemetry-lab', 'printf "SSH live: "; pwd'], env=env)
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/work/.no-mistakes/evidence/01M7TCTVHGPH3CVZZQN48YVMH0/live-telemetry.py", line 47, in run
+    assert p.returncode == expected, p.stdout
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError
+
+$ ssh fm-telemetry-lab 'printf "SSH live: "; pwd'
+SSH live: /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/ssh-host
+[exit 0]
+
+SCENARIO: Real SSH command failure records verified remote identity and command-only timing
+$ git init -q /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/remote-normal/repo
+[exit 0]
+$ git add -A
+[exit 0]
+$ git commit -qm initial
+[exit 0]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy.sh --class test --project p --remote -- bash t/job.sh
+real remote command
+[exit 9]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy-summary.sh --executions --log /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/remote-normal/home/state/heavy-jobs.jsonl
+project	command_sha256	source_sha256	executions	unknown
+p	1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41	6345922c88c877ce7c301c44c83c2ca12a7d8a31485a82010c265cc3eafa7a76	1	0
+[exit 0]
+PASS: Real SSH command failure records verified remote identity and command-only timing
+
+SCENARIO: TCP outage remains unknown until reconciliation; two verified executions count twice
+$ git init -q /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/reconciled/repo
+[exit 0]
+$ git add -A
+[exit 0]
+$ git commit -qm initial
+[exit 0]
+Injected TCP outage: existing SSH connections closed; new connections refused.
+$ fm-heavy.sh --class test --project p --remote -- bash t/job.sh
+[exit 75]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy-summary.sh --executions --log /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/reconciled/home/state/heavy-jobs.jsonl
+project	command_sha256	source_sha256	executions	unknown
+p	1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41	bf935fbf78ed86e1eed8ededa22e54a32635ad733fd3dc830424b3014f21e4f9	0	1
+[exit 0]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy-summary.sh --executions --log /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/reconciled/home/state/heavy-jobs.jsonl
+project	command_sha256	source_sha256	executions	unknown
+p	1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41	bf935fbf78ed86e1eed8ededa22e54a32635ad733fd3dc830424b3014f21e4f9	0	1
+[exit 0]
+Restored TCP connectivity; next real invocation must reconcile and then execute.
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy.sh --class test --project p --remote -- bash t/job.sh
+fm-heavy-remote: earlier job 1795109852-696430-3649 on fm-telemetry-lab ended pass (kept in /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/reconciled/home/state/heavy-remote/1795109852-696430-3649)
+remote-finished
+[exit 0]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy-summary.sh --executions --log /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/reconciled/home/state/heavy-jobs.jsonl
+project	command_sha256	source_sha256	executions	unknown
+p	1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41	bf935fbf78ed86e1eed8ededa22e54a32635ad733fd3dc830424b3014f21e4f9	2	0
+[exit 0]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy-summary.sh --executions --log /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/reconciled/home/state/heavy-jobs.jsonl --since 1795109854 --until 1795109855
+project	command_sha256	source_sha256	executions	unknown
+p	1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41	bf935fbf78ed86e1eed8ededa22e54a32635ad733fd3dc830424b3014f21e4f9	1	0
+[exit 0]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy-summary.sh --executions --log /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/reconciled/home/state/heavy-jobs.jsonl --until 1795109854
+project	command_sha256	source_sha256	executions	unknown
+[exit 0]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy-summary.sh --executions --log /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/reconciled/home/state/heavy-jobs.jsonl
+project	command_sha256	source_sha256	executions	unknown
+p	1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41	bf935fbf78ed86e1eed8ededa22e54a32635ad733fd3dc830424b3014f21e4f9	2	0
+[exit 0]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy.sh --class test --project p --remote --reattach -- bash t/job.sh
+remote-finished
+[exit 0]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy-summary.sh --executions --log /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/reconciled/home/state/heavy-jobs.jsonl
+project	command_sha256	source_sha256	executions	unknown
+p	1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41	bf935fbf78ed86e1eed8ededa22e54a32635ad733fd3dc830424b3014f21e4f9	2	0
+[exit 0]
+PASS: TCP outage remains unknown until reconciliation; two verified executions count twice
+
+SCENARIO: Host cancellation during real npm preparation is immediately not-started
+$ git init -q /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/cancel-direct/repo
+[exit 0]
+$ git add -A
+[exit 0]
+$ git commit -qm initial
+[exit 0]
+$ npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+up to date in 149ms
+[exit 0]
+$ git add -A
+[exit 0]
+$ git commit -qm 'dependency preparation'
+[exit 0]
+$ ssh fm-telemetry-lab 'python3 .fm-heavy-remote/1795109862-700083-16797/runner.py cancel .fm-heavy-remote/1795109862-700083-16797'
+done
+[exit 0]
+$ fm-heavy.sh --class test --project p --remote -- bash t/job.sh
+
+> cancel-direct@1.0.0 postinstall
+> echo installing > "$HOME/cancel-direct-install"; while [ ! -e "$HOME/cancel-direct-release" ]; do sleep .1; done
+
+[exit 143]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy-summary.sh --executions --log /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/cancel-direct/home/state/heavy-jobs.jsonl
+project	command_sha256	source_sha256	executions	unknown
+[exit 0]
+PASS: Host cancellation during real npm preparation is immediately not-started
+
+SCENARIO: Reconciled host cancellation during real npm preparation removes unknown without counting an execution
+$ git init -q /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/cancel-reconciled/repo
+[exit 0]
+$ git add -A
+[exit 0]
+$ git commit -qm initial
+[exit 0]
+$ npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+up to date in 169ms
+[exit 0]
+$ git add -A
+[exit 0]
+$ git commit -qm 'dependency preparation'
+[exit 0]
+$ fm-heavy.sh --class test --project p --remote -- bash t/job.sh
+[exit 75]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy-summary.sh --executions --log /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/cancel-reconciled/home/state/heavy-jobs.jsonl
+project	command_sha256	source_sha256	executions	unknown
+p	1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41	0c07b949dd6b728b7d5a9c9dc0daf8398d959b3720cc7b1f843e7b37787c7e60	0	1
+[exit 0]
+$ ssh fm-telemetry-lab 'python3 .fm-heavy-remote/1795109866-702041-20267/runner.py cancel .fm-heavy-remote/1795109866-702041-20267'
+done
+[exit 0]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy-summary.sh --executions --log /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/cancel-reconciled/home/state/heavy-jobs.jsonl
+project	command_sha256	source_sha256	executions	unknown
+p	1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41	0c07b949dd6b728b7d5a9c9dc0daf8398d959b3720cc7b1f843e7b37787c7e60	0	1
+[exit 0]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy.sh --class test --project p --remote -- bash t/job.sh
+fm-heavy-remote: earlier job 1795109866-702041-20267 on fm-telemetry-lab ended cancelled (kept in /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/cancel-reconciled/home/state/heavy-remote/1795109866-702041-20267)
+
+> cancel-reconciled@1.0.0 postinstall
+> echo installing > "$HOME/cancel-reconciled-install"; while [ ! -e "$HOME/cancel-reconciled-release" ]; do sleep .1; done
+
+
+up to date, audited 1 package in 141ms
+
+found 0 vulnerabilities
+[exit 0]
+$ /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/bin/fm-heavy-summary.sh --executions --log /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TCTVHGPH3CVZZQN48YVMH0/.no-mistakes/test-phase/cancel-reconciled/home/state/heavy-jobs.jsonl
+project	command_sha256	source_sha256	executions	unknown
+p	1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41	0c07b949dd6b728b7d5a9c9dc0daf8398d959b3720cc7b1f843e7b37787c7e60	1	0
+[exit 0]
+PASS: Reconciled host cancellation during real npm preparation removes unknown without counting an execution

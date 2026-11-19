@@ -1,0 +1,65 @@
+[
+  {
+    "name": "Local repeated failing commands preserve argv identity, distinct execution IDs and measured exit timing",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-telemetry.log; local-ledger.jsonl",
+    "reason": ""
+  },
+  {
+    "name": "Dirty tracked and untracked content changes source identity without changing the Git index; committing identical content preserves identity",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-telemetry.log; local-ledger.jsonl",
+    "reason": ""
+  },
+  {
+    "name": "Reattachments, duplicate observations and legacy rows do not inflate execution counts; time bounds and invalid inputs behave correctly",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-telemetry.log; local-ledger.jsonl",
+    "reason": ""
+  },
+  {
+    "name": "Queued cancellation starts no command and reports no execution or unknown",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-telemetry.log; queued-ledger.jsonl",
+    "reason": ""
+  },
+  {
+    "name": "Real SSH command failure records verified remote identity and command-only timing",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-telemetry.log",
+    "reason": ""
+  },
+  {
+    "name": "TCP outage remains unknown until reconciliation; two verified executions count twice",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-telemetry.log",
+    "reason": ""
+  },
+  {
+    "name": "Host cancellation during real npm preparation is immediately not-started",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-telemetry.log",
+    "reason": ""
+  },
+  {
+    "name": "Reconciled host cancellation during real npm preparation removes unknown without counting an execution",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-telemetry.log",
+    "reason": ""
+  },
+  {
+    "name": "A real no-mistakes help invocation is classified as pipeline-drive and excluded from execution counts",
+    "result": "pass",
+    "live": true,
+    "evidence": "driver-and-regression.log; local-ledger.jsonl",
+    "reason": ""
+  }
+]

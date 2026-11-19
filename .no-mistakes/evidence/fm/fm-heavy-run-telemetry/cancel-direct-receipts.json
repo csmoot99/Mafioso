@@ -1,0 +1,26 @@
+{
+  "1795109862-700083-16797/result.json": {
+    "schema": "fm-heavy-remote.v1",
+    "id": "1795109862-700083-16797",
+    "sha": "98d705e01e7da1d566071c1f1a49f2cb8dc2fecf",
+    "tree": "b08553b587888e27bcc190baa549e99678b3f491",
+    "command_sha256": "1b6738e1ca44ba4d1e0f15f1319d13f6ee2d929250d68977a2c2bb5d33fd4e41",
+    "bundle_sha256": "b61821894522a13309d6b0894df34f80cd781aecdf2d1959cfdf898662342616",
+    "outcome": "cancelled",
+    "preparation_step": "dependencies",
+    "exit_code": 143,
+    "started_at": 1795109863,
+    "ended_at": 1795109864,
+    "command_started_at": null,
+    "command_ended_at": null,
+    "run_s": 1.286,
+    "cpu_usec": 799755,
+    "host": "DESKTOP-NKCLCNH",
+    "artifacts": {
+      "run.log": {
+        "bytes": 151,
+        "sha256": "565d8d2341a2c7577a3b3855d6bbb58c6cfe811e6836646c78fceedc24a03b41"
+      }
+    }
+  }
+}
