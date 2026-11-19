@@ -935,16 +935,20 @@ test_abandoned_claim_reclaim_reaps_dead_steal_without_nesting() {
   FM_STATE_OVERRIDE="$dir/state" bash -c '
     . "$1"
     fm_lock_try_create "$2" || exit 7
+    : > "$3"
     exec sleep 30
-  ' _ "$dir/bin/fm-wake-lib.sh" "$dir/state/.claude-autoarm.lock.steal" >/dev/null 2>&1 &
+  ' _ "$dir/bin/fm-wake-lib.sh" "$dir/state/.claude-autoarm.lock.steal" "$dir/steal-ready" >/dev/null 2>&1 &
   holder=$!
+  # The pid is rewritten during acquisition; wait until the helper has finished
+  # claiming before killing it, so this fixture leaves a fully acquired mutex.
   i=0
-  while [ "$i" -lt 50 ] && [ ! -s "$dir/state/.claude-autoarm.lock.steal/pid" ]; do
+  while [ "$i" -lt 50 ] && [ ! -e "$dir/steal-ready" ]; do
     sleep 0.02
     i=$((i + 1))
   done
   kill -KILL "$holder" 2>/dev/null || true
   wait "$holder" 2>/dev/null || true
+  assert_present "$dir/steal-ready" "fixture did not finish acquiring the steal mutex"
   assert_present "$dir/state/.claude-autoarm.lock.steal" "fixture did not leave a dead-owner steal mutex"
   lnbin="$dir/lnbin"
   lnlog="$dir/ln.log"
