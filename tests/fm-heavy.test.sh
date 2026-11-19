@@ -404,7 +404,7 @@ test_execution_identity() {
   log=$home/state/heavy-jobs.jsonl
   for i in 1 2; do
     ( cd "$repo" && PATH="$fakebin:$PATH" heavy "$home" "$TMP_ROOT/identity.lock" --class build --project p --phase focused -- bash -c 'exit 7' )
-    expect_code 7 "$?" "failing execution"
+    expect_code 7 "$?" "failing execution $i"
   done
   ( cd "$repo" && PATH="$fakebin:$PATH" heavy "$home" "$TMP_ROOT/identity.lock" --class build --project p --reattach -- bash -c 'exit 7' )
   expect_code 7 "$?" "reattachment status"
