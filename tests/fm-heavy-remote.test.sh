@@ -138,6 +138,12 @@ test_pass_and_record() {
     and (.wait_s | type) == \"number\" and (.run_s | type) == \"number\"
     and .started_at >= .requested_at and .ended_at >= .started_at
     and .peak_memory_bytes == null and (.cpu_usec | type) == \"number\"" "remote record"
+  expect_record '.command_sha256 != null and .source_sha256 != null and .source_tree != null
+    and .source_head == .candidate and .source_dirty == false and .entry_kind == "execution"
+    and .execution_id == .job and .command_timing == "remote-result"
+    and .command_started_at != null and .command_ended_at >= .command_started_at
+    and .command_started_at >= .started_at and .command_ended_at <= .ended_at
+    and .command_exit == 0' "remote execution identity and verified command timing"
   expect_host_clean "scratch must be removed after a collected result"
   [ -z "$(ls -A "$HOME_FM/state/heavy-remote/unknown-fake-mac")" ] || fail "a finished job must leave no open record"
   assert_present "$HOME_FM/state/heavy-remote/$(last_record | jq -r .job)/result.json" "the result copy is kept locally"
@@ -409,7 +415,8 @@ test_connection_lost_is_reconciled() {
   setup reconcile 'echo run >> "$HOME/runs"; sleep 1'
   rule wait drop 'runner.py wait' 1
   heavy --remote >/dev/null 2>&1 || fail "a job found again after a dropped wait must still pass"
-  expect_record '.outcome == "pass"' "reconciled record"
+  expect_record '.outcome == "pass" and .entry_kind == "execution" and .execution_id == .job' "reconciled record"
+  [ "$("$SUMMARY" --executions --log "$LOG" | awk 'NR == 2 {print $4}')" = 1 ] || fail "reconnect must count one execution"
   [ "$(wc -l < "$REMOTE_HOME/runs")" -eq 1 ] || fail "a reconnect must never run the job a second time"
 
   # The start succeeds on the host but its answer is lost: the running job is adopted.
@@ -433,6 +440,8 @@ test_unreachable_job_is_unknown() {
   rule gone drop 'runner.py (wait|status)' -1
   heavy --remote >"$CASE/out" 2>&1; expect_code 75 "$?" "a job that cannot be reached again"
   expect_record '.outcome == "unknown" and .exit == 75 and .host == "fake-mac" and (.job | type) == "string"
+    and .entry_kind == "unknown" and .command_timing == "unavailable"
+    and .command_started_at == null and .command_ended_at == null and .command_exit == null
     and .ended_at == null and .run_s == null' "unknown record: completion was never seen"
   assert_present "$REMOTE_HOME/.fm-heavy-remote/$(last_record | jq -r .job)" "an unknown job's scratch is kept for reconciliation"
   assert_present "$HOME_FM/state/heavy-remote/unknown-fake-mac/$(last_record | jq -r .job).json" "an unknown job's record stays open"
@@ -505,6 +514,38 @@ wait_for() {  # <file>
   until [ -e "$1" ]; do n=$((n + 1)); [ "$n" -le 100 ] || fail "never appeared: $1"; sleep 0.1; done
 }
 
+test_summary_reconciled_executions() {
+  local out first duplicate started
+  unknown_job summary-reconciled 'echo run >> "$HOME/runs"; until [ -e "$HOME/release" ]; do sleep 0.1; done' 'runner.py (wait|status)'
+  first=$(last_record)
+  out=$("$SUMMARY" --executions --log "$LOG") || fail "unknown execution summary"
+  printf '%s\n' "$out" | awk 'NR == 2 {ok = ($4 == 0 && $5 == 1)} END {exit !ok}' \
+    || fail "unresolved job must be reported separately: $out"
+  : > "$REMOTE_HOME/release"
+  wait_for "$REMOTE_HOME/.fm-heavy-remote/$JOB/result.json"
+  out=$("$SUMMARY" --executions --log "$LOG") || fail "unverified result summary"
+  printf '%s\n' "$out" | awk 'NR == 2 {ok = ($4 == 0 && $5 == 1)} END {exit !ok}' \
+    || fail "a result without reconciliation must remain unknown: $out"
+  heavy --remote >/dev/null 2>&1 || fail "later request must reconcile and execute"
+  [ "$(wc -l < "$REMOTE_HOME/runs")" -eq 2 ] || fail "two actual commands must have run"
+  [ "$(head -1 "$LOG")" = "$first" ] || fail "reconciliation must preserve the original ledger row"
+  jq -e '.outcome == "pass"' "$JOB_DIR/reconciled.json" >/dev/null || fail "original result must be verified"
+  duplicate=$(last_record)
+  printf '%s\n%s\n' "$first" "$duplicate" >> "$LOG"
+  printf '%s\n' "$duplicate" | jq '.entry_kind = "reattachment" | .execution_id = "attachment"' >> "$LOG"
+  out=$("$SUMMARY" --executions --log "$LOG") || fail "reconciled execution summary"
+  printf '%s\n' "$out" | awk 'NR == 2 {ok = ($4 == 2 && $5 == 0)} END {exit !(ok && NR == 2)}' \
+    || fail "two actual executions must count twice, excluding duplicate observations and reattachments: $out"
+  started=$(jq -r .command_started_at "$JOB_DIR/result.json")
+  out=$("$SUMMARY" --executions --since "$started" --until "$((started + 1))" --log "$LOG") || fail "bounded reconciliation summary"
+  printf '%s\n' "$out" | awk 'NR == 2 {ok = ($4 >= 1 && $5 == 0)} END {exit !ok}' \
+    || fail "reconciled execution must use verified start time: $out"
+  out=$("$SUMMARY" --executions --until "$started" --log "$LOG") || fail "excluded reconciliation summary"
+  [ "$(printf '%s\n' "$out" | wc -l)" -eq 1 ] || fail "exclusive bound must exclude verified executions: $out"
+  expect_host_clean "reconciled execution summary scratch"
+  pass "fm-heavy-summary: verified reconciliations count once and unresolved jobs stay visible"
+}
+
 test_unknown_job_blocks_until_reconciled() {
   local first_sha second_sha
   unknown_job longjob 'echo $$ > "$HOME/job.pid"; until [ -e "$HOME/release" ]; do sleep 0.1; done' 'runner.py (wait|status)'
@@ -566,6 +607,8 @@ test_unknown_job_other_endings() {
   heavy --remote >/dev/null 2>&1 || fail "a rejected old result does not stop the new job"
   expect_record '.host == "fake-mac" and .outcome == "pass"' "the job after a rejected old result"
   jq -e '.outcome == "rejected"' "$JOB_DIR/reconciled.json" >/dev/null || fail "a bad result closes as rejected: $(cat "$JOB_DIR/reconciled.json")"
+  "$SUMMARY" --executions --log "$LOG" | awk 'NR > 1 {runs += $4; unknown += $5} END {exit !(runs == 1 && unknown == 1)}' \
+    || fail "a rejected result must remain unknown in execution counts"
   assert_absent "$OPEN" "a rejected result closes the record"
   expect_host_clean "scratch after a rejected old result"
 
@@ -575,6 +618,8 @@ test_unknown_job_other_endings() {
   heavy --remote >/dev/null 2>&1 || fail "the request after a job that never arrived"
   expect_record '.host == "fake-mac" and .outcome == "pass"' "the job after one that never arrived"
   jq -e '.outcome == "absent"' "$JOB_DIR/reconciled.json" >/dev/null || fail "a job that never arrived closes as absent: $(cat "$JOB_DIR/reconciled.json")"
+  "$SUMMARY" --executions --log "$LOG" | awk 'NR > 1 {runs += $4; unknown += $5} END {exit !(runs == 1 && unknown == 0)}' \
+    || fail "a job confirmed absent must count as neither execution nor unknown"
   assert_absent "$OPEN" "a job that never arrived closes its record"
 
   # The supervisor died and the job's group lives on, so nothing would ever stop it.
@@ -1265,6 +1310,62 @@ SH
   git -C "$REPO" add -A; git -C "$REPO" commit -q -m dependencies
 }
 
+test_precommand_cancellation_classification() {
+  local mode pid job jdir out duplicate first
+  for mode in direct reconciled; do
+    setup "precommand-cancel-$mode" 'echo ran >> "$HOME/ran"'
+    make_node_project
+    if [ "$mode" = reconciled ]; then rule gone drop 'runner.py (wait|status)' -1; fi
+    FAKE_INSTALL_HANG=1 heavy --remote >"$CASE/out" 2>&1 &
+    pid=$!
+    wait_for "$REMOTE_HOME/install.log"
+    job=$(basename "$HOME_FM/state/heavy-remote/unknown-fake-mac/"*.json .json)
+    jdir=$HOME_FM/state/heavy-remote/$job
+    if [ "$mode" = reconciled ]; then
+      wait "$pid"
+      expect_code 75 "$?" "unreachable preparation cancellation"
+      expect_record '.entry_kind == "unknown" and .outcome == "unknown"' "unverified preparation record"
+      first=$(last_record)
+      out=$("$SUMMARY" --executions --log "$LOG") || fail "unresolved preparation summary"
+      printf '%s\n' "$out" | awk 'NR == 2 {ok = ($4 == 0 && $5 == 1)} END {exit !ok}' \
+        || fail "unverified preparation must remain unknown: $out"
+      rm "$CTL/rules/gone"
+    fi
+    HOME="$REMOTE_HOME" python3 "$RUNNER" cancel "$REMOTE_HOME/.fm-heavy-remote/$job" >/dev/null \
+      || fail "cancel dependency preparation"
+    if [ "$mode" = direct ]; then
+      wait "$pid"
+      expect_code 143 "$?" "verified preparation cancellation"
+      expect_record '.outcome == "cancelled" and .entry_kind == "not-started"
+        and .command_started_at == null and .command_exit == null and .fallback == null' "verified pre-command cancellation record"
+    else
+      [ ! -e "$REMOTE_HOME/ran" ] || fail "cancelled preparation must never launch the command"
+      heavy --remote >"$CASE/next-out" 2>&1 || fail "reconcile cancellation and run next command"
+      jq -e '.outcome == "cancelled"' "$jdir/reconciled.json" >/dev/null || fail "cancelled result must be reconciled"
+      [ "$(head -1 "$LOG")" = "$first" ] || fail "reconciliation must preserve the original ledger row"
+      [ "$(wc -l < "$REMOTE_HOME/ran")" -eq 1 ] || fail "only the subsequent command may run"
+      duplicate=$(last_record)
+      printf '%s\n' "$duplicate" >> "$LOG"
+      printf '%s\n' "$duplicate" | jq -c '.entry_kind = "reattachment" | .execution_id = "attachment"' >> "$LOG"
+    fi
+    jq -e '.outcome == "cancelled" and .preparation_step == "dependencies" and .command_started_at == null' \
+      "$jdir/result.json" >/dev/null || fail "cancellation must occur during dependency preparation"
+    [ ! -e "$CTL/local-runs" ] || fail "pre-command cancellation must not fall back locally"
+    out=$("$SUMMARY" --executions --log "$LOG") || fail "verified preparation cancellation summary"
+    if [ "$mode" = direct ]; then
+      [ ! -e "$REMOTE_HOME/ran" ] || fail "cancelled preparation must not run the command"
+      [ "$(printf '%s\n' "$out" | wc -l)" -eq 1 ] || fail "not-started jobs must be excluded: $out"
+    else
+      printf '%s\n' "$out" | awk 'NR == 2 {ok = ($4 == 1 && $5 == 0)} END {exit !(ok && NR == 2)}' \
+        || fail "reconciled pre-command cancellation must not count as execution or unknown: $out"
+    fi
+    assert_absent "$REMOTE_HOME/.fm-heavy-remote/$job" "pre-command cancellation scratch"
+    assert_absent "$REMOTE_HOME/.fm-heavy-remote/$(last_record | jq -r .job)" "subsequent command scratch"
+    [ -z "$(ls -A "$HOME_FM/state/heavy-remote/unknown-fake-mac")" ] || fail "verified cancellation must close the open record"
+  done
+  pass "fm-heavy: verified pre-command cancellations are not-started directly and after reconciliation"
+}
+
 test_dependency_cache_and_failures() {
   local out
   setup dependencies 'test -f node_modules/proof && echo tested >> "$HOME/tested"'
@@ -1818,6 +1919,7 @@ test_connection_lost_is_reconciled
 test_unreachable_job_is_unknown
 test_bad_results_are_rejected
 test_duplicate_delivery
+test_summary_reconciled_executions
 test_unknown_job_blocks_until_reconciled
 test_unknown_job_other_endings
 test_live_client_with_orphaned_group_blocks_admission
@@ -1842,6 +1944,7 @@ test_scoped_offload
 test_bad_config_refuses_only_offload
 test_queued_job_moves_to_the_freed_host
 test_queued_job_signal_runs_nowhere
+test_precommand_cancellation_classification
 test_dependency_cache_and_failures
 test_each_project_runs_on_its_pinned_runtimes
 test_project_without_dependencies_needs_no_lockfile

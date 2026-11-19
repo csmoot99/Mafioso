@@ -56,7 +56,9 @@ supervise Runs the command in its own process group with cwd the checkout, outpu
           tree read back from the checkout, command_sha256, bundle_sha256,
           outcome (exited, prepare-failed, timeout or cancelled), preparation_step, exit_code (128+n for a signal),
           started_at, ended_at, run_s, cpu_usec, host, and artifacts (bytes and
-          sha256 of run.log).
+          sha256 of run.log). Additive command_started_at and command_ended_at
+          exclude preparation: the command handoff time and the time its exit is
+          observed, before descendant cleanup; null if command was never reached.
           preparation_step is container-start, services, runtime, dependencies,
           browsers or command. A nonzero exit or timeout before command is
           prepare-failed; cancellation remains cancelled at every step.
@@ -531,7 +533,7 @@ def module_dirs(work):
 
 
 def preparation_step(jdir, step):
-    write_json(os.path.join(jdir, "preparation.json"), {"step": step})
+    write_json(os.path.join(jdir, "preparation.json"), {"step": step, "at": int(time.time())})
 
 
 def prepare_dependencies(work, manifest):
@@ -690,6 +692,7 @@ def cmd_supervise(jdir, slot, ready):
     os.close(ready)
     if proc is None:
         write_json(os.path.join(jdir, "owner.json"), owner)
+    command_ended_at = None
     if proc:
         while proc.poll() is None:
             if stops:
@@ -702,13 +705,15 @@ def cmd_supervise(jdir, slot, ready):
             kill_group(owner, proc)
             remove_container(manifest)
         code = proc.wait()
+        command_ended_at = int(time.time())
         code = 128 - code if code < 0 else code
         kill_group(owner)  # anything the command left running
         remove_container(manifest)
         if stops and outcome == "exited":
             outcome = "cancelled"
     log.close()
-    step = (read_json(os.path.join(jdir, "preparation.json")) or {}).get("step", "container-start")
+    preparation = read_json(os.path.join(jdir, "preparation.json")) or {}
+    step = preparation.get("step", "container-start")
     if outcome in ("exited", "timeout") and code != 0 and step != "command":
         outcome = "prepare-failed"
     usage = resource.getrusage(resource.RUSAGE_CHILDREN)
@@ -719,6 +724,8 @@ def cmd_supervise(jdir, slot, ready):
         "tree": git("-C", work, "rev-parse", "HEAD^{tree}").stdout.strip(),
         "command_sha256": manifest["command_sha256"], "bundle_sha256": manifest["bundle_sha256"],
         "outcome": outcome, "preparation_step": step, "exit_code": code, "started_at": started_at, "ended_at": int(time.time()),
+        "command_started_at": preparation.get("at") if step == "command" else None,
+        "command_ended_at": command_ended_at if step == "command" else None,
         "run_s": round(time.monotonic() - began, 3), "cpu_usec": int((usage.ru_utime + usage.ru_stime) * 1e6),
         "host": socket.gethostname(),
         "artifacts": {"run.log": {"bytes": os.path.getsize(artifact), "sha256": sha256_file(artifact)}}})
