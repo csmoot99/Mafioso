@@ -391,6 +391,69 @@ test_brief_rule_is_machine_wide() {
   pass "fm-brief: config/heavy-commands is read from the root home"
 }
 
+test_execution_identity() {
+  local home fakebin repo log out i first
+  home=$(make_home identity)
+  fakebin=$(make_unscoped_systemd_run "$TMP_ROOT/identity-bin")
+  repo=$TMP_ROOT/identity-repo
+  mkdir -p "$repo"
+  git -C "$repo" init -q
+  printf 'one\n' > "$repo/input"
+  git -C "$repo" add input
+  git -C "$repo" -c user.name="Firstmate Tests" -c user.email=tests@example.invalid commit -qm initial
+  log=$home/state/heavy-jobs.jsonl
+  for i in 1 2; do
+    ( cd "$repo" && PATH="$fakebin:$PATH" heavy "$home" "$TMP_ROOT/identity.lock" --class build --project p --phase focused -- bash -c 'exit 7' )
+    expect_code 7 "$?" "failing execution"
+  done
+  ( cd "$repo" && PATH="$fakebin:$PATH" heavy "$home" "$TMP_ROOT/identity.lock" --class build --project p --reattach -- bash -c 'exit 7' )
+  expect_code 7 "$?" "reattachment status"
+  # Argument boundaries and empty arguments must participate in the hash.
+  ( cd "$repo" && PATH="$fakebin:$PATH" heavy "$home" "$TMP_ROOT/identity.lock" --class build --project p -- true 'a b' '' )
+  ( cd "$repo" && PATH="$fakebin:$PATH" heavy "$home" "$TMP_ROOT/identity.lock" --class build --project p -- true a b )
+  printf 'two\n' > "$repo/input"
+  ( cd "$repo" && PATH="$fakebin:$PATH" heavy "$home" "$TMP_ROOT/identity.lock" --class build --project p -- bash -c 'exit 7' )
+  expect_code 7 "$?" "dirty execution status"
+  printf 'new\n' > "$repo/untracked"
+  ( cd "$repo" && PATH="$fakebin:$PATH" heavy "$home" "$TMP_ROOT/identity.lock" --class build --project p -- bash -c 'exit 7' )
+  expect_code 7 "$?" "untracked execution status"
+  jq -se '
+    .[0].command_sha256 == .[1].command_sha256 and .[0].source_sha256 == .[1].source_sha256
+    and .[0].source_tree == .[1].source_tree and .[0].source_dirty == false
+    and .[0].source_head != null and .[0].phase == "focused"
+    and .[0].command_exit == 7 and .[0].command_ended_at >= .[0].command_started_at
+    and .[0].entry_kind == "execution" and .[2].entry_kind == "reattachment"
+    and .[3].command_sha256 != .[4].command_sha256
+    and .[0].source_sha256 != .[5].source_sha256 and .[5].source_dirty == true
+    and .[5].source_sha256 != .[6].source_sha256
+    and .[0].execution_id != .[1].execution_id' "$log" >/dev/null || fail "identity fields: $(cat "$log")"
+  [ -z "$(git -C "$repo" diff --cached --name-only)" ] || fail "telemetry changed real index"
+  git -C "$repo" add -A
+  git -C "$repo" -c user.name="Firstmate Tests" -c user.email=tests@example.invalid commit -qm changed
+  ( cd "$repo" && PATH="$fakebin:$PATH" heavy "$home" "$TMP_ROOT/identity.lock" --class build --project p -- bash -c 'exit 7' )
+  expect_code 7 "$?" "committed execution status"
+  jq -se '.[7].source_dirty == false and .[7].source_head != .[0].source_head
+    and .[7].source_sha256 == .[6].source_sha256 and .[7].source_tree == .[6].source_tree' "$log" >/dev/null \
+    || fail "committed and dirty views of identical content must share source identity"
+  printf '#!/bin/sh\nexit 0\n' > "$fakebin/no-mistakes"
+  chmod +x "$fakebin/no-mistakes"
+  ( cd "$repo" && PATH="$fakebin:$PATH" heavy "$home" "$TMP_ROOT/identity.lock" --class test --project p -- no-mistakes axi run )
+  jq -se '.[8].entry_kind == "pipeline-drive"' "$log" >/dev/null || fail "pipeline drive counted as execution"
+
+  # Duplicate observations and old records must not inflate execution counts.
+  first=$(head -1 "$log")
+  printf '%s\n' "$first" >> "$log"
+  printf '{"requested_at":0}\n' >> "$log"
+  out=$("$SUMMARY" --executions --log "$log") || fail "execution summary"
+  printf '%s\n' "$out" | awk 'NR > 1 {n += $4} END {exit n != 7}' || fail "execution count: $out"
+  out=$("$SUMMARY" --executions --since 0 --until 1 --log "$log")
+  [ "$(printf '%s\n' "$out" | wc -l)" -eq 1 ] || fail "period must exclude all executions: $out"
+  "$SUMMARY" --until later --log "$log" >/dev/null 2>&1
+  expect_code 2 "$?" "bad --until"
+  pass "fm-heavy: full argv and tree identity, reattachment exclusion, failure timing and bounded execution counts"
+}
+
+test_execution_identity
 test_record_and_exit_status
 test_command_runs_as_by_hand
 test_killed_while_running

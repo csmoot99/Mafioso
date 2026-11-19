@@ -27,6 +27,8 @@
 #   4. removes the host's scratch and anything the job still owns.
 # A job counts as passed only when every check holds and the command exited 0. The
 # job's stages are written to the --sample file for bin/fm-heavy.sh's record.
+# Verified result times and status use command_started_at, command_ended_at and
+# command_exit; these are absent until a result passes verification.
 #
 # The host's own heavy jobs (bin/fm-heavy.sh there) and the jobs sent here share its
 # capacity: a job is sent only while a host slot is free and no local job there is
@@ -290,9 +292,12 @@ reconcile_locked_job() {
 top=$(git rev-parse --show-toplevel 2>/dev/null) || fallback not-a-git-repository
 [ "$(pwd -P)" = "$(cd "$top" && pwd -P)" ] || fallback not-repository-root
 sha=$(git rev-parse HEAD) || fallback not-a-git-repository
+emit source_head "$sha"
 bundle_revs=(HEAD)
 status=$(GIT_OPTIONAL_LOCKS=0 git status --porcelain --untracked-files=all 2>/dev/null) || fallback snapshot-failed
+emit source_dirty false
 if [ -n "$status" ]; then
+  emit source_dirty true
   # Copy the real index so staged additions (including tracked ignored files)
   # have exactly the same meaning as git add -A, but never refresh that index.
   index=$(git rev-parse --git-path index) || fallback snapshot-failed
@@ -318,6 +323,7 @@ done
 "${SSH[@]}" "$host" "python3 - busy $host_slots" < "$SELF_DIR/fm-heavy-remote-runner.py" >/dev/null 2>>"$stage/ssh.err"
 case $? in 0) ;; 12) fallback destination-busy ;; *) fallback unreachable ;; esac
 
+emit source_tree "$(git rev-parse "$sha^{tree}")"
 emit candidate "$sha"
 prepare_began=$(date +%s)
 emit wait_until "$prepare_began"
@@ -434,6 +440,11 @@ if [ "$state" = lost ] || [ "$state" = absent ]; then
 fi
 [ -n "$collected" ] || reject "result or log missing or incomplete"
 why=$(result_problem) || reject "${why:-the checks did not finish}"
+if jq -e '(.command_started_at | type) == "number"' "$jdir/result.json" >/dev/null; then
+  emit command_started_at "$(jq -r '.command_started_at // empty' "$jdir/result.json")"
+  emit command_ended_at "$(jq -r '.command_ended_at // empty' "$jdir/result.json")"
+  emit command_exit "$(jq -r .exit_code "$jdir/result.json")"
+fi
 emit cpu "$(jq -r '.cpu_usec' "$jdir/result.json")"
 cleanup_remote
 

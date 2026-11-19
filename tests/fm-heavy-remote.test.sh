@@ -138,6 +138,12 @@ test_pass_and_record() {
     and (.wait_s | type) == \"number\" and (.run_s | type) == \"number\"
     and .started_at >= .requested_at and .ended_at >= .started_at
     and .peak_memory_bytes == null and (.cpu_usec | type) == \"number\"" "remote record"
+  expect_record '.command_sha256 != null and .source_sha256 != null and .source_tree != null
+    and .source_head == .candidate and .source_dirty == false and .entry_kind == "execution"
+    and .execution_id == .job and .command_timing == "remote-result"
+    and .command_started_at != null and .command_ended_at >= .command_started_at
+    and .command_started_at >= .started_at and .command_ended_at <= .ended_at
+    and .command_exit == 0' "remote execution identity and verified command timing"
   expect_host_clean "scratch must be removed after a collected result"
   [ -z "$(ls -A "$HOME_FM/state/heavy-remote/unknown-fake-mac")" ] || fail "a finished job must leave no open record"
   assert_present "$HOME_FM/state/heavy-remote/$(last_record | jq -r .job)/result.json" "the result copy is kept locally"
@@ -409,7 +415,8 @@ test_connection_lost_is_reconciled() {
   setup reconcile 'echo run >> "$HOME/runs"; sleep 1'
   rule wait drop 'runner.py wait' 1
   heavy --remote >/dev/null 2>&1 || fail "a job found again after a dropped wait must still pass"
-  expect_record '.outcome == "pass"' "reconciled record"
+  expect_record '.outcome == "pass" and .entry_kind == "execution" and .execution_id == .job' "reconciled record"
+  [ "$("$SUMMARY" --executions --log "$LOG" | awk 'NR == 2 {print $4}')" = 1 ] || fail "reconnect must count one execution"
   [ "$(wc -l < "$REMOTE_HOME/runs")" -eq 1 ] || fail "a reconnect must never run the job a second time"
 
   # The start succeeds on the host but its answer is lost: the running job is adopted.
@@ -433,6 +440,8 @@ test_unreachable_job_is_unknown() {
   rule gone drop 'runner.py (wait|status)' -1
   heavy --remote >"$CASE/out" 2>&1; expect_code 75 "$?" "a job that cannot be reached again"
   expect_record '.outcome == "unknown" and .exit == 75 and .host == "fake-mac" and (.job | type) == "string"
+    and .entry_kind == "unknown" and .command_timing == "unavailable"
+    and .command_started_at == null and .command_ended_at == null and .command_exit == null
     and .ended_at == null and .run_s == null' "unknown record: completion was never seen"
   assert_present "$REMOTE_HOME/.fm-heavy-remote/$(last_record | jq -r .job)" "an unknown job's scratch is kept for reconciliation"
   assert_present "$HOME_FM/state/heavy-remote/unknown-fake-mac/$(last_record | jq -r .job).json" "an unknown job's record stays open"

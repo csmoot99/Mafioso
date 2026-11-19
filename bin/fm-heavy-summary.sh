@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # fm-heavy-summary.sh - where heavy-command time goes, per project, class and host.
 #
-# usage: fm-heavy-summary.sh [--since <epoch>] [--log <file>]
+# usage: fm-heavy-summary.sh [--since <epoch>] [--until <epoch>] [--executions] [--log <file>]
 #
 # Reads the log bin/fm-heavy.sh appends to (state/heavy-jobs.jsonl in the root
 # Firstmate home; --log reads another file) and prints one row per project,
@@ -18,22 +18,32 @@
 # A job killed while queued has a wait but null run time and exit: it counts in
 # jobs and in the wait columns, and not as failed.
 # --since keeps jobs whose slot request is at or after that epoch.
+# --executions prints TSV counts grouped by project, command_sha256 and
+# source_sha256 over command_started_at in [since, until). Counts deduplicate
+# execution_id, exclude drivers, reattachments, not-started and unknown identity
+# records (including older ledger rows). It counts invocations, not test cases or
+# equivalent environments; the wrapper header owns identity coverage limitations.
+# Without --executions, --until filters requested_at with an exclusive upper bound.
 #
 # Exit status: 0 on a report (also an empty one), 2 on a usage error.
 set -u
 export LC_ALL=C
 
-log=; since=0
+log=; since=0; until=999999999999; executions=
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -h|--help) sed -n '2,/^set -u/p' "$0" | sed '$d; s/^# \{0,1\}//'; exit 0 ;;
+    --executions) executions=1; shift ;;
+    --until) until=${2:-}; shift 2 || break ;;
     --since) since=${2:-}; shift 2 || break ;;
     --log) log=${2:-}; shift 2 || break ;;
     *) break ;;
   esac
 done
-[ "$#" -eq 0 ] || { echo "usage: fm-heavy-summary.sh [--since <epoch>] [--log <file>]" >&2; exit 2; }
+[ "$#" -eq 0 ] || { echo "usage: fm-heavy-summary.sh [--since <epoch>] [--until <epoch>] [--executions] [--log <file>]" >&2; exit 2; }
 case "$since" in ''|*[!0-9]*) echo "fm-heavy-summary.sh: --since needs epoch seconds" >&2; exit 2 ;; esac
+
+case "$until" in ''|*[!0-9]*) echo "fm-heavy-summary.sh: --until needs epoch seconds" >&2; exit 2 ;; esac
 
 if [ -z "$log" ]; then
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -44,10 +54,23 @@ if [ -z "$log" ]; then
 fi
 [ -s "$log" ] || { echo "no heavy-command records in $log"; exit 0; }
 
-jq -r --argjson since "$since" -s '
+if [ -n "$executions" ]; then
+  jq -rs --argjson since "$since" --argjson until "$until" '
+    [.[] | select(.entry_kind == "execution" and .execution_id != null
+      and .command_sha256 != null and .source_sha256 != null
+      and .command_started_at != null and .command_started_at >= $since and .command_started_at < $until)]
+    | group_by([.project, .command_sha256, .source_sha256])
+    | (["project", "command_sha256", "source_sha256", "executions"] | @tsv),
+      (.[] | [ (.[0].project // "unknown"), .[0].command_sha256, .[0].source_sha256,
+        (unique_by(.execution_id) | length)] | @tsv)
+  ' "$log"
+  exit "$?"
+fi
+
+jq -r --argjson since "$since" --argjson until "$until" -s '
   def avg: if length == 0 then "unknown" else (add / length | round) end;
   def max_or: if length == 0 then "unknown" else max end;
-  [.[] | select(.requested_at >= $since)]
+  [.[] | select(.requested_at >= $since and .requested_at < $until)]
   | group_by([(.project // "unknown"), .class, (.host // "local")])
   | map(. as $g | {
       project: ($g[0].project // "unknown"), class: $g[0].class, host: ($g[0].host // "local"), jobs: ($g | length),

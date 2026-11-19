@@ -2,7 +2,7 @@
 # fm-heavy.sh - run one heavy command on this machine's shared test slot and
 # record where its time went.
 #
-# usage: fm-heavy.sh --class test|build|e2e|image [--task <id>] [--project <name-or-path>] [--remote] -- <command> [args...]
+# usage: fm-heavy.sh --class test|build|e2e|image [--task <id>] [--project <name-or-path>] [--remote] [--phase <label>] [--reattach] -- <command> [args...]
 #
 # The command runs exactly as workers ran it by hand before this wrapper:
 #   flock -o /tmp/fm-heavy.lock systemd-run --user --scope -q -p MemoryMax=6G -p MemorySwapMax=0 <command>
@@ -29,6 +29,23 @@
 # the job's own systemd scope (cgroup memory.peak and cpu.stat usage_usec). Any
 # value that is not available is null, never an estimate; --task and --project
 # are null when not given.
+# Additive identity fields: command_sha256 hashes the full NUL-terminated argv
+# (SHA-256, including argument boundaries); source_head is HEAD, source_tree is
+# the Git tree of tracked and non-ignored untracked working-copy contents, and
+# source_dirty includes staged, unstaged and untracked changes. A private index
+# captures the tree without changing the real index; Git objects may be written.
+# Ignored files, submodule working contents and external inputs are not covered.
+# source_sha256 hashes source_tree plus a newline; unavailable identities are null.
+# Identity is sampled at launch; concurrent edits during a job are not tracked.
+# phase is the optional caller label. entry_kind is execution, pipeline-drive
+# (no-mistakes), reattachment (--reattach), not-started, or unknown (remote
+# execution could not be verified). A reattachment still
+# runs its supplied driver command; it declares that no new suite is launched.
+# execution_id identifies a local invocation or remote job, including reconnects.
+# command_started_at, command_ended_at and command_exit describe actual execution:
+# local command boundaries, or verified remote command result times/status. Unknown remote
+# results leave these null and command_timing says unavailable; legacy start/end
+# keep their existing remote preparation/observation meaning.
 #
 # Killed jobs: TERM, INT or HUP still leaves a record; SIGKILL cannot. A running
 # job is recorded once its scope ends, with exit 128+n. The command stops only if
@@ -151,8 +168,10 @@ if [ "${1:-}" = --stage-scoped ]; then
   unit=$2 sample=$3
   shift 3
   trap : HUP INT TERM
+  command_started=$(date +%s)
   "$@"
   rc=$?
+  command_ended=$(date +%s)
   cg=$(sed -n 's/^0:://p' /proc/self/cgroup 2>/dev/null)
   peak=; cpu=
   case "$cg" in
@@ -161,13 +180,14 @@ if [ "${1:-}" = --stage-scoped ]; then
       cpu=$(awk '$1 == "usage_usec" { print $2 }' "/sys/fs/cgroup$cg/cpu.stat" 2>/dev/null)
       ;;
   esac
-  printf 'peak=%s\ncpu=%s\n' "$peak" "$cpu" > "$sample"
+  printf 'peak=%s\ncpu=%s\ncommand_started_at=%s\ncommand_ended_at=%s\ncommand_exit=%s\n' \
+    "$peak" "$cpu" "$command_started" "$command_ended" "$rc" > "$sample"
   exit "$rc"
 fi
 
 usage() { sed -n '2,/^set -u/p' "$0" | sed '$d; s/^# \{0,1\}//'; }
 
-class=; task=; project=; remote=
+class=; task=; project=; remote=; phase=; reattach=
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -h|--help) usage; exit 0 ;;
@@ -175,6 +195,8 @@ while [ "$#" -gt 0 ]; do
     --task) task=${2:-}; shift 2 || break ;;
     --project) project=${2:-}; shift 2 || break ;;
     --remote) remote=1; shift ;;
+    --phase) phase=${2:-}; shift 2 || break ;;
+    --reattach) reattach=1; shift ;;
     --) shift; break ;;
     *) break ;;
   esac
@@ -357,6 +379,40 @@ elif [ -e "$rconf" ]; then
   rslots=${rslots:-1}
 fi
 
+# Keep argv boundaries and empty arguments; use the platform's SHA-256 tool.
+sha256() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -d' ' -f1
+  else shasum -a 256 | cut -d' ' -f1; fi
+}
+command -v sha256sum >/dev/null 2>&1 || command -v shasum >/dev/null 2>&1 || {
+  echo "fm-heavy.sh: sha256sum or shasum is required" >&2; exit 69; }
+command_sha=$(printf '%s\0' "$@" | sha256)
+source_identity() {
+  source_head=$(git rev-parse --verify HEAD 2>/dev/null) || source_head=
+  source_dirty=; source_tree=; source_sha=
+  if [ -n "$source_head" ]; then
+    if source_status=$(GIT_OPTIONAL_LOCKS=0 git status --porcelain --untracked-files=all 2>/dev/null); then
+      source_dirty=false
+      [ -z "$source_status" ] || source_dirty=true
+      if [ "$source_dirty" = false ]; then
+        source_tree=$(git rev-parse 'HEAD^{tree}' 2>/dev/null) || source_tree=
+      else
+        source_tree=$( {
+          scratch=$(mktemp -d) || exit 1
+          trap 'rm -rf "$scratch"' EXIT
+          top=$(git rev-parse --show-toplevel) || exit 1
+          index=$(git rev-parse --git-path index) || exit 1
+          cp "$index" "$scratch/index" || exit 1
+          export GIT_INDEX_FILE=$scratch/index
+          git -C "$top" add -A && git write-tree
+        } 2>/dev/null) || source_tree=
+      fi
+      [ -z "$source_tree" ] || source_sha=$(printf '%s\n' "$source_tree" | sha256)
+    fi
+  fi
+}
+source_head=; source_tree=; source_dirty=; source_sha=
+
 lock=${FM_HEAVY_LOCK:-/tmp/fm-heavy.lock}
 log="$root/state/heavy-jobs.jsonl"
 cmd=$(basename -- "$1")
@@ -376,9 +432,13 @@ case "$class:$cmd" in
 esac
 
 record() {  # <exit status, empty when the command never started>
+  local kind timing cstart cend crc execution_id
   local now peak cpu ended='' run_s='' wait_s began
   now=$(date +%s)
   if [ -n "$host" ]; then  # a remote job: the stage times come from its driver
+    source_head=$(sget source_head); source_tree=$(sget source_tree); source_dirty=$(sget source_dirty)
+    source_sha=
+    [ -z "$source_tree" ] || source_sha=$(printf '%s\n' "$source_tree" | sha256)
     started=$(sget started)
     ended=$(sget ended)
     began=$(sget wait_until)
@@ -391,9 +451,30 @@ record() {  # <exit status, empty when the command never started>
       run_s=$((now - started))
     fi
   fi
+  kind=not-started; timing=unavailable; cstart=; cend=; crc=; execution_id=
+  if [ -n "$host" ]; then
+    cstart=$(sget command_started_at); cend=$(sget command_ended_at); crc=$(sget command_exit)
+    execution_id=$(sget job)
+    kind=unknown
+    [ -z "$cstart" ] || timing="remote-result"
+  elif [ -n "$started" ]; then
+    execution_id=$unit
+    if [ -n "$scoped" ]; then
+      cstart=$(sget command_started_at); cend=$(sget command_ended_at); crc=$(sget command_exit)
+    else
+      cstart=$started; cend=$ended; crc=$1
+    fi
+    [ -z "$cstart" ] || timing="local-command"
+  fi
+  if [ -n "$cstart" ]; then kind=execution; fi
+  [ "$cmd" != no-mistakes ] || kind=pipeline-drive
+  [ -z "$reattach" ] || kind=reattachment
   peak=$(sget peak)
   cpu=$(sget cpu)
   jq -nc --arg task "$task" --arg project "$project" --arg class "$class" --arg cmd "$cmd" \
+    --arg command_sha "$command_sha" --arg head "$source_head" --arg tree "$source_tree" \
+    --arg dirty "$source_dirty" --arg source_sha "$source_sha" --arg phase "$phase" --arg kind "$kind" \
+    --arg execution_id "$execution_id" --arg timing "$timing" --arg cstart "$cstart" --arg cend "$cend" --arg crc "$crc" \
     --arg req "$requested" --arg start "$started" --arg end "$ended" --arg wait "$wait_s" \
     --arg run "$run_s" --arg rc "$1" --arg slot "${started:+$slot}" --arg peak "$peak" --arg cpu "$cpu" \
     --arg host "${host:-local}" --arg prep "$(sget prepare_s)" --arg coll "$(sget collect_s)" \
@@ -402,6 +483,10 @@ record() {  # <exit status, empty when the command never started>
     def num: if test("^[0-9]+$") then tonumber else null end;
     def str: if . == "" then null else . end;
     {task: ($task | str), project: ($project | str), class: $class, cmd: $cmd,
+     command_sha256: $command_sha, source_head: ($head | str), source_tree: ($tree | str),
+     source_dirty: (if $dirty == "" then null else $dirty == "true" end), source_sha256: ($source_sha | str),
+     phase: ($phase | str), entry_kind: $kind, execution_id: ($execution_id | str), command_timing: $timing,
+     command_started_at: ($cstart | num), command_ended_at: ($cend | num), command_exit: ($crc | num),
      requested_at: ($req | num), started_at: ($start | num), ended_at: ($end | num),
      wait_s: ($wait | num), run_s: ($run | num), exit: ($rc | num), slot: ($slot | num),
      peak_memory_bytes: ($peak | num), cpu_usec: ($cpu | num),
@@ -562,6 +647,7 @@ rm -f "$lock.waiting/$$"
 # The command stays in the foreground so it keeps stdin and default signal
 # handling. run_captured closes the lock descriptor in the command, so a process
 # it leaves running (a daemon it auto-starts) cannot keep the slot held after it exits.
+source_identity
 started=$(date +%s)
 if [ -n "$scoped" ]; then
   run_captured systemd-run --user --scope -q -p "MemoryMax=$MEMORY_MAX" -p MemorySwapMax=0 \
