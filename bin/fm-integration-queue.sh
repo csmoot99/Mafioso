@@ -74,10 +74,11 @@ case "${1:-}" in
       'if .merged == true and .head.sha == "'"$HEAD"'" then "fm-queue-merged" else "fm-queue-unproved" end')
     [ "$PROOF" = fm-queue-merged ] || exit 1
     META="$STATE/$ID.meta"
-    if [ -f "$META" ]; then
-      CONTROL="$STATE/.control-$ID.lock"
-      fm_lock_acquire_wait "$CONTROL"
-      trap 'fm_lock_release "$CONTROL" || true' EXIT
+    CONTROL="$STATE/.control-$ID.lock"
+    fm_lock_acquire_wait "$CONTROL"
+    trap 'fm_lock_release "$CONTROL" || true' EXIT
+    if [ -f "$META" ] && ! fm_pr_poll_merge_already_notified "$STATE" "$ID" \
+      github "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER"; then
       LOCK=$(fm_meta_lock_path "$META")
       fm_lock_acquire_wait "$LOCK"
       RC=0

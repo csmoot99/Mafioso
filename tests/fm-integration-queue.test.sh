@@ -56,7 +56,9 @@ if sys.argv[1] == 'api':
         head = json.loads(json.load(open(os.environ['QUEUE_FORGE']))[url])['headRefOid']
         base = subprocess.check_output([os.environ['QUEUE_REAL_GIT'], '--git-dir=' + os.environ['QUEUE_REMOTE'], 'rev-parse', 'refs/heads/main'], text=True).strip()
         rc = subprocess.run([os.environ['QUEUE_REAL_GIT'], '--git-dir=' + os.environ['QUEUE_REMOTE'], 'merge-base', '--is-ancestor', head, base]).returncode
-        if (Path(os.environ['QUEUE_MARKERS']) / 'unproved').exists(): rc = 1
+        markers = Path(os.environ['QUEUE_MARKERS'])
+        blocked = markers / 'unproved-pr'
+        if (markers / 'unproved').exists() or (blocked.exists() and blocked.read_text() == url): rc = 1
         print('fm-queue-merged' if rc == 0 else 'fm-queue-unproved')
     elif '/rules/branches/' in endpoint:
         print('fm-queue-requires-pr' if (Path(os.environ['QUEUE_MARKERS']) / 'requires-pr').exists() else 'fm-queue-no-pr-rule')
@@ -77,7 +79,20 @@ import json, os, sys
 from pathlib import Path
 args = sys.argv[1:]
 if args[:2] == ['pr', 'merge']:
-    sys.exit('ordinary merge must never be used by a batch')
+    url = 'https://github.com/' + args[args.index('--repo')+1] + '/pull/' + args[2]
+    if os.environ.get('QUEUE_ORDINARY_PR') != url:
+        sys.exit('ordinary merge must never be used by a batch')
+    path = Path(os.environ['QUEUE_FORGE'])
+    records = json.loads(path.read_text())
+    data = json.loads(records[url])
+    if args[args.index('--match-head-commit')+1] != data['headRefOid']:
+        sys.exit('head mismatch')
+    data['state'] = 'MERGED'
+    records[url] = json.dumps(data)
+    path.write_text(json.dumps(records))
+    with (Path(os.environ['QUEUE_MARKERS']) / 'ordinary-merges').open('a') as log:
+        log.write(url + '\\n')
+    sys.exit(0)
 if args[:2] == ['pr', 'view']:
     value = args[2]
     url = value if value.startswith('https:') else 'https://github.com/' + args[args.index('--repo')+1] + '/pull/' + value
@@ -90,7 +105,15 @@ if args[:2] == ['pr', 'view']:
             data['statusCheckRollup'] = [dict(__typename='CheckRun', name='ci', status='COMPLETED', conclusion='FAILURE')]
         print(json.dumps(data))
 elif args[0] == 'api':
-    if any('/rules/branches/' in a for a in args):
+    if args[1] == 'graphql':
+        fields = dict(arg.split('=', 1) for arg in args if arg.startswith(('owner=', 'repo=', 'number=')))
+        url = 'https://github.com/' + fields['owner'] + '/' + fields['repo'] + '/pull/' + fields['number']
+        data = json.loads(json.load(open(os.environ['QUEUE_FORGE']))[url])
+        print('state=' + data['state'])
+        print('merged=' + ('true' if data['state'] == 'MERGED' else 'false'))
+        print('queued=false')
+        print('base=' + data['baseRefName'])
+    elif any('/rules/branches/' in a for a in args):
         print('[]')
     elif any('/branches/' in a for a in args):
         print('{"protected":false}')
@@ -463,6 +486,45 @@ else:
             self.assertNotEqual(result.returncode, 0)
             self.assertIn('must land through its bound queue batch', result.stderr)
 
+    def test_direct_successor_merge_requires_exact_previous_merge_proof(self):
+        manifest, command = self.ready_publication()
+        result = self.publish_attempt(command)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        successor = self.component('successor')
+        env = dict(self.env, QUEUE_ORDINARY_PR=successor[2])
+        meta = self.home / 'state/integration.meta'
+        original = meta.read_bytes()
+        marker = self.home / 'state/integration.pr-poll-merge-notified'
+        proof = marker.read_bytes()
+        other_pr = proof.decode().splitlines()
+        other_pr[-1] = successor[2].rsplit('/', 1)[1]
+        for invalid in (None, b'unreadable', ('\n'.join(other_pr) + '\n').encode()):
+            with self.subTest(proof=invalid):
+                if invalid is None:
+                    marker.unlink()
+                else:
+                    marker.write_bytes(invalid)
+                    marker.chmod(0o600)
+                for entry in ('fm-pr-check.sh', 'fm-pr-merge.sh'):
+                    result = self.cmd(['bash', str(ROOT / 'bin' / entry), 'integration', successor[2]],
+                                      check=False, env=env)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn('is bound to', result.stderr)
+                    self.assertEqual(meta.read_bytes(), original)
+        self.assertFalse((self.root / 'ordinary-merges').exists())
+        marker.write_bytes(proof)
+        marker.chmod(0o600)
+        result = self.cmd(['bash', str(ROOT / 'bin/fm-pr-merge.sh'), 'integration', successor[2]], env=env)
+        self.assertIn('is merged', result.stdout)
+        registered = dict(line.split('=', 1) for line in meta.read_text().splitlines())
+        self.assertNotIn('integration_batch', registered)
+        self.assertEqual(registered['pr'], successor[2])
+        self.assertEqual(registered['pr_head'], successor[1])
+        self.assertEqual((self.root / 'ordinary-merges').read_text().splitlines(), [successor[2]])
+        authority = (self.home / 'state/integration.merge-authority').read_text().splitlines()
+        self.assertEqual(authority[4], successor[2].rsplit('/', 1)[1])
+        self.assertEqual(marker.read_text().splitlines()[4], authority[4])
+
     def test_unlanded_batch_cannot_replace_pr_identity(self):
         manifest, command = self.ready_publication()
         hook = self.remote / 'hooks/update'
@@ -472,10 +534,11 @@ else:
         meta = self.home / 'state/integration.meta'
         original = meta.read_bytes()
         successor = self.component('successor')
-        result = self.cmd(['bash', str(ROOT / 'bin/fm-pr-check.sh'), 'integration', successor[2]], check=False)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn('is bound to', result.stderr)
-        self.assertEqual(meta.read_bytes(), original)
+        for entry in ('fm-pr-check.sh', 'fm-pr-merge.sh'):
+            result = self.cmd(['bash', str(ROOT / 'bin' / entry), 'integration', successor[2]], check=False)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('is bound to', result.stderr)
+            self.assertEqual(meta.read_bytes(), original)
         url = 'https://github.com/example/game/pull/99'
         self.cmd(['bash', str(ROOT / 'bin/fm-pr-check.sh'), 'integration', url])
         registered = dict(line.split('=', 1) for line in meta.read_text().splitlines())
@@ -509,6 +572,60 @@ else:
         (self.root / 'unproved').unlink()
         self.assertIsNone(self.claim())
         self.assertEqual(self.snapshot()['batches'][0]['status'], 'landed')
+
+    def test_partial_accounting_resumes_after_component_registers_successor(self):
+        manifest, command = self.ready_publication()
+        first, second = manifest['components']
+        blocked = self.root / 'unproved-pr'
+        blocked.write_text(second['pr'])
+        result = self.publish_attempt(command)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.git(self.project, 'ls-remote', 'origin', 'refs/heads/main').split()[0], manifest['commit'])
+        self.assertEqual(self.snapshot()['batches'][0]['status'], 'publishing')
+        marker = self.home / 'state' / (first['id'] + '.pr-poll-merge-notified')
+        proof = marker.read_bytes()
+        self.assertEqual(proof.decode().splitlines()[4], first['pr'].rsplit('/', 1)[1])
+        self.assertFalse((self.home / 'state' / (second['id'] + '.pr-poll-merge-notified')).exists())
+        self.assertFalse((self.home / 'state/integration.pr-poll-merge-notified').exists())
+        successor = self.component('successor')
+        self.cmd(['bash', str(ROOT / 'bin/fm-pr-check.sh'), first['id'], successor[2]])
+        meta = self.home / 'state' / (first['id'] + '.meta')
+        registered = meta.read_bytes()
+        authority = self.home / 'state' / (first['id'] + '.merge-authority')
+        prior_authority = authority.read_bytes()
+        other_pr = proof.decode().splitlines()
+        other_pr[-1] = successor[2].rsplit('/', 1)[1]
+        for invalid in (None, ('\n'.join(other_pr) + '\n').encode()):
+            with self.subTest(proof=invalid):
+                if invalid is None:
+                    marker.unlink()
+                else:
+                    marker.write_bytes(invalid)
+                    marker.chmod(0o600)
+                result = self.queue('claim', '--workdir', str(self.worker), '--', 'true', check=False)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(self.snapshot()['batches'][0]['status'], 'publishing')
+                self.assertEqual(meta.read_bytes(), registered)
+                self.assertEqual(authority.read_bytes(), prior_authority)
+        marker.write_bytes(proof)
+        marker.chmod(0o600)
+        blocked.unlink()
+        self.assertIsNone(self.claim())
+        self.assertIsNone(self.claim())
+        state = self.snapshot()
+        self.assertIsNone(state['active'])
+        self.assertEqual(state['batches'][0]['status'], 'landed')
+        self.assertEqual(meta.read_bytes(), registered)
+        self.assertEqual(authority.read_bytes(), prior_authority)
+        rows = [line.split('\t', 4) for line in (self.home / 'state/.wake-queue').read_text().splitlines()]
+        components = [*manifest['components'], dict(id='integration', pr='https://github.com/example/game/pull/99')]
+        for component in components:
+            key = 'merged-' + component['id'] + '-' + component['pr']
+            self.assertEqual(sum(row[2] == 'check' and row[3] == key for row in rows), 1)
+            marker = self.home / 'state' / (component['id'] + '.pr-poll-merge-notified')
+            self.assertEqual(marker.read_text().splitlines(),
+                             ['fm-pr-poll-merge-notified-v1', 'github', 'github.com', 'example/game',
+                              component['pr'].rsplit('/', 1)[1]])
 
     def test_protected_branch_rejection_has_no_fallback(self):
         manifest, command = self.ready_publication()

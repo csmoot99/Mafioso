@@ -478,11 +478,6 @@ merge_control_cleanup() {
 trap merge_control_cleanup EXIT
 MERGE_CONTROL_LOCK="$STATE/.control-$ID.lock"
 fm_lock_acquire_wait "$MERGE_CONTROL_LOCK"
-RECORDED_BATCH=$(sed -n 's/^integration_batch=//p' "$META" | tail -1)
-if [ -n "$RECORDED_BATCH" ] && [ "$RECORDED_BATCH" != "$INTEGRATION_BATCH" ]; then
-  echo 'error: queued integration PR must land through its bound queue batch' >&2
-  exit 1
-fi
 if ! fm_backlog_meta_spawn_gen_optional "$META" "$STATE"; then
   echo "error: task $ID changed while waiting to merge; refusing: $FM_BACKLOG_TRANSITION_ERROR" >&2
   exit 1
@@ -1393,10 +1388,16 @@ refuse_github_queue_while_away() {
 }
 
 require_recorded_pr_identity() {
-  local existing
+  local existing recorded_batch
   existing=$(grep '^pr=' "$META" | tail -1 | cut -d= -f2- || true)
-  [ -n "$existing" ] || return 0
-  [ "$existing" = "$URL" ] && return 0
+  if [ -z "$existing" ] || [ "$existing" = "$URL" ]; then
+    recorded_batch=$(sed -n 's/^integration_batch=//p' "$META" | tail -1)
+    if [ -n "$recorded_batch" ] && [ "$recorded_batch" != "$INTEGRATION_BATCH" ]; then
+      echo 'error: queued integration PR must land through its bound queue batch' >&2
+      return 1
+    fi
+    return 0
+  fi
   # Parsed in a subshell so FM_PR_* stays the new URL's identity for every
   # caller after this gate; only the already-notified verdict escapes.
   if ( fm_pr_url_parse "$existing" \
