@@ -20,8 +20,11 @@
 # --since keeps jobs whose slot request is at or after that epoch.
 # --executions prints TSV counts grouped by project, command_sha256 and
 # source_sha256 over command_started_at in [since, until). Counts deduplicate
-# execution_id, exclude drivers, reattachments, not-started and unknown identity
-# records (including older ledger rows). It counts invocations, not test cases or
+# execution_id, exclude drivers, reattachments, not-started and legacy records.
+# Executions lacking command or source identity remain uncounted. Verified
+# reconciled results in heavy-remote/ beside the log resolve unknown executions without changing the
+# ledger. The unknown column counts unresolved jobs, using requested_at for the
+# period when command start is unknown. It counts invocations, not test cases or
 # equivalent environments; the wrapper header owns identity coverage limitations.
 # Without --executions, --until filters requested_at with an exclusive upper bound.
 #
@@ -55,15 +58,45 @@ fi
 [ -s "$log" ] || { echo "no heavy-command records in $log"; exit 0; }
 
 if [ -n "$executions" ]; then
+  evidence=()
+  while IFS= read -r job; do
+    case "$job" in ''|*[!0-9-]*) continue ;; esac
+    for name in reconciled result; do
+      path=$(dirname "$log")/heavy-remote/$job/$name.json
+      [ ! -s "$path" ] || evidence+=("$path")
+    done
+  done < <(jq -r 'select(.entry_kind == "unknown" and .job == .execution_id) | .job // empty' "$log" | sort -u)
   jq -rs --argjson since "$since" --argjson until "$until" '
-    [.[] | select(.entry_kind == "execution" and .execution_id != null
-      and .command_sha256 != null and .source_sha256 != null
-      and .command_started_at != null and .command_started_at >= $since and .command_started_at < $until)]
+    . as $records
+    | (map(select(.reconciled_at != null)) | INDEX(.job)) as $settled
+    | (map(select(.schema == "fm-heavy-remote.v1")) | INDEX(.id)) as $results
+    | [$records[] | select(.entry_kind == "execution" or .entry_kind == "unknown")
+      | if .entry_kind == "unknown" then
+          $settled[.job // ""] as $receipt | $results[.job // ""] as $result
+          | if .job != null and .execution_id == .job and .candidate != null
+              and $receipt.candidate == .candidate then
+              if $receipt.outcome == "absent" then .entry_kind = "not-started"
+              elif ($receipt.outcome | IN("pass", "failed", "timeout", "cancelled", "prepare-failed"))
+                and $result.id == .job and $result.sha == .candidate
+                and $result.command_sha256 == .command_sha256 then
+                if ($result.command_started_at | type) == "number" and .source_sha256 != null then
+                  .entry_kind = "execution" | .command_started_at = $result.command_started_at
+                elif $receipt.outcome == "prepare-failed" then .entry_kind = "not-started"
+                else . end
+              else . end
+            else . end
+        else . end
+      | select((.entry_kind == "unknown") or (.entry_kind == "execution" and .execution_id != null
+          and .command_sha256 != null and .source_sha256 != null and .command_started_at != null))
+      | (.command_started_at // .requested_at) as $at | select($at >= $since and $at < $until)]
     | group_by([.project, .command_sha256, .source_sha256])
-    | (["project", "command_sha256", "source_sha256", "executions"] | @tsv),
-      (.[] | [ (.[0].project // "unknown"), .[0].command_sha256, .[0].source_sha256,
-        (unique_by(.execution_id) | length)] | @tsv)
-  ' "$log"
+    | (["project", "command_sha256", "source_sha256", "executions", "unknown"] | @tsv),
+      (.[] | group_by(.execution_id) | map(sort_by(.entry_kind != "execution") | .[0])
+        | [ (.[0].project // "unknown"),
+        (.[0].command_sha256 // "unknown"), (.[0].source_sha256 // "unknown"),
+        (map(select(.entry_kind == "execution")) | length),
+        (map(select(.entry_kind == "unknown")) | length)] | @tsv)
+  ' "$log" ${evidence[@]+"${evidence[@]}"}
   exit "$?"
 fi
 

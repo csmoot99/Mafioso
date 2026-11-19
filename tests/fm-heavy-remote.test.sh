@@ -514,6 +514,38 @@ wait_for() {  # <file>
   until [ -e "$1" ]; do n=$((n + 1)); [ "$n" -le 100 ] || fail "never appeared: $1"; sleep 0.1; done
 }
 
+test_summary_reconciled_executions() {
+  local out first duplicate started
+  unknown_job summary-reconciled 'echo run >> "$HOME/runs"; until [ -e "$HOME/release" ]; do sleep 0.1; done' 'runner.py (wait|status)'
+  first=$(last_record)
+  out=$("$SUMMARY" --executions --log "$LOG") || fail "unknown execution summary"
+  printf '%s\n' "$out" | awk 'NR == 2 {ok = ($4 == 0 && $5 == 1)} END {exit !ok}' \
+    || fail "unresolved job must be reported separately: $out"
+  : > "$REMOTE_HOME/release"
+  wait_for "$REMOTE_HOME/.fm-heavy-remote/$JOB/result.json"
+  out=$("$SUMMARY" --executions --log "$LOG") || fail "unverified result summary"
+  printf '%s\n' "$out" | awk 'NR == 2 {ok = ($4 == 0 && $5 == 1)} END {exit !ok}' \
+    || fail "a result without reconciliation must remain unknown: $out"
+  heavy --remote >/dev/null 2>&1 || fail "later request must reconcile and execute"
+  [ "$(wc -l < "$REMOTE_HOME/runs")" -eq 2 ] || fail "two actual commands must have run"
+  [ "$(head -1 "$LOG")" = "$first" ] || fail "reconciliation must preserve the original ledger row"
+  jq -e '.outcome == "pass"' "$JOB_DIR/reconciled.json" >/dev/null || fail "original result must be verified"
+  duplicate=$(last_record)
+  printf '%s\n%s\n' "$first" "$duplicate" >> "$LOG"
+  printf '%s\n' "$duplicate" | jq '.entry_kind = "reattachment" | .execution_id = "attachment"' >> "$LOG"
+  out=$("$SUMMARY" --executions --log "$LOG") || fail "reconciled execution summary"
+  printf '%s\n' "$out" | awk 'NR == 2 {ok = ($4 == 2 && $5 == 0)} END {exit !(ok && NR == 2)}' \
+    || fail "two actual executions must count twice, excluding duplicate observations and reattachments: $out"
+  started=$(jq -r .command_started_at "$JOB_DIR/result.json")
+  out=$("$SUMMARY" --executions --since "$started" --until "$((started + 1))" --log "$LOG") || fail "bounded reconciliation summary"
+  printf '%s\n' "$out" | awk 'NR == 2 {ok = ($4 >= 1 && $5 == 0)} END {exit !ok}' \
+    || fail "reconciled execution must use verified start time: $out"
+  out=$("$SUMMARY" --executions --until "$started" --log "$LOG") || fail "excluded reconciliation summary"
+  [ "$(printf '%s\n' "$out" | wc -l)" -eq 1 ] || fail "exclusive bound must exclude verified executions: $out"
+  expect_host_clean "reconciled execution summary scratch"
+  pass "fm-heavy-summary: verified reconciliations count once and unresolved jobs stay visible"
+}
+
 test_unknown_job_blocks_until_reconciled() {
   local first_sha second_sha
   unknown_job longjob 'echo $$ > "$HOME/job.pid"; until [ -e "$HOME/release" ]; do sleep 0.1; done' 'runner.py (wait|status)'
@@ -575,6 +607,8 @@ test_unknown_job_other_endings() {
   heavy --remote >/dev/null 2>&1 || fail "a rejected old result does not stop the new job"
   expect_record '.host == "fake-mac" and .outcome == "pass"' "the job after a rejected old result"
   jq -e '.outcome == "rejected"' "$JOB_DIR/reconciled.json" >/dev/null || fail "a bad result closes as rejected: $(cat "$JOB_DIR/reconciled.json")"
+  "$SUMMARY" --executions --log "$LOG" | awk 'NR > 1 {runs += $4; unknown += $5} END {exit !(runs == 1 && unknown == 1)}' \
+    || fail "a rejected result must remain unknown in execution counts"
   assert_absent "$OPEN" "a rejected result closes the record"
   expect_host_clean "scratch after a rejected old result"
 
@@ -584,6 +618,8 @@ test_unknown_job_other_endings() {
   heavy --remote >/dev/null 2>&1 || fail "the request after a job that never arrived"
   expect_record '.host == "fake-mac" and .outcome == "pass"' "the job after one that never arrived"
   jq -e '.outcome == "absent"' "$JOB_DIR/reconciled.json" >/dev/null || fail "a job that never arrived closes as absent: $(cat "$JOB_DIR/reconciled.json")"
+  "$SUMMARY" --executions --log "$LOG" | awk 'NR > 1 {runs += $4; unknown += $5} END {exit !(runs == 1 && unknown == 0)}' \
+    || fail "a job confirmed absent must count as neither execution nor unknown"
   assert_absent "$OPEN" "a job that never arrived closes its record"
 
   # The supervisor died and the job's group lives on, so nothing would ever stop it.
@@ -1827,6 +1863,7 @@ test_connection_lost_is_reconciled
 test_unreachable_job_is_unknown
 test_bad_results_are_rejected
 test_duplicate_delivery
+test_summary_reconciled_executions
 test_unknown_job_blocks_until_reconciled
 test_unknown_job_other_endings
 test_live_client_with_orphaned_group_blocks_admission
