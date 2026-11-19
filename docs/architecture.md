@@ -533,4 +533,4 @@ Durable publication intent and ancestry plus forge proof recover interrupted pub
 The queue's assertions about focused tests and review do not replace any current pipeline requirement or grant merge authority.
 The queue conservatively refuses preparation alongside any active legacy validation on that base, while the ordinary single-PR path retains its existing conflict guard.
 The implementation uses Python's standard SQLite and `fcntl` modules, so queue behavior is independent of worker runtime and needs no `flock` executable on macOS.
-`tests/fm-integration-queue.test.sh` exercises the public entrypoint using local Git remotes and real OS leases, including external base movement, changed heads, legacy validation, crash recovery, conflict rejection and attributed batch failure.
+`tests/fm-integration-queue.test.sh` exercises the public entrypoints using local Git remotes and real OS leases, including dependency eligibility and cycles, failure requeueing, external base movement, changed heads, legacy validation, crash recovery, conflict rejection and successor PR registration.

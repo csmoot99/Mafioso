@@ -145,8 +145,8 @@ else:
     def write_forge(self):
         (self.root / 'forge.json').write_text(json.dumps({k: json.dumps(v) for k, v in self.forge.items()}))
 
-    def component(self, name, path=None, content=None, deps=()):
-        self.git(self.project, 'checkout', '-q', '-B', name, self.base)
+    def component(self, name, path=None, content=None, deps=(), parent=None):
+        self.git(self.project, 'checkout', '-q', '-B', name, parent or self.base)
         file = self.project / (path or name)
         file.write_text(content or name)
         self.git(self.project, 'add', '.')
@@ -197,10 +197,22 @@ else:
 
     def test_no_more_than_three_and_explicit_dependency_order(self):
         for i, dep in [('a', ()), ('b', ('a',)), ('c', ('b',)), ('d', ())]:
-            self.submit(self.component(i, deps=dep))
+            self.submit(self.component(i, deps=dep, parent=dep[-1] if dep else None))
         manifest = self.claim()
         self.assertEqual([c['id'] for c in manifest['components']], ['a', 'b', 'c'])
         self.assertEqual(len(self.snapshot()['components']), 4)
+
+    def test_submission_refuses_dependency_cycles(self):
+        a = self.component('a')
+        self.submit(a)
+        self.submit(self.component('b', deps=('a',)))
+        self.submit(self.component('c', deps=('b',)))
+        result = self.queue(*a[3], '--depends-on', 'c', check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('dependency cycle', result.stderr)
+        manifest = self.claim()
+        self.assertEqual([c['id'] for c in manifest['components']], ['a', 'b', 'c'])
+        self.assertEqual(manifest['components'][0]['dependencies'], [])
 
     def test_external_base_movement_invalidates_instead_of_resuming(self):
         self.submit(self.component('a'))
@@ -251,10 +263,20 @@ else:
         failed = self.claim(command)
         state = self.snapshot()
         self.assertEqual(state['batches'][0]['status'], 'failed')
-        self.assertEqual([c['status'] for c in state['components']], ['ready', 'failed', 'failed'])
+        self.assertEqual([c['status'] for c in state['components']], ['ready', 'failed', 'ready'])
         next_batch = self.claim()
         self.assertEqual([c['id'] for c in next_batch['components']], ['a'])
         self.assertNotEqual(next_batch['id'], failed['id'])
+
+    def test_failed_dependency_keeps_transitive_dependents_queued(self):
+        for name, deps in [('a', ()), ('b', ('a',)), ('c', ('b',))]:
+            self.submit(self.component(name, deps=deps))
+        command = self.integrator('record-result --batch "$FM_INTEGRATION_BATCH" --failed-component a --reason failure')
+        self.claim(command)
+        self.assertIsNone(self.claim())
+        state = self.snapshot()
+        self.assertIsNone(state['active'])
+        self.assertEqual([c['status'] for c in state['components']], ['failed', 'ready', 'ready'])
 
     def test_active_legacy_run_refuses_and_unknown_state_refuses(self):
         self.submit(self.component('a'))
@@ -403,6 +425,61 @@ else:
         self.assertEqual(self.snapshot()['batches'][0]['status'], 'landed')
         for task in ('a', 'b', 'integration'):
             self.assertTrue((self.home / 'state' / (task + '.pr-poll-merge-notified')).exists())
+
+    def test_successor_registration_retires_landed_batch_binding(self):
+        manifest, command = self.ready_publication()
+        result = self.publish_attempt(command)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        meta = self.home / 'state/integration.meta'
+        authority = self.home / 'state/integration.merge-authority'
+        prior_authority = authority.read_bytes()
+        successor = self.component('successor')
+        self.cmd(['bash', str(ROOT / 'bin/fm-pr-check.sh'), 'integration', successor[2]])
+        registered = dict(line.split('=', 1) for line in meta.read_text().splitlines())
+        self.assertNotIn('integration_batch', registered)
+        self.assertEqual(registered['pr'], successor[2])
+        self.assertEqual(registered['pr_head'], successor[1])
+        self.assertEqual(authority.read_bytes(), prior_authority)
+        args = list(successor[3])
+        args[args.index('--task') + 1] = 'integration'
+        self.queue(*args)
+        self.assertEqual([c['id'] for c in self.claim()['components']], ['integration'])
+
+    def test_same_pr_retry_preserves_batch_binding(self):
+        manifest, command = self.ready_publication()
+        result = self.publish_attempt(command)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        url = 'https://github.com/example/game/pull/99'
+        meta = self.home / 'state/integration.meta'
+        authority = self.home / 'state/integration.merge-authority'
+        prior_authority = authority.read_bytes()
+        self.cmd(['bash', str(ROOT / 'bin/fm-pr-check.sh'), 'integration', url])
+        registered = dict(line.split('=', 1) for line in meta.read_text().splitlines())
+        self.assertEqual(registered['integration_batch'], manifest['id'])
+        self.assertEqual(registered['pr'], url)
+        self.assertEqual(authority.read_bytes(), prior_authority)
+        for flags in ([], ['--integration-batch', 'e' * 32]):
+            result = self.cmd(['bash', str(ROOT / 'bin/fm-pr-merge.sh'), 'integration', url, *flags], check=False)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('must land through its bound queue batch', result.stderr)
+
+    def test_unlanded_batch_cannot_replace_pr_identity(self):
+        manifest, command = self.ready_publication()
+        hook = self.remote / 'hooks/update'
+        hook.write_text('#!/bin/sh\n[ "$1" != refs/heads/main ]\n')
+        hook.chmod(0o700)
+        self.assertNotEqual(self.publish_attempt(command).returncode, 0)
+        meta = self.home / 'state/integration.meta'
+        original = meta.read_bytes()
+        successor = self.component('successor')
+        result = self.cmd(['bash', str(ROOT / 'bin/fm-pr-check.sh'), 'integration', successor[2]], check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('is bound to', result.stderr)
+        self.assertEqual(meta.read_bytes(), original)
+        url = 'https://github.com/example/game/pull/99'
+        self.cmd(['bash', str(ROOT / 'bin/fm-pr-check.sh'), 'integration', url])
+        registered = dict(line.split('=', 1) for line in meta.read_text().splitlines())
+        self.assertEqual(registered['integration_batch'], manifest['id'])
 
     def test_landed_dependency_allows_next_batch(self):
         manifest, command = self.ready_publication()

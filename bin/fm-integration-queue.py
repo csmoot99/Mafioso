@@ -17,7 +17,12 @@ There is no stale-lock timer or break-lock operation. After all holders exit,
 the next claim resumes the exact durable active manifest or invalidates it if
 its base, heads or candidate objects changed. Each new batch starts immediately
 with up to three dependency-ordered compatible components. Conflicts and stale
-heads are recorded and excluded, as are their dependents; no auto-resolution.
+heads are recorded and excluded; no auto-resolution. A component records task
+IDs it depends on and is eligible only when each has landed or appears earlier
+in the batch. Submission requires known dependencies and refuses cycles.
+On attributed failure the batch is dropped: only the failed component requires
+a new reviewed/focused-green head, while its dependents remain queued until
+their dependencies can land. Across batches dependencies only wait for landing.
 
 Submission's reviewed-head and focused-head are explicit supervisor assertions
 at the exact live PR head, not test receipts or proof of permission. Owner holds
@@ -229,7 +234,7 @@ class Queue:
         if a.task in a.depends_on or len(set(a.depends_on)) != len(a.depends_on):
             raise Refused('invalid dependency list')
         component = dict(id=a.task, pr=a.pr, head=head, base=self.base(),
-                         dependencies=a.depends_on, dependency_heads={}, reviewed_head=a.reviewed_head,
+                         dependencies=a.depends_on, reviewed_head=a.reviewed_head,
                          focused_head=a.focused_head)
         self.admission(component)
         with self.transaction():
@@ -238,11 +243,9 @@ class Queue:
                 raise Refused('component belongs to the active batch; release or finish it first')
             old = self.db.execute('SELECT * FROM components WHERE id=?', (a.task,)).fetchone()
             for dependency in a.depends_on:
-                row = self.db.execute('SELECT status,data FROM components WHERE id=?', (dependency,)).fetchone()
-                if not row or row[0] not in ('ready', 'landed'):
-                    raise Refused('dependency must already be ready or landed: ' + dependency)
-                dependency_data = json.loads(row['data'])
-                component['dependency_heads'][dependency] = dependency_data['head']
+                row = self.db.execute('SELECT id FROM components WHERE id=?', (dependency,)).fetchone()
+                if not row:
+                    raise Refused('unknown dependency: ' + dependency)
                 pending = [dependency]
                 seen = set()
                 while pending:
@@ -300,11 +303,8 @@ class Queue:
 
     def finish(self, manifest, status, reason, failed=None):
         # Caller holds the transaction and live integrator lease.
-        failed_ids = {failed} if failed else set()
         for component in manifest['components']:
-            if failed_ids.intersection(component['dependencies']):
-                failed_ids.add(component['id'])
-            state = 'failed' if component['id'] in failed_ids else 'ready'
+            state = 'failed' if component['id'] == failed else 'ready'
             self.db.execute('UPDATE components SET status=? WHERE id=?', (state, component['id']))
         self.db.execute('UPDATE batches SET status=?, result=? WHERE id=?',
                         (status, json.dumps(dict(reason=reason, failed_component=failed)), manifest['id']))
@@ -341,28 +341,17 @@ class Queue:
             for row in rows:
                 component = json.loads(row['data'])
                 unmet = False
-                changed = False
                 for dependency in component['dependencies']:
-                    entry = self.db.execute('SELECT status,data FROM components WHERE id=?', (dependency,)).fetchone()
-                    if not entry or json.loads(entry['data'])['head'] != component['dependency_heads'][dependency]:
-                        changed = True
-                        break
                     if dependency not in {c['id'] for c in selected}:
-                        if entry['status'] != 'landed':
+                        entry = self.db.execute('SELECT status,data FROM components WHERE id=?', (dependency,)).fetchone()
+                        if not entry or entry['status'] != 'landed':
                             unmet = True
                         else:
                             git(self.project, 'merge-base', '--is-ancestor',
-                                component['dependency_heads'][dependency], base, env=env)
-                if changed:
-                    self.db.execute("UPDATE components SET status='stale' WHERE id=?", (component['id'],))
-                    self.event('stale', dict(component=component['id'], reason='declared dependency head changed'))
-                    continue
+                                json.loads(entry['data'])['head'], base, env=env)
                 if unmet:
                     continue
                 try:
-                    if any(component['dependency_heads'][c['id']] != c['head']
-                           for c in selected if c['id'] in component['dependencies']):
-                        raise HeadChanged('declared dependency head changed')
                     self.admission(component)
                 except HeadChanged as error:
                     self.db.execute("UPDATE components SET status='stale' WHERE id=?", (component['id'],))
@@ -683,7 +672,8 @@ def main():
     submit.add_argument('--head', required=True)
     submit.add_argument('--reviewed-head', required=True)
     submit.add_argument('--focused-head', required=True)
-    submit.add_argument('--depends-on', action='append', default=[])
+    submit.add_argument('--depends-on', action='append', default=[],
+                        help='known prerequisite task ID; repeat for multiple dependencies; cycles refuse')
     commands.add_parser('list', help='read components, immutable manifests, outcomes and recovery history')
     claim = commands.add_parser('claim', help='immediately prepare/resume up to three components under one live lease')
     claim.add_argument('--workdir', required=True)
