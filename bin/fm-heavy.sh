@@ -75,7 +75,9 @@
 # unchanged. The host's own heavy jobs count toward host-slots and
 # go first: a job is sent only while capacity is free and none of the host's jobs
 # waits for it, and no running job of either kind is stopped for another. Each job
-# waiting for a local slot leaves a <lock>.waiting/<pid> marker for that check.
+# waiting for a local slot leaves a <lock>.waiting/<pid> marker for that check,
+# holding the job's --task (an empty line without one). Markers do not guarantee
+# admission order; bin/fm-bearings-snapshot.sh owns their checks projection.
 # An approved job the host cannot take yet because it is busy,
 # unreachable or still running an unknown job waits for a local slot while it
 # keeps checking: the remote slot every two seconds, the host itself every
@@ -536,7 +538,7 @@ fi
 # A waiting job leaves a marker beside the lock, so a remote job offered to this
 # machine (bin/fm-heavy-remote-runner.py) yields to it.
 if [ -z "$slot" ]; then
-  { [ -d "$lock.waiting" ] || mkdir "$lock.waiting" 2>/dev/null; } && : > "$lock.waiting/$$"
+  { [ -d "$lock.waiting" ] || mkdir "$lock.waiting" 2>/dev/null; } && printf '%s\n' "$task" > "$lock.waiting/$$"
 fi
 while [ -z "$slot" ]; do
   case "$remote:$fallback" in

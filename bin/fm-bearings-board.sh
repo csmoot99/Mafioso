@@ -117,7 +117,7 @@
 # Every Underway row likewise carries a non-empty `name`: the durable task name
 # when known, otherwise its durable identifier.
 # An Underway row MAY carry `progress`, which the Underway tab draws as progress
-# bars: `{ "stage", "reached", "pct", "parts"? }`, where `reached` is the run
+# bars: `{ "stage", "reached", "pct", "parts"?, "checks"? }`, where `reached` is the run
 # stage reached (planning, building, validating, checks, ready, or reported for a
 # finished scout), `stage` is that same value or one of the markers owner or
 # stuck, `pct` is the whole-number fill (0-100) of the reached stage, and
@@ -126,7 +126,18 @@
 # merged, current or pending, in that order, with at most one current. The row
 # then shows one bar for the parts merged out of the total and one bar per part:
 # merged parts full, the current part filled to `pct`, later parts empty. A row
-# with no `parts` shows its own stage bar only. A marker keeps the reached fill
+# with no `parts` shows its own stage bar. `progress` MAY also carry
+# `checks`, a finer line drawn under the stage bar while the task's checks run:
+# the bearings snapshot's checks row for that id without its `id`, each field
+# null or absent when unknown - `step` (a run step name), `n` of `of` (its place
+# among the steps), `elapsed_s`, `done` of `total` tests (a total needs a done
+# count no larger than it), `pct` (0-99, the fill; `estimate` true marks it as
+# time-based and the line says "about"), `size_adjusted` (false labels an
+# estimate "unadjusted"), `waiting_others` (other tasks waiting for the shared
+# test slot) and `label` (such as "fix round 2" or "waiting on a decision"). A
+# queue or label line has no `pct`, and a checks object names a step,
+# a waiting_others count or a label. A row without `checks` renders exactly as before.
+# A marker keeps the reached fill
 # and its bar says in words that it waits on the owner or is stuck; such a row,
 # like a row with no `progress`, also keeps its state pill. The values come from
 # the bearings snapshot's in_flight `stage`, `reached` and `pct` and its `parts`
@@ -252,6 +263,19 @@ validate_payload() {  # <data.json>
       and ([.[] | type == "object" and (.label | nonempty_string) and (.state | IN("merged", "current", "pending"))] | all)
       and ([.[] | part_rank] as $r | $r == ($r | sort))
       and ([.[] | select(.state == "current")] | length) <= 1;
+    def count($min): . == null or (type == "number" and floor == . and . >= $min);
+    def valid_checks:
+      type == "object"
+      and (.step == null or (.step | nonempty_string)) and (.label == null or (.label | nonempty_string))
+      and (.n | count(1)) and (.of | count(1)) and (.elapsed_s | count(0)) and (.waiting_others | count(0))
+      and (.done | count(0)) and (.total | count(0)) and (.pct | count(0)) and ((.pct // 0) <= 99)
+      and (.estimate == null or (.estimate | type == "boolean"))
+      and (.size_adjusted == null or ((.size_adjusted | type == "boolean") and .estimate == true))
+      and ((.n == null) == (.of == null)) and ((.n // 0) <= (.of // 0))
+      and (.total == null or (.done != null and .done <= .total))
+      and (.estimate != true or .pct != null)
+      and ((.waiting_others == null and .label == null) or .pct == null)
+      and (.step != null or .waiting_others != null or .label != null);
     def optional_progress:
       (has("progress") | not)
       or (.progress
@@ -259,7 +283,8 @@ validate_payload() {  # <data.json>
           and (.reached | IN("planning", "building", "validating", "checks", "ready", "reported"))
           and (.stage == .reached or (.stage | IN("owner", "stuck")))
           and (.pct | type == "number" and . >= 0 and . <= 100 and floor == .)
-          and ((has("parts") | not) or (.parts | valid_parts)));
+          and ((has("parts") | not) or (.parts | valid_parts))
+          and ((has("checks") | not) or (.checks | valid_checks)));
     def underway_item:
       type == "object" and repo_marker and name_marker and (.id | nonempty_string)
       and (.state | nonempty_string) and (.doing | nonempty_string) and (.kind | nonempty_string)

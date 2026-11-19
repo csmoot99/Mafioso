@@ -53,6 +53,29 @@
 # is planned, and `merged <pr-url>` lines appended per recorded merge outcome
 # (bin/fm-merge-outcome-lib.sh). A part is merged while the merged count covers
 # it, current next, then pending; at most 40 parts are read.
+# checks[] gives a shown main-home Underway row whose checks are running a finer
+# reading, each field from a machine-readable source or null, never status prose:
+# step (the run's current step from `no-mistakes axi status` in the task's
+# worktree), n and of (its place among the run's steps), elapsed_s (time in that
+# step, or in the queue), done and total (tests finished and, once the runner
+# prints it, the total, counted from a configured test command's live step log:
+# Godot PASS/FAIL lines, top-level TAP results or vitest per-file counts), pct
+# (whole-number fill: the test count, capped at 99; review/document estimates,
+# or test estimates only with no readable count, use the median of this project's
+# last five completed step durations from no-mistakes' state database opened
+# read-only, capped at 95 and flagged estimate=true).
+# Review/document samples scale by current/historical changed lines from each
+# run's base_sha to head_sha, bounded to 0.25-4; missing sizes retain the sample's
+# duration and size_adjusted=false marks the estimate as unadjusted (true only
+# when every sample was adjusted, null without an estimate). Other steps have
+# no fill. waiting_others counts other live tasks waiting for the shared heavy
+# slot from bin/fm-heavy.sh's waiting markers, with no pct and no step; it covers
+# a direct-PR worker's own wrapped check run while it waits. label is
+# "fix round <n>" or "waiting on a decision", with no pct. The reader has FM_BEARINGS_CHECKS_TASK_TIMEOUT seconds per task
+# (default 2) within FM_BEARINGS_CHECKS_TIMEOUT overall (default 6); a task it
+# cannot read in time has no checks row, and its Underway row is unchanged.
+# Checks enrichment makes no network calls; if python3 is unavailable or the
+# overall reader fails, checks[] is empty and Underway rows remain available.
 # Captain-hold placement follows the canonical snapshot's hold_bucket and
 # nothing else; this wrapper never inspects hold reason or body prose. The
 # buckets are total and mutually exclusive, so every captain hold appears in
@@ -118,6 +141,9 @@ FLEET="$SCRIPT_DIR/fm-fleet-snapshot.sh"
 # shellcheck source=bin/fm-timeout-lib.sh
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/fm-timeout-lib.sh"
+# shellcheck source=bin/fm-nm-run-lib.sh
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/fm-nm-run-lib.sh"  # fm_nm_state_db: no-mistakes' state database
 # shellcheck source=bin/fm-landed-lib.sh
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/fm-landed-lib.sh"  # FM_LANDED_JQ_DEFS: the shared landed selector
@@ -151,6 +177,207 @@ validate_bound FM_BEARINGS_UNHEALTHY "$FM_BEARINGS_UNHEALTHY"
 validate_bound FM_BEARINGS_PR_REPOS "$FM_BEARINGS_PR_REPOS"
 validate_bound FM_BEARINGS_PR_LIMIT "$FM_BEARINGS_PR_LIMIT"
 
+FM_BEARINGS_CHECKS_TASK_TIMEOUT=${FM_BEARINGS_CHECKS_TASK_TIMEOUT:-2}
+FM_BEARINGS_CHECKS_TIMEOUT=${FM_BEARINGS_CHECKS_TIMEOUT:-6}
+validate_bound FM_BEARINGS_CHECKS_TASK_TIMEOUT "$FM_BEARINGS_CHECKS_TASK_TIMEOUT"
+validate_bound FM_BEARINGS_CHECKS_TIMEOUT "$FM_BEARINGS_CHECKS_TIMEOUT"
+
+# The checks reader (see "check progress" below). argv: per-task budget,
+# overall budget, heavy waiting-marker directory, state database path or "",
+# and [{id, wt, run}]; stdout: {id: checks row}.
+CHECKS_PY=$(cat <<'PY'
+import csv, json, os, re, sqlite3, subprocess, sys, time
+from contextlib import closing
+from pathlib import Path
+
+task_budget, total_budget, waiting, database = int(sys.argv[1]), int(sys.argv[2]), sys.argv[3], sys.argv[4]
+tasks = json.loads(sys.argv[5])
+end_all = time.monotonic() + total_budget
+FIELDS = ("step", "n", "of", "elapsed_s", "pct", "estimate", "size_adjusted", "done", "total", "waiting_others", "label")
+GATES = ("awaiting_approval", "fix_review")
+
+
+def row(**kw):
+    out = dict.fromkeys(FIELDS)
+    out["estimate"] = False
+    out.update(kw)
+    return out
+
+
+def queue():
+    marks = []
+    try:
+        entries = list(os.scandir(waiting))
+    except OSError:
+        return {}
+    for e in entries:
+        if not e.name.isdigit():
+            continue
+        try:
+            os.kill(int(e.name), 0)
+        except ProcessLookupError:
+            continue
+        except OSError:
+            pass
+        try:
+            with open(e.path, "rb") as f:
+                task = f.read(256).decode("utf-8", "replace").strip()
+            marks.append((e.stat().st_mtime, int(e.name), task))
+        except OSError:
+            continue
+    waits = {}
+    others = {task or pid for _, pid, task in marks}
+    for mtime, _, task in marks:
+        if task:
+            waits[task] = min(mtime, waits.get(task, mtime))
+    return {task: row(waiting_others=len(others) - 1,
+                      elapsed_s=max(0, int(time.time() - mtime)))
+            for task, mtime in waits.items()}
+
+
+def seconds(text):
+    m = re.fullmatch(r"(?:(\d+)h)?(?:(\d+)m)?(?:(\d+(?:\.\d+)?)s)?", text or "")
+    if not m or not any(m.groups()):
+        return None
+    h, mi, se = m.groups()
+    return int(h or 0) * 3600 + int(mi or 0) * 60 + int(float(se or 0))
+
+
+def table(lines, name):
+    for i, line in enumerate(lines):
+        m = re.fullmatch(r"\s*" + name + r"\[(\d+)\]\{([^}]*)\}:", line)
+        if m:
+            keys = m.group(2).split(",")
+            body = [l.strip() for l in lines[i + 1:i + 1 + int(m.group(1))]]
+            return [dict(zip(keys, r)) for r in csv.reader(body, escapechar="\\", doublequote=False)]
+    return []
+
+
+def tests(path, limit):
+    """(done, total) from a configured test command's own live output."""
+    try:
+        with open(path, "rb") as f:
+            text = f.read(limit).decode("utf-8", "replace")
+    except (OSError, TypeError):
+        return None
+    if not text.startswith("running tests:"):
+        return None
+    godot = len(re.findall(r"^(?:PASS|FAIL) \S", text, re.M))
+    if godot:
+        m = re.search(r"^(\d+) tests, \d+ failed$", text, re.M)
+        return godot, int(m.group(1)) if m else None
+    tap = len(re.findall(r"^(?:not )?ok \d+\b", text, re.M))
+    if tap:
+        m = re.search(r"^1\.\.(\d+)$", text, re.M)
+        return tap, int(m.group(1)) if m else None
+    files = [int(n) for n in re.findall(r"^ +[✓×❯] .+? \((\d+) tests?", text, re.M)]
+    if files:
+        m = re.search(r"^ +Tests +.*\((\d+)\)$", text, re.M)
+        return sum(files), int(m.group(1)) if m else None
+    return None
+
+
+def change_size(wt, base, head, deadline):
+    if not all(re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", ref or "") for ref in (base, head)):
+        return None
+    out = subprocess.run(["git", "diff", "--numstat", "--no-ext-diff", "--no-textconv", base, head, "--"],
+                         cwd=wt, capture_output=True, text=True, stdin=subprocess.DEVNULL,
+                         timeout=max(0.1, deadline - time.monotonic()))
+    if out.returncode:
+        return None
+    return sum(int(n) for line in out.stdout.splitlines() for n in line.split("\t")[:2] if n.isdigit())
+
+
+def history(run, step, wt, deadline):
+    if not database or not os.path.isfile(database):
+        return None, None, None
+    with closing(sqlite3.connect(Path(database).as_uri() + "?mode=ro", uri=True,
+                                 timeout=max(0.1, deadline - time.monotonic()))) as db:
+        log = db.execute("SELECT log_path FROM step_results WHERE run_id = ? AND step_name = 'test'",
+                         (run,)).fetchone()
+        current = db.execute("SELECT base_sha, head_sha FROM runs WHERE id = ?", (run,)).fetchone()
+        rows = list(db.execute(
+            "SELECT s.duration_ms, r.base_sha, r.head_sha FROM step_results s JOIN runs r ON r.id = s.run_id "
+            "WHERE r.repo_id = (SELECT repo_id FROM runs WHERE id = ?) AND r.id != ? "
+            "AND s.step_name = ? AND s.status = 'completed' AND s.duration_ms > 0 "
+            "ORDER BY s.completed_at DESC LIMIT 5", (run, run, step)))
+    durations, adjusted = [], step in ("review", "document")
+    current_size = change_size(wt, *current, deadline) if adjusted and current else None
+    for duration, base, head in rows:
+        size = change_size(wt, base, head, deadline) if current_size is not None else None
+        if size is not None:
+            duration *= min(4, max(0.25, max(1, current_size) / max(1, size)))
+        else:
+            adjusted = False
+        durations.append(duration)
+    durations.sort()
+    median = None
+    if durations:
+        mid = len(durations) // 2
+        median = durations[mid] if len(durations) % 2 else (durations[mid - 1] + durations[mid]) / 2
+    return ((log and log[0]) or os.path.join(os.path.dirname(database), "logs", run, "test.log")), median, adjusted
+
+
+def run_checks(wt, deadline):
+    out = subprocess.run(["no-mistakes", "axi", "status"], cwd=wt, capture_output=True, text=True,
+                         stdin=subprocess.DEVNULL, timeout=max(0.1, deadline - time.monotonic())).stdout
+    lines = out.splitlines()
+    if "run:" not in lines:
+        return None
+    scalar = lambda k: next((l.split(":", 1)[1].strip().strip('"') for l in lines
+                             if re.match(r"\s+" + k + ":", l)), "")
+    if scalar("outcome"):
+        return None
+    steps = table(lines, "steps")
+    current = next((s for s in steps if s.get("status") not in ("completed", "skipped")), None)
+    if current is None:
+        return None
+    step, status = current.get("step", ""), current.get("status", "")
+    active = next((a for a in table(lines, "active_steps") if a.get("step") == step), {})
+    c = row(step=step, n=steps.index(current) + 1, of=len(steps), elapsed_s=seconds(active.get("active_for")))
+    if status in GATES:
+        c["label"] = "waiting on a decision"
+        return c
+    if status == "fixing":
+        m = re.search(r"\d+", active.get("round", ""))
+        c["label"] = "fix round %d" % (int(m.group()) - 1) if m and int(m.group()) > 1 else "fix round"
+        return c
+    if status != "running" or step == "ci":
+        return c
+    if step not in ("review", "document", "test"):
+        return c
+    log, median, adjusted = history(scalar("id"), step, wt, deadline)
+    counts = tests(log, 8 << 20) if step == "test" else None
+    if counts:
+        c["done"], c["total"] = counts
+        if c["total"]:
+            c["pct"] = min(99, int(c["done"] * 100 / c["total"] + 0.5))
+    elif median and c["elapsed_s"] is not None:
+        c["pct"] = min(95, int(c["elapsed_s"] * 100000 // median))
+        c["estimate"], c["size_adjusted"] = True, adjusted
+    return c
+
+
+places, result = queue(), {}
+for t in tasks:
+    if time.monotonic() >= end_all:
+        break
+    if t["id"] in places:
+        result[t["id"]] = places[t["id"]]
+        continue
+    if not t.get("run") or not os.path.isdir(t.get("wt") or ""):
+        continue
+    deadline = min(end_all, time.monotonic() + task_budget)
+    try:
+        c = run_checks(t["wt"], deadline)
+    except (subprocess.TimeoutExpired, OSError, sqlite3.Error, ValueError):
+        continue
+    if c is not None and time.monotonic() <= deadline:
+        result[t["id"]] = c
+json.dump(result, sys.stdout)
+PY
+)
+
 usage() {
   cat <<'EOF'
 usage: fm-bearings-snapshot.sh [--json] [--include-prs] [--fields <list>]
@@ -167,6 +394,8 @@ remote homes under one shared snapshot budget and may refresh the parent-side ca
 
 Default fields: schema, home, generated, prs, in_flight{id,kind,state,repo,name,doing,stage,reached,pct},
   parts{id,n,label,state} (only in-flight tasks with a data/<id>/parts record),
+  checks{id,step,n,of,elapsed_s,pct,estimate,size_adjusted,done,total,waiting_others,label} (only
+  main in-flight tasks whose checks are running or queued),
   secondmates{id,state,doing,provenance,freshness,age_seconds,contradiction,reason},
   secondmate_reconcile{id,spawn_gen,host,kind,ids},
   decisions_open{id,key,verb,summary,owner}, landed{id,what,artifact,owner},
@@ -400,8 +629,24 @@ for parts_file in "$FM_DATA_DIR"/*/parts; do
   ') || PARTS='{"rows":[],"merged":{}}'
 done
 
+# --- check progress (optional, structured) --------------------------------
+# The header owns the checks contract. The optional reader can fail or time out
+# without suppressing the canonical Underway rows.
+CHECKS='{}'
+case "${NM_HOME:-}" in ''|/*) CHECKS_DB=$(fm_nm_state_db /) ;; *) CHECKS_DB= ;; esac
+if command -v python3 >/dev/null 2>&1; then
+  CHECK_TASKS=$(printf '%s' "$SNAP" | jq -c '[.tasks[] | select(.kind != "secondmate")
+      | {id, wt:(.paths.worktree.path // ""),
+         run:(.current_state.source == "run-step" and ((.current_state.state // "") | IN("working", "parked")))}]') \
+    && CHECKS=$(fm_run_timed "$((FM_BEARINGS_CHECKS_TIMEOUT + 2))" python3 -I -c "$CHECKS_PY" \
+        "$FM_BEARINGS_CHECKS_TASK_TIMEOUT" "$FM_BEARINGS_CHECKS_TIMEOUT" \
+        "${FM_HEAVY_LOCK:-/tmp/fm-heavy.lock}.waiting" "$CHECKS_DB" "$CHECK_TASKS" </dev/null 2>/dev/null) \
+    && printf '%s' "$CHECKS" | jq -e 'type == "object"' >/dev/null 2>&1 || CHECKS='{}'
+fi
+
 MODEL=$(printf '%s' "$SNAP" | jq \
   --argjson parts "$PARTS" \
+  --argjson checks "$CHECKS" \
   --arg home "$HOME_LABEL" \
   --arg now "$NOW" \
   --arg today "$BEARINGS_TODAY" \
@@ -722,6 +967,8 @@ MODEL=$(printf '%s' "$SNAP" | jq \
       in_flight: (if $all_in_flight == 1 then $in_flight_all else $in_flight_all[:$in_flight_n] end),
       parts: ((if $all_in_flight == 1 then $in_flight_all else $in_flight_all[:$in_flight_n] end) as $shown
               | [$parts.rows[] | select(.id as $id | $shown | any(.id == $id))]),
+      checks: [(if $all_in_flight == 1 then $in_flight_all else $in_flight_all[:$in_flight_n] end)[]
+               | .id as $id | $checks[$id] // empty | {id:$id} + .],
       secondmates: (if $all_secondmates == 1 then $secondmates_all else $secondmates_all[:$secondmates_n] end),
       secondmate_reconcile: [ (.secondmate_current.records // [])[]
         | select(.reconcile_inventory != null)

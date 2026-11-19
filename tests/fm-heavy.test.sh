@@ -153,6 +153,7 @@ test_killed_while_queued() {
     touch "$TMP_ROOT/queued-group.ran"
   pid=$!
   sleep 1.2
+  [ "$(cat "$lock.waiting/$pid" 2>/dev/null)" = group ] || fail "the queued job's waiting marker does not name its task"
   kill -TERM -- "-$pid"
   wait "$pid"
   expect_code 143 "$?" "wrapper status when queued"

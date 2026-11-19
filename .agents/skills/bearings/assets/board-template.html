@@ -349,6 +349,7 @@ a { color: inherit; text-decoration: none; }
 @media (max-width: 640px) {
   .bb-barline { grid-template-columns: minmax(0, 1fr) auto; }
   .bb-barline .bb-bar { grid-column: 1 / -1; grid-row: 2; }
+  .bb-barline__gap { display: none; }
 }
 
 /* ---- Charted Next dispatch picker ---- */
@@ -1389,10 +1390,43 @@ __FM_BEARINGS_BOARD_DATA__
     var words = STAGE_LABEL[p.reached] || p.reached, marker = MARKER_LABEL[p.stage];
     return progBar(label, p.pct, words + " · " + (marker || p.pct + "%"), marker ? p.stage : "", feature);
   }
+  /* the finer checks line under the stage bar: a bar only when the payload has
+     a fill, and words for a slot wait, a fix round or a decision */
+  var STEP_LABEL = { intent: "Intent", rebase: "Rebase", review: "Review", test: "Tests",
+    document: "Docs", lint: "Lint", push: "Push", pr: "PR", ci: "GitHub checks" };
+  function took(s) {
+    return s < 60 ? s + "s" : s < 3600 ? Math.floor(s / 60) + "m" : Math.floor(s / 3600) + "h " + Math.floor(s % 3600 / 60) + "m";
+  }
+  function checksLine(c) {
+    var label, bits = [];
+    if (c.waiting_others != null) {
+      label = "Checks: waiting for the shared test slot";
+      bits.push(c.waiting_others + " other " + (c.waiting_others === 1 ? "task" : "tasks") + " waiting");
+    } else {
+      label = "Checks" + (c.step ? ": " + (STEP_LABEL[c.step] || c.step) : "")
+        + (c.n != null ? ", step " + c.n + " of " + c.of : "");
+      if (c.label) bits.push(c.label);
+      if (c.done != null) bits.push(c.done + (c.total != null ? " of " + c.total : "") + " tests");
+      if (c.pct != null && (c.estimate || c.done == null)) bits.push((c.estimate ? "about " : "") + c.pct + "%");
+      if (c.estimate && c.size_adjusted === false) bits.push("unadjusted");
+    }
+    if (c.elapsed_s != null) bits.push(took(c.elapsed_s));
+    var text = bits.join(" · ") || "running";
+    if (c.pct != null) return progBar(label, c.pct, text, "");
+    var line = el("div", "bb-barline");
+    line.appendChild(el("span", "bb-barline__label", label));
+    line.appendChild(el("span", "bb-barline__gap"));
+    line.appendChild(el("span", "bb-barline__text", text));
+    return line;
+  }
   function progressBlock(t) {
     var p = t.progress, block = el("div", "bb-prog");
     if (p.stage === "owner") block.appendChild(el("span", "bb-wait", "Waiting on you"));
-    if (!p.parts) { block.appendChild(stageBar("This task", p)); return block; }
+    if (!p.parts) {
+      block.appendChild(stageBar("This task", p));
+      if (p.checks) block.appendChild(checksLine(p.checks));
+      return block;
+    }
     var merged = p.parts.filter(function (x) { return x.state === "merged"; }).length;
     block.appendChild(progBar("Feature", Math.round(100 * merged / p.parts.length),
       merged + " of " + p.parts.length + " parts merged", "", true));
@@ -1405,6 +1439,7 @@ __FM_BEARINGS_BOARD_DATA__
       list.appendChild(li);
     });
     block.appendChild(list);
+    if (p.checks) block.appendChild(checksLine(p.checks));
     return block;
   }
   data.underway.forEach(function (t) {
