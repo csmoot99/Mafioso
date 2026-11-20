@@ -450,6 +450,42 @@ EOF
   pass "promotion keeps a scout's recorded base branch and refuses local-only for it"
 }
 
+test_promotion_carries_the_worker_testing_policy() {
+  local home id mode out contract policy
+  home="$TMP_ROOT/promote-testing-home"
+  policy='# Testing before handoff
+Run focused tests during development and before validation; fix reproduced failures and rerun the affected checks.
+Leave the full suite to the pipeline or assigned integrator; do not pre-run an identical full baseline merely to hand off.
+Keep every task-specific test mandate and currently required gate unless firstmate explicitly supersedes it.'
+  for mode in no-mistakes direct-PR local-only; do
+    id="promote-testing-$mode"
+    mkdir -p "$home/state" "$home/data/$id"
+    printf 'window=fm-%s\nkind=scout\nworktree=%s\n' "$id" "$TMP_ROOT/worktree" > "$home/state/$id.meta"
+    cat > "$home/data/$id/brief.md" <<'EOF'
+# Task
+## Captain's intent
+Ship the investigated fix.
+
+## Firstmate spec
+Reproduce the failure before promotion.
+
+# Rules
+Preserve the scout safety protocol.
+EOF
+    out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-promote.sh" "$id" --mode "$mode" --yolo off 2>&1) \
+      || fail "$mode: testing-policy promotion failed: $out"
+    for contract in "$home/data/$id/ship-instructions.md" "$home/data/$id/brief.md"; do
+      assert_contains "$(cat "$contract")" "$policy" \
+        "$mode: generated worker contract $contract omitted the testing policy"
+    done
+    assert_grep 'Preserve the scout safety protocol.' "$home/data/$id/brief.md" \
+      "$mode: promotion dropped existing scout safety instructions"
+    assert_grep 'kind=ship' "$home/state/$id.meta" \
+      "$mode: promotion did not persist the ship role"
+  done
+  pass "promotion delivers the worker testing policy and persists it for relaunch"
+}
+
 test_scout_done_is_not_gated
 test_unpushed_ship_done_is_refused
 test_no_mistakes_prevalidation_done_is_not_gated
@@ -470,6 +506,7 @@ test_non_done_lines_are_not_gated
 test_fenced_and_indented_captain_lines_are_not_intent
 test_pr_based_dod_draft_check_uses_gh_axi
 test_promotion_keeps_the_recorded_base_branch
+test_promotion_carries_the_worker_testing_policy
 
 # The launch role is the generated text a worker receives. It must keep the
 # skill name, so a session that registers the skill loads it by name, and must

@@ -216,6 +216,14 @@ test_ship_modes_generate_clean_briefs() {
     assert_grep 'never a bare number such as "PR 108"' "$brief" "$id: brief missing the full-PR-URL rule"
     assert_grep "mid-task \`working:\` line (including setup complete) is nonterminal" "$brief" \
       "$id: brief missing nonterminal working:/setup-complete gate protection"
+    assert_grep "Run focused tests during development and before validation" "$brief" \
+      "$id: ship brief lost focused development and pre-validation testing"
+    assert_grep "Leave the full suite to the pipeline or assigned integrator" "$brief" \
+      "$id: ship brief lost full-baseline ownership"
+    assert_grep "do not pre-run an identical full baseline merely to hand off" "$brief" \
+      "$id: ship brief restored duplicate blanket preflight"
+    assert_grep "Keep every task-specific test mandate and currently required gate" "$brief" \
+      "$id: ship brief allowed required tests to be skipped"
     assert_no_grep "EOF" "$brief" "$id: brief leaked a heredoc EOF marker (unterminated heredoc)"
   done
   pass "fm-brief.sh: no-mistakes/direct-PR/local-only briefs generate cleanly"
@@ -1380,6 +1388,16 @@ test_worker_return_envelopes() {
         ;;
     esac
     brief="$home/data/$kind/brief.md"
+    if [ "$kind" = scout ]; then
+      assert_no_grep '# Testing before handoff' "$brief" 'scout received ship testing instructions'
+    else
+      assert_grep 'Run focused tests during development and before validation' "$brief" \
+        "$kind brief omitted focused testing before validation"
+      assert_grep 'Leave the full suite to the pipeline or assigned integrator' "$brief" \
+        "$kind brief omitted full-baseline ownership"
+      assert_grep 'Keep every task-specific test mandate and currently required gate' "$brief" \
+        "$kind brief permits skipping required tests"
+    fi
     assert_grep 'every done or blocked report (status line and final reply) to at most about 500 tokens' "$brief" \
       "$kind brief omitted the bounded return contract"
     for field in 'outcome' 'files changed' 'diff stat' 'checks run and results' 'one open question only if blocked'; do
@@ -1401,7 +1419,7 @@ test_worker_return_envelopes() {
 }
 
 test_qwen_shape_inlines_the_plan_and_keeps_the_contract() {
-  local home plan brief id=brief-qwen-q1 standard before after epoch status wt fakebin start report blocked out line ack inbox done_envelope blocked_envelope
+  local home plan brief id=brief-qwen-q1 standard before after epoch status wt fakebin start report blocked out line ack inbox done_envelope blocked_envelope normalized
   home="$TMP_ROOT/qwen-home"
   mkdir -p "$home/data"
   plan="$TMP_ROOT/qwen-plan.md"
@@ -1437,8 +1455,15 @@ test_qwen_shape_inlines_the_plan_and_keeps_the_contract() {
     "the qwen brief lost the push and merge rule"
   assert_grep 'git rev-parse --show-toplevel' "$brief" "the qwen brief lost its isolation check"
   assert_grep "$home/state/$id.inbox" "$brief" "the qwen brief does not name its steering inbox"
+  # Check instruction content without treating an installation path containing
+  # e.g. .no-mistakes as an instruction to run that pipeline.
+  normalized="$TMP_ROOT/qwen-normalized.md"
+  out=$(cat "$brief")
+  out=${out//"$home"/<home>}
+  out=${out//"$ROOT"/<code-root>}
+  printf '%s\n' "$out" > "$normalized"
   for absent in 'no-mistakes' 'Herdr' 'paused' 'ponytail' '# Project memory'; do
-    assert_no_grep "$absent" "$brief" "the qwen brief still carries '$absent', which a direct-PR qwen task cannot use"
+    assert_no_grep "$absent" "$normalized" "the qwen brief still carries '$absent', which a direct-PR qwen task cannot use"
   done
 
   # The start, report, and blocked commands run as written in a real copy and

@@ -1,6 +1,6 @@
 ---
 name: combined-merge
-description: Load before landing two or more approved PRs on the same project and base at the same time, before a merge that would put another approved PR on that base into conflict, or before any merge on a base where a combined PR is being built or validated; it trial-merges them and lands them one by one or through one combined PR.
+description: Load before landing two or more approved PRs on the same project and base at the same time, before a merge that would put another approved PR on that base into conflict, or before any merge on a base where a combined PR is being built or validated; it selects shared-baseline batches, including disjoint green PRs, or trial-merges legacy combined PRs.
 user-invocable: false
 metadata:
   internal: true
@@ -8,10 +8,57 @@ metadata:
 
 # Combined merge
 
-Approved PRs that share a project and base land through one combined PR when they touch the same files, so their conflicts are resolved once instead of after every merge.
+For the approved superhero-game pilot, use the staged integration queue below to share a full baseline across ready changes, including disjoint green PRs.
+Outside that pilot, approved PRs that share a project and base land through one combined PR when they touch the same files, so their conflicts are resolved once instead of after every merge.
 `ship-landing` still owns registration, merge monitoring, and cleanup for every task involved; this skill owns only the combining.
 
-## When to combine
+## Staged integration queue
+
+`bin/fm-integration-queue.sh` is the mechanism; its header, sibling implementation header and version-matched help own exact commands, manifests, leases, publication and recovery.
+This publication authority covers superhero game only until the captain explicitly extends it; configuring another project is not authorization.
+Publish the exact tested commit to main only if main has not moved, never forced, and refuse where branch protection requires PR merges.
+A queue refusal is not permission to fall back to another publication route.
+
+### Readiness and scheduling
+
+A **reviewed-ready component** has clear code review at its exact head, focused passing tests with coverage reasoning, current documentation/generated files, declared dependencies and known limitations.
+It is eligible for queue consideration, not authorized to land.
+Keep the current delivery path and every required component check: the queue does not yet provide pipeline support for skipping independent full baselines.
+Submit the exact head and base with that evidence, then freeze the head; a fix requires a new reviewed candidate, never a push beneath an active manifest or a manual repair of pipeline-owned work.
+Resolve component review findings before admission and leave that component and its dependents out while unrelated ready work proceeds.
+
+Firstmate assigns one integrator/publisher per project and base and batches up to three compatible ready changes for one shared full baseline, even when their files do not overlap.
+Start immediately when idle, including a singleton; collect newly ready work for the next batch without a wait-for-three timer.
+An urgent fix can take the next safe singleton boundary.
+Other workers continue development and review while the integrator owns publication to that base; preserve the existing in-flight guard and its attended override rather than bypassing either.
+Apply Merge authority below to every component and the integration task, including captain holds and live green checks.
+
+### Integration-green and failures
+
+Before expensive testing, establish clear component reviews, current required files/maps and candidate build/import readiness.
+Preserve exact component ancestry; review conflict resolutions and the integration diff, involving component authors for semantic conflicts.
+If both intents cannot be kept, exclude the affected component and dependents and seek a scoped decision.
+The current queue rejects conflicts; resolve them through the component authors and resubmit reviewed heads rather than changing an immutable candidate.
+
+An **integration-green batch** has the full project baseline and omitted task-specific/platform checks passing on the exact combined candidate, plus final-head review under `ship-landing`, including Consigliere when enabled.
+For no-mistakes, the integrator's pipeline owns that baseline: do not manually pre-run the full union before starting it.
+Use the authorized heavy runner and preserve the prepared candidate and component ancestry through validation; if the pipeline cannot do so, stop for resolution rather than asserting a different candidate passed.
+Component reviews and green checks never substitute for final-head review or the combined baseline.
+Recheck live component heads, expected main and candidate identity before guarded publication; green work lands promptly under existing captain-word or `yolo` authority.
+Queue publication/recovery owns per-component landing accounting; `ship-landing` still owns cleanup, and a tested batch alone proves no landing.
+
+Do not rerun a baseline merely because a drive call timed out, a monitor finished or a PR number changed; reattach to existing validation.
+This queue supplies assertions, not trusted test receipts: do not infer reuse from equal diffs, clean merges or changed commit identities.
+Retest the actual candidate when relevant inputs, main, component heads, ordering or membership change, or proof is unavailable; trusted receipt caching and narrower input-based reuse are later work.
+
+Preserve failed results and investigate the narrow failing check first.
+Eject an isolated faulty component and its dependents; interaction or resolution findings belong to the integrator and affected authors.
+When ownership is unclear, split the ordered batch and test a prefix to isolate the failure.
+A passing prefix may land only on its validated actual base and tree; rebuild and test the tail against the new base.
+Document suspected flakiness and any diagnostic rerun's reason, seed and environment; never erase a failure by retrying until green.
+Use the queue's failure/recovery path rather than overwriting its evidence, and keep unrelated work moving when safely isolated.
+
+## Legacy combined PRs: when to combine
 
 Consider combining when two or more PRs on the same project and base branch are approved to merge at the same time, or when merging one approved PR would put another approved PR on that base into conflict.
 Do not combine:
@@ -60,7 +107,8 @@ Project workers do not load firstmate's skills, so put these steps in the integr
 3. Resolve each conflict once, keeping every PR's intent as the steer describes it; a conflict that cannot keep both intents is a `needs-decision`, not the integrator's choice.
    When the project's PRs write their own entries into its rolling bookkeeping files, resolve each fold's conflict in those files by keeping the combined branch's side, then after the last fold make one commit that replaces every folded PR's own entries in those files, including ones that merged without a conflict, with one combined entry naming every folded PR, within the caps the project sets for those files.
    When its ordinary PRs write no such entries, such as a changelog generated from git history or a status file only an integration PR overwrites, there is nothing to fold: after the last fold, make in one commit only the update the project's own rules reserve for an integration PR.
-4. Run the union of the folded PRs' tests and the repository's own gates.
+4. For direct-PR, run the union of the folded PRs' tests and the repository's own gates.
+   For no-mistakes, run focused checks for conflict resolutions as needed and leave the full union baseline to the single pipeline run in step 5; never add a manual full-union pre-run.
 5. Publish a combined PR into the base by the integrator's mode: no-mistakes runs one validation on the combined branch, while direct-PR pushes and opens the PR itself.
 6. List in the combined PR body each folded PR's full URL and the exact head commit folded from it.
 7. Report the ordinary ready line naming the combined PR.
@@ -68,7 +116,7 @@ Project workers do not load firstmate's skills, so put these steps in the integr
 When the integrator's own permission check refuses a merge, push, or validation start, it reports `blocked:` with the exact refused command and stops, never retrying it in another form or routing around the check.
 Hand the captain that exact command to type as `! <command>` in the integrator's session, then steer the integrator to continue once it ran; never run it from firstmate or offer a workaround.
 
-## No-mistakes projects
+## Legacy combined PR validation
 
 - Each folded PR's own run validated that PR alone against the old base, and nothing has validated the conflict resolutions, so the combined branch gets exactly one ordinary no-mistakes run driven by the integrator under `validation-supervision`.
 - Never hand-merge around that run, skip it because every part passed, or start a second pipeline beside it; its ask-user findings follow `ask-user-authority` as usual.
@@ -82,7 +130,7 @@ Hand the captain that exact command to type as `! <command>` in the integrator's
 - A context handoff from a folded worker that is only waiting gets no replacement: while it is still running, close the handoff with `bin/fm-send.sh <id> --resolve-key context-handoff-<n> "<no replacement needed>"`, let it move that record into handled/, then exit it that way.
 - When an exited folded worker is needed again, such as for a PR that must land on its own, `bin/fm-control.sh <id> relaunch --note "<why>"` resumes it in the same copy.
 
-## Land
+## Legacy combined PR landing
 
 When `config/consigliere` is `on`, the combined PR is a PR like any other: once its checks are green on its own head, run the ordinary `ship-landing` Consigliere stage on that head with the integrator as its builder for reviewer selection, before registering it in step 1.
 The folded PRs' receipts never stand in for it; `bin/fm-pr-check.sh` and `bin/fm-pr-merge.sh` require a clear receipt for the combined URL and head in the integrator's `data/<integrator-task>/consigliere.json`, so a new combined head from step 2 needs that review again.

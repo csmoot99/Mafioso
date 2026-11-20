@@ -24,6 +24,13 @@ Load `combined-merge` before landing two or more approved PRs on the same projec
 For any custom `state/<id>.check.sh` you write yourself, keep it an ordinary single-link mode-`0700` file, print one line only when firstmate should wake, print nothing otherwise, finish before `FM_CHECK_TIMEOUT`, then bind its current bytes with `bin/fm-check-register.sh <id>` before the watcher may execute it.
 Retire a custom check only through `bin/fm-check-unregister.sh <id>` (or `bin/fm-teardown.sh` for a spawned task); never hand-compose an `rm` with `$STATE`/`$ID`.
 
+## Staged queue readiness
+
+`combined-merge` owns the superhero-game pilot's reviewed-ready versus integration-green policy, scheduling disjoint green PRs for a shared baseline, failure isolation and publication scope.
+Load it when selecting a batch; `bin/fm-integration-queue.sh` and its header own the mechanism and exact commands.
+A component ready signal above retains its existing required checks and review; it is not evidence that the integration candidate passed.
+Return here for final-head Consigliere review when enabled, registration, merge monitoring and cleanup of the integration task and every component.
+
 ## Opt-in Consigliere review
 
 [`docs/configuration.md`](../../../docs/configuration.md#consigliere-review-configconsigliere) owns the `config/consigliere` switch, dispatch mapping, and configuration instructions.

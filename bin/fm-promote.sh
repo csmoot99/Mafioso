@@ -272,6 +272,7 @@ EOF
   fi
   printf '\n'
   fm_ship_coding_discipline_block "$FM_ROOT"
+  fm_ship_testing_block
   printf '\n'
   fm_dod_block "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH"
 }
