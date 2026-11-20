@@ -251,6 +251,16 @@ fm_ship_coding_discipline_block() {  # <code-root>
   printf "Before editing, read and follow \`%s/.agents/skills/ponytail/SKILL.md\`.\n" "$root"
 }
 
+fm_ship_testing_block() {
+  cat <<'EOF'
+
+# Testing before handoff
+Run focused tests during development and before validation; fix reproduced failures and rerun the affected checks.
+Leave the full suite to the pipeline or assigned integrator; do not pre-run an identical full baseline merely to hand off.
+Keep every task-specific test mandate and currently required gate unless firstmate explicitly supersedes it.
+EOF
+}
+
 # Return 0 when a Task subsection still consists only of its scaffold
 # placeholder. A missing file and legacy briefs carry no such placeholders.
 fm_brief_task_placeholders_present() {  # <file>

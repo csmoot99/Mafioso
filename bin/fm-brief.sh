@@ -910,12 +910,7 @@ echo "scaffolded: $BRIEF ($KIND; replace {TASK} and {FIRSTMATE_SPEC})"
 exit 0
 fi
 
-TESTING_BLOCK='
-# Testing before handoff
-Run focused tests during development and before validation; fix reproduced failures and rerun the affected checks.
-Leave the full suite to the pipeline or assigned integrator; do not pre-run an identical full baseline merely to hand off.
-Keep every task-specific test mandate and currently required gate unless firstmate explicitly supersedes it.
-'
+TESTING_BLOCK=$(fm_ship_testing_block)
 
 if [ "$HARNESS" = qwen ]; then
 RULE1=$(fm_ship_rule_one "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH") || exit 1
