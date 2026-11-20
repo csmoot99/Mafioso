@@ -1,0 +1,216 @@
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/bin/fm-lab-home.sh create /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/home
+/home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/home
+[exit 0]
+
+$ git init -q --bare /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/origin.git
+[exit 0]
+
+$ git init -q -b main /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/project
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/project commit -q --allow-empty -m 'isolated live queue base'
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/project remote add origin /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/origin.git
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/project push -q origin main
+[exit 0]
+
+$ git clone -q -b main /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/origin.git /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/worker
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/project rev-parse HEAD
+ef50582d8ba66119f0958614518e2df034c22a23
+[exit 0]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/bin/fm-integration-queue.sh --project /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/project --base main list
+{"accounting": [], "active": null, "batches": [], "components": [], "events": []}
+[exit 0]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/bin/fm-integration-queue.sh --project /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/project --base main claim --workdir /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/worker -- touch /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/unexpected-command
+null
+[exit 0]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/bin/fm-integration-queue.sh --project /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/project --base main claim --workdir /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/project -- true
+error: integrator command requires a distinct isolated repository root
+[exit 1]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/bin/fm-integration-queue.sh --project /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/project --base main record-result --tested-tree ef50582d8ba66119f0958614518e2df034c22a23 --reviewed-head ef50582d8ba66119f0958614518e2df034c22a23 --reason 'unleased check' --batch aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+error: operation requires the inherited live integrator lease
+[exit 1]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/bin/fm-integration-queue.sh --project /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/project --base main release --reason 'unleased check' --batch aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+error: operation requires the inherited live integrator lease
+[exit 1]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/bin/fm-integration-queue.sh --project /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/project --base main publish --task integration --pr https://github.com/csmoot99/Mafioso/pull/62 --batch aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+error: operation requires the inherited live integrator lease
+[exit 1]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/bin/fm-integration-queue.sh --project /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/project --base main submit --task closed-check --pr https://github.com/csmoot99/Mafioso/pull/62 --head ef50582d8ba66119f0958614518e2df034c22a23 --reviewed-head bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb --focused-head ef50582d8ba66119f0958614518e2df034c22a23
+error: review and focused-test assertions must bind the exact head
+[exit 1]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/bin/fm-integration-queue.sh --project /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/project --base main submit --task closed-check --pr https://gitlab.com/example/game/-/merge_requests/1 --head ef50582d8ba66119f0958614518e2df034c22a23 --reviewed-head ef50582d8ba66119f0958614518e2df034c22a23 --focused-head ef50582d8ba66119f0958614518e2df034c22a23
+error: initial queue supports canonical GitHub PR URLs only
+[exit 1]
+
+$ gh-axi pr list --repo csmoot99/Mafioso --state open --limit 5
+count: 0
+pull_requests: []
+help[2]:
+  Run `gh-axi pr create --title "..." --body-file <path> -R csmoot99/Mafioso` to create a PR
+  Run `gh-axi pr list --state closed -R csmoot99/Mafioso` to see closed PRs
+[exit 0]
+
+$ gh-axi pr view 62 --repo csmoot99/Mafioso --fields url,headRefOid,baseRefName,state,isDraft
+pull_request:
+  baseRefName: main
+  headRefOid: c28b1ae56c82aefc640ef8f792f34493311bf805
+  isDraft: false
+  state: MERGED
+  url: "https://github.com/csmoot99/Mafioso/pull/62"
+[exit 0]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/bin/fm-integration-queue.sh --project /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/project --base main submit --task closed-check --pr https://github.com/csmoot99/Mafioso/pull/62 --head c28b1ae56c82aefc640ef8f792f34493311bf805 --reviewed-head c28b1ae56c82aefc640ef8f792f34493311bf805 --focused-head c28b1ae56c82aefc640ef8f792f34493311bf805
+error: component PR identity, state or base changed: closed-check
+[exit 1]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/bin/fm-integration-queue.sh --account closed-check https://github.com/csmoot99/Mafioso/pull/62 attended c28b1ae56c82aefc640ef8f792f34493311bf805
+error: unproven accounting for task closed-check, PR https://github.com/csmoot99/Mafioso/pull/62: notification already exists or task identity is unavailable or replaced; manual verification required
+[exit 1]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/bin/fm-integration-queue.sh --project /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/project --base main resolve-accounting --batch aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --task closed-check --pr https://github.com/csmoot99/Mafioso/pull/62 --head c28b1ae56c82aefc640ef8f792f34493311bf805 --reason 'negative check; no stopped batch'
+usage: fm-integration-queue.py resolve-accounting [-h] --batch BATCH
+                                                  --task TASK --pr PR
+                                                  --head HEAD --github-checked
+                                                  --reason REASON
+fm-integration-queue.py resolve-accounting: error: the following arguments are required: --github-checked
+[exit 2]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/bin/fm-integration-queue.sh --project /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/project --base main resolve-accounting --batch aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --task closed-check --pr https://github.com/csmoot99/Mafioso/pull/62 --head c28b1ae56c82aefc640ef8f792f34493311bf805 --reason 'negative check; no stopped batch' --github-checked
+error: manual resolution requires the active accounting-stopped batch
+[exit 1]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/bin/fm-integration-queue.sh --project /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/project --base main list
+{"accounting": [], "active": null, "batches": [], "components": [], "events": []}
+[exit 0]
+
+$ git -C /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/.nm-queue-live.sw3kn3te/project ls-remote origin refs/heads/main
+ef50582d8ba66119f0958614518e2df034c22a23	refs/heads/main
+[exit 0]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7TFTSQXYVXHZVS34WF8J2QB/bin/fm-integration-queue.sh --help
+usage: fm-integration-queue.py [-h] --project PROJECT --base BASE
+                               {submit,list,claim,record-result,release,publish,resolve-accounting,landing-data} ...
+
+Opt-in integration queue and guarded GitHub fast-forward publication.
+
+CLI owner: this module's --help. Storage: <state>/integration-queue/<key>/,
+where key hashes the canonical project path and base ref. Each SQLite database
+has ready components, immutable manifests, mutable batch outcomes, accounting
+progress and an event history. FULL-synchronous transactions publish each
+transition atomically.
+Candidate objects live beside the database, never in the project clone.
+
+`claim --workdir <isolated-copy> -- <command> ...` holds an exclusive flock on
+lease for the command's lifetime. A competing claim refuses immediately. The
+command inherits that descriptor and FM_INTEGRATION_{BATCH,MANIFEST,COMMIT,
+OBJECTS,LEASE_FD}; shell children retain it, even if the original claimant dies.
+Call record-result/release from that shell while the descriptor is inherited.
+Do not background work or close the descriptor before the integrator finishes.
+There is no stale-lock timer or break-lock operation. After all holders exit,
+the next claim resumes the exact durable active manifest or invalidates it if
+its base, heads or candidate objects changed. Each new batch starts immediately
+with up to three dependency-ordered compatible components. Conflicts and stale
+heads are recorded and excluded; no auto-resolution. A component records task
+IDs it depends on and is eligible only when each has landed or appears earlier
+in the batch. Submission requires known dependencies and refuses cycles.
+On attributed failure the batch is dropped: only the failed component requires
+a new reviewed/focused-green head, while its dependents remain queued until
+their dependencies can land. Across batches dependencies only wait for landing.
+
+Submission's reviewed-head and focused-head are explicit supervisor assertions
+at the exact live PR head, not test receipts or proof of permission. Owner holds
+and merge authority are read by the shell adapter using existing merge helpers.
+No new merge grant, review waiver, test reuse or pipeline configuration exists.
+This initial implementation supports GitHub component reads only; other forge
+URLs refuse explicitly. All commands emit JSON, errors go to stderr.
+
+After running the full baseline on the candidate in the isolated integrator
+copy and reviewing that exact commit, record-result binds those assertions.
+Publish additionally needs a separate integration task and non-draft PR at
+that exact commit, on the intended integration_branch, with all source heads
+included by ancestry. The supervisor publishes the integration branch/PR via
+its existing delivery path; this tool never pushes a review branch. It invokes
+fm-pr-merge, which retains its authority, owner-hold, review, exact-head and
+live-green guards for the integration PR and all components. Waivers and
+ordinary forge merge are unavailable for a batch. Projects must be explicitly
+listed in the private config/integration-queue-projects (default empty).
+
+A normal Git push chains the original pre-push hook and rejects any advertised
+old base except expected_base. Receive-pack then atomically checks that old
+value while updating the single ref. No force flag, fallback or bypass exists.
+PR-only protection or unreadable rules refuse, and server rejection is final.
+A durable publishing intent precedes that command. After interruption, claim
+proves the exact candidate is an ancestor of the remote base and every folded
+PR is merged at its recorded head before idempotent merge-outcome accounting.
+Accounting progress is keyed by batch, task, PR URL and exact head, with an
+accounted boolean and Unix timestamp for its last transition. Publication
+intent creates pending rows for all components and the integration PR.
+Accounting attempts are committed before filesystem side effects; their
+completion records cannot be atomic with those writes. Recovery skips completed
+records even after the task's successor PR has merged. An interrupted attempt,
+an earlier monitor notification, or a replaced/unreadable task identity stops
+the active batch as accounting-stopped, naming the task, PR and exact head.
+Repeated claim/publish and release cannot bypass that stop.
+
+Firstmate must check the exact PR's merged head on GitHub, verify the candidate
+remains in the remote base, and reconcile the prior notification and authority.
+Then run the stop message's resolve-accounting command with --github-checked
+and --reason describing that evidence, followed by claim again. Resolution
+locks the queue, rechecks live merged-head, tree and ancestry proof, and records
+one exact identity as accounted without modifying task metadata, authority
+files or notifications. It does not grant merge permission or republish Git.
+Coordinating merge command, monitor and queue accounting at one shared lifecycle
+step remains a separate follow-up outside this change.
+If the base is still expected_base the same passed candidate may retry the
+existing guards; any ambiguous publication remains recoverable, never guessed
+landed or silently replaced. A changed component after publication leaves
+accounting unproved rather than declaring its new commits landed.
+Do not release or overwrite a publishing batch until its outcome is resolved.
+
+positional arguments:
+  {submit,list,claim,record-result,release,publish,resolve-accounting,landing-data}
+    submit              assert reviewed/focused-green readiness at one live
+                        head
+    list                read components, immutable manifests, outcomes,
+                        accounting progress and recovery history
+    claim               immediately prepare/resume up to three components
+                        under one live lease
+    record-result       record failure attribution or exact full-
+                        baseline/final-review assertions
+    release             requeue batch; OS lease releases when the integrator
+                        command exits
+    publish             land through existing merge guards; requires an opted-
+                        in project and final integration PR
+    resolve-accounting  manually acknowledge one stopped identity after
+                        checking GitHub and prior notification/authority; then
+                        claim again
+    landing-data        ==SUPPRESS==
+
+options:
+  -h, --help            show this help message and exit
+  --project PROJECT     registered canonical project clone path
+  --base BASE           base branch name, e.g. main
+[exit 0]
+
+Verified observations:
+Empty queue returns null without launching the integrator command
+Integrator command refuses the primary project checkout
+Result, release and publish all refuse calls without an inherited integrator lease
+Readiness refuses mismatched review assertions and unsupported forge URLs
+Real GitHub merged PR is refused despite matching exact readiness assertions
+Accounting checks the real merged head and refuses an unavailable task identity
+Manual resolve requires GitHub attestation and an active stopped batch

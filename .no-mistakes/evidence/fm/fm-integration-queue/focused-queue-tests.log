@@ -1,0 +1,39 @@
+test_accounting_commit_failure_stops_and_resolves_after_successor_merge (__main__.QueueTests.test_accounting_commit_failure_stops_and_resolves_after_successor_merge) ... ok
+test_active_legacy_run_refuses_and_unknown_state_refuses (__main__.QueueTests.test_active_legacy_run_refuses_and_unknown_state_refuses) ... ok
+test_base_moves_between_verification_and_push_advertisement (__main__.QueueTests.test_base_moves_between_verification_and_push_advertisement) ... ok
+test_changed_component_head_invalidates_then_quarantines (__main__.QueueTests.test_changed_component_head_invalidates_then_quarantines) ... ok
+test_conflict_is_rejected_and_unrelated_change_proceeds (__main__.QueueTests.test_conflict_is_rejected_and_unrelated_change_proceeds) ... ok
+test_crash_after_publication_recovers_all_outcomes (__main__.QueueTests.test_crash_after_publication_recovers_all_outcomes) ... ok
+test_crash_between_components_resumes_without_double_accounting (__main__.QueueTests.test_crash_between_components_resumes_without_double_accounting) ... ok
+test_direct_successor_merge_requires_exact_previous_merge_proof (__main__.QueueTests.test_direct_successor_merge_requires_exact_previous_merge_proof) ... ok
+test_external_base_movement_invalidates_instead_of_resuming (__main__.QueueTests.test_external_base_movement_invalidates_instead_of_resuming) ... ok
+test_failed_component_and_dependents_drop_other_component_retries (__main__.QueueTests.test_failed_component_and_dependents_drop_other_component_retries) ... ok
+test_failed_dependency_keeps_transitive_dependents_queued (__main__.QueueTests.test_failed_dependency_keeps_transitive_dependents_queued) ... ok
+test_guarded_fast_forward_accounts_all_prs (__main__.QueueTests.test_guarded_fast_forward_accounts_all_prs) ... ok
+test_interrupted_accounting_attempt_stops_before_replay (__main__.QueueTests.test_interrupted_accounting_attempt_stops_before_replay) ... ok
+test_landed_dependency_allows_next_batch (__main__.QueueTests.test_landed_dependency_allows_next_batch) ... ok
+test_live_lease_survives_parent_crash_and_releases_on_last_holder (__main__.QueueTests.test_live_lease_survives_parent_crash_and_releases_on_last_holder) ... ok
+test_live_red_checks_refuse_even_with_passed_batch (__main__.QueueTests.test_live_red_checks_refuse_even_with_passed_batch) ... ok
+test_monitor_notifies_component_first_stops_for_manual_resolution (__main__.QueueTests.test_monitor_notifies_component_first_stops_for_manual_resolution) ... ok
+test_monitor_notifies_integration_first_stops_for_manual_resolution (__main__.QueueTests.test_monitor_notifies_integration_first_stops_for_manual_resolution) ... ok
+test_no_more_than_three_and_explicit_dependency_order (__main__.QueueTests.test_no_more_than_three_and_explicit_dependency_order) ... ok
+test_non_descendant_candidate_refuses (__main__.QueueTests.test_non_descendant_candidate_refuses) ... ok
+test_owner_hold_and_unreadable_authority_refuse_submission (__main__.QueueTests.test_owner_hold_and_unreadable_authority_refuse_submission) ... ok
+test_partial_accounting_resumes_after_component_merges_successor (__main__.QueueTests.test_partial_accounting_resumes_after_component_merges_successor) ... ok
+test_partial_accounting_resumes_after_component_registers_successor (__main__.QueueTests.test_partial_accounting_resumes_after_component_registers_successor) ... ok
+test_protected_branch_rejection_has_no_fallback (__main__.QueueTests.test_protected_branch_rejection_has_no_fallback) ... ok
+test_publication_requires_opt_in_and_exact_full_result (__main__.QueueTests.test_publication_requires_opt_in_and_exact_full_result) ... ok
+test_rejected_publication_can_resume_and_release (__main__.QueueTests.test_rejected_publication_can_resume_and_release) ... ok
+test_release_requeues_and_primary_copy_command_refuses (__main__.QueueTests.test_release_requeues_and_primary_copy_command_refuses) ... ok
+test_required_pr_rule_refuses_before_pushing (__main__.QueueTests.test_required_pr_rule_refuses_before_pushing) ... ok
+test_result_requires_lease_and_exact_tree_and_head (__main__.QueueTests.test_result_requires_lease_and_exact_tree_and_head) ... ok
+test_same_pr_retry_preserves_batch_binding (__main__.QueueTests.test_same_pr_retry_preserves_batch_binding) ... ok
+test_singleton_starts_immediately_and_resumes_immutable_manifest (__main__.QueueTests.test_singleton_starts_immediately_and_resumes_immutable_manifest) ... ok
+test_submission_refuses_dependency_cycles (__main__.QueueTests.test_submission_refuses_dependency_cycles) ... ok
+test_successor_registration_retires_landed_batch_binding (__main__.QueueTests.test_successor_registration_retires_landed_batch_binding) ... ok
+test_unlanded_batch_cannot_replace_pr_identity (__main__.QueueTests.test_unlanded_batch_cannot_replace_pr_identity) ... ok
+
+----------------------------------------------------------------------
+Ran 34 tests in 327.892s
+
+OK

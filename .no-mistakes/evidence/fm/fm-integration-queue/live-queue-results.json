@@ -1,0 +1,9 @@
+[
+  "Empty queue returns null without launching the integrator command",
+  "Integrator command refuses the primary project checkout",
+  "Result, release and publish all refuse calls without an inherited integrator lease",
+  "Readiness refuses mismatched review assertions and unsupported forge URLs",
+  "Real GitHub merged PR is refused despite matching exact readiness assertions",
+  "Accounting checks the real merged head and refuses an unavailable task identity",
+  "Manual resolve requires GitHub attestation and an active stopped batch"
+]
