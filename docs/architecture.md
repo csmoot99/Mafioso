@@ -530,6 +530,8 @@ Publication runs inside the existing merge guards and uses a normal fast-forward
 The original project pre-push hook is preserved, and branch protection requiring PR merges refuses publication.
 The private project opt-in is documented in [configuration.md](configuration.md#integration-queue-publication).
 Durable publication intent and ancestry plus forge proof recover interrupted publication and account for each folded PR through the existing merge-outcome reporter.
+Filesystem notifications and SQLite progress cannot commit atomically, so interrupted accounting or a monitor notification arriving first stops the batch visibly for the [manual accounting resolution](configuration.md#stopped-integration-accounting).
+Making the merge command, merge monitor and queue record accounting at one shared lifecycle step is a separate follow-up outside this PR.
 The queue's assertions about focused tests and review do not replace any current pipeline requirement or grant merge authority.
 The queue conservatively refuses preparation alongside any active legacy validation on that base, while the ordinary single-PR path retains its existing conflict guard.
 The implementation uses Python's standard SQLite and `fcntl` modules, so queue behavior is independent of worker runtime and needs no `flock` executable on macOS.

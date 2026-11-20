@@ -52,9 +52,23 @@ proves the exact candidate is an ancestor of the remote base and every folded
 PR is merged at its recorded head before idempotent merge-outcome accounting.
 Accounting progress is keyed by batch, task, PR URL and exact head, with an
 accounted boolean and Unix timestamp for its last transition. Publication
-intent creates pending rows for all components and the integration PR. Each
-accounting step and its completion record run in one transaction; recovery
-skips completed records even after the task's successor PR has merged.
+intent creates pending rows for all components and the integration PR.
+Accounting attempts are committed before filesystem side effects; their
+completion records cannot be atomic with those writes. Recovery skips completed
+records even after the task's successor PR has merged. An interrupted attempt,
+an earlier monitor notification, or a replaced/unreadable task identity stops
+the active batch as accounting-stopped, naming the task, PR and exact head.
+Repeated claim/publish and release cannot bypass that stop.
+
+Firstmate must check the exact PR's merged head on GitHub, verify the candidate
+remains in the remote base, and reconcile the prior notification and authority.
+Then run the stop message's resolve-accounting command with --github-checked
+and --reason describing that evidence, followed by claim again. Resolution
+locks the queue, rechecks live merged-head, tree and ancestry proof, and records
+one exact identity as accounted without modifying task metadata, authority
+files or notifications. It does not grant merge permission or republish Git.
+Coordinating merge command, monitor and queue accounting at one shared lifecycle
+step remains a separate follow-up outside this change.
 If the base is still expected_base the same passed candidate may retry the
 existing guards; any ambiguous publication remains recoverable, never guessed
 landed or silently replaced. A changed component after publication leaves
@@ -69,6 +83,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import sqlite3
 import stat
 import subprocess
@@ -325,6 +340,8 @@ class Queue:
         active = self.active()
         if active:
             manifest = self.manifest(active)
+            if self.batch_status(active) == 'accounting-stopped':
+                raise Refused(self.accounting_stop_message(manifest))
             if self.batch_status(active) == 'publishing':
                 if self.recover_publication(manifest):
                     return None
@@ -453,7 +470,7 @@ class Queue:
 
     def record_result(self):
         manifest = self.owned_manifest()
-        if self.batch_status(manifest['id']) == 'publishing':
+        if self.batch_status(manifest['id']) in ('publishing', 'accounting-stopped'):
             raise Refused('publication intent must be recovered before replacing its result')
         a = self.args
         if a.failed_component:
@@ -478,7 +495,7 @@ class Queue:
 
     def release(self):
         manifest = self.owned_manifest()
-        if self.batch_status(manifest['id']) == 'publishing':
+        if self.batch_status(manifest['id']) in ('publishing', 'accounting-stopped'):
             raise Refused('publication intent must be recovered before release')
         with self.transaction():
             self.finish(manifest, 'released', self.args.reason)
@@ -510,6 +527,8 @@ class Queue:
     def publish(self):
         manifest = self.owned_manifest()
         self.allowed()
+        if self.batch_status(manifest['id']) == 'accounting-stopped':
+            raise Refused(self.accounting_stop_message(manifest))
         if self.batch_status(manifest['id']) == 'publishing' and self.recover_publication(manifest):
             return self.snapshot()
         data = self.publication_data()
@@ -549,6 +568,72 @@ class Queue:
             raise Refused('publication was not confirmed; durable intent retained for recovery')
         return self.snapshot()
 
+    def accounting_stop_message(self, manifest):
+        result = json.loads(self.db.execute('SELECT result FROM batches WHERE id=?', (manifest['id'],)).fetchone()[0])
+        stop = result['accounting_stop']
+        command = shlex.join(['bash', self.shell, '--project', self.project, '--base', self.args.base,
+                              'resolve-accounting', '--batch', manifest['id'], '--task', stop['task'],
+                              '--pr', stop['pr'], '--head', stop['head'], '--github-checked',
+                              '--reason', 'describe GitHub and prior notification/authority verification'])
+        return ('batch ' + manifest['id'] + ' stopped: unproven accounting for task ' + stop['task'] +
+                ', PR ' + stop['pr'] + ', head ' + stop['head'] + ': ' + stop['reason'] +
+                '. Firstmate must check GitHub and the prior notification/authority, then run: ' + command)
+
+    def stop_accounting(self, manifest, component, reason):
+        with self.transaction():
+            result = json.loads(self.db.execute('SELECT result FROM batches WHERE id=?', (manifest['id'],)).fetchone()[0])
+            stop = dict(task=component['id'], pr=component['pr'], head=component['head'], reason=reason)
+            result['accounting_stop'] = stop
+            self.db.execute("UPDATE batches SET status='accounting-stopped',result=? WHERE id=?",
+                            (json.dumps(result), manifest['id']))
+            self.event('accounting-stopped', dict(batch=manifest['id'], **stop))
+        raise Refused(self.accounting_stop_message(manifest))
+
+    def prove_component_merge(self, manifest, component, env):
+        git(self.project, 'merge-base', '--is-ancestor', component['head'], manifest['commit'], env=env)
+        owner_repo, number = component['pr'][len('https://github.com/'):].split('/pull/')
+        proof = run(['gh-axi', 'api', 'repos/' + owner_repo + '/pulls/' + number,
+                     '--jq', 'if .merged == true and .head.sha == "' + component['head'] +
+                     '" then "fm-queue-merged" else "fm-queue-unproved" end'])
+        if proof != 'fm-queue-merged':
+            raise Refused('published PR merge is not yet proved: ' + component['pr'])
+
+    def resolve_accounting(self):
+        a = self.args
+        if not a.reason.strip():
+            raise Refused('manual resolution requires verification evidence in --reason')
+        with open(self.root / 'lease', 'a') as lease:
+            try:
+                fcntl.flock(lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                raise Refused('another integrator owns this project/base lease') from None
+            if self.active() != a.batch or self.batch_status(a.batch) != 'accounting-stopped':
+                raise Refused('manual resolution requires the active accounting-stopped batch')
+            manifest = self.manifest(a.batch)
+            result = json.loads(self.db.execute('SELECT result FROM batches WHERE id=?', (a.batch,)).fetchone()[0])
+            stop = result['accounting_stop']
+            if (a.task, a.pr, oid(a.head)) != (stop['task'], stop['pr'], stop['head']):
+                raise Refused('manual resolution must match the stopped task, PR and exact head')
+            env = self.objects_env()
+            base = self.base()
+            self.fetch(base, env)
+            git(self.project, 'merge-base', '--is-ancestor', manifest['expected_base'], manifest['commit'], env=env)
+            git(self.project, 'merge-base', '--is-ancestor', manifest['commit'], base, env=env)
+            if git(self.project, 'rev-parse', manifest['commit'] + '^{tree}', env=env) != manifest['tree']:
+                raise Refused('published candidate tree cannot be proved')
+            self.prove_component_merge(manifest, dict(pr=a.pr, head=a.head), env)
+            with self.transaction():
+                changed = self.db.execute('INSERT INTO accounting VALUES(?,?,?,?,1,?) '
+                                          'ON CONFLICT(batch,task,pr,head) DO UPDATE SET accounted=1,at=excluded.at WHERE accounting.accounted=0',
+                                          (a.batch, a.task, a.pr, a.head, int(time.time()))).rowcount
+                if changed != 1:
+                    raise Refused('exact pending accounting record is unavailable')
+                del result['accounting_stop']
+                self.db.execute("UPDATE batches SET status='publishing',result=? WHERE id=?", (json.dumps(result), a.batch))
+                self.event('accounting-resolved', dict(batch=a.batch, task=a.task, pr=a.pr, head=a.head,
+                                                      reason=a.reason, github_checked=a.github_checked))
+        return self.snapshot()
+
     def recover_publication(self, manifest):
         row = self.db.execute('SELECT status,result FROM batches WHERE id=?', (manifest['id'],)).fetchone()
         if row['status'] != 'publishing':
@@ -573,26 +658,28 @@ class Queue:
         if git(self.project, 'rev-parse', manifest['commit'] + '^{tree}', env=env) != manifest['tree']:
             raise Refused('published candidate tree cannot be proved')
         for component in [*manifest['components'], result['publication']]:
-            git(self.project, 'merge-base', '--is-ancestor', component['head'], manifest['commit'], env=env)
-            owner_repo, number = component['pr'][len('https://github.com/'):].split('/pull/')
-            proof = run(['gh-axi', 'api', 'repos/' + owner_repo + '/pulls/' + number,
-                         '--jq', 'if .merged == true and .head.sha == "' + component['head'] +
-                         '" then "fm-queue-merged" else "fm-queue-unproved" end'])
-            if proof != 'fm-queue-merged':
-                raise Refused('published PR merge is not yet proved: ' + component['pr'])
+            self.prove_component_merge(manifest, component, env)
             identity = (manifest['id'], component['id'], component['pr'], component['head'])
+            progress = self.db.execute('SELECT accounted FROM accounting WHERE batch=? AND task=? AND pr=? AND head=?',
+                                       identity).fetchone()
+            if not progress:
+                self.stop_accounting(manifest, component, 'exact accounting record is missing')
+            if progress['accounted']:
+                continue
+            attempt = dict(batch=manifest['id'], task=component['id'], pr=component['pr'], head=component['head'])
+            if self.db.execute("SELECT 1 FROM events WHERE kind='accounting-started' AND data=?",
+                               (json.dumps(attempt, sort_keys=True),)).fetchone():
+                self.stop_accounting(manifest, component, 'an earlier accounting attempt has no durable completion')
             with self.transaction():
-                progress = self.db.execute('SELECT accounted FROM accounting WHERE batch=? AND task=? AND pr=? AND head=?',
-                                           identity).fetchone()
-                if not progress:
-                    raise Refused('publication accounting record is missing: ' + component['pr'])
-                if progress['accounted']:
-                    continue
-                run(['bash', self.shell, '--account', component['id'], component['pr'], result['authority'], component['head']])
-                self.db.execute('UPDATE accounting SET accounted=1,at=? WHERE batch=? AND task=? AND pr=? AND head=?',
-                                (int(time.time()), *identity))
-                self.event('accounted', dict(batch=manifest['id'], task=component['id'],
-                                             pr=component['pr'], head=component['head']))
+                self.event('accounting-started', attempt)
+            try:
+                with self.transaction():
+                    run(['bash', self.shell, '--account', component['id'], component['pr'], result['authority'], component['head']])
+                    self.db.execute('UPDATE accounting SET accounted=1,at=? WHERE batch=? AND task=? AND pr=? AND head=?',
+                                    (int(time.time()), *identity))
+                    self.event('accounted', attempt)
+            except (Refused, OSError, sqlite3.Error, subprocess.TimeoutExpired) as error:
+                self.stop_accounting(manifest, component, 'accounting did not complete: ' + str(error))
         with self.transaction():
             self.db.execute("UPDATE batches SET status='landed' WHERE id=?", (manifest['id'],))
             for component in manifest['components']:
@@ -719,6 +806,13 @@ def main():
     publish.add_argument('--batch', required=True)
     publish.add_argument('--task', required=True)
     publish.add_argument('--pr', required=True)
+    resolve = commands.add_parser('resolve-accounting', help='manually acknowledge one stopped identity after checking GitHub and prior notification/authority; then claim again')
+    resolve.add_argument('--batch', required=True)
+    resolve.add_argument('--task', required=True)
+    resolve.add_argument('--pr', required=True)
+    resolve.add_argument('--head', required=True)
+    resolve.add_argument('--github-checked', action='store_true', required=True)
+    resolve.add_argument('--reason', required=True, help='verification evidence; records progress without rewriting task metadata or publishing a notification')
     data = commands.add_parser('landing-data', help=argparse.SUPPRESS)
     data.add_argument('--batch', required=True)
     args = parser.parse_args()
@@ -728,7 +822,8 @@ def main():
         if args.action == 'claim':
             return queue.claim()
         method = dict(list=queue.snapshot, submit=queue.submit, release=queue.release,
-                      **{'record-result': queue.record_result, 'publish': queue.publish, 'landing-data': queue.publication_data})[args.action]
+                      **{'record-result': queue.record_result, 'publish': queue.publish, 'landing-data': queue.publication_data,
+                         'resolve-accounting': queue.resolve_accounting})[args.action]
         emit(method())
         return 0
     finally:

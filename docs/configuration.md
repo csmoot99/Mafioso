@@ -1355,6 +1355,14 @@ Only list projects explicitly authorized for this publication method.
 The queue is not automatically used by dispatch or landing policy.
 The command, durable records, publication guards and recovery contract belong to [`bin/fm-integration-queue.sh`](../bin/fm-integration-queue.sh) and its [implementation header and help](../bin/fm-integration-queue.py).
 
+### Stopped integration accounting
+
+An `accounting-stopped` batch remains active and refuses automatic retries, publication and release until Firstmate resolves its named task, PR and exact head.
+Check that exact PR on GitHub, verify its merged head and inclusion in the published candidate and current base, and check the prior notification and recorded authority, including an outcome the monitor may have labeled external.
+Run the `resolve-accounting` command printed by the stop message with `--github-checked` and a `--reason` describing the verification and any manual notification or authority reconciliation, then run `claim` again.
+The command rechecks live GitHub merge proof, candidate tree and ancestry and records only that exact identity as accounted; it leaves task metadata, authority files, notifications and remote Git refs untouched.
+Its exact flags and the stop contract are owned by the [queue header and help](../bin/fm-integration-queue.py).
+
 
 ## Consigliere review (config/consigliere)
 

@@ -663,6 +663,124 @@ else:
     def test_partial_accounting_resumes_after_component_merges_successor(self):
         self.resume_after_successor(merge=True)
 
+    def assert_accounting_stopped(self, manifest, component):
+        state = self.snapshot()
+        self.assertEqual(state['active'], manifest['id'])
+        self.assertEqual(state['batches'][0]['status'], 'accounting-stopped')
+        stopped = json.loads(state['batches'][0]['result'])['accounting_stop']
+        self.assertEqual((stopped['task'], stopped['pr'], stopped['head']),
+                         (component['id'], component['pr'], component['head']))
+        result = self.queue('claim', '--workdir', str(self.worker), '--', 'true', check=False)
+        self.assertNotEqual(result.returncode, 0)
+        for text in ('stopped', 'unproven accounting', component['id'], component['pr'],
+                     component['head'], 'resolve-accounting', '--github-checked', '--reason'):
+            self.assertIn(text, result.stderr)
+        return result.stderr
+
+    def resolve_args(self, manifest, component):
+        return ['resolve-accounting', '--batch', manifest['id'], '--task', component['id'],
+                '--pr', component['pr'], '--head', component['head'], '--github-checked',
+                '--reason', 'checked exact merged head on GitHub and reconciled prior notification/authority']
+
+    def test_accounting_commit_failure_stops_and_resolves_after_successor_merge(self):
+        manifest, command = self.ready_publication()
+        first = manifest['components'][0]
+        database = next((self.home / 'state/integration-queue').glob('*/queue.sqlite'))
+        with sqlite3.connect(database) as db:
+            db.execute("CREATE TRIGGER reject_completion BEFORE UPDATE OF accounted ON accounting "
+                       "WHEN NEW.task='a' AND NEW.accounted=1 BEGIN SELECT RAISE(ABORT, 'injected completion failure'); END")
+        result = self.publish_attempt(command)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('unproven accounting', result.stderr)
+        self.assert_accounting_stopped(manifest, first)
+        self.assert_accounting(manifest, [False, False, False])
+        marker = self.home / 'state/a.pr-poll-merge-notified'
+        self.assertTrue(marker.exists())
+        successor = self.component('successor')
+        env = dict(self.env, QUEUE_ORDINARY_PR=successor[2])
+        self.cmd(['bash', str(ROOT / 'bin/fm-pr-merge.sh'), 'a', successor[2]], env=env)
+        meta = self.home / 'state/a.meta'
+        authority = self.home / 'state/a.merge-authority'
+        preserved = (meta.read_bytes(), authority.read_bytes(), marker.read_bytes())
+        with sqlite3.connect(database) as db:
+            db.execute('DROP TRIGGER reject_completion')
+        args = self.resolve_args(manifest, first)
+        for field, value in (('--task', 'b'), ('--pr', successor[2]), ('--head', successor[1])):
+            wrong = list(args)
+            wrong[wrong.index(field) + 1] = value
+            self.assertNotEqual(self.queue(*wrong, check=False).returncode, 0)
+            self.assertEqual(self.snapshot()['batches'][0]['status'], 'accounting-stopped')
+        unchecked = [arg for arg in args if arg != '--github-checked']
+        self.assertNotEqual(self.queue(*unchecked, check=False).returncode, 0)
+        (self.root / 'unproved').touch()
+        self.assertNotEqual(self.queue(*args, check=False).returncode, 0)
+        self.assertEqual(self.snapshot()['batches'][0]['status'], 'accounting-stopped')
+        (self.root / 'unproved').unlink()
+        self.queue(*args)
+        self.assertIsNone(self.claim())
+        self.assertEqual(self.snapshot()['batches'][0]['status'], 'landed')
+        self.assertEqual((meta.read_bytes(), authority.read_bytes(), marker.read_bytes()), preserved)
+        self.assert_accounting(manifest, [True, True, True])
+        events = [e['data'] for e in self.snapshot()['events'] if e['kind'] == 'accounting-resolved']
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]['reason'], args[-1])
+        self.assertTrue(events[0]['github_checked'])
+        self.assert_merge_outcomes_once([*manifest['components'], dict(id='a', pr=successor[2]),
+                                        dict(id='integration', pr='https://github.com/example/game/pull/99')])
+
+    def monitor_first_accounting(self, index):
+        manifest, command = self.ready_publication()
+        (self.root / 'unproved').touch()
+        self.assertNotEqual(self.publish_attempt(command).returncode, 0)
+        (self.root / 'unproved').unlink()
+        components = [*manifest['components'], dict(id='integration', pr='https://github.com/example/game/pull/99',
+                                                   head=manifest['commit'])]
+        component = components[index]
+        self.cmd(['bash', '-c', '. "$1"; fm_merge_outcome_report "$FM_HOME" "$FM_STATE_OVERRIDE" "$2" "$3" poll external',
+                  'monitor-outcome', str(ROOT / 'bin/fm-merge-outcome-lib.sh'), component['id'], component['pr']])
+        notifications = (self.home / 'state/.wake-queue').read_text().splitlines()
+        self.assertTrue(any(component['pr'] in row and row.endswith(' external') for row in notifications))
+        result = self.queue('claim', '--workdir', str(self.worker), '--', 'true', check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('notification already exists', result.stderr)
+        self.assert_accounting_stopped(manifest, component)
+        self.queue(*self.resolve_args(manifest, component))
+        self.assertIsNone(self.claim())
+        self.assertEqual(self.snapshot()['batches'][0]['status'], 'landed')
+        self.assert_accounting(manifest, [True, True, True])
+        self.assert_merge_outcomes_once(components)
+
+    def test_monitor_notifies_component_first_stops_for_manual_resolution(self):
+        self.monitor_first_accounting(0)
+
+    def test_monitor_notifies_integration_first_stops_for_manual_resolution(self):
+        self.monitor_first_accounting(2)
+
+    def test_interrupted_accounting_attempt_stops_before_replay(self):
+        manifest, command = self.ready_publication()
+        (self.root / 'unproved').touch()
+        self.assertNotEqual(self.publish_attempt(command).returncode, 0)
+        (self.root / 'unproved').unlink()
+        first = manifest['components'][0]
+        database = next((self.home / 'state/integration-queue').glob('*/queue.sqlite'))
+        attempt = dict(batch=manifest['id'], task=first['id'], pr=first['pr'], head=first['head'])
+        with sqlite3.connect(database) as db:
+            db.execute('INSERT INTO events(at,kind,data) VALUES(?,?,?)',
+                       (1, 'accounting-started', json.dumps(attempt, sort_keys=True)))
+        self.assert_accounting_stopped_after_claim(manifest, first)
+
+    def assert_accounting_stopped_after_claim(self, manifest, component):
+        result = self.queue('claim', '--workdir', str(self.worker), '--', 'true', check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('earlier accounting attempt has no durable completion', result.stderr)
+        self.assert_accounting_stopped(manifest, component)
+        self.assertFalse((self.home / 'state' / (component['id'] + '.pr-poll-merge-notified')).exists())
+        self.cmd(['bash', '-c', '. "$1"; fm_merge_outcome_report "$FM_HOME" "$FM_STATE_OVERRIDE" "$2" "$3" self attended',
+                  'manual-notification', str(ROOT / 'bin/fm-merge-outcome-lib.sh'), component['id'], component['pr']])
+        self.queue(*self.resolve_args(manifest, component))
+        self.assertIsNone(self.claim())
+        self.assertEqual(self.snapshot()['batches'][0]['status'], 'landed')
+
     def test_protected_branch_rejection_has_no_fallback(self):
         manifest, command = self.ready_publication()
         hook = self.remote / 'hooks/update'
