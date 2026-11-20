@@ -22,6 +22,9 @@
 # (bin/fm-consigliere-lib.sh owns the receipt).
 # The recorded pr= also frees the task's place in a declared project capacity
 # (bin/fm-project-capacity-lib.sh).
+# A queue merge caller may bind integration_batch while registering its final
+# PR; fm-pr-merge refuses an ordinary landing of that bound PR on retries.
+# A successor PR retires that binding only after the prior PR's merge is proved.
 # Usage: fm-pr-check.sh <task-id> <pr-url>
 set -eu
 
@@ -173,6 +176,10 @@ if [ "$REVIEW_MODE" = on ]; then
   fm_consigliere_require_review "$FM_HOME" "$ID" "$URL" "$REVIEW_HEAD" || exit 1
 fi
 
+INTEGRATION_BATCH=${FM_INTEGRATION_REGISTER_BATCH:-}
+if [ -n "$INTEGRATION_BATCH" ]; then
+  [ "${FM_PR_CHECK_MERGE:-}" = 1 ] && [[ "$INTEGRATION_BATCH" =~ ^[a-f0-9]{32}$ ]] || exit 2
+fi
 META_TMP=
 META_LOCK=
 META_LOCK_HELD=0
@@ -203,13 +210,33 @@ META_LOCK_HELD=1
 META_DEVICE=$(fm_pr_file_device "$META") || exit 1
 STATE_DEVICE=$(fm_pr_file_device "$STATE") || exit 1
 [ "$META_DEVICE" = "$STATE_DEVICE" ] || { echo "error: task metadata is unavailable" >&2; exit 1; }
+RETIRE_INTEGRATION_BATCH=0
+if grep -q '^integration_batch=' "$META"; then
+  EXISTING_URL=$(grep '^pr=' "$META" | tail -1 | cut -d= -f2- || true)
+  if [ "$EXISTING_URL" != "$URL" ]; then
+    if ( fm_pr_metadata_identity_parse "$META" \
+      && fm_pr_poll_merge_already_notified "$STATE" "$ID" \
+        "$FM_PR_META_PROVIDER" "$FM_PR_META_HOST" "$FM_PR_META_PATH" "$FM_PR_META_NUMBER" ); then
+      RETIRE_INTEGRATION_BATCH=1
+    else
+      echo "error: task $ID is bound to $EXISTING_URL, not $URL" >&2
+      exit 1
+    fi
+  fi
+fi
 META_TMP=$(mktemp "$STATE/.fm-pr-meta.XXXXXX") || exit 1
 while IFS= read -r line || [ -n "$line" ]; do
   case "$line" in
+    integration_batch=*)
+      if [ -z "$INTEGRATION_BATCH" ] && [ "$RETIRE_INTEGRATION_BATCH" = 0 ]; then
+        printf '%s\n' "$line" >> "$META_TMP" || exit 1
+      fi
+      ;;
     pr=*|pr_head=*) ;;
     *) printf '%s\n' "$line" >> "$META_TMP" || exit 1 ;;
   esac
 done < "$META"
+[ -z "$INTEGRATION_BATCH" ] || printf 'integration_batch=%s\n' "$INTEGRATION_BATCH" >> "$META_TMP" || exit 1
 printf 'pr=%s\n' "$URL" >> "$META_TMP" || exit 1
 [ -z "$PR_HEAD" ] || printf 'pr_head=%s\n' "$PR_HEAD" >> "$META_TMP" || exit 1
 chmod 0600 "$META_TMP" || exit 1

@@ -87,6 +87,7 @@ Each effective `FM_HOME` contains private operational directories.
 - Watcher and wake-queue coordination, away-mode state, and generated Relay artifacts.
 - Inactive terminal-outcome receipts under `state/terminal-outcomes/`.
 - Enabled extension working namespaces under `state/extensions/`.
+- Opt-in integration preparation under `state/integration-queue/` ([`bin/fm-integration-queue.sh`](../bin/fm-integration-queue.sh) owns its records and commands).
 - Bounded per-job test output under `state/heavy-logs/` in the root home ([`bin/fm-heavy.sh`](../bin/fm-heavy.sh)).
 - Parent-side remote ledger copies under `state/secondmate-summary-cache/`.
 - One-shot Bearings reconcile requests under `state/reconcile-notify/`.
@@ -1346,6 +1347,23 @@ The explicit Codex handoff percentage does not require a launch-env override; wi
 [`bin/fm-context-handoff.sh --help`](../bin/fm-context-handoff.sh) owns the hook mechanics, the fallback ceiling, the durable records, and the replacement command, and the `context-handoff` skill owns what the handoff document carries.
 The file is inherited into secondmate homes through the [primary-authoritative configuration contract](../.agents/skills/secondmate-provisioning/SKILL.md), so a secondmate's own Claude and Codex workers hand off the same way.
 Regression coverage runs the real hook commands, spawn wiring, and replacement command in [`tests/fm-context-handoff.test.sh`](../tests/fm-context-handoff.test.sh); the blocking and in-band-notice behaviors are Claude's own and are proven on the installed Claude Code by the opt-in live guard recorded in [`docs/verification/runtime-backends.md`](verification/runtime-backends.md), and the installed Codex's loading of the Codex hooks is checked by [`tests/fm-codex-hook-layer-live-e2e.test.sh`](../tests/fm-codex-hook-layer-live-e2e.test.sh).
+
+## Integration queue publication
+
+`config/integration-queue-projects` is an optional private UTF-8 file containing one canonical absolute project clone path per line.
+An absent or empty file enables no projects.
+The file must be owned by the current user, regular, with a single link and no group or other permissions (normally mode 0600); blank lines match no project, and comments or wildcards have no special meaning.
+Listing a project opts it into the GitHub integration publication path; it does not grant merge authority or change its testing or review requirements.
+Only list projects explicitly authorized for this publication method.
+The queue is not automatically used by dispatch or landing policy.
+The command, durable records, publication guards and recovery contract belong to [`bin/fm-integration-queue.sh`](../bin/fm-integration-queue.sh) and its [implementation header and help](../bin/fm-integration-queue.py).
+
+### Stopped integration accounting
+
+The [queue header and help](../bin/fm-integration-queue.py) own the accounting stop conditions and exact resolution command.
+Check the exact PR named by the stop message on GitHub, verify its merged head and inclusion in the published candidate and current base, and check the prior notification and recorded authority, including an outcome the monitor may have labeled external.
+After the foreground integrator exits, run the `resolve-accounting` command printed by the stop message with a reason describing the verification and any manual notification or authority reconciliation, then run `claim` again.
+Resolution acknowledges accounting without publishing missing notifications or repairing authority, so complete any required reconciliation before acknowledging it.
 
 ## Consigliere review (config/consigliere)
 
