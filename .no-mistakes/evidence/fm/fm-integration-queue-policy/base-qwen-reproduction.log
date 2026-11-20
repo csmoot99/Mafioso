@@ -1,0 +1,2 @@
+ok - fm-brief: scaffolds leave the worker role scope to the launch boundary and keep the secondmate contract
+not ok - the qwen brief still carries 'no-mistakes', which a direct-PR qwen task cannot use

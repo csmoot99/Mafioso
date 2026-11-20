@@ -1,0 +1,8 @@
+Selected executable-interface cases from tests/fm-brief.test.sh:
+test_ship_modes_generate_clean_briefs
+test_ship_mode_is_required_and_closed_set
+test_worker_return_envelopes
+test_qwen_shape_inlines_the_plan_and_keeps_the_contract
+test_qwen_combine_renders_the_trial_merge
+
+Definitions loaded without executing the script-wide test list. No static checks invoked.

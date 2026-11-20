@@ -1,0 +1,113 @@
+[
+  {
+    "name": "no-mistakes scaffold emits focused-test policy with required gates and isolation",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "ship-no-mistakes-brief.md"
+    ]
+  },
+  {
+    "name": "direct-PR scaffold emits focused-test policy with required gates and isolation",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "ship-direct-PR-brief.md"
+    ]
+  },
+  {
+    "name": "local-only scaffold emits focused-test policy with required gates and isolation",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "ship-local-only-brief.md"
+    ]
+  },
+  {
+    "name": "Compact Qwen plan scaffold retains focused policy and explicit done command",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "qwen-brief.md"
+    ]
+  },
+  {
+    "name": "Compact Qwen integration scaffold emits testing policy beside exact fold instructions",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "qwen-combine-brief.md",
+      "qwen-combine-combine.sh"
+    ]
+  },
+  {
+    "name": "Missing delivery mode is refused without generating a worker brief",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "live-cli-transcript.log"
+    ]
+  },
+  {
+    "name": "Promote scout to no-mistakes: active and persisted relaunch contracts carry policy and preserve safety",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "promoted-no-mistakes-ship-instructions.md",
+      "promoted-no-mistakes-relaunch-brief.md",
+      "promoted-no-mistakes-meta.txt"
+    ]
+  },
+  {
+    "name": "Repeated no-mistakes promotion refuses without changing the published contracts",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "live-cli-transcript.log"
+    ]
+  },
+  {
+    "name": "Promote scout to direct-PR: active and persisted relaunch contracts carry policy and preserve safety",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "promoted-direct-PR-ship-instructions.md",
+      "promoted-direct-PR-relaunch-brief.md",
+      "promoted-direct-PR-meta.txt"
+    ]
+  },
+  {
+    "name": "Repeated direct-PR promotion refuses without changing the published contracts",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "live-cli-transcript.log"
+    ]
+  },
+  {
+    "name": "Promote scout to local-only: active and persisted relaunch contracts carry policy and preserve safety",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "promoted-local-only-ship-instructions.md",
+      "promoted-local-only-relaunch-brief.md",
+      "promoted-local-only-meta.txt"
+    ]
+  },
+  {
+    "name": "Repeated local-only promotion refuses without changing the published contracts",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "live-cli-transcript.log"
+    ]
+  },
+  {
+    "name": "Unfilled scout intent cannot be promoted or receive ship-policy output",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "live-cli-transcript.log"
+    ]
+  }
+]

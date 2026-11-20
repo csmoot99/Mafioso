@@ -1,0 +1,6 @@
+window=fm-promoted-direct-PR
+worktree=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0
+kind=ship
+mode=direct-PR
+yolo=off
+branch=fm/promoted-direct-PR

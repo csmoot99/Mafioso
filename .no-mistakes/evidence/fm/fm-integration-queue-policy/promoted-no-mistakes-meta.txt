@@ -1,0 +1,6 @@
+window=fm-promoted-no-mistakes
+worktree=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0
+kind=ship
+mode=no-mistakes
+yolo=off
+branch=fm/promoted-no-mistakes

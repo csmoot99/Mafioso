@@ -1,0 +1,94 @@
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/bin/fm-lab-home.sh create /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/.test-phase-tmp/live-home
+/home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/.test-phase-tmp/live-home
+[exit 0]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/bin/fm-brief.sh ship-no-mistakes fixture-project --mode no-mistakes
+scaffolded: /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/.test-phase-tmp/live-home/data/ship-no-mistakes/brief.md (ship, mode=no-mistakes; replace {TASK} and {FIRSTMATE_SPEC})
+[exit 0]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/bin/fm-brief.sh ship-direct-PR fixture-project --mode direct-PR
+scaffolded: /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/.test-phase-tmp/live-home/data/ship-direct-PR/brief.md (ship, mode=direct-PR; replace {TASK} and {FIRSTMATE_SPEC})
+[exit 0]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/bin/fm-brief.sh ship-local-only fixture-project --mode local-only
+scaffolded: /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/.test-phase-tmp/live-home/data/ship-local-only/brief.md (ship, mode=local-only; replace {TASK} and {FIRSTMATE_SPEC})
+[exit 0]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/bin/fm-brief.sh qwen fixture-project --mode direct-PR --harness qwen --plan /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/.test-phase-tmp/live-home/plan.md --files src/a.ts src/a.test.ts --done-command make focused-test
+scaffolded: /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/.test-phase-tmp/live-home/data/qwen/brief.md (ship, mode=direct-PR, qwen shape; replace {TASK} and {FIRSTMATE_SPEC})
+[exit 0]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/bin/fm-brief.sh qwen-combine fixture-project --mode direct-PR --harness qwen --combine /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/.test-phase-tmp/live-home/combine.txt --done-command make combined-test
+scaffolded: /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/.test-phase-tmp/live-home/data/qwen-combine/brief.md and /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/.test-phase-tmp/live-home/data/qwen-combine/combine.sh (ship, mode=direct-PR, qwen combine shape; replace {TASK} and {FIRSTMATE_SPEC})
+[exit 0]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/bin/fm-brief.sh no-mode fixture-project
+error: ship briefs require --mode <no-mistakes|direct-PR|local-only>; resolve it at intake from the captain's instruction and the project's registered posture in data/projects.md
+[exit 1]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/bin/fm-brief.sh promoted-no-mistakes fixture-project --scout
+scaffolded: /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/.test-phase-tmp/live-home/data/promoted-no-mistakes/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+[exit 0]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/bin/fm-promote.sh promoted-no-mistakes --mode no-mistakes --yolo off
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+promoted promoted-no-mistakes to ship mode=no-mistakes yolo=off (teardown protection restored)
+wrote ship instructions for mode=no-mistakes: /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/.test-phase-tmp/live-home/data/promoted-no-mistakes/ship-instructions.md
+next: FM_HOME=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/.test-phase-tmp/live-home bin/fm-send.sh fm-promoted-no-mistakes "$(cat /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/.test-phase-tmp/live-home/data/promoted-no-mistakes/ship-instructions.md)"
+[exit 0]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/bin/fm-promote.sh promoted-no-mistakes --mode no-mistakes --yolo off
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: task promoted-no-mistakes is not a scout task (kind=scout not in meta)
+[exit 1]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/bin/fm-brief.sh promoted-direct-PR fixture-project --scout
+scaffolded: /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/.test-phase-tmp/live-home/data/promoted-direct-PR/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+[exit 0]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/bin/fm-promote.sh promoted-direct-PR --mode direct-PR --yolo off
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+promoted promoted-direct-PR to ship mode=direct-PR yolo=off (teardown protection restored)
+wrote ship instructions for mode=direct-PR: /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/.test-phase-tmp/live-home/data/promoted-direct-PR/ship-instructions.md
+next: FM_HOME=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/.test-phase-tmp/live-home bin/fm-send.sh fm-promoted-direct-PR "$(cat /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/.test-phase-tmp/live-home/data/promoted-direct-PR/ship-instructions.md)"
+[exit 0]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/bin/fm-promote.sh promoted-direct-PR --mode direct-PR --yolo off
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: task promoted-direct-PR is not a scout task (kind=scout not in meta)
+[exit 1]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/bin/fm-brief.sh promoted-local-only fixture-project --scout
+scaffolded: /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/.test-phase-tmp/live-home/data/promoted-local-only/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+[exit 0]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/bin/fm-promote.sh promoted-local-only --mode local-only --yolo off
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+promoted promoted-local-only to ship mode=local-only yolo=off (teardown protection restored)
+wrote ship instructions for mode=local-only: /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/.test-phase-tmp/live-home/data/promoted-local-only/ship-instructions.md
+next: FM_HOME=/home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/.test-phase-tmp/live-home bin/fm-send.sh fm-promoted-local-only "$(cat /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/.test-phase-tmp/live-home/data/promoted-local-only/ship-instructions.md)"
+[exit 0]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/bin/fm-promote.sh promoted-local-only --mode local-only --yolo off
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: task promoted-local-only is not a scout task (kind=scout not in meta)
+[exit 1]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/bin/fm-brief.sh unfilled-scout fixture-project --scout
+scaffolded: /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/.test-phase-tmp/live-home/data/unfilled-scout/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+[exit 0]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/bin/fm-promote.sh unfilled-scout --mode no-mistakes --yolo off
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/.test-phase-tmp/live-home/data/unfilled-scout/brief.md still contains {TASK} or {FIRSTMATE_SPEC}; preserve the original ask in ## Captain's intent and fill the scout-time ## Firstmate spec; promotion generates a separate ship-time spec
+[exit 1]
+
+$ bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M7VKR3HV925EC3NA45YYP7Z0/bin/fm-test-failure.sh classify policy-test-classification --test test_qwen_shape_inlines_the_plan_and_keeps_the_contract --file tests/fm-brief.test.sh --class brittle --cause Reproduced at base and target: global no-mistakes substring prohibition also matches absolute code/home paths inside the gate .no-mistakes worktree. Normalize emitted installation paths before checking instruction content.
+fm-test-failure.sh: no recorded failure of test_qwen_shape_inlines_the_plan_and_keeps_the_contract in task policy-test-classification; classification kept unlinked
+[exit 0]

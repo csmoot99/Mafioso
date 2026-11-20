@@ -1,0 +1,6 @@
+ok - fm-brief: scaffolds leave the worker role scope to the launch boundary and keep the secondmate contract
+ok - fm-brief.sh: no-mistakes/direct-PR/local-only briefs generate cleanly
+ok - fm-brief.sh: ship --mode is required and closed-set validated
+ok - fm-brief.sh: all worker shapes bound returns; scout reports open with a standalone envelope
+ok - fm-brief.sh --harness qwen: plan inlined, machine lines and safety contract kept, runnable reporting and inbox ack, Start last, under half the size
+ok - fm-brief.sh --combine renders each fold, conflict note and last step, with the home include last and no Start
