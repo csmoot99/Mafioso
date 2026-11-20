@@ -12,7 +12,8 @@ Candidate objects live beside the database, never in the project clone.
 lease for the command's lifetime. A competing claim refuses immediately. The
 command inherits that descriptor and FM_INTEGRATION_{BATCH,MANIFEST,COMMIT,
 OBJECTS,LEASE_FD}; shell children retain it, even if the original claimant dies.
-Call record-result/release from that shell while the descriptor is inherited.
+Call record-result, release or publish from that shell while the descriptor
+is inherited.
 Do not background work or close the descriptor before the integrator finishes.
 There is no stale-lock timer or break-lock operation. After all holders exit,
 the next claim resumes the exact durable active manifest or invalidates it if
@@ -30,7 +31,9 @@ at the exact live PR head, not test receipts or proof of permission. Owner holds
 and merge authority are read by the shell adapter using existing merge helpers.
 No new merge grant, review waiver, test reuse or pipeline configuration exists.
 This initial implementation supports GitHub component reads only; other forge
-URLs refuse explicitly. All commands emit JSON, errors go to stderr.
+URLs refuse explicitly. Queue records are emitted as JSON; the foreground
+command and publication guards may also emit their own output. Queue errors
+go to stderr.
 
 After running the full baseline on the candidate in the isolated integrator
 copy and reviewing that exact commit, record-result binds those assertions.
@@ -60,10 +63,10 @@ an earlier monitor notification, or a replaced/unreadable task identity stops
 the active batch as accounting-stopped, naming the task, PR and exact head.
 Repeated claim/publish and release cannot bypass that stop.
 
-Firstmate must check the exact PR's merged head on GitHub, verify the candidate
-remains in the remote base, and reconcile the prior notification and authority.
-Then run the stop message's resolve-accounting command with --github-checked
-and --reason describing that evidence, followed by claim again. Resolution
+Firstmate's manual verification procedure is owned by docs/configuration.md,
+under "Stopped integration accounting". After verification and the integrator's
+exit, run the stop message's resolve-accounting command with --github-checked
+and --reason describing the evidence, followed by claim again. Resolution
 locks the queue, rechecks live merged-head, tree and ancestry proof, and records
 one exact identity as accounted without modifying task metadata, authority
 files or notifications. It does not grant merge permission or republish Git.

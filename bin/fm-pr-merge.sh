@@ -173,7 +173,8 @@
 # holds their control locks through publication, and invokes only the exact
 # fast-forward primitive in fm-integration-queue.py. No overrides or forge
 # arguments apply to this path. A recorded integration_batch refuses an
-# ordinary PR merge, including retries after a publication refusal.
+# ordinary merge of that bound PR, including retries after a publication
+# refusal; the proven-merged successor exception above retires the binding.
 #
 # Usage: fm-pr-merge.sh <task-id> <pr-url> [--attended-override] [--allow-red <check-name>]... [--allow-missing <check-name>] [--allow-in-flight] [-- <extra forge merge args>]
 #

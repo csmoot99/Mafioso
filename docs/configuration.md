@@ -1357,12 +1357,10 @@ The command, durable records, publication guards and recovery contract belong to
 
 ### Stopped integration accounting
 
-An `accounting-stopped` batch remains active and refuses automatic retries, publication and release until Firstmate resolves its named task, PR and exact head.
-Check that exact PR on GitHub, verify its merged head and inclusion in the published candidate and current base, and check the prior notification and recorded authority, including an outcome the monitor may have labeled external.
-Run the `resolve-accounting` command printed by the stop message with `--github-checked` and a `--reason` describing the verification and any manual notification or authority reconciliation, then run `claim` again.
-The command rechecks live GitHub merge proof, candidate tree and ancestry and records only that exact identity as accounted; it leaves task metadata, authority files, notifications and remote Git refs untouched.
-Its exact flags and the stop contract are owned by the [queue header and help](../bin/fm-integration-queue.py).
-
+The [queue header and help](../bin/fm-integration-queue.py) own the accounting stop conditions and exact resolution command.
+Check the exact PR named by the stop message on GitHub, verify its merged head and inclusion in the published candidate and current base, and check the prior notification and recorded authority, including an outcome the monitor may have labeled external.
+After the foreground integrator exits, run the `resolve-accounting` command printed by the stop message with a reason describing the verification and any manual notification or authority reconciliation, then run `claim` again.
+Resolution acknowledges accounting without publishing missing notifications or repairing authority, so complete any required reconciliation before acknowledging it.
 
 ## Consigliere review (config/consigliere)
 

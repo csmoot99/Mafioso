@@ -393,9 +393,10 @@ When a selected delivery path calls for a diff, `bin/fm-review-diff.sh` refreshe
 A GitLab merge request and a Gerrit change expose no such ref, so a task recording one of those diffs the local branch under that same warning, which is its current content.
 Where a no-mistakes pipeline stores evidence in the repo, it publishes that PR-viewable validation evidence to an orphan evidence branch that shares no history with code branches, so it never enters the crew branch or the default branch.
 This repo uses that setting, and its own `.no-mistakes/` directory remains local state that stays gitignored and is rejected by CI if tracked; [`configuration.md`](configuration.md) owns the setting.
-PR-based task merges go through `bin/fm-pr-merge.sh`, which records `pr=` and any available `pr_head=` through `bin/fm-pr-check.sh` before calling the forge CLI.
+PR-based task merges go through `bin/fm-pr-merge.sh`, which records `pr=` and any available `pr_head=` through `bin/fm-pr-check.sh` before attempting a landing.
 The helper requires a full canonical URL and rejects malformed URLs or repo override flags before recording merge state.
-A `https://github.com/<owner>/<repo>/pull/<n>` URL requires `gh` and `jq`, is merged only after live reads confirm the pull request is open, not a draft, mergeable, conflict-free, every unwaived check is green at the current head, and every unwaived check the base branch requires has reported at that head, then `gh pr merge` binds that verified head with `--match-head-commit`.
+On the ordinary single-PR path, a `https://github.com/<owner>/<repo>/pull/<n>` URL requires `gh` and `jq`, is merged only after live reads confirm the pull request is open, not a draft, mergeable, conflict-free, every unwaived check is green at the current head, and every unwaived check the base branch requires has reported at that head, then `gh pr merge` binds that verified head with `--match-head-commit`.
+The opt-in [integration queue](#integration-queue) uses the guarded publication path described below.
 A required check that never reported is absent from the checks list rather than red; [`bin/fm-pr-merge.sh`](../bin/fm-pr-merge.sh)'s header owns required-context sources, producer identity, partial-read refusals, and attended check waivers.
 A check run is green when its current run is green, because GitHub leaves a cancelled run in the rollup beside the passing re-run it triggered when the base branch advanced; `bin/fm-pr-merge.sh`'s `github_checks_not_green` owns the rule, which uses `startedAt` to clear only an older completed check run that a passing run with the same name provably replaced, while unfinished check runs and non-green status contexts stay red.
 `--auto`, `--admin`, and branch-deletion flags are refused unless `--attended-override` is passed for an explicit captain instruction; that override never skips the live green check, the away-record read, or a captain hold.
@@ -530,8 +531,8 @@ Publication runs inside the existing merge guards and uses a normal fast-forward
 The original project pre-push hook is preserved, and branch protection requiring PR merges refuses publication.
 The private project opt-in is documented in [configuration.md](configuration.md#integration-queue-publication).
 Durable publication intent and ancestry plus forge proof recover interrupted publication and account for each folded PR through the existing merge-outcome reporter.
-Filesystem notifications and SQLite progress cannot commit atomically, so interrupted accounting or a monitor notification arriving first stops the batch visibly for the [manual accounting resolution](configuration.md#stopped-integration-accounting).
-Making the merge command, merge monitor and queue record accounting at one shared lifecycle step is a separate follow-up outside this PR.
+Filesystem notifications and SQLite progress cannot commit atomically; the [queue header](../bin/fm-integration-queue.py) owns the resulting stop conditions, and [configuration.md](configuration.md#stopped-integration-accounting) owns Firstmate's manual verification procedure.
+Making the merge command, merge monitor and queue record accounting at one shared lifecycle step remains a separate follow-up.
 The queue's assertions about focused tests and review do not replace any current pipeline requirement or grant merge authority.
 The queue conservatively refuses preparation alongside any active legacy validation on that base, while the ordinary single-PR path retains its existing conflict guard.
 The implementation uses Python's standard SQLite and `fcntl` modules, so queue behavior is independent of worker runtime and needs no `flock` executable on macOS.
