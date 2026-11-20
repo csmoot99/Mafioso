@@ -55,6 +55,7 @@ case "${1:-}" in
       0) echo 'error: task is still held for the owner' >&2; exit 1 ;;
       *) echo 'error: owner hold could not be read' >&2; exit 1 ;;
     esac
+    # shellcheck source=bin/fm-consigliere-lib.sh
     . "$SCRIPT_DIR/fm-consigliere-lib.sh"
     fm_consigliere_require_review "$FM_HOME" "$ID" "$URL" "$HEAD" || exit 1
     fm_afk_contract_lock_hold "$STATE" || exit 1
@@ -65,7 +66,9 @@ case "${1:-}" in
   --account)
     [ "$#" -eq 5 ] || exit 2
     ID=$2 URL=$3 AUTHORITY=$4 HEAD=$5
+    # shellcheck source=bin/fm-merge-outcome-lib.sh
     . "$SCRIPT_DIR/fm-merge-outcome-lib.sh"
+    # shellcheck source=bin/fm-merge-authority-lib.sh
     . "$SCRIPT_DIR/fm-merge-authority-lib.sh"
     fm_pr_task_id_valid "$ID" && fm_pr_url_parse "$URL" && fm_pr_head_valid "$HEAD" || exit 2
     [ "$FM_PR_PROVIDER" = github ] || exit 2
