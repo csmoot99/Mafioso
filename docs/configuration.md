@@ -1355,7 +1355,7 @@ An absent or empty file enables no projects.
 The file must be owned by the current user, regular, with a single link and no group or other permissions (normally mode 0600); blank lines match no project, and comments or wildcards have no special meaning.
 Listing a project opts it into the GitHub integration publication path; it does not grant merge authority or change its testing or review requirements.
 Only list projects explicitly authorized for this publication method.
-The queue is not automatically used by dispatch or landing policy.
+Dispatch does not automatically select the queue; [`combined-merge`](../.agents/skills/combined-merge/SKILL.md) owns the supervised pilot landing policy.
 The command, durable records, publication guards and recovery contract belong to [`bin/fm-integration-queue.sh`](../bin/fm-integration-queue.sh) and its [implementation header and help](../bin/fm-integration-queue.py).
 
 ### Stopped integration accounting

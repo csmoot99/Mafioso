@@ -1419,7 +1419,7 @@ test_worker_return_envelopes() {
 }
 
 test_qwen_shape_inlines_the_plan_and_keeps_the_contract() {
-  local home plan brief id=brief-qwen-q1 standard before after epoch status wt fakebin start report blocked out line ack inbox done_envelope blocked_envelope
+  local home plan brief id=brief-qwen-q1 standard before after epoch status wt fakebin start report blocked out line ack inbox done_envelope blocked_envelope normalized
   home="$TMP_ROOT/qwen-home"
   mkdir -p "$home/data"
   plan="$TMP_ROOT/qwen-plan.md"
@@ -1455,8 +1455,15 @@ test_qwen_shape_inlines_the_plan_and_keeps_the_contract() {
     "the qwen brief lost the push and merge rule"
   assert_grep 'git rev-parse --show-toplevel' "$brief" "the qwen brief lost its isolation check"
   assert_grep "$home/state/$id.inbox" "$brief" "the qwen brief does not name its steering inbox"
+  # Check instruction content without treating an installation path containing
+  # e.g. .no-mistakes as an instruction to run that pipeline.
+  normalized="$TMP_ROOT/qwen-normalized.md"
+  out=$(cat "$brief")
+  out=${out//"$home"/<home>}
+  out=${out//"$ROOT"/<code-root>}
+  printf '%s\n' "$out" > "$normalized"
   for absent in 'no-mistakes' 'Herdr' 'paused' 'ponytail' '# Project memory'; do
-    assert_no_grep "$absent" "$brief" "the qwen brief still carries '$absent', which a direct-PR qwen task cannot use"
+    assert_no_grep "$absent" "$normalized" "the qwen brief still carries '$absent', which a direct-PR qwen task cannot use"
   done
 
   # The start, report, and blocked commands run as written in a real copy and
