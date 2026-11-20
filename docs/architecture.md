@@ -526,7 +526,7 @@ The away posture is the record `bin/fm-afk-contract.sh` owns; see [supervision-h
 ### Integration queue
 
 [`bin/fm-integration-queue.sh`](../bin/fm-integration-queue.sh) is an opt-in integration tool, with its command and durable-record contract owned by the sibling [implementation header and help](../bin/fm-integration-queue.py).
-It is not wired into dispatch, readiness registration, validation or landing policy.
+Dispatch, readiness registration and validation are not automatically wired to the queue; [`combined-merge`](../.agents/skills/combined-merge/SKILL.md) owns the supervised pilot landing policy.
 Publication runs inside the existing merge guards and uses a normal fast-forward Git push with an expected-old-base pre-push check, followed by the server's atomic reference update.
 The original project pre-push hook is preserved, and branch protection requiring PR merges refuses publication.
 The private project opt-in is documented in [configuration.md](configuration.md#integration-queue-publication).

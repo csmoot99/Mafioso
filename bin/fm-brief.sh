@@ -910,6 +910,13 @@ echo "scaffolded: $BRIEF ($KIND; replace {TASK} and {FIRSTMATE_SPEC})"
 exit 0
 fi
 
+TESTING_BLOCK='
+# Testing before handoff
+Run focused tests during development and before validation; fix reproduced failures and rerun the affected checks.
+Leave the full suite to the pipeline or assigned integrator; do not pre-run an identical full baseline merely to hand off.
+Keep every task-specific test mandate and currently required gate unless firstmate explicitly supersedes it.
+'
+
 if [ "$HARNESS" = qwen ]; then
 RULE1=$(fm_ship_rule_one "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH") || exit 1
 if [ -n "$BASE_BRANCH" ]; then
@@ -993,6 +1000,7 @@ $COMBINE_STEPS
 5. ${RULE1#1. }
    Never use \`--force\`, \`--squash\` or \`--amend\`.
 
+$TESTING_BLOCK
 # Finish
 After the last step, run this command:
     bash $CS publish
@@ -1068,6 +1076,7 @@ $PLAN_FENCE
 6. Run any formatter the plan names once, after your last edit.
 7. ${RULE1#1. }
 
+$TESTING_BLOCK
 # Done means this command exits 0
 $DONE_COMMAND_BLOCK
 Run it; until it exits 0, fix the first failure and run it again. Never say it passed unless it printed a pass.
@@ -1168,7 +1177,7 @@ $SHARED_NO_CD_RULE
 $WAIT_BLOCK$HEAVY_BLOCK$INBOX_SECTION
 
 $CODING_DISCIPLINE
-
+$TESTING_BLOCK
 # Project memory
 A project's \`AGENTS.md\` or \`CLAUDE.md\` is loaded into every agent session in that project, so edit it only to correct information that is factually wrong - including information your own change made wrong - and never to add knowledge because it is missing.
 A correction edits only the wrong text: do not run \`$FM_ROOT/bin/fm-ensure-agents-md.sh\`, create either file, or add sections, headings, or pointers alongside it.
