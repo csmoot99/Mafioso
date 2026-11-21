@@ -1,0 +1,8 @@
+{
+  "guard.err": "",
+  "timing.log": "guard-start 1795300208.264089566\nguard-end 1795300219.047514885 rc=2\nguard-start 1795300224.587661862\nguard-end 1795300224.678373814 rc=0\n",
+  ".lock-session": "0b97a6f1-37be-4e61-ac3e-0a8df4ff8b2f\n",
+  ".lock": "257591\n",
+  "guard-history.log": "\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\u25cf  TURN WOULD END BLIND - SUPERVISION IS OFF\n\u25cf  1 registered custom check(s), but no live watcher holds this home lock (last beat: never).\n\u25cf  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.\n\u25cf  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n",
+  "guard.out": ""
+}

@@ -1,0 +1,15 @@
+# Targeted product validation
+
+Target: c67052be9380cfd395bcf767e250b16ed9676aac. Base: 9e414d107ee7b463396146def893c21352ecd9a9.
+
+The intended handoff behavior passed. Real Claude Code 2.1.330 received a Stop with supervision-host-off and one registered check, while the real asyncRewake auto-arm was delayed two seconds. The guard returned 0 without a blind-stop warning, a real watcher ran, and its actionable check was delivered to Claude. Removing the asyncRewake registration produced guard exit 2 and TURN WOULD END BLIND, delivered as a forced continuation. Both sessions completed after the test check was retired. These fixtures use real shipped scripts and the existing login, in a disposable primary project and marked FM_HOME within this worktree. The final runs used a private absolute tmux socket path and a 120x40 pane. An initial run using a relative TMUX_TMPDIR fell back to a non-default fm-lab socket; it was torn down and repeated with the corrected absolute path. No default tmux server or fleet pane was used.
+
+Product transcript and persisted lifecycle output: claude-live-evidence.txt. Reproduction drivers: live-handoff-driver.py and live-missing-driver.py. Every lab and its server was removed in its driver finally block.
+
+The complete focused guard suite passed (guard-suite.log). Its new cycle-handoff regression also passed alone (target-regression.log), and failed against the old guard with exit 2 where exit 0 was required (baseline-regression.log). Temporary runners retained the original suite definitions and invoked only the named test. They assert executed behavior and persisted state.
+
+The auto-arm suite failed at tests/fm-claude-stop-autoarm.test.sh:1342, test_orphaned_claim_from_dead_session_is_superseded_by_replacement: it expected three arm invocations and observed four. The same scenario failed alone against the target (orphan-target.log) and against the base source extracted by git archive (orphan-baseline.log). This path executes fm-claude-stop-autoarm.sh and its fixture arm, not the changed turn-end guard. Its script, helper, and test are unchanged between base and target. This is a reproduced pre-existing failure, not evidence of a flake, and prevents claiming all checks green. Watcher lifecycle changes are outside this change's accepted scope; no source correction was attempted.
+
+The existing Pi test_rendering_and_session_lifecycle test passed against the supplied Pi 1.6.0 dependencies (pi-render.log), supporting preserved runtime rendering after the return-type-only correction. It uses a test extension API and is not live end-user evidence. No typechecker, linter, formatter, static analysis, full repository suite, remote CI, push, PR operation, or pipeline control was run in this test phase. There is no visual layout change; the changed product surface is hook output and exit behavior, captured as CLI transcripts rather than screenshots.
+
+Outcome: no-go due to the independently reproduced auto-arm test failure; the requested handoff and missing-recovery product behaviors both pass live.

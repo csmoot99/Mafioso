@@ -1,0 +1,40 @@
+
+ ▀▀█  v1.6.0                                                                                                            
+ █▀ █ escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o more                                   
+ Press ctrl+o to show full startup help and loaded resources.                                                           
+                                                                                                                        
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.                                  
+
+[Extensions]                                                                                                            
+  fm-calm.ts                                                                                                            
+
+                                                                                                                        
+ LIVE_ORDINARY_ROW                                                                                                      
+                                                                                                                        
+
+                                                                                                                        
+ ⁣FIRSTMATE_OP: v1 watcher: LIVE_OPERATIONAL_ROW                                                                         
+                                                                                                                        
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+                                                                                                                        
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/5f69104d19ce/01M803CXX7TKJC35F8S804SHBH/.p/project (main)
+0.0%/0 (auto)                                                                                                    unknown
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

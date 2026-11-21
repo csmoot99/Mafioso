@@ -1,0 +1,1 @@
+not ok - default --claude wait must cover a delayed generation claim between cycles: expected exit 0, got 2

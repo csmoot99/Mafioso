@@ -1,0 +1,2 @@
+ok - auto-arm: a dead session's orphaned open claim is superseded so the replacement session delivers the wake
+ok - auto-arm: a resumed session with the dead session's id still supersedes its orphaned claim

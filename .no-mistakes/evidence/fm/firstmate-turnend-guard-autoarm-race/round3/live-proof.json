@@ -1,0 +1,38 @@
+{
+  "target": {
+    "first_guard_rc": 0,
+    "blind_warning_delivered": false,
+    "stop_feedback_messages": 1,
+    "result": {
+      "is_error": false,
+      "result": "ACK"
+    },
+    "timing": "guard-start 1795300960.545812303\nautoarm-delay-start 1795300960.546981089\nautoarm-exec 1795300963.555320738\nguard-end 1795300970.225310996 rc=0\nguard-start 1795300984.091090667\nautoarm-delay-start 1795300984.091446281\nguard-end 1795300984.222067625 rc=0\nautoarm-exec 1795300987.099802698\n",
+    "epoch": "epoch=1 owner_pid=745196 outcome=rewake updated_at=1795300975 session_pid=728779 recovery_generation=751041.1795300972.SlIsrC\nlinux-starttime=6155010 cmdline-hex=62617368002f686f6d652f776f726b2f2e6e6f2d6d697374616b65732f776f726b74726565732f3566363931303464313963652f30314d38303343585837544b4a433335463853383034534842482f2e762f70726f6a6563742f62696e2f666d2d636c617564652d73746f702d6175746f61726d2e736800\n",
+    "watcher_ledger": "arm_pid=748827\twatcher_pid=748901\torigin=started\tstarted_at=1795300969\tended_at=1795300971\texit_code=0\tsignal=none\treason=actionable-check\tbeacon_age=1\tlock_before=pid:748901|identity:linux-starttime=6155609 cmdline-hex=62617368002f686f6d652f776f726b2f2e6e6f2d6d697374616b65732f776f726b74726565732f3566363931303464313963652f30314d38303343585837544b4a433335463853383034534842482f2e762f70726f6a6563742f62696e2f666d2d77617463682e736800\tlock_after=pid:none|identity:none\tsuccessor=started:751041\narm_pid=750993\twatcher_pid=751041\torigin=started\tstarted_at=1795300971\tended_at=1795300972\texit_code=0\tsignal=none\treason=actionable-check\tbeacon_age=1\tlock_before=pid:751041|identity:linux-starttime=6155804 cmdline-hex=62617368002f686f6d652f776f726b2f2e6e6f2d6d697374616b65732f776f726b74726565732f3566363931303464313963652f30314d38303343585837544b4a433335463853383034534842482f2e762f70726f6a6563742f62696e2f666d2d77617463682e736800\tlock_after=pid:none|identity:none\tsuccessor=none\n"
+  },
+  "missing": {
+    "first_guard_rc": 2,
+    "blind_warning_delivered": true,
+    "stop_feedback_messages": 1,
+    "result": {
+      "is_error": false,
+      "result": "ACK"
+    },
+    "timing": "guard-start 1795301008.728370208\nguard-end 1795301021.114332879 rc=2\nguard-start 1795301029.288809509\nguard-end 1795301029.405468887 rc=0\n",
+    "epoch": "absent",
+    "watcher_ledger": "absent"
+  },
+  "baseline": {
+    "first_guard_rc": 2,
+    "blind_warning_delivered": true,
+    "stop_feedback_messages": 2,
+    "result": {
+      "is_error": false,
+      "result": "ACK"
+    },
+    "timing": "guard-start 1795301048.241065599\nautoarm-delay-start 1795301048.242999181\nautoarm-exec 1795301051.252300624\nguard-end 1795301055.445273706 rc=2\nautoarm-delay-start 1795301073.348524307\nguard-start 1795301073.349581219\nguard-end 1795301073.487911524 rc=0\nautoarm-exec 1795301076.359670505\n",
+    "epoch": "epoch=1 owner_pid=816800 outcome=rewake updated_at=1795301063 session_pid=810189 recovery_generation=821803.1795301060.xeLKHF\nlinux-starttime=6163780 cmdline-hex=62617368002f686f6d652f776f726b2f2e6e6f2d6d697374616b65732f776f726b74726565732f3566363931303464313963652f30314d38303343585837544b4a433335463853383034534842482f2e762f70726f6a6563742f62696e2f666d2d636c617564652d73746f702d6175746f61726d2e736800\n",
+    "watcher_ledger": "arm_pid=819798\twatcher_pid=819835\torigin=started\tstarted_at=1795301057\tended_at=1795301059\texit_code=0\tsignal=none\treason=actionable-check\tbeacon_age=1\tlock_before=pid:819835|identity:linux-starttime=6164423 cmdline-hex=62617368002f686f6d652f776f726b2f2e6e6f2d6d697374616b65732f776f726b74726565732f3566363931303464313963652f30314d38303343585837544b4a433335463853383034534842482f2e762f70726f6a6563742f62696e2f666d2d77617463682e736800\tlock_after=pid:none|identity:none\tsuccessor=started:821803\narm_pid=821757\twatcher_pid=821803\torigin=started\tstarted_at=1795301059\tended_at=1795301061\texit_code=0\tsignal=none\treason=actionable-check\tbeacon_age=1\tlock_before=pid:821803|identity:linux-starttime=6164633 cmdline-hex=62617368002f686f6d652f776f726b2f2e6e6f2d6d697374616b65732f776f726b74726565732f3566363931303464313963652f30314d38303343585837544b4a433335463853383034534842482f2e762f70726f6a6563742f62696e2f666d2d77617463682e736800\tlock_after=pid:none|identity:none\tsuccessor=none\n"
+  }
+}

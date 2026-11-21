@@ -1,0 +1,95 @@
+Real Claude Code 2.1.330; private 120x40 tmux panes; existing login.
+All hooks, auto-arm, arms, and watchers are shipped scripts, with supervision-host-off.
+The handoff wrapper delays only the real asyncRewake invocation by three seconds.
+The missing-recovery control removes the asyncRewake registration.
+The baseline substitutes only the base guard from 9e414d107ee7b463396146def893c21352ecd9a9.
+
+=== TARGET ===
+assistant: CYCLE0
+user: Stop hook feedback:
+["$CLAUDE_PROJECT_DIR"/bin/e2e-autoarm.sh]: firstmate watcher wake - one supervision event needs a handling turn now.
+check: /home/work/.no-mistakes/worktrees/5f69104d19ce/01M803CXX7TKJC35F8S804SHBH/.v/state/probe.check.sh: ready
+Run bin/fm-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQUIRED --ack-through command. Until that post-handling acknowledgement, interruption leaves the wake durable for idempotent re-handling. This Stop hook owns watcher continuity: when the handling turn ends, the next needed cycle arms automatically - do NOT run bin/fm-watch-arm.sh after an ordinary wake.
+
+tool: Bash {"command": "bin/e2e-finish.sh", "description": "Run the e2e finish script"}
+tool result: NEED_RETIRED
+assistant: ACK
+Claude result: {"is_error": false, "result": "ACK"}
+Hook timings:
+guard-start 1795300960.545812303
+autoarm-delay-start 1795300960.546981089
+autoarm-exec 1795300963.555320738
+guard-end 1795300970.225310996 rc=0
+guard-start 1795300984.091090667
+autoarm-delay-start 1795300984.091446281
+guard-end 1795300984.222067625 rc=0
+autoarm-exec 1795300987.099802698
+
+Auto-arm epoch: epoch=1 owner_pid=745196 outcome=rewake updated_at=1795300975 session_pid=728779 recovery_generation=751041.1795300972.SlIsrC
+linux-starttime=6155010 cmdline-hex=62617368002f686f6d652f776f726b2f2e6e6f2d6d697374616b65732f776f726b74726565732f3566363931303464313963652f30314d38303343585837544b4a433335463853383034534842482f2e762f70726f6a6563742f62696e2f666d2d636c617564652d73746f702d6175746f61726d2e736800
+
+Watcher cycle ledger:
+arm_pid=748827	watcher_pid=748901	origin=started	started_at=1795300969	ended_at=1795300971	exit_code=0	signal=none	reason=actionable-check	beacon_age=1	lock_before=pid:748901|identity:linux-starttime=6155609 cmdline-hex=62617368002f686f6d652f776f726b2f2e6e6f2d6d697374616b65732f776f726b74726565732f3566363931303464313963652f30314d38303343585837544b4a433335463853383034534842482f2e762f70726f6a6563742f62696e2f666d2d77617463682e736800	lock_after=pid:none|identity:none	successor=started:751041
+arm_pid=750993	watcher_pid=751041	origin=started	started_at=1795300971	ended_at=1795300972	exit_code=0	signal=none	reason=actionable-check	beacon_age=1	lock_before=pid:751041|identity:linux-starttime=6155804 cmdline-hex=62617368002f686f6d652f776f726b2f2e6e6f2d6d697374616b65732f776f726b74726565732f3566363931303464313963652f30314d38303343585837544b4a433335463853383034534842482f2e762f70726f6a6563742f62696e2f666d2d77617463682e736800	lock_after=pid:none|identity:none	successor=none
+
+
+=== MISSING ===
+assistant: CYCLE0
+user: Stop hook feedback:
+["$CLAUDE_PROJECT_DIR"/bin/e2e-guard.sh]: ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  TURN WOULD END BLIND - SUPERVISION IS OFF
+●  1 registered custom check(s), but no live watcher holds this home lock (last beat: never).
+●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+tool: Bash {"command": "bin/e2e-finish.sh", "description": "Run the e2e finish script"}
+tool result: NEED_RETIRED
+assistant: ACK
+Claude result: {"is_error": false, "result": "ACK"}
+Hook timings:
+guard-start 1795301008.728370208
+guard-end 1795301021.114332879 rc=2
+guard-start 1795301029.288809509
+guard-end 1795301029.405468887 rc=0
+
+Auto-arm epoch: absent
+Watcher cycle ledger:
+absent
+
+=== BASELINE ===
+assistant: CYCLE0
+user: Stop hook feedback:
+["$CLAUDE_PROJECT_DIR"/bin/e2e-guard.sh]: ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  TURN WOULD END BLIND - SUPERVISION IS OFF
+●  1 registered custom check(s), but no live watcher holds this home lock (last beat: never).
+●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+user: Stop hook feedback:
+["$CLAUDE_PROJECT_DIR"/bin/e2e-autoarm.sh]: firstmate watcher wake - one supervision event needs a handling turn now.
+check: /home/work/.no-mistakes/worktrees/5f69104d19ce/01M803CXX7TKJC35F8S804SHBH/.v/state/probe.check.sh: ready
+Run bin/fm-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQUIRED --ack-through command. Until that post-handling acknowledgement, interruption leaves the wake durable for idempotent re-handling. This Stop hook owns watcher continuity: when the handling turn ends, the next needed cycle arms automatically - do NOT run bin/fm-watch-arm.sh after an ordinary wake.
+
+tool: Bash {"command": "bin/e2e-finish.sh", "description": "Run e2e finish script"}
+tool result: NEED_RETIRED
+assistant: ACK
+Claude result: {"is_error": false, "result": "ACK"}
+Hook timings:
+guard-start 1795301048.241065599
+autoarm-delay-start 1795301048.242999181
+autoarm-exec 1795301051.252300624
+guard-end 1795301055.445273706 rc=2
+autoarm-delay-start 1795301073.348524307
+guard-start 1795301073.349581219
+guard-end 1795301073.487911524 rc=0
+autoarm-exec 1795301076.359670505
+
+Auto-arm epoch: epoch=1 owner_pid=816800 outcome=rewake updated_at=1795301063 session_pid=810189 recovery_generation=821803.1795301060.xeLKHF
+linux-starttime=6163780 cmdline-hex=62617368002f686f6d652f776f726b2f2e6e6f2d6d697374616b65732f776f726b74726565732f3566363931303464313963652f30314d38303343585837544b4a433335463853383034534842482f2e762f70726f6a6563742f62696e2f666d2d636c617564652d73746f702d6175746f61726d2e736800
+
+Watcher cycle ledger:
+arm_pid=819798	watcher_pid=819835	origin=started	started_at=1795301057	ended_at=1795301059	exit_code=0	signal=none	reason=actionable-check	beacon_age=1	lock_before=pid:819835|identity:linux-starttime=6164423 cmdline-hex=62617368002f686f6d652f776f726b2f2e6e6f2d6d697374616b65732f776f726b74726565732f3566363931303464313963652f30314d38303343585837544b4a433335463853383034534842482f2e762f70726f6a6563742f62696e2f666d2d77617463682e736800	lock_after=pid:none|identity:none	successor=started:821803
+arm_pid=821757	watcher_pid=821803	origin=started	started_at=1795301059	ended_at=1795301061	exit_code=0	signal=none	reason=actionable-check	beacon_age=1	lock_before=pid:821803|identity:linux-starttime=6164633 cmdline-hex=62617368002f686f6d652f776f726b2f2e6e6f2d6d697374616b65732f776f726b74726565732f3566363931303464313963652f30314d38303343585837544b4a433335463853383034534842482f2e762f70726f6a6563742f62696e2f666d2d77617463682e736800	lock_after=pid:none|identity:none	successor=none
+
