@@ -1289,7 +1289,7 @@ test_stuck_generation_claim_is_superseded_and_rearms() {
 # captain turn, and the orphan's banner write into its dead parent's pipe leaves
 # a stranded state/.claude-autoarm-output.* holding the reason line.
 test_orphaned_claim_from_dead_session_is_superseded_by_replacement() {
-  local dir out status orphan_pid orphan_out lock_pid dead_lock_pid i
+  local dir out status orphan_pid orphan_out lock_pid dead_lock_pid i arms_before_release
   dir=$(make_primary_dir "$TMP_ROOT/orphaned-claim")
   : > "$dir/state/task.meta"
   write_arm_fixture "$dir" gated-actionable
@@ -1320,17 +1320,22 @@ test_orphaned_claim_from_dead_session_is_superseded_by_replacement() {
         "$FM_HOME/bin/fm-claude-stop-autoarm.sh"
       ' > "$dir/state/replacement-out" 2>&1 &
   RUN_AUTOARM_BG_PID=$!
-  for i in $(seq 1 250); do
+  # Lock recovery and generation ownership checks can exceed five seconds on
+  # a loaded runner. Do not close the orphan's cycle until replacement arming
+  # proves supersession; otherwise the orphan can legitimately start a successor.
+  for i in $(seq 1 1500); do
     kill -0 "$RUN_AUTOARM_BG_PID" 2>/dev/null || break
     [ "$(wc -l < "$dir/state/arm-ran")" -ge 2 ] && break
     sleep 0.02
   done
+  arms_before_release=$(wc -l < "$dir/state/arm-ran")
   lock_pid=$(sed -n 1p "$dir/state/.lock")
   : > "$dir/state/arm-release"
   wait "$RUN_AUTOARM_BG_PID"; status=$?
   out=$(cat "$dir/state/replacement-out")
   for i in $(seq 1 250); do kill -0 "$orphan_pid" 2>/dev/null || break; sleep 0.02; done
   kill -0 "$orphan_pid" 2>/dev/null && { kill "$orphan_pid" 2>/dev/null; fail "the orphaned hook never finished after its cycle closed"; }
+  [ "$arms_before_release" -eq 2 ] || fail "replacement did not arm before the orphan's cycle was released: $out"
 
   expect_code 2 "$status" "the replacement session's first Stop must supersede the dead session's orphaned claim and rewake, not defer to it"
   assert_contains "$out" "firstmate watcher wake" "the replacement's rewake must carry the wake banner"
@@ -1358,7 +1363,7 @@ test_orphaned_claim_from_dead_session_is_superseded_by_replacement() {
 # lock-holder identity is the dead holder's. Deferring here would leave the resumed
 # home deaf for exactly the case this change exists to fix.
 test_resumed_same_id_session_supersedes_the_orphan() {
-  local dir out status orphan_pid orphan_out lock_pid dead_lock_pid i
+  local dir out status orphan_pid orphan_out lock_pid dead_lock_pid i arms_before_release
   dir=$(make_primary_dir "$TMP_ROOT/resumed-same-id-orphan")
   : > "$dir/state/task.meta"
   write_arm_fixture "$dir" gated-actionable
@@ -1391,17 +1396,22 @@ test_resumed_same_id_session_supersedes_the_orphan() {
         "$FM_HOME/bin/fm-claude-stop-autoarm.sh"
       ' > "$dir/state/replacement-out" 2>&1 &
   RUN_AUTOARM_BG_PID=$!
-  for i in $(seq 1 250); do
+  # Lock recovery and generation ownership checks can exceed five seconds on
+  # a loaded runner. Do not close the orphan's cycle until replacement arming
+  # proves supersession; otherwise the orphan can legitimately start a successor.
+  for i in $(seq 1 1500); do
     kill -0 "$RUN_AUTOARM_BG_PID" 2>/dev/null || break
     [ "$(wc -l < "$dir/state/arm-ran")" -ge 2 ] && break
     sleep 0.02
   done
+  arms_before_release=$(wc -l < "$dir/state/arm-ran")
   lock_pid=$(sed -n 1p "$dir/state/.lock")
   : > "$dir/state/arm-release"
   wait "$RUN_AUTOARM_BG_PID"; status=$?
   out=$(cat "$dir/state/replacement-out")
   for i in $(seq 1 250); do kill -0 "$orphan_pid" 2>/dev/null || break; sleep 0.02; done
   kill -0 "$orphan_pid" 2>/dev/null && { kill "$orphan_pid" 2>/dev/null; fail "the orphaned hook never finished after its cycle closed"; }
+  [ "$arms_before_release" -eq 2 ] || fail "replacement did not arm before the orphan's cycle was released: $out"
   unset CLAUDE_CODE_SESSION_ID
 
   expect_code 2 "$status" "a resumed session sharing the dead session's id must supersede its orphaned claim and rewake, not defer to it"
