@@ -1939,6 +1939,39 @@ test_hook_claude_mode_waits_for_late_claim() {
   pass "fm-turnend-guard --claude: bounded claim wait avoids a token-consuming forced continuation"
 }
 
+test_hook_claude_mode_default_wait_covers_cycle_handoff() {
+  local dir helper out status holder
+  dir=$(make_primary_dir "$TMP_ROOT/hook-claude-cycle-handoff")
+  : > "$dir/state/task1.meta"
+  printf '%s\n' "$$" > "$dir/state/.lock"
+  # The prior cycle has ended. No watcher or open claim exists while the
+  # next Stop-owned hook starts, taking longer than the former 800ms window.
+  touch -t 202001010000 "$dir/state/.last-watcher-beat"
+  bash -c '
+    dir=$1
+    . "$dir/bin/fm-wake-lib.sh"
+    sleep 2
+    fm_autoarm_claim_next "$dir/state" || exit 1
+    sleep 60 &
+    printf "%s\n" $! > "$dir/holder.pid"
+    wait
+  ' _ "$dir" &
+  helper=$!
+  out=$(run_hook_claude "$dir" true); status=$?
+  holder=$(cat "$dir/holder.pid" 2>/dev/null || true)
+  kill "$holder" 2>/dev/null || true
+  kill "$helper" 2>/dev/null || true
+  wait "$helper" 2>/dev/null || true
+  expect_code 0 "$status" "default --claude wait must cover a delayed generation claim between cycles"
+  [ -z "$out" ] || fail "cycle handoff forced a duplicate recovery turn: $out"
+  assert_absent "$dir/state/.turnend-claude-blocks" "cycle handoff consumed the block budget"
+  # With no successor starting, the same default must still block.
+  out=$(run_hook_claude "$dir" true); status=$?
+  expect_code 2 "$status" "default --claude wait must still block when recovery never starts"
+  assert_contains "$out" "TURN WOULD END BLIND" "missing recovery lost the blocking diagnostic"
+  pass "fm-turnend-guard --claude: default wait covers cycle handoff and still blocks absent recovery"
+}
+
 test_hook_claude_mode_secondmate_reblocks_like_primary() {
   local dir pid out status
   dir=$(make_secondmate_dir "$TMP_ROOT/hook-claude-sm-reblock")
@@ -2272,6 +2305,7 @@ test_hook_claude_mode_fail_open_requires_notice_and_failure_epoch
 test_hook_claude_mode_away_mode_never_uses_stop_autoarm_fail_open
 test_hook_claude_mode_allow_resets_budget
 test_hook_claude_mode_waits_for_late_claim
+test_hook_claude_mode_default_wait_covers_cycle_handoff
 test_hook_claude_mode_secondmate_reblocks_like_primary
 test_hook_away_daemon_allows_between_watcher_cycles
 test_hook_away_daemon_allows_over_dead_watcher_lock
