@@ -1947,14 +1947,15 @@ test_hook_claude_mode_default_wait_covers_cycle_handoff() {
   # The prior cycle has ended. No watcher or open claim exists while the
   # next Stop-owned hook starts, taking longer than the former 800ms window.
   touch -t 202001010000 "$dir/state/.last-watcher-beat"
-  (
+  bash -c '
+    dir=$1
     . "$dir/bin/fm-wake-lib.sh"
     sleep 2
     fm_autoarm_claim_next "$dir/state" || exit 1
     sleep 60 &
-    printf '%s\n' $! > "$dir/holder.pid"
+    printf "%s\n" $! > "$dir/holder.pid"
     wait
-  ) &
+  ' _ "$dir" &
   helper=$!
   out=$(run_hook_claude "$dir" true); status=$?
   holder=$(cat "$dir/holder.pid" 2>/dev/null || true)
