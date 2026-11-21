@@ -102,7 +102,7 @@ export function installCalmOperationalUserLayout(): void {
       this.hasLeadingSpacer = hasLeadingSpacer;
     }
 
-    override render(width: number): string[] {
+    override render(width: number): ReturnType<PiUserMessageComponent["render"]> {
       if (patch.hidesOperationalInput()) return [];
       const lines = super.render(width);
       return this.hasLeadingSpacer ? ["", ...lines] : lines;
