@@ -1,0 +1,20 @@
+Claude Code 2.1.330; real primary Stop guard with no auto-arm registered.
+Required supervision: one registered idle custom check; no live watcher or automatic recovery.
+guard start=1795297476362264095 end=1795297488145135717 duration_ms=11782 exit=2
+guard start=1795297490052522888 end=1795297500894402628 duration_ms=10841 exit=2
+guard start=1795297503225021182 end=1795297514284543061 duration_ms=11059 exit=2
+
+Latest hook payload: {"session_id": "a3ce2ca8-28b8-4060-9599-b5430ad0374c", "hook_event_name": "Stop", "stop_hook_active": true}
+Guard output at capture: ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  TURN WOULD END BLIND - SUPERVISION IS OFF
+●  1 registered custom check(s), but no live watcher holds this home lock (last beat: 75s ago).
+●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Block budget: session=a3ce2ca8-28b8-4060-9599-b5430ad0374c
+count=3
+epoch=1
+
+Watcher lock exists: False
+Auto-arm ledger: epoch=1 owner_pid=2360146 outcome=clean updated_at=1795297428

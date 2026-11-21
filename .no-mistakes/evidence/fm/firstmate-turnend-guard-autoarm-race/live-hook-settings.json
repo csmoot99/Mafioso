@@ -1,0 +1,56 @@
+{
+  "delayed_handoff": {
+    "hooks": {
+      "SessionStart": [
+        {
+          "hooks": [
+            {
+              "type": "command",
+              "command": "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M800SH802CKYQR24FHQ03GEQ/bin/fm-lock.sh"
+            }
+          ]
+        }
+      ],
+      "Stop": [
+        {
+          "hooks": [
+            {
+              "type": "command",
+              "command": "bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M800SH802CKYQR24FHQ03GEQ/.l/guard.sh"
+            },
+            {
+              "type": "command",
+              "command": "bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M800SH802CKYQR24FHQ03GEQ/.l/autoarm.sh",
+              "asyncRewake": true,
+              "timeout": 300
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "missing_recovery": {
+    "hooks": {
+      "SessionStart": [
+        {
+          "hooks": [
+            {
+              "type": "command",
+              "command": "/home/work/.no-mistakes/worktrees/5f69104d19ce/01M800SH802CKYQR24FHQ03GEQ/bin/fm-lock.sh"
+            }
+          ]
+        }
+      ],
+      "Stop": [
+        {
+          "hooks": [
+            {
+              "type": "command",
+              "command": "bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M800SH802CKYQR24FHQ03GEQ/.l/guard.sh"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

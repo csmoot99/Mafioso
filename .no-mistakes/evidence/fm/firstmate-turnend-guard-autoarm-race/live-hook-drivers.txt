@@ -1,0 +1,22 @@
+Temporary guard hook wrapper:
+#!/usr/bin/env bash
+payload=$(cat)
+printf '%s' "$payload" > "$FM_HOME/payload.json"
+start=$(date +%s%N)
+printf '%s' "$payload" | "$PWD/bin/fm-turnend-guard.sh" --claude > "$FM_HOME/guard.out" 2>&1
+rc=$?
+end=$(date +%s%N)
+printf 'guard start=%s end=%s duration_ms=%s exit=%s\n' "$start" "$end" "$(((end-start)/1000000))" "$rc" >> "$FM_HOME/events.log"
+cat "$FM_HOME/guard.out" >&2
+exit "$rc"
+
+Temporary delayed auto-arm wrapper:
+#!/usr/bin/env bash
+payload=$(cat)
+printf 'autoarm scheduled=%s delay=2s\n' "$(date +%s%N)" >> "$FM_HOME/events.log"
+sleep 2
+printf 'autoarm launching=%s\n' "$(date +%s%N)" >> "$FM_HOME/events.log"
+printf '%s' "$payload" | "$PWD/bin/fm-claude-stop-autoarm.sh" >> "$FM_HOME/autoarm.out" 2>&1
+rc=$?
+printf 'autoarm finished=%s exit=%s\n' "$(date +%s%N)" "$rc" >> "$FM_HOME/events.log"
+exit "$rc"

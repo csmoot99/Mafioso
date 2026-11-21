@@ -1,0 +1,7 @@
+Targeted command: bash tests/fm-turnend-guard.test.sh (exit 0).
+Focused before/after: run test_hook_claude_mode_default_wait_covers_cycle_handoff using existing test setup, substituting only the base guard executable for the before check. Base fails because guard returns 2; target passes.
+Live: Claude Code 2.1.330 with normal login, private 120x40 tmux session on .l/tmux, marked disposable home minted by bin/fm-lab-home.sh create. Temporary secondmate-home marker scopes this linked gate copy as a primary.
+Delayed handoff: real guard and real asyncRewake auto-arm, admission delayed two seconds by wrapper; quiet stop, no budget charged, real arm/watch pair with fresh beacon.
+Missing recovery: omit auto-arm registration, retain registered custom check; three real Stop attempts exit 2 with diagnostic, including stop_hook_active=true.
+Cleanup: unregister check; stop only lab watcher via fm-watch-arm.sh --stop; stop private tmux server; confirm Claude process exited; remove lab and temporary marker.
+No lint, formatters, full repository suite, pipeline controls, pushes, PR changes or remote CI operations ran. Supplied Pi TS4104 and secondmate CI failures remain outer CI-phase concerns; this result does not claim they are green.

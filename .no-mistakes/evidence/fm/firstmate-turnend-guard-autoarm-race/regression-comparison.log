@@ -1,0 +1,9 @@
+Focused behavioral regression against base 9e414d107ee7b463396146def893c21352ecd9a9:
+not ok - default --claude wait must cover a delayed generation claim between cycles: expected exit 0, got 2
+
+baseline regression exit=1
+
+Same regression against target a4a99b1c605732da9a98c6257c9ad685f21ee94f:
+ok - fm-turnend-guard --claude: default wait covers cycle handoff and still blocks absent recovery
+
+target regression exit=0

@@ -1,0 +1,3 @@
+ok - fm-turnend-guard --claude: default wait covers cycle handoff and still blocks absent recovery
+
+target regression exit=0

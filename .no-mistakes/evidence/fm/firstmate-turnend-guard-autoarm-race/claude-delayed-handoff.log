@@ -1,0 +1,13 @@
+Claude Code 2.1.330; private tmux session primary, 120x40; supervision-host-off.
+Actual Claude Stop hooks run the real guard and auto-arm; auto-arm wrapper delays admission by two seconds.
+autoarm scheduled=1795297372181119751 delay=2s
+autoarm launching=1795297374189450019
+guard start=1795297372181119715 end=1795297380125465995 duration_ms=7944 exit=0
+
+Guard stdout/stderr: ''
+Generation ledger: epoch=1 owner_pid=2360146 outcome=arming updated_at=1795297379 owner_session_id=5d827f54-c5ed-49b2-8f22-3cc367232026
+Watcher lock pid: 2361991
+
+Arm product output:
+
+Block budget exists: FalseLIVE: identity-matched watcher with fresh beacon

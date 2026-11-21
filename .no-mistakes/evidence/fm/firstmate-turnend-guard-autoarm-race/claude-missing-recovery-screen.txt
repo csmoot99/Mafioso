@@ -1,0 +1,40 @@
+● Ran 1 stop hook
+  ⎿  Stop hook reported a problem
+     [bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M800SH802CKYQR24FHQ03GEQ/.l/guard.sh]:
+     ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+     ●  1 registered custom check(s), but no live watcher holds this home lock (last beat: 62s ago).
+     ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+     ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before
+     ending the turn.
+     ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+● The stop hook has fired again with the same message. The last beat is now 62s ago, up from 48s, so nothing has
+  recovered in between.
+
+  You told me not to use tools or run lifecycle operations, and that automatic monitoring recovery is disabled for this
+  test. So I'm not inspecting the hook registration or startup status, and I'm not re-arming the watcher. This
+  blind-turn warning is the result the test should produce.
+
+  If you want me to investigate, tell me to and I'll start with the hook registration and the startup status.
+
+● Ran 1 stop hook
+  ⎿  Stop hook reported a problem
+     [bash /home/work/.no-mistakes/worktrees/5f69104d19ce/01M800SH802CKYQR24FHQ03GEQ/.l/guard.sh]:
+     ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+     ●  1 registered custom check(s), but no live watcher holds this home lock (last beat: 75s ago).
+     ●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+     ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before
+     ending the turn.
+     ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+●
+
+✽ Puzzling… (40s · ↓ 313 tokens)
+  ⎿  Tip: Use /btw to ask a side question without interrupting Claude
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle) · esc to interrupt
