@@ -20,7 +20,8 @@
 #   (d) terminal run-step (passed/failed) is authoritative        -> run-step
 #   (d2) terminal failed run whose only failure is an orphaned ci monitor
 #       after checks read green                                   -> done
-#   (d3) cancelled green deliveries retain done, skipped rebase or test is allowed;
+#   (d3) cancelled green deliveries retain done, skipped rebase or zero-finding
+#       skipped test is allowed;
 #       other cancellations read unknown without a false fleet contradiction
 #   (e) cross-branch attribution: this branch's own run found via list lookup
 #   (e2) multiple runs: creation order preserves newer failures, replacement
@@ -1739,6 +1740,39 @@ test_cancelled_delivery_and_skipped_steps() {
     ) || failures=$((failures + 1))
   done
   [ "$failures" -eq 0 ] || fail "$failures cancelled delivery regressions"
+}
+
+# Only a start-time skip leaves zero findings; a test dismissed at its gate, or a
+# row whose findings cannot be read, is no evidence that nothing failed.
+test_skipped_test_without_zero_findings_stays_failed() {
+  local rebase row failures=0
+  for rebase in completed skipped; do
+    for row in test,skipped,1,3096910 test,skipped,10,0 test,skipped,none,0 \
+      test,skipped,,0 test,skipped,0 test,skipped; do
+      (
+        reset_fakes
+        local d out
+        d=$(new_case "test-findings-$rebase-${row//,/-}")
+        make_repo_on_branch "$d/wt" fm/test-findings
+        make_fakebin "$d" >/dev/null
+        fm_write_meta "$d/state/delivery.meta" "window=fm:fm-delivery" "worktree=$d/wt" "kind=ship"
+        FM_FAKE_AXI_STATUS="$(run_failed_ci_orphan fm/test-findings)"
+        FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS/test,completed,0,0/$row}
+        FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS/rebase,completed/rebase,$rebase}
+        assert_contains "$FM_FAKE_AXI_STATUS" "  $row
+" "$row: fixture carries the test row"
+        FM_FAKE_PR_STATE=OPEN
+        FM_FAKE_PR_MERGED=false
+        FM_FAKE_PR_STATE_AXI=open
+        FM_FAKE_CI_LOGS="all CI checks passed - still monitoring until merged or closed"
+        out=$(FM_HOME="$d" run_crew_state "$d" delivery)
+        assert_contains "$out" "state: failed" "$row (rebase $rebase): run stays failed: $out"
+        assert_not_contains "$out" "held for merge" "$row (rebase $rebase): no unsupported delivery claim"
+        pass "$row with rebase $rebase keeps the failed verdict"
+      ) || failures=$((failures + 1))
+    done
+  done
+  [ "$failures" -eq 0 ] || fail "$failures skipped-test findings regressions"
 }
 
 # A skipped test step excuses no other unfinished step.
@@ -5735,6 +5769,7 @@ for cancellation_test in test_captured_cancelled_review_has_no_verdict \
   test_cancelled_without_delivery_has_no_verdict \
   test_cancelled_fleet_inventory_is_unverified_not_contradictory \
   test_cancelled_delivery_and_skipped_steps \
+  test_skipped_test_without_zero_findings_stays_failed \
   test_skipped_test_with_another_unfinished_step_stays_failed; do
   ("$cancellation_test") || cancellation_failures=$((cancellation_failures + 1))
 done
