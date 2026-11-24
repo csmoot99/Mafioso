@@ -103,8 +103,8 @@
 # An open away-return catch-up is disclosed the same way, as a single action-free
 # (return-catchup) gate row naming the blockers left to clear or the reason the
 # catch-up was retained. Reporting is not ordinary captain work, so the gate never
-# suppresses the digest; an ACTIVE away window still refuses, because the right
-# answer there is to run the return first. bin/fm-afk-return.sh owns the gate.
+# suppresses the digest; an ACTIVE away window (never quiet mode) still refuses,
+# because the right answer there is to run the return first. bin/fm-afk-return.sh owns the gate.
 #
 # The landed section merges this home's Done with the canonical snapshot's
 # secondmate_landed roll-up (fm-fleet-snapshot.sh), so merges a secondmate managed -
