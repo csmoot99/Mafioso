@@ -114,7 +114,7 @@
 #      green, so a green PR is never silently read as still-validating. And a
 #      terminal failed or cancelled run whose only unfinished step is the ci
 #      monitor, after every substantive step completed (an explicitly skipped
-#      rebase is allowed) and the ci log's last marker reads checks green,
+#      rebase, or test with zero findings, is allowed) and the ci log's last marker reads checks green,
 #      also reads done only when the bounded forge read confirms the PR is
 #      open (held-for-merge) or merged. Closed, missing, unreadable, or skipped
 #      forge evidence leaves the original failed or unknown classification.
@@ -728,8 +728,10 @@ nm_run_activity_is_recent() {
 # 0 when a terminal failed or cancelled run ended at the ci monitor and the
 # ci log's last recognized marker reads checks green. Requires the exact
 # shape, all on positive evidence: a steps[] table where every step completed
-# except `ci` failed/cancelled and an optional skipped rebase (any other
-# non-completed step disqualifies), plus nm_ci_checks_state=green (a genuinely red
+# except `ci` failed/cancelled and an optionally skipped rebase and/or
+# zero-finding test, the row a start-time --skip=test leaves (a test dismissed at
+# its gate carries findings; it, an unreadable findings column, or any
+# other non-completed step disqualifies), plus nm_ci_checks_state=green (a genuinely red
 # check, or an unreadable ci log, cannot prove delivery). This is the
 # orphaned-CI-monitor gap (2026-09-05 jr-voice): a run held for a captain
 # merge decision polls until the shared daemon restarts under it and marks
@@ -748,8 +750,7 @@ nm_failed_run_is_green_held_ci() {
     case "$status" in
       completed) continue ;;
       skipped)
-        [ "$step" = rebase ] || return 1
-        continue
+        case "$step,${rest#*,}" in rebase,*|test,0,*) continue ;; *) return 1 ;; esac
         ;;
       failed|cancelled)
         [ "$step" = ci ] || return 1

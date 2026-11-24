@@ -346,6 +346,7 @@ cp "$SELF_DIR/fm-heavy-remote-runner.py" "$stage/runner.py"
 if ! cp "$stage/manifest.json" "$record.tmp" || ! mv "$record.tmp" "$record"; then fallback state-unwritable; fi
 [ -z "$sig" ] || finish cancelled $((128 + sig))
 
+launched=$(date +%s)  # the job may begin its command before start returns
 tar -cf - -C "$stage" runner.py manifest.json src.bundle \
   | "${SSH[@]}" "$host" "mkdir -p $rdir && tar -xf - -C $rdir && $runner start $rdir" \
     > "$stage/start.out" 2>>"$stage/ssh.err"
@@ -375,9 +376,9 @@ if [ "$rc" -ne 0 ]; then
     fallback prepare-failed
   fi
 fi
-started=$(date +%s)
+started=$launched
 emit started "$started"
-emit prepare_s "$((started - prepare_began))"
+emit prepare_s "$(($(date +%s) - prepare_began))"
 
 # Wait for the durable completion record. A lost connection is reconciled against
 # the job's record, never answered with a second run.

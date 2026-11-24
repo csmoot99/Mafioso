@@ -20,7 +20,8 @@
 #   (d) terminal run-step (passed/failed) is authoritative        -> run-step
 #   (d2) terminal failed run whose only failure is an orphaned ci monitor
 #       after checks read green                                   -> done
-#   (d3) cancelled green deliveries retain done, skipped rebase is allowed;
+#   (d3) cancelled green deliveries retain done, skipped rebase or zero-finding
+#       skipped test is allowed;
 #       other cancellations read unknown without a false fleet contradiction
 #   (e) cross-branch attribution: this branch's own run found via list lookup
 #   (e2) multiple runs: creation order preserves newer failures, replacement
@@ -1698,10 +1699,11 @@ test_terminal_failed() {
 }
 
 # Recovered delivery cases, varying only the terminal route and the optional
-# rebase step. The already-fixed passed-run case remains a control.
-test_cancelled_delivery_and_skipped_rebase() {
+# rebase and test steps. The already-fixed passed-run case remains a control.
+test_cancelled_delivery_and_skipped_steps() {
   local scenario failures=0
-  for scenario in cancelled-outcome cancelled-status skipped-rebase cancelled-skipped-rebase passed; do
+  for scenario in cancelled-outcome cancelled-status skipped-rebase cancelled-skipped-rebase \
+    skipped-test cancelled-skipped-test skipped-rebase-and-test passed; do
     (
       reset_fakes
       local d out
@@ -1715,6 +1717,10 @@ test_cancelled_delivery_and_skipped_rebase() {
       esac
       case "$scenario" in
         *skipped-rebase) FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS/rebase,completed/rebase,skipped} ;;
+        *skipped-test) FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS/test,completed/test,skipped} ;;
+        skipped-rebase-and-test)
+          FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS/rebase,completed/rebase,skipped}
+          FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS/test,completed/test,skipped} ;;
         cancelled-status) FM_FAKE_AXI_STATUS=$(printf '%s\n' "$FM_FAKE_AXI_STATUS" | sed '/^outcome:/d') ;;
         passed) FM_FAKE_AXI_STATUS="$(run_passed_with_pr fm/delivery https://github.com/o/r/pull/203)" ;;
       esac
@@ -1734,6 +1740,68 @@ test_cancelled_delivery_and_skipped_rebase() {
     ) || failures=$((failures + 1))
   done
   [ "$failures" -eq 0 ] || fail "$failures cancelled delivery regressions"
+}
+
+# Only a start-time skip leaves zero findings; a test dismissed at its gate, or a
+# row whose findings cannot be read, is no evidence that nothing failed.
+test_skipped_test_without_zero_findings_stays_failed() {
+  local rebase row failures=0
+  for rebase in completed skipped; do
+    for row in test,skipped,1,3096910 test,skipped,10,0 test,skipped,none,0 \
+      test,skipped,,0 test,skipped,0 test,skipped; do
+      (
+        reset_fakes
+        local d out
+        d=$(new_case "test-findings-$rebase-${row//,/-}")
+        make_repo_on_branch "$d/wt" fm/test-findings
+        make_fakebin "$d" >/dev/null
+        fm_write_meta "$d/state/delivery.meta" "window=fm:fm-delivery" "worktree=$d/wt" "kind=ship"
+        FM_FAKE_AXI_STATUS="$(run_failed_ci_orphan fm/test-findings)"
+        FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS/test,completed,0,0/$row}
+        FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS/rebase,completed/rebase,$rebase}
+        assert_contains "$FM_FAKE_AXI_STATUS" "  $row
+" "$row: fixture carries the test row"
+        FM_FAKE_PR_STATE=OPEN
+        FM_FAKE_PR_MERGED=false
+        FM_FAKE_PR_STATE_AXI=open
+        FM_FAKE_CI_LOGS="all CI checks passed - still monitoring until merged or closed"
+        out=$(FM_HOME="$d" run_crew_state "$d" delivery)
+        assert_contains "$out" "state: failed" "$row (rebase $rebase): run stays failed: $out"
+        assert_not_contains "$out" "held for merge" "$row (rebase $rebase): no unsupported delivery claim"
+        pass "$row with rebase $rebase keeps the failed verdict"
+      ) || failures=$((failures + 1))
+    done
+  done
+  [ "$failures" -eq 0 ] || fail "$failures skipped-test findings regressions"
+}
+
+# A skipped test step excuses no other unfinished step.
+test_skipped_test_with_another_unfinished_step_stays_failed() {
+  local scenario failures=0
+  for scenario in lint,failed review,pending review,skipped document,skipped ci,skipped; do
+    (
+      reset_fakes
+      local d out step=${scenario%,*}
+      d=$(new_case "skipped-test-${scenario/,/-}")
+      make_repo_on_branch "$d/wt" fm/skipped-test
+      make_fakebin "$d" >/dev/null
+      fm_write_meta "$d/state/delivery.meta" "window=fm:fm-delivery" "worktree=$d/wt" "kind=ship"
+      FM_FAKE_AXI_STATUS="$(run_failed_ci_orphan fm/skipped-test)"
+      FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS/test,completed/test,skipped}
+      FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS/$step,completed/$scenario}
+      FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS/$step,failed/$scenario}
+      assert_contains "$FM_FAKE_AXI_STATUS" "  $scenario," "$scenario: fixture carries the second step"
+      FM_FAKE_PR_STATE=OPEN
+      FM_FAKE_PR_MERGED=false
+      FM_FAKE_PR_STATE_AXI=open
+      FM_FAKE_CI_LOGS="all CI checks passed - still monitoring until merged or closed"
+      out=$(FM_HOME="$d" run_crew_state "$d" delivery)
+      assert_contains "$out" "state: failed" "$scenario: run stays failed: $out"
+      assert_not_contains "$out" "held for merge" "$scenario: no unsupported delivery claim"
+      pass "$scenario beside a skipped test keeps the failed verdict"
+    ) || failures=$((failures + 1))
+  done
+  [ "$failures" -eq 0 ] || fail "$failures skipped-test rejection regressions"
 }
 
 test_terminal_green_delivery_disposition() {
@@ -1821,7 +1889,7 @@ test_terminal_green_delivery_disposition() {
 # Exercise both detailed routes, selected-run attribution, and the coarse ledger.
 test_cancelled_without_delivery_has_no_verdict() {
   local scenario failures=0
-  for scenario in outcome status selected coarse no-ci-log red-ci cancelled-test skipped-test; do
+  for scenario in outcome status selected coarse no-ci-log red-ci cancelled-test skipped-review; do
     (
       reset_fakes
       local d out
@@ -1844,7 +1912,7 @@ runs[1]{id,branch,status,head,pr}:
           FM_FAKE_AXI_STATUS="$(run_running fm/another)"
           FM_FAKE_RUNS_LIST="  cancelled  fm/cancelled $FM_FAKE_RUN_HEAD  2026-09-26 17:00"
           ;;
-        no-ci-log|red-ci|cancelled-test|skipped-test)
+        no-ci-log|red-ci|cancelled-test|skipped-review)
           FM_FAKE_AXI_STATUS="$(run_failed_ci_orphan fm/cancelled)"
           FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS//failed/cancelled}
           FM_FAKE_CI_LOGS="all CI checks passed - still monitoring until merged or closed"
@@ -1853,7 +1921,7 @@ runs[1]{id,branch,status,head,pr}:
             red-ci) FM_FAKE_CI_LOGS="$FM_FAKE_CI_LOGS
 checks failed: 1 of 2 checks red" ;;
             cancelled-test) FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS/test,completed/test,cancelled} ;;
-            skipped-test) FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS/test,completed/test,skipped} ;;
+            skipped-review) FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS/review,completed/review,skipped} ;;
           esac
           ;;
       esac
@@ -1901,7 +1969,7 @@ EOF
   if [ "$scenario" = captured ]; then
     # Real record supplied read-only from axi status --run
     # 01M2SXM5NDEWK2KY5TG8DDYJMV; only branch/head are rebound for attribution.
-    # Skipped rebase and cancelled CI monitoring remain synthetic cases above.
+    # Skipped rebase or test and cancelled CI monitoring remain synthetic cases above.
     FM_FAKE_AXI_STATUS="$(cat <<EOF
 current_branch: fm/fm-abort-autorise-nest-pas-un-echec
 other_branch_run:
@@ -5700,7 +5768,9 @@ for cancellation_test in test_captured_cancelled_review_has_no_verdict \
   test_terminal_green_delivery_disposition \
   test_cancelled_without_delivery_has_no_verdict \
   test_cancelled_fleet_inventory_is_unverified_not_contradictory \
-  test_cancelled_delivery_and_skipped_rebase; do
+  test_cancelled_delivery_and_skipped_steps \
+  test_skipped_test_without_zero_findings_stays_failed \
+  test_skipped_test_with_another_unfinished_step_stays_failed; do
   ("$cancellation_test") || cancellation_failures=$((cancellation_failures + 1))
 done
 [ "$cancellation_failures" -eq 0 ] || fail "$cancellation_failures cancellation test groups failed"
