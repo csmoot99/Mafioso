@@ -300,7 +300,9 @@ catchup_summary() {
 # The mode owner lives in fm-wake-lib.sh, whose initialization creates the state
 # directory; only asked while state/.afk exists, so the guard still writes nothing.
 flag_mode() (
-  # shellcheck source=bin/fm-wake-lib.sh
+  # Sourced in a subshell on purpose; not followed so its STATE/FM_HOME
+  # initialization is not read as leaking into the caller (SC2031).
+  # shellcheck source=/dev/null
   . "$SCRIPT_DIR/fm-wake-lib.sh" && fm_afk_mode "$STATE"
 )
 
