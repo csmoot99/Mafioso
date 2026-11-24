@@ -316,7 +316,7 @@ test_away_reentry_refuses_pending_return_gate() {
 test_return_is_mode_agnostic_for_quiet_mode() {
   # kunchenguid/firstmate#2356's /quiet off calls this exact script, unchanged
   # - it must behave identically whether state/.afk declares "away" or
-  # "quiet", since return_guard/return_reconcile only ever test presence.
+  # "quiet", since return_reconcile only ever tests presence.
   local dir out
   dir="$TMP_ROOT/quiet-mode-return"
   install_runner "$dir"
@@ -893,6 +893,102 @@ test_return_guard_refuses_while_the_record_exists() {
   pass "the read-only guard treats the away-posture record as active away mode without the legacy flag"
 }
 
+guard_in() {  # <case-dir>: sets GUARD_OUT and GUARD_STATUS
+  GUARD_STATUS=0
+  GUARD_OUT=$(FM_HOME="$1/home" FM_STATE_OVERRIDE="$1/home/state" "$1/bin/fm-afk-return.sh" guard 2>&1) || GUARD_STATUS=$?
+}
+
+assert_guard_refuses_active() {  # <case-dir> <what>
+  guard_in "$1"
+  [ "$GUARD_STATUS" -eq 3 ] || fail "guard should refuse with exit 3 for $2 (rc=$GUARD_STATUS): $GUARD_OUT"
+  [ "$GUARD_OUT" = 'fm-afk-return: away mode is still active; run bin/fm-afk-return.sh before ordinary captain work' ] \
+    || fail "guard changed its refusal for $2: $GUARD_OUT"
+}
+
+test_return_guard_passes_in_quiet_mode() {
+  local dir out rc flag record before after
+  for flag in quiet none; do
+    for record in quiet none; do
+      [ "$flag$record" != nonenone ] || continue
+      dir="$TMP_ROOT/guard-quiet-$flag-$record"
+      install_runner "$dir"
+      [ "$flag" = none ] || printf 'quiet\n%s\n' "$(date +%s)" > "$dir/home/state/.afk"
+      [ "$record" = none ] || FM_AFK_MODE=quiet contract_in "$dir" enter >/dev/null 2>&1 || fail "could not write the quiet record"
+      before=$(cd "$dir/home/state" && find . -type f -exec cksum {} + | sort)
+      guard_in "$dir"
+      [ "$GUARD_STATUS" -eq 0 ] || fail "guard refused in quiet mode (flag=$flag record=$record rc=$GUARD_STATUS): $GUARD_OUT"
+      [ -z "$GUARD_OUT" ] || fail "guard was not silent in quiet mode (flag=$flag record=$record): $GUARD_OUT"
+      after=$(cd "$dir/home/state" && find . -type f -exec cksum {} + | sort)
+      [ "$before" = "$after" ] || fail "the read-only guard changed state (flag=$flag record=$record)"
+      out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" "$ROOT/bin/fm-bearings-snapshot.sh" --json) \
+        || fail "Bearings refused in quiet mode (flag=$flag record=$record)"
+      printf '%s' "$out" | jq -e '(.gates | type == "array") and (.gates | any(.id == "(return-catchup)") | not)' >/dev/null \
+        || fail "Bearings did not produce its ordinary output in quiet mode: $out"
+      [ "$flag" = none ] || [ -e "$dir/home/state/.afk" ] || fail "reporting ended quiet mode"
+    done
+  done
+
+  # Quiet mode hides no catch-up: an open gate still answers with its own branch.
+  printf 'schema\tfm-afk-return.v1\nphase\tblocked\n' > "$dir/home/state/.afk-return-catchup"
+  guard_in "$dir"
+  rc=$GUARD_STATUS
+  [ "$rc" -eq 4 ] || fail "quiet mode hid an open return catch-up (rc=$rc): $GUARD_OUT"
+  assert_contains "$GUARD_OUT" 'return catch-up is pending' "quiet mode changed the catch-up refusal"
+  pass "the read-only guard and Bearings treat quiet mode as no away window and still report an open catch-up"
+}
+
+test_return_guard_refuses_unless_every_record_reads_quiet() {
+  local dir out rc content n=0
+  # The daemon flag: away, legacy, empty, and unrecognized content.
+  for content in 'away' '1784074271' '' 'quietly' ' quiet'; do
+    n=$((n + 1))
+    dir="$TMP_ROOT/guard-flag-$n"
+    install_runner "$dir"
+    printf '%s\n' "$content" > "$dir/home/state/.afk"
+    assert_guard_refuses_active "$dir" "flag content '$content'"
+  done
+  # A flag that cannot be read at all (a directory fails for every uid).
+  dir="$TMP_ROOT/guard-flag-unreadable"
+  install_runner "$dir"
+  mkdir "$dir/home/state/.afk"
+  assert_guard_refuses_active "$dir" 'an unreadable flag'
+
+  # The posture record: an unrecognized mode, and one that cannot be read.
+  dir="$TMP_ROOT/guard-record-mode"
+  install_runner "$dir"
+  FM_AFK_MODE=quiet contract_in "$dir" enter >/dev/null 2>&1 || fail "could not write the quiet record"
+  sed 's/^mode: quiet$/mode: quie/' "$dir/home/state/.afk-contract" > "$dir/record"
+  cp "$dir/record" "$dir/home/state/.afk-contract"
+  assert_guard_refuses_active "$dir" 'a record with a damaged mode'
+  if [ "$(id -u)" -ne 0 ]; then
+    chmod 000 "$dir/home/state/.afk-contract"
+    assert_guard_refuses_active "$dir" 'an unreadable record'
+    printf 'quiet\n' > "$dir/home/state/.afk"
+    assert_guard_refuses_active "$dir" 'an unreadable record beside a quiet flag'
+    chmod 600 "$dir/home/state/.afk-contract"
+  fi
+
+  # Disagreeing records, each way round; Bearings refuses with the guard.
+  dir="$TMP_ROOT/guard-disagree-away-record"
+  install_runner "$dir"
+  contract_in "$dir" enter >/dev/null 2>&1 || fail "could not write the away record"
+  printf 'quiet\n' > "$dir/home/state/.afk"
+  assert_guard_refuses_active "$dir" 'a quiet flag beside an away record'
+  dir="$TMP_ROOT/guard-disagree-quiet-record"
+  install_runner "$dir"
+  FM_AFK_MODE=quiet contract_in "$dir" enter >/dev/null 2>&1 || fail "could not write the quiet record"
+  printf 'away\n' > "$dir/home/state/.afk"
+  assert_guard_refuses_active "$dir" 'an away flag beside a quiet record'
+  rc=0
+  out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" "$ROOT/bin/fm-bearings-snapshot.sh" --json 2>&1) || rc=$?
+  [ "$rc" -eq 3 ] || fail "Bearings should refuse while the records disagree (rc=$rc): $out"
+  assert_contains "$out" 'away mode is still active' "Bearings did not relay the refusal"
+  # An open catch-up never downgrades an away refusal to the catch-up branch.
+  printf 'schema\tfm-afk-return.v1\nphase\tblocked\n' > "$dir/home/state/.afk-return-catchup"
+  assert_guard_refuses_active "$dir" 'disagreeing records over an open catch-up'
+  pass "the read-only guard still refuses for away, unreadable, and disagreeing records"
+}
+
 test_return_brief_health_leads_with_a_gap() {
   local dir out gap_line clean_line
   dir="$TMP_ROOT/brief-gap"
@@ -1376,6 +1472,8 @@ test_unreadable_status_file_keeps_catchup_gated
 test_statusless_leftover_record_keeps_catchup_gated_until_cleanup
 test_statusful_leftover_record_lets_catchup_clear
 test_return_guard_refuses_while_the_record_exists
+test_return_guard_passes_in_quiet_mode
+test_return_guard_refuses_unless_every_record_reads_quiet
 test_return_brief_health_leads_with_a_gap
 test_return_brief_does_not_report_an_acked_watcher_down_marker_as_a_gap
 test_return_brief_reports_only_an_open_downtime_episode_as_a_gap

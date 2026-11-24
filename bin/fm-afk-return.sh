@@ -6,8 +6,8 @@
 #   fm-afk-return.sh          Stop away mode, render the return brief, and open/check the gate.
 #   fm-afk-return.sh begin    Same as the default command.
 #   fm-afk-return.sh check    Re-render the brief and close the gate only after blockers resolve.
-#   fm-afk-return.sh guard    Read-only consult: exit 3 while away mode is still
-#                            active, exit 4 while return catch-up is pending.
+#   fm-afk-return.sh guard    Read-only consult: exit 3 while away mode (not quiet
+#                            mode) is active, exit 4 while return catch-up is pending.
 #   fm-afk-return.sh catchup-summary  Read-only catch-up projection for a reporting surface.
 #
 # THE RETURN BRIEF (stdout, on begin and on every check) is rendered from durable
@@ -53,7 +53,11 @@
 # entrypoints such as fm-bearings-snapshot.sh. `guard` separates its two
 # refusal branches by exit status so a reporting surface can keep refusing
 # during an active away window while still rendering the catch-up posture as
-# content; this file owns the gate format both branches read.
+# content; this file owns the gate format both branches read. Quiet mode is not
+# an away window to `guard`: the captain is present and nothing is held for a
+# return. state/.afk and the posture record must each be absent or read as quiet
+# through their mode owners; any other reading, or a disagreement, is away.
+# `begin` and `check` never read the mode.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -293,9 +297,17 @@ catchup_summary() {
   printf '%s\t%s\n' "$count" "$reason"
 }
 
+# The mode owner lives in fm-wake-lib.sh, whose initialization creates the state
+# directory; only asked while state/.afk exists, so the guard still writes nothing.
+flag_mode() (
+  # shellcheck source=bin/fm-wake-lib.sh
+  . "$SCRIPT_DIR/fm-wake-lib.sh" && fm_afk_mode "$STATE"
+)
+
 return_guard() {
   local reasons
-  if [ -e "$STATE/.afk" ] || fm_afk_contract_present "$STATE"; then
+  if { [ -e "$STATE/.afk" ] && [ "$(flag_mode)" != quiet ]; } \
+    || fm_afk_contract_away_present "$STATE" 2>/dev/null; then
     printf 'fm-afk-return: away mode is still active; run bin/fm-afk-return.sh before ordinary captain work\n' >&2
     return 3
   fi
@@ -899,9 +911,10 @@ main() {
   esac
 
   # The mutating begin/check paths need locks, the keyed status fold, and the
-  # backlog reader. `guard` returned above without sourcing fm-wake-lib.sh,
-  # whose initialization creates the state directory, so the advertised
-  # read-only guard is literal.
+  # backlog reader. `guard` returned above without this sourcing, because
+  # fm-wake-lib.sh's initialization creates the state directory (flag_mode
+  # reads it only where that directory exists), so the advertised read-only
+  # guard is literal.
   # shellcheck source=bin/fm-wake-lib.sh
   . "$SCRIPT_DIR/fm-wake-lib.sh"
   # shellcheck source=bin/fm-tasks-axi-lib.sh
